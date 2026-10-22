@@ -1,0 +1,32 @@
+name: wisata_daerahku
+description: Aplikasi Wisata Daerahku - Tugas Media Digital Interaktif
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  cupertino_icons: ^1.0.2
+  image_picker: ^1.2.2
+  firebase_core: ^3.6.0
+  firebase_auth: ^5.3.1
+  cloud_firestore: ^5.4.4
+  firebase_storage: ^12.3.2
+  qr_flutter: ^4.1.0
+  http: ^1.2.2
+  google_fonts: ^8.2.1
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^2.0.0
+
+flutter:
+  uses-material-design: true
+
+  assets:
+    - assets/images/Candi_Borobudur.jpg
+    - assets/images/Pantai_Kuta.jpg

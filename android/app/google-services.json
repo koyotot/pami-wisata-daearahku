@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "402016388579",
+    "project_id": "wisata-daerahku",
+    "storage_bucket": "wisata-daerahku.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:402016388579:android:1f5c412d0966866ffeccd6",
+        "android_client_info": {
+          "package_name": "com.example.wisata_daerahku"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCTZAbPVsARPjkkbbJACwUkkLMfaduUads"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
