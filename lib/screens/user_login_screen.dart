@@ -7,7 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:firebase_auth/firebase_auth.dart' as fb_auth;
-import 'package:cloud_firestore/cloud_firestore.dart';
+import '../services/auth_session.dart';
 
 import '../data/app_data.dart';
 import 'main_navigation_screen.dart';
@@ -119,62 +119,15 @@ class _UserLoginScreenState extends State<UserLoginScreen>
     });
 
     try {
-      final credential =
-          await fb_auth.FirebaseAuth.instance.signInWithEmailAndPassword(
-        email: email,
-        password: password,
-      );
-
-      final uid = credential.user!.uid;
-
-      final doc =
-          await FirebaseFirestore.instance.collection('users').doc(uid).get();
-
+      await fb_auth.FirebaseAuth.instance.signOut();
+      await AuthSession.instance.login(email, password);
       if (!mounted) return;
-
-      if (doc.exists) {
-        final data = doc.data()!;
-
-        currentUser = User(
-          id: uid,
-          namaLengkap: data['namaLengkap'] ?? '',
-          email: data['email'] ?? email,
-          noTelepon: data['noTelepon'] ?? '',
-          password: '',
-          createdAt: (data['createdAt'] as Timestamp).toDate(),
-        );
-      }
-
       setState(() => _isLoading = false);
       _openMainNavigation();
-    } on fb_auth.FirebaseAuthException catch (e) {
+    } on ApiException catch (e) {
       if (!mounted) return;
-
-      String pesan;
-
-      switch (e.code) {
-        case 'user-not-found':
-          pesan = 'Akun dengan email ini tidak ditemukan.';
-          break;
-        case 'wrong-password':
-        case 'invalid-credential':
-          pesan = 'Email atau password salah. Silakan coba lagi.';
-          break;
-        case 'invalid-email':
-          pesan = 'Format email tidak valid.';
-          break;
-        case 'user-disabled':
-          pesan = 'Akun ini telah dinonaktifkan.';
-          break;
-        case 'too-many-requests':
-          pesan = 'Terlalu banyak percobaan. Coba lagi nanti.';
-          break;
-        default:
-          pesan = 'Terjadi kesalahan. Silakan coba lagi.';
-      }
-
       setState(() {
-        _errorMsg = pesan;
+        _errorMsg = e.message;
         _isLoading = false;
       });
     } catch (_) {
@@ -184,6 +137,41 @@ class _UserLoginScreenState extends State<UserLoginScreen>
         _errorMsg = 'Terjadi kesalahan tidak terduga.';
         _isLoading = false;
       });
+    }
+  }
+
+  Future<void> _googleLogin() async {
+    if (_isLoading) return;
+    setState(() {
+      _isLoading = true;
+      _errorMsg = null;
+    });
+    try {
+      await fb_auth.FirebaseAuth.instance.signOut();
+      final credential = await fb_auth.FirebaseAuth.instance
+          .signInWithProvider(fb_auth.GoogleAuthProvider());
+      final token = await credential.user?.getIdToken();
+      if (token == null) {
+        throw const ApiException('Identitas Google tidak tersedia.');
+      }
+      await AuthSession.instance.google(token);
+      if (mounted) _openMainNavigation();
+    } on ApiException catch (e) {
+      if (mounted) setState(() => _errorMsg = e.message);
+    } on fb_auth.FirebaseAuthException catch (e) {
+      if (mounted &&
+          !['web-context-cancelled', 'popup-closed-by-user', 'cancelled']
+              .contains(e.code)) {
+        setState(() =>
+            _errorMsg = 'Tidak dapat masuk dengan Google. Silakan coba lagi.');
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() => _errorMsg = 'Tidak dapat masuk dengan Google.');
+      }
+    } finally {
+      await fb_auth.FirebaseAuth.instance.signOut();
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
@@ -413,6 +401,10 @@ class _UserLoginScreenState extends State<UserLoginScreen>
                   ),
                   const SizedBox(height: 22),
                   _buildForm(),
+                  TextButton.icon(
+                      onPressed: _isLoading ? null : _googleLogin,
+                      icon: const Icon(Icons.login_rounded),
+                      label: const Text('Masuk dengan Google')),
                   const SizedBox(height: 22),
                   Center(
                     child: Text(

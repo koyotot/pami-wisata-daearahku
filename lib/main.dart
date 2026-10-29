@@ -1,3 +1,5 @@
+import 'services/auth_session.dart';
+import 'screens/main_navigation_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:firebase_core/firebase_core.dart';
@@ -16,15 +18,42 @@ void main() async {
       statusBarIconBrightness: Brightness.light,
     ),
   );
+  await AuthSession.instance.restore();
   runApp(const WisataDaerahkuApp());
 }
 
-class WisataDaerahkuApp extends StatelessWidget {
+class WisataDaerahkuApp extends StatefulWidget {
   const WisataDaerahkuApp({super.key});
+
+  @override
+  State<WisataDaerahkuApp> createState() => _WisataDaerahkuAppState();
+}
+
+class _WisataDaerahkuAppState extends State<WisataDaerahkuApp> {
+  final _navigator = GlobalKey<NavigatorState>();
+  @override
+  void initState() {
+    super.initState();
+    AuthSession.instance.authenticated.addListener(_sessionChanged);
+  }
+
+  void _sessionChanged() {
+    if (!AuthSession.instance.authenticated.value) {
+      _navigator.currentState?.pushAndRemoveUntil(
+          MaterialPageRoute(builder: (_) => const HomeScreen()), (_) => false);
+    }
+  }
+
+  @override
+  void dispose() {
+    AuthSession.instance.authenticated.removeListener(_sessionChanged);
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
+      navigatorKey: _navigator,
       title: 'Wisata Daerahku',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
@@ -89,7 +118,9 @@ class WisataDaerahkuApp extends StatelessWidget {
           color: Colors.white,
         ),
       ),
-      home: const HomeScreen(),
+      home: AuthSession.instance.authenticated.value
+          ? const MainNavigationScreen()
+          : const HomeScreen(),
     );
   }
 }

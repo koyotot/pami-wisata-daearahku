@@ -5,6 +5,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 
 // ── Model User ─────────────────────────────────────────────
 class User {
+  final bool isLaravel;
   String id;
   String namaLengkap;
   String email;
@@ -13,6 +14,7 @@ class User {
   DateTime createdAt;
 
   User({
+    this.isLaravel = false,
     required this.id,
     required this.namaLengkap,
     required this.email,

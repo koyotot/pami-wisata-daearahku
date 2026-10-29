@@ -6,10 +6,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:firebase_auth/firebase_auth.dart' as fb_auth;
-import 'package:cloud_firestore/cloud_firestore.dart';
-
-import '../data/app_data.dart';
+import '../services/auth_session.dart';
 
 // ── Palet: sama dengan home dan login ─────────────────────────
 class _C {
@@ -115,42 +112,9 @@ class _UserRegisterScreenState extends State<UserRegisterScreen>
     setState(() => _isLoading = true);
 
     try {
-      final email = _emailCtrl.text.trim();
-      final password = _passwordCtrl.text;
       final nama = _namaCtrl.text.trim();
-      final telepon = _teleponCtrl.text.trim();
-      final now = DateTime.now();
-
-      // 1. Buat akun Firebase Auth.
-      final credential =
-          await fb_auth.FirebaseAuth.instance.createUserWithEmailAndPassword(
-        email: email,
-        password: password,
-      );
-
-      final uid = credential.user!.uid;
-
-      // 2. Update nama di Firebase Auth.
-      await credential.user!.updateDisplayName(nama);
-
-      // 3. Simpan profil ke Firestore.
-      await FirebaseFirestore.instance.collection('users').doc(uid).set({
-        'namaLengkap': nama,
-        'email': email,
-        'noTelepon': telepon,
-        'createdAt': Timestamp.fromDate(now),
-      });
-
-      // 4. Simpan profil di memori aplikasi.
-      currentUser = User(
-        id: uid,
-        namaLengkap: nama,
-        email: email,
-        noTelepon: telepon,
-        password: '',
-        createdAt: now,
-      );
-
+      await AuthSession.instance.register(nama, _emailCtrl.text.trim(),
+          _passwordCtrl.text, _konfirmasiCtrl.text);
       if (!mounted) return;
 
       // Tetap loading sampai dialog ditutup.
@@ -164,30 +128,10 @@ class _UserRegisterScreenState extends State<UserRegisterScreen>
 
       // Dikembalikan ke halaman login untuk melanjutkan navigasi.
       Navigator.pop(context, true);
-    } on fb_auth.FirebaseAuthException catch (e) {
+    } on ApiException catch (e) {
       if (!mounted) return;
-
-      String pesan;
-
-      switch (e.code) {
-        case 'email-already-in-use':
-          pesan = 'Email ini sudah terdaftar. Silakan gunakan email lain.';
-          break;
-        case 'invalid-email':
-          pesan = 'Format email tidak valid.';
-          break;
-        case 'weak-password':
-          pesan = 'Password terlalu lemah. Gunakan minimal 6 karakter.';
-          break;
-        case 'operation-not-allowed':
-          pesan = 'Pendaftaran email/password belum diaktifkan.';
-          break;
-        default:
-          pesan = 'Terjadi kesalahan. Silakan coba lagi.';
-      }
-
       setState(() {
-        _errorMsg = pesan;
+        _errorMsg = e.message;
         _isLoading = false;
       });
     } catch (_) {
@@ -469,7 +413,7 @@ class _UserRegisterScreenState extends State<UserRegisterScreen>
             _RegField(
               controller: _passwordCtrl,
               label: 'Password',
-              hint: 'Minimal 6 karakter',
+              hint: 'Minimal 8 karakter',
               icon: Icons.lock_rounded,
               enabled: !_isLoading,
               obscure: _obscurePass,
@@ -479,8 +423,8 @@ class _UserRegisterScreenState extends State<UserRegisterScreen>
                 setState(() => _obscurePass = !_obscurePass);
               },
               validator: (value) {
-                if (value == null || value.length < 6) {
-                  return 'Password minimal 6 karakter';
+                if (value == null || value.length < 8) {
+                  return 'Password minimal 8 karakter';
                 }
                 return null;
               },
@@ -772,7 +716,7 @@ class _PasswordStrength extends StatelessWidget {
   // 0 = kosong, 1 = lemah, 2 = cukup, 3 = kuat
   int get _level {
     if (password.isEmpty) return 0;
-    if (password.length < 6) return 1;
+    if (password.length < 8) return 1;
 
     var score = 0;
     if (password.length >= 8) score++;

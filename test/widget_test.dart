@@ -18,6 +18,6 @@ void main() {
 
     // Memastikan aplikasi berhasil dimuat dengan mendeteksi teks judul utama di HomeScreen
     expect(find.text('Wisata Daerahku'), findsOneWidget);
-    expect(find.text('Jelajahi Keindahan Nusantara'), findsOneWidget);
+    expect(find.text('Jelajahi keindahan Nusantara.'), findsOneWidget);
   });
 }

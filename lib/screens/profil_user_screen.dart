@@ -1,3 +1,4 @@
+import '../services/auth_session.dart';
 // ============================================================
 // lib/screens/profil_user_screen.dart
 // Tab "Profil" — bagian dari navigasi drawer (MainNavigationScreen)
@@ -107,7 +108,7 @@ class _ProfilUserScreenState extends State<ProfilUserScreen>
   // bukan dari `daftarPendaftar` yang cuma list sementara di RAM dan akan
   // kosong lagi setiap kali app dibuka ulang.
   Future<void> _loadJumlahPendaftaran() async {
-    final uid = currentUser?.id ?? '';
+    final uid = currentUser?.isLaravel == true ? '' : (currentUser?.id ?? '');
     if (uid.isEmpty) {
       setState(() => _loadingJumlah = false);
       return;
@@ -181,6 +182,14 @@ class _ProfilUserScreenState extends State<ProfilUserScreen>
 
     if (konfirmasi != true) return;
 
+    try {
+      await AuthSession.instance.logout();
+    } catch (_) {
+      if (context.mounted)
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+            content: Text(
+                'Sesi lokal dihapus. Pencabutan sesi server belum dapat dikonfirmasi.')));
+    }
     await fb_auth.FirebaseAuth.instance.signOut();
     currentUser = null;
     if (!context.mounted) return;
@@ -198,10 +207,14 @@ class _ProfilUserScreenState extends State<ProfilUserScreen>
         onSimpan: (nama, telepon) async {
           final uid = currentUser?.id ?? '';
           if (uid.isEmpty) return;
-          await FirebaseFirestore.instance
-              .collection('users')
-              .doc(uid)
-              .update({'namaLengkap': nama, 'noTelepon': telepon});
+          if (currentUser?.isLaravel == true) {
+            await AuthSession.instance.updateProfile(nama, telepon);
+          } else {
+            await FirebaseFirestore.instance
+                .collection('users')
+                .doc(uid)
+                .update({'namaLengkap': nama, 'noTelepon': telepon});
+          }
           currentUser?.namaLengkap = nama;
           currentUser?.noTelepon = telepon;
           if (!mounted) return;
@@ -224,7 +237,9 @@ class _ProfilUserScreenState extends State<ProfilUserScreen>
       context: context,
       backgroundColor: Colors.transparent,
       isScrollControlled: true,
-      builder: (_) => _RiwayatUlasanSheet(userId: currentUser?.id ?? ''),
+      builder: (_) => _RiwayatUlasanSheet(
+          userId:
+              currentUser?.isLaravel == true ? '' : (currentUser?.id ?? '')),
     );
   }
 
@@ -250,11 +265,18 @@ class _ProfilUserScreenState extends State<ProfilUserScreen>
       context: context,
       backgroundColor: Colors.transparent,
       isScrollControlled: true,
-      builder: (_) => _SemuaWisataTersimpanSheet(userId: currentUser?.id ?? ''),
+      builder: (_) => _SemuaWisataTersimpanSheet(
+          userId:
+              currentUser?.isLaravel == true ? '' : (currentUser?.id ?? '')),
     );
   }
 
   void _bukaGantiPassword(BuildContext context) {
+    if (currentUser?.isLaravel == true) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text('Fitur ini belum tersedia untuk akun API.')));
+      return;
+    }
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
@@ -756,7 +778,7 @@ class _ProfilUserScreenState extends State<ProfilUserScreen>
   //  WISATA TERSIMPAN
   // ══════════════════════════════════════════════════════════
   Widget _buildWisataTersimpan() {
-    final uid = currentUser?.id ?? '';
+    final uid = currentUser?.isLaravel == true ? '' : (currentUser?.id ?? '');
     if (uid.isEmpty) {
       return Container(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
@@ -977,6 +999,11 @@ class _ProfilUserScreenState extends State<ProfilUserScreen>
   }
 
   void _konfirmasiHapusAkun(BuildContext context) {
+    if (currentUser?.isLaravel == true) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text('Fitur ini belum tersedia untuk akun API.')));
+      return;
+    }
     final passwordCtrl = TextEditingController();
     bool obscure = true;
 

@@ -1,3 +1,4 @@
+import '../services/auth_session.dart';
 // ============================================================
 // lib/screens/main_navigation_screen.dart
 // Shell utama navigasi user setelah login.
@@ -500,6 +501,14 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
 
     if (yakin != true) return;
 
+    try {
+      await AuthSession.instance.logout();
+    } catch (_) {
+      if (context.mounted)
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+            content: Text(
+                'Sesi lokal dihapus. Pencabutan sesi server belum dapat dikonfirmasi.')));
+    }
     await fb_auth.FirebaseAuth.instance.signOut();
     currentUser = null;
     if (!mounted) return;
