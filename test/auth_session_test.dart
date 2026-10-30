@@ -4,6 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:wisata_daerahku/services/auth_session.dart';
+import 'package:wisata_daerahku/services/fcm_device_manager.dart';
 import 'package:wisata_daerahku/data/app_data.dart';
 
 class MemoryStore implements SessionStore {
@@ -31,6 +32,75 @@ Map<String, dynamic> tokens(String id) => {
 http.Response ok(Map<String, dynamic> data) =>
     http.Response(jsonEncode({'data': data}), 200);
 void main() {
+  test('failed device removal does not block logout', () async {
+    var loggedOut = false;
+    final session = AuthSession(
+      baseUrl: 'https://api.example.test/api/v1',
+      store: MemoryStore(),
+      client: MockClient((request) async {
+        if (request.url.path.endsWith('/login')) return ok(tokens('1'));
+        if (request.url.path.endsWith('/devices')) {
+          return request.method == 'DELETE'
+              ? http.Response('{}', 500)
+              : ok({'registered': true});
+        }
+        loggedOut = true;
+        return ok({'message': 'Logged out.'});
+      }),
+    );
+    final manager = FcmDeviceManager(session)..attach();
+    manager.updateToken('device-token');
+    await session.login('a@example.test', 'password');
+    await session.logout();
+    expect(loggedOut, isTrue);
+    expect(session.authenticated.value, isFalse);
+    manager.dispose();
+  });
+  test('device registration is ordered across account changes and logout',
+      () async {
+    final firstPut = Completer<void>();
+    final started = Completer<void>();
+    final secondStarted = Completer<void>();
+    final operations = <String>[];
+    var logins = 0;
+    final session = AuthSession(
+      baseUrl: 'https://api.example.test/api/v1',
+      store: MemoryStore(),
+      client: MockClient((request) async {
+        if (request.url.path.endsWith('/login')) {
+          return ok(tokens('${++logins}'));
+        }
+        if (request.url.path.endsWith('/devices')) {
+          final auth = request.headers['Authorization']!;
+          operations.add('${request.method} $auth');
+          if (request.method == 'PUT' && auth.endsWith('1')) {
+            started.complete();
+            await firstPut.future;
+          }
+          if (request.method == 'PUT' && auth.endsWith('2')) {
+            secondStarted.complete();
+          }
+          return ok({'registered': request.method == 'PUT'});
+        }
+        return ok({'message': 'Logged out.'});
+      }),
+    );
+    final manager = FcmDeviceManager(session)..attach();
+    manager.updateToken('device-token');
+    await session.login('a@example.test', 'password');
+    await started.future;
+    await session.login('b@example.test', 'password');
+    firstPut.complete();
+    // Queue a logout after the second registration and wait for both operations.
+    await secondStarted.future;
+    await session.logout();
+    expect(operations, [
+      'PUT Bearer access-1',
+      'PUT Bearer access-2',
+      'DELETE Bearer access-2',
+    ]);
+    manager.dispose();
+  });
   test('logout response cannot clear a newer login', () async {
     final store = MemoryStore();
     final gate = Completer<void>();

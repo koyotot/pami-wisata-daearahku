@@ -40,6 +40,10 @@ class AuthSession {
   Map<String, dynamic>? _tokens;
   Future<void>? _refreshing;
   int _generation = 0;
+  int get sessionGeneration => _generation;
+  bool deviceSessionReady = false;
+  void Function()? deviceSessionChanged;
+  Future<void> Function()? beforeDeviceLogout;
   Future<void> _storageQueue = Future.value();
   Future<void> _persist(Future<void> Function() action) {
     final next = _storageQueue.then((_) => action());
@@ -54,8 +58,10 @@ class AuthSession {
       : client = client ?? http.Client(),
         store = store ?? const SecureSessionStore();
 
-  Future<Map<String, dynamic>> _send(String method, String path,
-      {Map<String, dynamic>? body, String? token}) async {
+  Future<Map<String, dynamic>> _sendEnvelope(String method, String path,
+      {Map<String, dynamic>? body,
+      String? token,
+      Map<String, String>? headers}) async {
     final base = Uri.tryParse(baseUrl);
     if (base == null ||
         !base.hasAuthority ||
@@ -70,7 +76,13 @@ class AuthSession {
       request.headers.addAll({
         'Accept': 'application/json',
         'Content-Type': 'application/json',
-        if (token != null) 'Authorization': 'Bearer $token'
+
+        // Khusus Android Emulator + Laragon development
+        if (kDebugMode && base.host == '127.0.0.1' && base.port == 8080)
+          'Host': 'pami-wisata-daerahku-api.test',
+
+        if (token != null) 'Authorization': 'Bearer $token',
+        ...?headers,
       });
       if (body != null) request.body = jsonEncode(body);
       final response = await client
@@ -102,11 +114,10 @@ class AuthSession {
                   },
             response.statusCode);
       }
-      final data = decoded['data'];
-      if (data is! Map<String, dynamic>) {
+      if (!decoded.containsKey('data')) {
         throw const ApiException('Respons layanan tidak valid.');
       }
-      return data;
+      return decoded;
     } on ApiException {
       rethrow;
     } on TimeoutException {
@@ -116,6 +127,20 @@ class AuthSession {
           'Tidak dapat terhubung ke layanan. Periksa koneksi Anda.');
     }
   }
+
+  Future<Map<String, dynamic>> _send(String method, String path,
+      {Map<String, dynamic>? body, String? token}) async {
+    final data =
+        (await _sendEnvelope(method, path, body: body, token: token))['data'];
+    if (data is! Map<String, dynamic>) {
+      throw const ApiException('Respons layanan tidak valid.');
+    }
+    return data;
+  }
+
+  Future<Map<String, dynamic>> publicEnvelope(String method, String path,
+          {Map<String, dynamic>? body}) =>
+      _sendEnvelope(method, path, body: body);
 
   void _user(Map<String, dynamic> data) {
     currentUser = User(
@@ -142,7 +167,9 @@ class AuthSession {
     if (generation != _generation) return;
     _tokens = data;
     _user(data['user']);
+    deviceSessionReady = true;
     authenticated.value = true;
+    deviceSessionChanged?.call();
   }
 
   Future<void> login(String email, String password) =>
@@ -159,10 +186,20 @@ class AuthSession {
       _authenticate('auth/google', {'id_token': idToken});
   Future<void> _authenticate(String path, Map<String, dynamic> body) async {
     final generation = ++_generation;
-    final data = await _send('POST', path, body: body);
-    await _save(data, generation);
-    if (generation != _generation) {
-      throw const ApiException('Permintaan masuk sudah dibatalkan.');
+    deviceSessionReady = false;
+    deviceSessionChanged?.call();
+    try {
+      final data = await _send('POST', path, body: body);
+      await _save(data, generation);
+      if (generation != _generation) {
+        throw const ApiException('Permintaan masuk sudah dibatalkan.');
+      }
+    } catch (_) {
+      if (generation == _generation && _tokens != null) {
+        deviceSessionReady = true;
+        deviceSessionChanged?.call();
+      }
+      rethrow;
     }
   }
 
@@ -173,7 +210,11 @@ class AuthSession {
       if (raw == null || generation != _generation) return;
       _tokens = jsonDecode(raw) as Map<String, dynamic>;
       await me();
-      if (generation == _generation) authenticated.value = true;
+      if (generation == _generation) {
+        deviceSessionReady = true;
+        authenticated.value = true;
+        deviceSessionChanged?.call();
+      }
     } catch (_) {
       if (generation == _generation) await clear();
     }
@@ -200,11 +241,24 @@ class AuthSession {
 
   Future<Map<String, dynamic>> request(String method, String path,
       {Map<String, dynamic>? body}) async {
+    final data = (await requestEnvelope(method, path, body: body))['data'];
+    if (data is! Map<String, dynamic>) {
+      throw const ApiException('Respons layanan tidak valid.');
+    }
+    return data;
+  }
+
+  Future<Map<String, dynamic>> requestEnvelope(String method, String path,
+      {Map<String, dynamic>? body, Map<String, String>? headers}) async {
     final generation = _generation;
     final token = _tokens?['access_token'] as String?;
     if (token == null) throw const ApiException('Silakan masuk kembali.', 401);
+    Future<Map<String, dynamic>> send(String accessToken) =>
+        _sendEnvelope(method, path,
+            body: body, token: accessToken, headers: headers);
+    Map<String, dynamic> result;
     try {
-      return await _send(method, path, body: body, token: token);
+      result = await send(token);
     } on ApiException catch (e) {
       if (e.status != 401) rethrow;
       if (generation != _generation) {
@@ -215,13 +269,13 @@ class AuthSession {
         throw const ApiException('Sesi telah berakhir.', 401);
       }
       try {
-        return await _send(method, path,
-            body: body, token: _tokens!['access_token']);
+        result = await send(_tokens!['access_token'] as String);
       } on ApiException catch (retry) {
         if (retry.status == 401 && generation == _generation) await clear();
         rethrow;
       }
     }
+    return result;
   }
 
   Future<void> me() async {
@@ -237,9 +291,55 @@ class AuthSession {
     if (generation == _generation) _user(data);
   }
 
+// =====================================================
+// FIREBASE CLOUD MESSAGING — DEVICE REGISTRATION
+// =====================================================
+
+  /// Mendaftarkan FCM token ke sesi Laravel yang aktif.
+  Future<void> registerDevice(String fcmToken) async {
+    if (fcmToken.isEmpty) return;
+
+    final data = await request(
+      'PUT',
+      'devices',
+      body: {
+        'token': fcmToken,
+        'platform': 'android',
+      },
+    );
+
+    if (data['registered'] != true) {
+      throw const ApiException('Registrasi perangkat gagal.');
+    }
+  }
+
+  /// Menghapus FCM token dari registrasi perangkat Laravel.
+  Future<void> unregisterDevice(String fcmToken) async {
+    if (fcmToken.isEmpty) return;
+
+    final data = await request(
+      'DELETE',
+      'devices',
+      body: {
+        'token': fcmToken,
+      },
+    );
+
+    if (data['registered'] != false) {
+      throw const ApiException('Gagal menghapus registrasi perangkat.');
+    }
+  }
+
+// =====================================================
+// AUTHENTICATION — LOGOUT
+// =====================================================
+
   Future<void> logout() async {
     final generation = _generation;
     try {
+      try {
+        await beforeDeviceLogout?.call();
+      } catch (_) {}
       if (_refreshing != null) await _refreshing;
       if (generation == _generation && _tokens != null) {
         await request('POST', 'auth/logout');
@@ -252,8 +352,10 @@ class AuthSession {
   Future<void> clear() async {
     _generation++;
     _tokens = null;
+    deviceSessionReady = false;
     currentUser = null;
     authenticated.value = false;
+    deviceSessionChanged?.call();
     await _persist(() => store.clear());
   }
 }

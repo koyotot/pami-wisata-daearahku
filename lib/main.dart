@@ -1,4 +1,5 @@
 import 'services/auth_session.dart';
+import 'services/fcm_device_manager.dart';
 import 'screens/main_navigation_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -11,6 +12,7 @@ void main() async {
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
+  final fcm = FcmDeviceManager(AuthSession.instance)..attach();
 
   SystemChrome.setSystemUIOverlayStyle(
     const SystemUiOverlayStyle(
@@ -19,11 +21,12 @@ void main() async {
     ),
   );
   await AuthSession.instance.restore();
-  runApp(const WisataDaerahkuApp());
+  runApp(WisataDaerahkuApp(fcm: fcm));
 }
 
 class WisataDaerahkuApp extends StatefulWidget {
-  const WisataDaerahkuApp({super.key});
+  const WisataDaerahkuApp({super.key, required this.fcm});
+  final FcmDeviceManager fcm;
 
   @override
   State<WisataDaerahkuApp> createState() => _WisataDaerahkuAppState();
@@ -31,10 +34,19 @@ class WisataDaerahkuApp extends StatefulWidget {
 
 class _WisataDaerahkuAppState extends State<WisataDaerahkuApp> {
   final _navigator = GlobalKey<NavigatorState>();
+  final _messenger = GlobalKey<ScaffoldMessengerState>();
   @override
   void initState() {
     super.initState();
     AuthSession.instance.authenticated.addListener(_sessionChanged);
+    widget.fcm.start(onForeground: (message) {
+      if (AuthSession.instance.authenticated.value &&
+          message.data['notification_guid'] is String) {
+        _messenger.currentState?.showSnackBar(
+          const SnackBar(content: Text('Anda menerima notifikasi baru.')),
+        );
+      }
+    });
   }
 
   void _sessionChanged() {
@@ -47,6 +59,7 @@ class _WisataDaerahkuAppState extends State<WisataDaerahkuApp> {
   @override
   void dispose() {
     AuthSession.instance.authenticated.removeListener(_sessionChanged);
+    widget.fcm.dispose();
     super.dispose();
   }
 
@@ -54,6 +67,7 @@ class _WisataDaerahkuAppState extends State<WisataDaerahkuApp> {
   Widget build(BuildContext context) {
     return MaterialApp(
       navigatorKey: _navigator,
+      scaffoldMessengerKey: _messenger,
       title: 'Wisata Daerahku',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
