@@ -75,26 +75,27 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
 
   void _bukaMenu() => _scaffoldKey.currentState?.openDrawer();
 
-  late final List<Widget> _tabs = [
-    BerandaUserScreen(onBukaMenu: _bukaMenu),
-    CariWisataScreen(
-      embedded: true,
-      onBukaMenu: _bukaMenu, // tombol ☰ membuka drawer
-      onKembali: () => _gotoTab(0), // tombol kembali -> tab Beranda
-    ),
-    BuktiPendaftaranScreen(
-      embedded: true,
-      // Dari tab Riwayat yang kosong, tombol "Jelajahi Wisata"
-      // mengarahkan kembali ke tab Beranda alih-alih Navigator.pop.
-      onExploreWisata: () => _gotoTab(0),
-      onBukaMenu: _bukaMenu, // tombol ☰ membuka drawer
-      onKembali: () => _gotoTab(0), // tombol kembali -> tab Beranda
-    ),
-    ProfilUserScreen(
-      onBukaMenu: _bukaMenu, // tombol ☰ membuka drawer
-      onKembali: () => _gotoTab(0), // tombol kembali -> tab Beranda
-    ),
-  ];
+  List<Widget> get _tabs => [
+        BerandaUserScreen(onBukaMenu: _bukaMenu),
+        CariWisataScreen(
+          embedded: true,
+          onBukaMenu: _bukaMenu, // tombol ☰ membuka drawer
+          onKembali: () => _gotoTab(0), // tombol kembali -> tab Beranda
+        ),
+        BuktiPendaftaranScreen(
+          embedded: true,
+          active: _selectedIndex == 2,
+          // Dari tab Riwayat yang kosong, tombol "Jelajahi Wisata"
+          // mengarahkan kembali ke tab Beranda alih-alih Navigator.pop.
+          onExploreWisata: () => _gotoTab(0),
+          onBukaMenu: _bukaMenu, // tombol ☰ membuka drawer
+          onKembali: () => _gotoTab(0), // tombol kembali -> tab Beranda
+        ),
+        ProfilUserScreen(
+          onBukaMenu: _bukaMenu, // tombol ☰ membuka drawer
+          onKembali: () => _gotoTab(0), // tombol kembali -> tab Beranda
+        ),
+      ];
 
   static const List<_MenuData> _menu = [
     _MenuData(

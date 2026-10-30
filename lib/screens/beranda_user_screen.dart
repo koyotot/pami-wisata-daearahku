@@ -11,6 +11,8 @@ import 'package:google_fonts/google_fonts.dart';
 
 import '../data/app_data.dart';
 import '../data/catalog_state.dart';
+import '../data/business_repository.dart';
+import '../services/auth_session.dart';
 import 'detail_wisata_screen.dart';
 
 // ── Palet & font (sama dengan home_screen.dart) ──────────────
@@ -56,6 +58,7 @@ class _BerandaUserScreenState extends State<BerandaUserScreen>
   final TextEditingController _searchCtrl = TextEditingController();
   late AnimationController _fadeCtrl;
   final _catalog = CatalogState();
+  int? _bookingCount;
   bool get _isLoadingData =>
       _catalog.destinations.loading || _catalog.categories.loading;
   List<Map<String, dynamic>> get _kategoriList => [
@@ -94,7 +97,29 @@ class _BerandaUserScreenState extends State<BerandaUserScreen>
     )..forward();
     _catalog.categories.addListener(_changed);
     _catalog.destinations.addListener(_changed);
+    AuthSession.instance.sessionChanges.addListener(_sessionChanged);
     _muatData();
+  }
+
+  void _sessionChanged() {
+    if (!mounted) return;
+    setState(() => _bookingCount = null);
+    _loadBookingCount();
+  }
+
+  Future<void> _loadBookingCount() async {
+    final session = AuthSession.instance;
+    if (!session.authenticated.value || !session.deviceSessionReady) return;
+    final generation = session.sessionGeneration;
+    try {
+      final page = await BusinessRepository().bookings();
+      if (!mounted || generation != session.sessionGeneration) return;
+      setState(() => _bookingCount = page.meta?['total'] as int?);
+    } catch (_) {
+      if (mounted && generation == session.sessionGeneration) {
+        setState(() => _bookingCount = null);
+      }
+    }
   }
 
   // ── Logika data (tidak diubah) ─────────────────────────────
@@ -106,14 +131,13 @@ class _BerandaUserScreenState extends State<BerandaUserScreen>
         search: _searchCtrl.text,
       )
     ]);
-    try {
-      await loadPendaftarFromFirestore(userId: currentUser?.id);
-    } catch (_) {}
+    await _loadBookingCount();
     if (mounted) setState(() {});
   }
 
   @override
   void dispose() {
+    AuthSession.instance.sessionChanges.removeListener(_sessionChanged);
     _catalog.dispose();
     _searchCtrl.dispose();
     _fadeCtrl.dispose();
@@ -394,7 +418,7 @@ class _BerandaUserScreenState extends State<BerandaUserScreen>
                     _statPill(Icons.category_rounded,
                         '${_kategoriList.length - 1}', 'Kategori'),
                     const SizedBox(width: 10),
-                    _statPill(Icons.people_rounded, '${daftarPendaftar.length}',
+                    _statPill(Icons.people_rounded, '${_bookingCount ?? '–'}',
                         'Terdaftar'),
                   ],
                 ),

@@ -13,6 +13,7 @@ import 'package:firebase_auth/firebase_auth.dart' as fb_auth;
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../data/app_data.dart';
+import '../data/business_repository.dart';
 import '../data/favorite_state.dart';
 import 'home_screen.dart';
 import 'user_login_screen.dart';
@@ -86,7 +87,7 @@ class _ProfilUserScreenState extends State<ProfilUserScreen>
   late Animation<Offset> _slideAnim;
 
   bool _loadingJumlah = true;
-  int _jumlahPendaftaran = 0;
+  int? _jumlahPendaftaran;
   int _jumlahUlasan = 0;
   int _jumlahDikunjungi = 0;
 
@@ -101,6 +102,18 @@ class _ProfilUserScreenState extends State<ProfilUserScreen>
       begin: const Offset(0, 0.06),
       end: Offset.zero,
     ).animate(CurvedAnimation(parent: _animCtrl, curve: Curves.easeOutCubic));
+    AuthSession.instance.sessionChanges.addListener(_sessionChanged);
+    _loadJumlahPendaftaran();
+  }
+
+  void _sessionChanged() {
+    if (!mounted) return;
+    setState(() {
+      _jumlahPendaftaran = null;
+      _jumlahUlasan = 0;
+      _jumlahDikunjungi = 0;
+      _loadingJumlah = true;
+    });
     _loadJumlahPendaftaran();
   }
 
@@ -109,6 +122,24 @@ class _ProfilUserScreenState extends State<ProfilUserScreen>
   // bukan dari `daftarPendaftar` yang cuma list sementara di RAM dan akan
   // kosong lagi setiap kali app dibuka ulang.
   Future<void> _loadJumlahPendaftaran() async {
+    final session = AuthSession.instance;
+    final generation = session.sessionGeneration;
+    if (currentUser?.isLaravel == true &&
+        session.authenticated.value &&
+        session.deviceSessionReady) {
+      try {
+        final page = await BusinessRepository().bookings();
+        if (!mounted || generation != session.sessionGeneration) return;
+        setState(() {
+          _jumlahPendaftaran = page.meta?['total'] as int?;
+          _loadingJumlah = false;
+        });
+      } catch (_) {
+        if (!mounted || generation != session.sessionGeneration) return;
+        setState(() => _loadingJumlah = false);
+      }
+      return;
+    }
     final uid = currentUser?.isLaravel == true ? '' : (currentUser?.id ?? '');
     if (uid.isEmpty) {
       setState(() => _loadingJumlah = false);
@@ -133,7 +164,7 @@ class _ProfilUserScreenState extends State<ProfilUserScreen>
             .get(),
       ]);
 
-      if (!mounted) return;
+      if (!mounted || generation != session.sessionGeneration) return;
       setState(() {
         _jumlahPendaftaran = results[0].count ?? 0;
         _jumlahUlasan = results[1].count ?? 0;
@@ -141,13 +172,14 @@ class _ProfilUserScreenState extends State<ProfilUserScreen>
         _loadingJumlah = false;
       });
     } catch (_) {
-      if (!mounted) return;
+      if (!mounted || generation != session.sessionGeneration) return;
       setState(() => _loadingJumlah = false);
     }
   }
 
   @override
   void dispose() {
+    AuthSession.instance.sessionChanges.removeListener(_sessionChanged);
     _animCtrl.dispose();
     super.dispose();
   }
@@ -671,7 +703,9 @@ class _ProfilUserScreenState extends State<ProfilUserScreen>
                   children: [
                     _statCard(
                       icon: Icons.receipt_long_rounded,
-                      value: _loadingJumlah ? '–' : '$_jumlahPendaftaran',
+                      value: _loadingJumlah || _jumlahPendaftaran == null
+                          ? '–'
+                          : '$_jumlahPendaftaran',
                       label: 'Pendaftaran',
                       iconColor: _C.orange,
                     ),

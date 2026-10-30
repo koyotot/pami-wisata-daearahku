@@ -5,9 +5,9 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
+import '../data/booking_intent.dart';
+import '../services/auth_session.dart';
 import '../data/app_data.dart';
-import 'bukti_konfirmasi_screen.dart';
 
 // ── Palet (sama dengan home_screen.dart) ─────────────────────
 class _C {
@@ -50,6 +50,7 @@ class _DaftarKunjunganScreenState extends State<DaftarKunjunganScreen>
   DateTime? _tanggal;
   int _jumlahOrang = 1;
   bool _isLoading = false;
+  bool _completed = false;
 
   late AnimationController _animCtrl;
   late Animation<double> _fadeAnim;
@@ -73,6 +74,8 @@ class _DaftarKunjunganScreenState extends State<DaftarKunjunganScreen>
       statusBarIconBrightness: Brightness.dark,
     ));
 
+    AuthSession.instance.sessionChanges.addListener(_sessionChanged);
+
     // Auto-fill data dari akun yang sedang login
     if (currentUser != null) {
       _namaCtrl.text = currentUser!.namaLengkap;
@@ -81,21 +84,35 @@ class _DaftarKunjunganScreenState extends State<DaftarKunjunganScreen>
     }
   }
 
+  void _sessionChanged() {
+    _namaCtrl.clear();
+    _teleponCtrl.clear();
+    _emailCtrl.clear();
+    _catatanCtrl.clear();
+    final user = AuthSession.instance.deviceSessionReady ? currentUser : null;
+    if (user != null && user.isLaravel) {
+      _namaCtrl.text = user.namaLengkap;
+      _teleponCtrl.text = user.noTelepon;
+      _emailCtrl.text = user.email;
+    }
+    if (mounted) {
+      setState(() {
+        _tanggal = null;
+        _jumlahOrang = 1;
+        _completed = false;
+      });
+    }
+  }
+
   @override
   void dispose() {
+    AuthSession.instance.sessionChanges.removeListener(_sessionChanged);
     _animCtrl.dispose();
     _namaCtrl.dispose();
     _teleponCtrl.dispose();
     _emailCtrl.dispose();
     _catatanCtrl.dispose();
     super.dispose();
-  }
-
-  String _generateNomorBukti() {
-    final now = DateTime.now();
-    final ts =
-        '${now.year}${now.month.toString().padLeft(2, '0')}${now.day.toString().padLeft(2, '0')}${now.millisecond}';
-    return 'WD-$ts';
   }
 
   Future<void> _pickDate() async {
@@ -137,44 +154,86 @@ class _DaftarKunjunganScreenState extends State<DaftarKunjunganScreen>
       return;
     }
 
+    if (_isLoading || _completed) return;
+    final user = currentUser;
+    if (user == null || !user.isLaravel || !widget.wisata.isLaravel) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text('Pendaftaran memerlukan akun dan destinasi Laravel.')));
+      return;
+    }
+    final generation = AuthSession.instance.sessionGeneration;
     setState(() => _isLoading = true);
-    await Future.delayed(const Duration(milliseconds: 600));
-
-    final tanggalStr =
-        '${_tanggal!.day.toString().padLeft(2, '0')}/${_tanggal!.month.toString().padLeft(2, '0')}/${_tanggal!.year}';
-
-    final pendaftar = Pendaftar(
-      userId: currentUser?.id ?? '',
-      namaPengunjung: _namaCtrl.text.trim(),
-      noTelepon: _teleponCtrl.text.trim(),
-      email: _emailCtrl.text.trim(),
-      wisata: widget.wisata.nama,
-      tanggal: tanggalStr,
-      jumlahOrang: _jumlahOrang,
-      nomorBukti: _generateNomorBukti(),
-      catatan: _catatanCtrl.text.trim(),
-    );
-
-    // Simpan ke Firestore agar tersimpan permanen & terikat ke user
-    await FirebaseFirestore.instance
-        .collection('pendaftar')
-        .add(pendaftar.toMap());
-
-    // Simpan juga ke list lokal (untuk tampilan admin / sesi ini)
-    daftarPendaftar.add(pendaftar);
-
-    if (!mounted) return;
-    setState(() => _isLoading = false);
-
-    Navigator.pushReplacement(
-      context,
-      MaterialPageRoute(
-        builder: (_) => BuktiKonfirmasiScreen(
-          pendaftaran: pendaftar,
-          wisata: widget.wisata,
-        ),
-      ),
-    );
+    final date = _tanggal!;
+    final fields = <String, dynamic>{
+      'destination_guid': widget.wisata.id,
+      'visit_date':
+          '${date.year.toString().padLeft(4, '0')}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}',
+      'quantity': _jumlahOrang,
+      'visitor_name': _namaCtrl.text.trim(),
+      'visitor_email': _emailCtrl.text.trim(),
+      'visitor_phone': _teleponCtrl.text.trim(),
+      'notes': _catatanCtrl.text.trim(),
+    };
+    try {
+      final intent = BookingIntent();
+      final pending = await intent.pending(user.id);
+      if (!mounted || generation != AuthSession.instance.sessionGeneration) {
+        return;
+      }
+      if (pending != null) {
+        final reconcile = await showDialog<bool>(
+            context: context,
+            builder: (context) => ValueListenableBuilder<int>(
+                valueListenable: AuthSession.instance.sessionChanges,
+                builder: (context, _, __) => generation !=
+                        AuthSession.instance.sessionGeneration
+                    ? const AlertDialog(content: Text('Sesi telah berakhir.'))
+                    : AlertDialog(
+                        title: const Text('Periksa pendaftaran sebelumnya'),
+                        content: Text(
+                            'Hasil pendaftaran sebelumnya belum diketahui. Periksa ulang untuk destinasi ${pending['destination_guid']}, tanggal ${pending['visit_date']}, atas nama ${pending['visitor_name']}. Permintaan lama dapat membuat booking jika sebelumnya belum diterima. Data formulir saat ini belum dikirim.'),
+                        actions: [
+                          TextButton(
+                              onPressed: () => Navigator.pop(context, false),
+                              child: const Text('Batal')),
+                          TextButton(
+                              onPressed: () => Navigator.pop(context, true),
+                              child: const Text('Periksa kembali'))
+                        ],
+                      )));
+        if (reconcile != true ||
+            !mounted ||
+            generation != AuthSession.instance.sessionGeneration) {
+          return;
+        }
+      }
+      final booking =
+          await intent.submit(user.id, fields, reconcile: pending != null);
+      if (!mounted ||
+          currentUser?.id != user.id ||
+          generation != AuthSession.instance.sessionGeneration) {
+        return;
+      }
+      setState(() => _completed = true);
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(
+              'Pendaftaran ${booking.json['booking_number']}: ${booking.status}')));
+    } catch (error) {
+      if (!mounted ||
+          currentUser?.id != user.id ||
+          generation != AuthSession.instance.sessionGeneration) {
+        return;
+      }
+      final message = error is ApiException &&
+              error.status != null &&
+              error.status! < 500
+          ? error.message
+          : 'Hasil pendaftaran belum diketahui. Periksa kembali pendaftaran sebelumnya.';
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(message)));
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
   }
 
   @override
@@ -406,7 +465,7 @@ class _DaftarKunjunganScreenState extends State<DaftarKunjunganScreen>
 
                 // ── Tombol Daftar ───────────────────────────
                 GestureDetector(
-                  onTap: _isLoading ? null : _submit,
+                  onTap: _isLoading || _completed ? null : _submit,
                   child: AnimatedContainer(
                     duration: const Duration(milliseconds: 200),
                     height: 56,

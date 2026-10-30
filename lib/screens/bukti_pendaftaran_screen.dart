@@ -14,6 +14,8 @@ import 'package:firebase_auth/firebase_auth.dart' as fb_auth;
 import 'package:google_fonts/google_fonts.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import '../data/app_data.dart';
+import '../data/business_repository.dart';
+import '../services/auth_session.dart';
 
 // ── Palet (sama dengan home_screen) ──────────────────────────
 const _blue = Color(0xFF1976D2);
@@ -55,16 +57,39 @@ class _StatusStyle {
 
 _StatusStyle _styleFor(String status) {
   switch (status) {
+    case 'confirmed':
     case 'disetujui':
       return const _StatusStyle(
           _green, _greenDeep, 'Disetujui', Icons.check_circle_rounded);
+    case 'rejected':
     case 'ditolak':
       return const _StatusStyle(
           _red, Color(0xFFC53030), 'Ditolak', Icons.cancel_rounded);
-    default:
+    case 'pending_approval':
+    case 'menunggu':
       return const _StatusStyle(
           _amber, Color(0xFFD97706), 'Menunggu', Icons.hourglass_top_rounded);
+    default:
+      return _StatusStyle(
+          _amber, const Color(0xFFD97706), status, Icons.hourglass_top_rounded);
   }
+}
+
+Pendaftar _fromBooking(Booking booking) {
+  final json = booking.json;
+  return Pendaftar(
+    id: booking.guid,
+    userId: '',
+    namaPengunjung: booking.visitorName,
+    noTelepon: json['visitor_phone'] as String,
+    email: json['visitor_email'] as String,
+    wisata: booking.destinationName,
+    tanggal: json['visit_date'] as String,
+    jumlahOrang: json['quantity'] as int,
+    nomorBukti: json['booking_number'] as String,
+    catatan: json['notes'] as String? ?? '',
+    status: booking.status,
+  );
 }
 
 // ── Cari data wisata (untuk foto) berdasarkan nama ────────────
@@ -126,6 +151,7 @@ class BuktiPendaftaranScreen extends StatefulWidget {
   // Saat true, layar ini ditampilkan sebagai salah satu tab di
   // MainNavigationScreen.
   final bool embedded;
+  final bool active;
 
   // Dipanggil saat tombol "Jelajahi Wisata" pada empty state ditekan
   // ketika layar ini embedded. Jika null, dipakai Navigator.pop.
@@ -143,6 +169,7 @@ class BuktiPendaftaranScreen extends StatefulWidget {
   const BuktiPendaftaranScreen({
     super.key,
     this.embedded = false,
+    this.active = true,
     this.onExploreWisata,
     this.onBukaMenu,
     this.onKembali,
@@ -154,34 +181,67 @@ class BuktiPendaftaranScreen extends StatefulWidget {
 
 class _BuktiPendaftaranScreenState extends State<BuktiPendaftaranScreen> {
   String? _filter; // null = semua, atau 'menunggu' / 'disetujui' / 'ditolak'
+  int _streamGeneration = 0;
 
   @override
   void initState() {
     super.initState();
-    // Pastikan data wisata (untuk foto tiket) sudah termuat.
-    loadWisataFromFirestore().then((_) {
-      if (mounted) setState(() {});
+    AuthSession.instance.sessionChanges.addListener(_refresh);
+  }
+
+  @override
+  void didUpdateWidget(BuktiPendaftaranScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.active && !oldWidget.active) _refresh();
+  }
+
+  Stream<List<Pendaftar>> _pendaftaranStream() async* {
+    final session = AuthSession.instance;
+    if (!session.authenticated.value || !session.deviceSessionReady) {
+      throw const ApiException('Silakan masuk kembali.', 401);
+    }
+    final generation = session.sessionGeneration;
+    final repository = BusinessRepository();
+    final items = <Pendaftar>[];
+    var page = 1;
+    while (true) {
+      final result = await repository.bookings(query: {'page': '$page'});
+      if (generation != session.sessionGeneration) {
+        throw const ApiException('Sesi telah berakhir.', 401);
+      }
+      for (final booking in result.items) {
+        items.add(_fromBooking(booking));
+      }
+      final lastPage = result.meta?['last_page'];
+      if (lastPage is! int || page >= lastPage) break;
+      page++;
+    }
+    yield items;
+  }
+
+  late Stream<List<Pendaftar>> _stream = _pendaftaranStream();
+
+  void _refresh() {
+    if (!mounted) return;
+    setState(() {
+      _filter = null;
+      _streamGeneration++;
+      _stream = _pendaftaranStream();
     });
   }
 
-  Stream<List<Pendaftar>> _pendaftaranStream() {
-    final uid = currentUser?.id ?? '';
-    if (uid.isEmpty) return Stream.value([]);
-    return FirebaseFirestore.instance
-        .collection('pendaftar')
-        .where('userId', isEqualTo: uid)
-        .snapshots()
-        .map((snap) =>
-            snap.docs.map((d) => Pendaftar.fromMap(d.data(), d.id)).toList()
-              ..sort((a, b) {
-                // Urutkan: menunggu dulu, lalu disetujui, lalu ditolak
-                const order = {'menunggu': 0, 'disetujui': 1, 'ditolak': 2};
-                return (order[a.status] ?? 3).compareTo(order[b.status] ?? 3);
-              }));
+  @override
+  void dispose() {
+    AuthSession.instance.sessionChanges.removeListener(_refresh);
+    super.dispose();
   }
 
-  // Stream dibuat sekali agar tidak berlangganan ulang tiap rebuild.
-  late final Stream<List<Pendaftar>> _stream = _pendaftaranStream();
+  bool _matches(String actual, String filter) => switch (filter) {
+        'menunggu' => actual == 'pending_approval',
+        'disetujui' => actual == 'confirmed',
+        'ditolak' => actual == 'rejected',
+        _ => false,
+      };
 
   void _jelajahi() {
     if (widget.onExploreWisata != null) {
@@ -202,15 +262,17 @@ class _BuktiPendaftaranScreenState extends State<BuktiPendaftaranScreen> {
       child: Scaffold(
         backgroundColor: _background,
         body: StreamBuilder<List<Pendaftar>>(
+          key: ValueKey(_streamGeneration),
           stream: _stream,
           builder: (context, snap) {
             final isLoading = snap.connectionState == ConnectionState.waiting;
             final semua = snap.data ?? [];
             final tampil = _filter == null
                 ? semua
-                : semua.where((p) => p.status == _filter).toList();
+                : semua.where((p) => _matches(p.status, _filter!)).toList();
 
-            int hitung(String s) => semua.where((p) => p.status == s).length;
+            int hitung(String s) =>
+                semua.where((p) => _matches(p.status, s)).length;
 
             return CustomScrollView(
               physics: const BouncingScrollPhysics(),
@@ -227,6 +289,17 @@ class _BuktiPendaftaranScreenState extends State<BuktiPendaftaranScreen> {
                     child: Center(
                       child: CircularProgressIndicator(color: _blue),
                     ),
+                  )
+                else if (snap.hasError)
+                  SliverFillRemaining(
+                    hasScrollBody: false,
+                    child: Center(
+                        child:
+                            Column(mainAxisSize: MainAxisSize.min, children: [
+                      Text('${snap.error}'),
+                      TextButton(
+                          onPressed: _refresh, child: const Text('Coba lagi')),
+                    ])),
                   )
                 else if (semua.isEmpty)
                   SliverFillRemaining(
@@ -248,7 +321,7 @@ class _BuktiPendaftaranScreenState extends State<BuktiPendaftaranScreen> {
                               // saat filter berganti.
                               key: ValueKey(p.id ?? p.nomorBukti),
                               index: i,
-                              child: _TicketCard(pendaftar: p),
+                              child: _TicketCard(pendaftar: p, isLaravel: true),
                             );
                           },
                           childCount: tampil.length,
@@ -686,8 +759,9 @@ class _FadeSlide extends StatelessWidget {
 // ══════════════════════════════════════════════════════════
 class _TicketCard extends StatefulWidget {
   final Pendaftar pendaftar;
+  final bool isLaravel;
 
-  const _TicketCard({required this.pendaftar});
+  const _TicketCard({required this.pendaftar, this.isLaravel = false});
 
   @override
   State<_TicketCard> createState() => _TicketCardState();
@@ -695,6 +769,8 @@ class _TicketCard extends StatefulWidget {
 
 class _TicketCardState extends State<_TicketCard> {
   bool _expanded = false;
+  bool _loadingDetail = false;
+  Pendaftar? _detail;
   bool _sudahUlasan = false;
   String? _statusSebelumnya;
 
@@ -702,7 +778,7 @@ class _TicketCardState extends State<_TicketCard> {
   void initState() {
     super.initState();
     _statusSebelumnya = widget.pendaftar.status;
-    if (widget.pendaftar.status == 'disetujui') {
+    if (!widget.isLaravel && widget.pendaftar.status == 'disetujui') {
       _cekSudahUlasan();
     }
   }
@@ -814,7 +890,7 @@ class _TicketCardState extends State<_TicketCard> {
 
   @override
   Widget build(BuildContext context) {
-    final p = widget.pendaftar;
+    final p = _detail ?? widget.pendaftar;
     final isApproved = p.status == 'disetujui';
     final st = _styleFor(p.status);
 
@@ -849,7 +925,7 @@ class _TicketCardState extends State<_TicketCard> {
 
   Widget _buildTicketHeader(Pendaftar p, _StatusStyle st) {
     final isApproved = p.status == 'disetujui';
-    final wisata = _cariWisata(p.wisata);
+    final wisata = widget.isLaravel ? null : _cariWisata(p.wisata);
 
     return Material(
       color: Colors.transparent,
@@ -1052,7 +1128,33 @@ class _TicketCardState extends State<_TicketCard> {
 
   Widget _buildExpandBtn(Pendaftar p) {
     return GestureDetector(
-      onTap: () => setState(() => _expanded = !_expanded),
+      onTap: () async {
+        if (!widget.isLaravel || _expanded) {
+          setState(() => _expanded = !_expanded);
+          return;
+        }
+        if (_loadingDetail || p.id == null) return;
+        final generation = AuthSession.instance.sessionGeneration;
+        setState(() => _loadingDetail = true);
+        try {
+          final booking = await BusinessRepository().booking(p.id!);
+          if (!mounted || generation != AuthSession.instance.sessionGeneration)
+            return;
+          setState(() {
+            _detail = _fromBooking(booking);
+            _expanded = true;
+          });
+        } catch (error) {
+          if (!mounted || generation != AuthSession.instance.sessionGeneration)
+            return;
+          ScaffoldMessenger.of(context)
+              .showSnackBar(SnackBar(content: Text('$error')));
+        } finally {
+          if (mounted && generation == AuthSession.instance.sessionGeneration) {
+            setState(() => _loadingDetail = false);
+          }
+        }
+      },
       behavior: HitTestBehavior.opaque,
       child: Container(
         decoration: const BoxDecoration(
@@ -1066,7 +1168,9 @@ class _TicketCardState extends State<_TicketCard> {
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   Text(
-                    _expanded ? 'Sembunyikan detail' : 'Lihat detail',
+                    _loadingDetail
+                        ? 'Memuat...'
+                        : (_expanded ? 'Sembunyikan detail' : 'Lihat detail'),
                     style: _font(12, FontWeight.w700, _blue),
                   ),
                   const SizedBox(width: 4),
