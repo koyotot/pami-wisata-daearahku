@@ -1,14 +1,13 @@
-﻿// ============================================================
+// ============================================================
 // lib/screens/detail_wisata_screen.dart
 // Tema: biru terang — sama dengan home, login, beranda, dan profil
 // ============================================================
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:firebase_auth/firebase_auth.dart' as fb_auth;
-import 'package:cloud_firestore/cloud_firestore.dart';
 import '../data/app_data.dart';
 import '../data/business_repository.dart';
+import '../data/favorite_state.dart';
 import '../services/api_client.dart';
 import '../services/auth_session.dart';
 import 'daftar_kunjungan_screen.dart';
@@ -56,10 +55,9 @@ class _DetailWisataScreenState extends State<DetailWisataScreen>
 
   bool get _isLiked => _likedWisataIds.contains(widget.wisata.id);
 
-  // ── Saved state dari Firestore ──────────────────────────────
-  bool _isSaved = false;
+  final _favorites = FavoriteState.instance;
+  bool get _isSaved => _favorites.isFavorite(widget.wisata.id);
   bool _loadingSave = false;
-  String? _savedDocId; // id doc di Firestore agar bisa dihapus
 
   @override
   void initState() {
@@ -81,7 +79,7 @@ class _DetailWisataScreenState extends State<DetailWisataScreen>
 
     _detail.addListener(_detailChanged);
     _loadDetail();
-    _cekStatusSimpan();
+    _favorites.favorites.addListener(_detailChanged);
   }
 
   void _detailChanged() {
@@ -103,15 +101,13 @@ class _DetailWisataScreenState extends State<DetailWisataScreen>
   void didUpdateWidget(covariant DetailWisataScreen oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.wisata.id != widget.wisata.id) {
-      _isSaved = false;
-      _savedDocId = null;
       _loadDetail();
-      _cekStatusSimpan();
     }
   }
 
   @override
   void dispose() {
+    _favorites.favorites.removeListener(_detailChanged);
     _detail.removeListener(_detailChanged);
     _detail.dispose();
     _animCtrl.dispose();
@@ -133,70 +129,51 @@ class _DetailWisataScreenState extends State<DetailWisataScreen>
     );
   }
 
-  // Cek apakah wisata ini sudah disimpan user di Firestore
-  Future<void> _cekStatusSimpan() async {
-    final uid = fb_auth.FirebaseAuth.instance.currentUser?.uid;
-    if (uid == null) return;
-    final id = widget.wisata.id;
-    final snap = await FirebaseFirestore.instance
-        .collection('wisataTersimpan')
-        .where('userId', isEqualTo: uid)
-        .where('wisataId', isEqualTo: id)
-        .limit(1)
-        .get();
-    if (!mounted || widget.wisata.id != id) return;
-    setState(() {
-      _isSaved = snap.docs.isNotEmpty;
-      _savedDocId = snap.docs.isNotEmpty ? snap.docs.first.id : null;
-    });
-  }
-
   Future<void> _toggleSave() async {
     if (_loadingSave) return;
-    final uid = fb_auth.FirebaseAuth.instance.currentUser?.uid;
-    if (uid == null) {
+    if (!_favorites.session.authenticated.value ||
+        !_favorites.session.deviceSessionReady) {
       _showSnack('Login dulu untuk menyimpan wisata.');
       return;
     }
+    final id = widget.wisata.id;
+    final generation = _favorites.session.sessionGeneration;
+    if (_favorites.favorites.error != null ||
+        _favorites.favorites.data == null) {
+      await _favorites.load();
+      if (!mounted ||
+          generation != _favorites.session.sessionGeneration ||
+          id != widget.wisata.id ||
+          !_favorites.session.deviceSessionReady) {
+        return;
+      }
+      if (_favorites.favorites.error != null ||
+          _favorites.favorites.data == null) {
+        _showSnack(_favorites.favorites.error?.toString() ??
+            'Gagal memuat wisata tersimpan.');
+        return;
+      }
+    }
+    final wasSaved = _isSaved;
     setState(() => _loadingSave = true);
     try {
-      if (_isSaved && _savedDocId != null) {
-        // Hapus dari Firestore
-        await FirebaseFirestore.instance
-            .collection('wisataTersimpan')
-            .doc(_savedDocId)
-            .delete();
-        if (!mounted) return;
-        setState(() {
-          _isSaved = false;
-          _savedDocId = null;
-          _loadingSave = false;
-        });
-        _showSnack('📌  Dihapus dari tersimpan');
-      } else {
-        // Simpan ke Firestore
-        final doc =
-            await FirebaseFirestore.instance.collection('wisataTersimpan').add({
-          'userId': uid,
-          'wisataId': widget.wisata.id,
-          'namaWisata': Wisata.fromDestination(_detail.data!).nama,
-          'lokasi': Wisata.fromDestination(_detail.data!).lokasi,
-          'kategori': Wisata.fromDestination(_detail.data!).kategori,
-          'imagePath': Wisata.fromDestination(_detail.data!).imagePath ?? '',
-          'savedAt': FieldValue.serverTimestamp(),
-        });
-        if (!mounted) return;
-        setState(() {
-          _isSaved = true;
-          _savedDocId = doc.id;
-          _loadingSave = false;
-        });
-        _showSnack('🔖  ${widget.wisata.nama} disimpan!');
+      await _favorites.toggle(id);
+      if (!mounted ||
+          generation != _favorites.session.sessionGeneration ||
+          id != widget.wisata.id) {
+        return;
+      }
+      if (_favorites.favorites.error != null) {
+        _showSnack(_favorites.favorites.error.toString());
+      } else if (_isSaved != wasSaved) {
+        _showSnack(_isSaved ? 'Wisata disimpan!' : 'Dihapus dari tersimpan');
       }
     } catch (e) {
-      if (!mounted) return;
-      setState(() => _loadingSave = false);
-      _showSnack('Gagal menyimpan, coba lagi.');
+      if (mounted && generation == _favorites.session.sessionGeneration) {
+        _showSnack(e.toString());
+      }
+    } finally {
+      if (mounted) setState(() => _loadingSave = false);
     }
   }
 

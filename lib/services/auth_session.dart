@@ -37,6 +37,7 @@ class AuthSession {
   final SessionStore store;
   final String baseUrl;
   final ValueNotifier<bool> authenticated = ValueNotifier(false);
+  final ValueNotifier<int> sessionChanges = ValueNotifier(0);
   Map<String, dynamic>? _tokens;
   Future<void>? _refreshing;
   int _generation = 0;
@@ -109,6 +110,8 @@ class AuthSession {
                     401 =>
                       'Sesi atau kredensial tidak valid. Silakan masuk kembali.',
                     403 => 'Akses tidak diizinkan.',
+                    404 => 'Wisata atau data tidak ditemukan.',
+                    409 => 'Terjadi konflik. Silakan coba lagi.',
                     429 => 'Terlalu banyak percobaan. Coba lagi nanti.',
                     _ => 'Layanan sedang bermasalah. Silakan coba lagi.',
                   },
@@ -167,8 +170,10 @@ class AuthSession {
     if (generation != _generation) return;
     _tokens = data;
     _user(data['user']);
+    final sessionWasReady = deviceSessionReady;
     deviceSessionReady = true;
     authenticated.value = true;
+    if (!sessionWasReady) sessionChanges.value++;
     deviceSessionChanged?.call();
   }
 
@@ -187,6 +192,7 @@ class AuthSession {
   Future<void> _authenticate(String path, Map<String, dynamic> body) async {
     final generation = ++_generation;
     deviceSessionReady = false;
+    sessionChanges.value++;
     deviceSessionChanged?.call();
     try {
       final data = await _send('POST', path, body: body);
@@ -197,6 +203,7 @@ class AuthSession {
     } catch (_) {
       if (generation == _generation && _tokens != null) {
         deviceSessionReady = true;
+        sessionChanges.value++;
         deviceSessionChanged?.call();
       }
       rethrow;
@@ -355,6 +362,7 @@ class AuthSession {
     deviceSessionReady = false;
     currentUser = null;
     authenticated.value = false;
+    sessionChanges.value++;
     deviceSessionChanged?.call();
     await _persist(() => store.clear());
   }

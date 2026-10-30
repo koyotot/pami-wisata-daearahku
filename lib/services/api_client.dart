@@ -81,6 +81,15 @@ class RequestState<T> extends ChangeNotifier {
     }
   }
 
+  void reset() {
+    _generation++;
+    data = null;
+    error = null;
+    loading = false;
+    _retry = null;
+    notifyListeners();
+  }
+
   Future<void> retry() async => _retry?.call();
 
   @override

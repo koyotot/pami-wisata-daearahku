@@ -13,6 +13,7 @@ import 'package:firebase_auth/firebase_auth.dart' as fb_auth;
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../data/app_data.dart';
+import '../data/favorite_state.dart';
 import 'home_screen.dart';
 import 'user_login_screen.dart';
 
@@ -265,9 +266,7 @@ class _ProfilUserScreenState extends State<ProfilUserScreen>
       context: context,
       backgroundColor: Colors.transparent,
       isScrollControlled: true,
-      builder: (_) => _SemuaWisataTersimpanSheet(
-          userId:
-              currentUser?.isLaravel == true ? '' : (currentUser?.id ?? '')),
+      builder: (_) => const _SemuaWisataTersimpanSheet(),
     );
   }
 
@@ -778,38 +777,12 @@ class _ProfilUserScreenState extends State<ProfilUserScreen>
   //  WISATA TERSIMPAN
   // ══════════════════════════════════════════════════════════
   Widget _buildWisataTersimpan() {
-    final uid = currentUser?.isLaravel == true ? '' : (currentUser?.id ?? '');
-    if (uid.isEmpty) {
-      return Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-        decoration: BoxDecoration(
-          color: _C.card,
-          borderRadius: BorderRadius.circular(18),
-          border: Border.all(color: _C.teal.withValues(alpha: 0.12)),
-        ),
-        child: Center(
-          child: Text('Login untuk melihat wisata tersimpan',
-              style: TextStyle(color: _C.textMuted, fontSize: 13)),
-        ),
-      );
-    }
-    return StreamBuilder<QuerySnapshot>(
-      stream: FirebaseFirestore.instance
-          .collection('wisataTersimpan')
-          .where('userId', isEqualTo: uid)
-          .limit(5)
-          .snapshots(),
-      builder: (context, snap) {
-        final docs = (snap.data?.docs ?? [])
-          ..sort((a, b) {
-            final at = (a.data() as Map)['savedAt'];
-            final bt = (b.data() as Map)['savedAt'];
-            if (at == null || bt == null) return 0;
-            return (bt as Timestamp).compareTo(at as Timestamp);
-          });
-        final isLoading =
-            snap.connectionState == ConnectionState.waiting && docs.isEmpty;
-
+    final state = FavoriteState.instance;
+    return AnimatedBuilder(
+      animation: state.favorites,
+      builder: (context, _) {
+        final docs = state.favorites.data ?? [];
+        final isLoading = state.favorites.loading;
         return Container(
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
           decoration: BoxDecoration(
@@ -827,74 +800,85 @@ class _ProfilUserScreenState extends State<ProfilUserScreen>
                         child: CircularProgressIndicator(strokeWidth: 2)),
                   ),
                 )
-              : docs.isEmpty
-                  ? Center(
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 8),
-                        child: Text('Belum ada wisata tersimpan',
-                            style:
-                                TextStyle(color: _C.textMuted, fontSize: 13)),
-                      ),
-                    )
-                  : Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      children: [
-                        ...docs.map((doc) {
-                          final data = doc.data() as Map<String, dynamic>;
-                          final nama =
-                              data['namaWisata'] as String? ?? 'Wisata';
-                          return Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 12, vertical: 6),
-                            decoration: BoxDecoration(
-                              color: _C.teal.withValues(alpha: 0.12),
-                              borderRadius: BorderRadius.circular(20),
-                              border: Border.all(
-                                  color: _C.teal.withValues(alpha: 0.25)),
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
+              : state.favorites.error != null
+                  ? TextButton(
+                      onPressed: state.load,
+                      child: Text(state.favorites.error.toString()))
+                  : !state.session.authenticated.value
+                      ? Center(
+                          child: Text('Login untuk melihat wisata tersimpan',
+                              style:
+                                  TextStyle(color: _C.textMuted, fontSize: 13)))
+                      : docs.isEmpty
+                          ? Center(
+                              child: Padding(
+                                padding:
+                                    const EdgeInsets.symmetric(vertical: 8),
+                                child: Text('Belum ada wisata tersimpan',
+                                    style: TextStyle(
+                                        color: _C.textMuted, fontSize: 13)),
+                              ),
+                            )
+                          : Wrap(
+                              spacing: 8,
+                              runSpacing: 8,
                               children: [
-                                Container(
-                                  width: 6,
-                                  height: 6,
-                                  decoration: BoxDecoration(
-                                    shape: BoxShape.circle,
-                                    color: _C.teal,
+                                ...docs.take(5).map((doc) {
+                                  final nama = doc.destination.name;
+                                  return Container(
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 12, vertical: 6),
+                                    decoration: BoxDecoration(
+                                      color: _C.teal.withValues(alpha: 0.12),
+                                      borderRadius: BorderRadius.circular(20),
+                                      border: Border.all(
+                                          color:
+                                              _C.teal.withValues(alpha: 0.25)),
+                                    ),
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Container(
+                                          width: 6,
+                                          height: 6,
+                                          decoration: BoxDecoration(
+                                            shape: BoxShape.circle,
+                                            color: _C.teal,
+                                          ),
+                                        ),
+                                        const SizedBox(width: 6),
+                                        Text(nama,
+                                            style: TextStyle(
+                                                color: _C.teal,
+                                                fontSize: 12.5,
+                                                fontWeight: FontWeight.w600)),
+                                      ],
+                                    ),
+                                  );
+                                }),
+                                // Lihat semua chip
+                                GestureDetector(
+                                  onTap: () =>
+                                      _bukaSemuaWisataTersimpan(context),
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 12, vertical: 6),
+                                    decoration: BoxDecoration(
+                                      color: _C.gold.withValues(alpha: 0.10),
+                                      borderRadius: BorderRadius.circular(20),
+                                      border: Border.all(
+                                          color:
+                                              _C.gold.withValues(alpha: 0.30)),
+                                    ),
+                                    child: Text('+ Lihat semua',
+                                        style: TextStyle(
+                                            color: _C.warning,
+                                            fontSize: 12.5,
+                                            fontWeight: FontWeight.w600)),
                                   ),
                                 ),
-                                const SizedBox(width: 6),
-                                Text(nama,
-                                    style: TextStyle(
-                                        color: _C.teal,
-                                        fontSize: 12.5,
-                                        fontWeight: FontWeight.w600)),
                               ],
                             ),
-                          );
-                        }),
-                        // Lihat semua chip
-                        GestureDetector(
-                          onTap: () => _bukaSemuaWisataTersimpan(context),
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 12, vertical: 6),
-                            decoration: BoxDecoration(
-                              color: _C.gold.withValues(alpha: 0.10),
-                              borderRadius: BorderRadius.circular(20),
-                              border: Border.all(
-                                  color: _C.gold.withValues(alpha: 0.30)),
-                            ),
-                            child: Text('+ Lihat semua',
-                                style: TextStyle(
-                                    color: _C.warning,
-                                    fontSize: 12.5,
-                                    fontWeight: FontWeight.w600)),
-                          ),
-                        ),
-                      ],
-                    ),
         );
       },
     );
@@ -2251,8 +2235,7 @@ class _PilihBahasaSheetState extends State<_PilihBahasaSheet> {
 //  BOTTOM SHEET — Semua Wisata Tersimpan
 // ════════════════════════════════════════════════════════════
 class _SemuaWisataTersimpanSheet extends StatelessWidget {
-  final String userId;
-  const _SemuaWisataTersimpanSheet({required this.userId});
+  const _SemuaWisataTersimpanSheet();
 
   @override
   Widget build(BuildContext context) {
@@ -2281,63 +2264,62 @@ class _SemuaWisataTersimpanSheet extends StatelessWidget {
                   color: _C.text, fontSize: 18, fontWeight: FontWeight.w800)),
           const SizedBox(height: 16),
           Expanded(
-            child: userId.isEmpty
-                ? Center(
+            child: AnimatedBuilder(
+              animation: FavoriteState.instance.favorites,
+              builder: (context, _) {
+                final state = FavoriteState.instance;
+                if (state.favorites.loading) {
+                  return const Center(child: CircularProgressIndicator());
+                }
+                if (state.favorites.error != null) {
+                  return TextButton(
+                      onPressed: state.load,
+                      child: Text(state.favorites.error.toString()));
+                }
+                final docs = state.favorites.data ?? [];
+                if (docs.isEmpty) {
+                  return Center(
                     child: Text('Belum ada wisata tersimpan.',
-                        style: TextStyle(color: _C.textMuted)))
-                : StreamBuilder<QuerySnapshot>(
-                    stream: FirebaseFirestore.instance
-                        .collection('wisataTersimpan')
-                        .where('userId', isEqualTo: userId)
-                        .snapshots(),
-                    builder: (context, snap) {
-                      if (snap.connectionState == ConnectionState.waiting) {
-                        return const Center(child: CircularProgressIndicator());
-                      }
-                      final docs = snap.data?.docs ?? [];
-                      if (docs.isEmpty) {
-                        return Center(
-                          child: Text('Belum ada wisata tersimpan.',
-                              style: TextStyle(color: _C.textMuted)),
-                        );
-                      }
-                      return ListView.separated(
-                        itemCount: docs.length,
-                        separatorBuilder: (_, __) =>
-                            Divider(color: _C.border.withValues(alpha: 0.4)),
-                        itemBuilder: (context, i) {
-                          final data = docs[i].data() as Map<String, dynamic>;
-                          final nama =
-                              data['namaWisata'] as String? ?? 'Wisata';
-                          final lokasi = data['lokasi'] as String? ?? '';
-                          return ListTile(
-                            contentPadding: EdgeInsets.zero,
-                            leading: Container(
-                              padding: const EdgeInsets.all(10),
-                              decoration: BoxDecoration(
-                                color: _C.teal.withValues(alpha: 0.12),
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              child: Icon(Icons.bookmark_rounded,
-                                  color: _C.teal, size: 18),
-                            ),
-                            title: Text(nama,
-                                style: TextStyle(
-                                    color: _C.text,
-                                    fontWeight: FontWeight.w700,
-                                    fontSize: 13.5)),
-                            subtitle: lokasi.isNotEmpty
-                                ? Text(lokasi,
-                                    style: TextStyle(
-                                        color: _C.textMuted, fontSize: 12))
-                                : null,
-                            trailing: Icon(Icons.arrow_forward_ios_rounded,
-                                color: _C.textDim, size: 13),
-                          );
-                        },
-                      );
-                    },
-                  ),
+                        style: TextStyle(color: _C.textMuted)),
+                  );
+                }
+                return ListView.separated(
+                  itemCount: docs.length,
+                  separatorBuilder: (_, __) =>
+                      Divider(color: _C.border.withValues(alpha: 0.4)),
+                  itemBuilder: (context, i) {
+                    final destination = docs[i].destination;
+                    final nama = destination.name;
+                    final lokasi =
+                        destination.json['location'] as String? ?? '';
+                    return ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      leading: Container(
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: _C.teal.withValues(alpha: 0.12),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Icon(Icons.bookmark_rounded,
+                            color: _C.teal, size: 18),
+                      ),
+                      title: Text(nama,
+                          style: TextStyle(
+                              color: _C.text,
+                              fontWeight: FontWeight.w700,
+                              fontSize: 13.5)),
+                      subtitle: lokasi.isNotEmpty
+                          ? Text(lokasi,
+                              style:
+                                  TextStyle(color: _C.textMuted, fontSize: 12))
+                          : null,
+                      trailing: Icon(Icons.arrow_forward_ios_rounded,
+                          color: _C.textDim, size: 13),
+                    );
+                  },
+                );
+              },
+            ),
           ),
         ],
       ),
