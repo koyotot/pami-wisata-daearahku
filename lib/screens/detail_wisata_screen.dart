@@ -10,6 +10,7 @@ import '../data/business_repository.dart';
 import '../data/favorite_state.dart';
 import '../services/api_client.dart';
 import '../services/auth_session.dart';
+import '../widgets/api_image.dart';
 import 'daftar_kunjungan_screen.dart';
 
 // ── Palet (sama dengan home_screen.dart) ─────────────────────
@@ -756,6 +757,13 @@ class _DetailWisataScreenState extends State<DetailWisataScreen>
   }
 
   Widget _buildImage(Wisata w) {
+    // Destinasi Laravel: gambar dimuat lewat API (imagePath selalu null).
+    if (w.isLaravel) {
+      return ApiImage(
+          imageUrl: w.imageUrl,
+          fit: BoxFit.cover,
+          placeholder: (_) => _placeholder());
+    }
     final path = w.imagePath;
     if (path == null || path.isEmpty) return _placeholder();
     if (path.startsWith('http')) {

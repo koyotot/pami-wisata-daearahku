@@ -3,15 +3,15 @@
 // Tema: biru terang — sama dengan home, login, dan dashboard admin
 // Dependency: image_picker (tambah ke pubspec.yaml)
 // ============================================================
-import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
+import '../data/admin_state.dart';
 import '../data/app_data.dart';
 import '../data/business_repository.dart';
-import '../services/api_client.dart';
 import '../services/auth_session.dart';
+import '../widgets/api_image.dart';
 
 // ── Palet (sama dengan home_screen.dart) ─────────────────────
 class _C {
@@ -36,7 +36,10 @@ class _C {
 
 class TambahWisataScreen extends StatefulWidget {
   final Wisata? wisataEdit;
-  const TambahWisataScreen({super.key, this.wisataEdit});
+  final BusinessRepository? repository;
+  final AuthSession? session;
+  const TambahWisataScreen(
+      {super.key, this.wisataEdit, this.repository, this.session});
 
   @override
   State<TambahWisataScreen> createState() => _TambahWisataScreenState();
@@ -46,45 +49,22 @@ class _TambahWisataScreenState extends State<TambahWisataScreen> {
   final _formKey = GlobalKey<FormState>();
   late TextEditingController namaCtrl, lokasiCtrl, deskCtrl, hargaCtrl, jamCtrl;
   double _rating = 4.5;
-  String? _imagePath; // URL dari Storage (atau URL lama saat edit)
-  File? _imageFile; // File lokal yang baru dipilih (belum diupload)
-  double? _uploadProgress; // 0.0–1.0 saat upload berlangsung
+  Uint8List? _imageBytes; // Gambar baru yang dipilih (belum diunggah)
+  String _imageName = 'destination.jpg';
   bool _isSaving = false;
 
-  final _repository = BusinessRepository();
-  final _adminCatalog = BusinessRepository();
-  final _categories = RequestState<List<Category>>();
+  late final BusinessRepository _repository =
+      widget.repository ?? BusinessRepository();
+  late final AuthSession _session = widget.session ?? AuthSession.instance;
+  late final PagedListController<Category> _categories;
   String? _categoryGuid;
-  int? _sessionGeneration;
+  late String _timezone;
+  late final int _sessionGeneration;
 
-  Future<void> _load() => _categories.load(() async {
-        final all = <Category>[];
-        var page = 1;
-        while (true) {
-          final result = await _repository.categories(query: {'page': '$page'});
-          all.addAll(result.items);
-          if (result.links?['next'] == null) break;
-          page++;
-        }
-        final edit = widget.wisataEdit;
-        if (edit != null) {
-          final destination = await _repository.destination(edit.id);
-          if (mounted &&
-              _sessionGeneration == AuthSession.instance.sessionGeneration) {
-            _categoryGuid =
-                destination.json['destination_category_guid'] as String?;
-            hargaCtrl.text = '${destination.json['ticket_price']}';
-          }
-        }
-        return all;
-      });
+  Future<void> _load() => _categories.load();
 
   void _onCategories() {
     if (mounted) setState(() {});
-  }
-
-  void _onSession() {
-    _categories.reset();
   }
 
   @override
@@ -94,21 +74,26 @@ class _TambahWisataScreenState extends State<TambahWisataScreen> {
     namaCtrl = TextEditingController(text: w?.nama ?? '');
     lokasiCtrl = TextEditingController(text: w?.lokasi ?? '');
     deskCtrl = TextEditingController(text: w?.deskripsi ?? '');
-    hargaCtrl = TextEditingController(
-        text: w?.hargaTiket.replaceFirst(RegExp(r'^IDR '), '') ?? '');
+    hargaCtrl = TextEditingController(text: w == null ? '' : '${w.ticketPrice}');
     jamCtrl = TextEditingController(text: w?.jamBuka ?? '');
     _rating = w?.rating ?? 4.5;
-    _imagePath = w?.imagePath;
-    _sessionGeneration = AuthSession.instance.sessionGeneration;
-    _categories.addListener(_onCategories);
-    AuthSession.instance.sessionChanges.addListener(_onSession);
+    _categoryGuid =
+        (w?.categoryGuid.isNotEmpty ?? false) ? w!.categoryGuid : null;
+    _timezone = (w?.timezone.isNotEmpty ?? false) ? w!.timezone : kAdminTimezones.first;
+    _sessionGeneration = _session.sessionGeneration;
+    _categories = PagedListController<Category>(
+      session: _session,
+      keyOf: (category) => category.guid,
+      fetchPage: (page, _) => _repository.categories(query: {'page': '$page'}),
+    )..addListener(_onCategories);
     _load();
   }
 
   @override
   void dispose() {
-    AuthSession.instance.sessionChanges.removeListener(_onSession);
-    _categories.dispose();
+    _categories
+      ..removeListener(_onCategories)
+      ..dispose();
     namaCtrl.dispose();
     lokasiCtrl.dispose();
     deskCtrl.dispose();
@@ -127,12 +112,22 @@ class _TambahWisataScreenState extends State<TambahWisataScreen> {
       maxHeight: 900,
       imageQuality: 85,
     );
-    if (picked != null) {
-      setState(() {
-        _imageFile = File(picked.path); // simpan sebagai File untuk upload
-        _imagePath = null; // belum punya URL Storage
-      });
+    if (picked == null) return;
+    final bytes = await picked.readAsBytes();
+    if (!mounted) return;
+    final problem = validateDestinationImage(bytes);
+    if (problem != null) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(problem),
+        backgroundColor: _C.danger,
+        behavior: SnackBarBehavior.floating,
+      ));
+      return;
     }
+    setState(() {
+      _imageBytes = bytes;
+      _imageName = picked.name.isEmpty ? 'destination.jpg' : picked.name;
+    });
   }
 
   void _showImagePicker() {
@@ -180,17 +175,14 @@ class _TambahWisataScreenState extends State<TambahWisataScreen> {
                   )),
                 ],
               ),
-              if (_imagePath != null || _imageFile != null) ...[
+              if (_imageBytes != null) ...[
                 const SizedBox(height: 12),
                 _sheetBtn(
-                  icon: Icons.delete_rounded,
-                  label: 'Hapus Foto',
+                  icon: Icons.undo_rounded,
+                  label: 'Batalkan Foto Baru',
                   color: _C.danger,
                   onTap: () {
-                    setState(() {
-                      _imagePath = null;
-                      _imageFile = null;
-                    });
+                    setState(() => _imageBytes = null);
                     Navigator.pop(context);
                   },
                 ),
@@ -231,82 +223,84 @@ class _TambahWisataScreenState extends State<TambahWisataScreen> {
     );
   }
 
-  // ── Upload foto ke Cloudinary ────────────────────────────
+  // ── Simpan ke Laravel (multipart bila ada foto baru) ────────
+  void _snack(String message, {bool error = true}) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Row(children: [
+          Icon(error ? Icons.error_rounded : Icons.check_circle_rounded,
+              color: Colors.white, size: 18),
+          const SizedBox(width: 10),
+          Expanded(child: Text(message)),
+        ]),
+        backgroundColor: error ? _C.danger : _C.tealDark,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        margin: const EdgeInsets.all(16),
+      ),
+    );
+  }
+
   Future<void> _simpan() async {
     if (_isSaving || !_formKey.currentState!.validate()) return;
-    if (widget.wisataEdit == null) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-          content: Text(
-              'Penambahan belum tersedia: zona waktu wajib belum tersedia pada formulir.')));
+    final edit = widget.wisataEdit;
+    if (!_session.isCurrentGeneration(_sessionGeneration)) {
+      _snack('Sesi telah berakhir. Silakan masuk kembali.');
       return;
     }
-    if (_sessionGeneration != AuthSession.instance.sessionGeneration ||
-        _categoryGuid == null ||
-        _categories.loading ||
-        _categories.error != null) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-          content: Text('Kategori belum tersedia. Muat ulang dan coba lagi.')));
+    if (_categoryGuid == null) {
+      _snack('Pilih kategori terlebih dahulu.');
       return;
     }
     final price = int.tryParse(hargaCtrl.text.trim());
     if (price == null || price < 0) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-          content: Text('Harga harus berupa bilangan bulat nonnegatif.')));
+      _snack('Harga harus berupa bilangan bulat nonnegatif.');
       return;
     }
-    if (_imageFile != null || _imagePath != widget.wisataEdit!.imagePath) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-          content: Text('Perubahan foto belum tersedia melalui layanan ini.')));
-      return;
+    final bytes = _imageBytes;
+    if (bytes != null) {
+      final problem = validateDestinationImage(bytes);
+      if (problem != null) {
+        _snack(problem);
+        return;
+      }
     }
+    final fields = <String, dynamic>{
+      'destination_category_guid': _categoryGuid,
+      'name': namaCtrl.text.trim(),
+      'location': lokasiCtrl.text.trim(),
+      'description': deskCtrl.text.trim(),
+      'ticket_price': price,
+      'opening_hours': jamCtrl.text.trim(),
+      'timezone': _timezone,
+    };
+    final upload = bytes == null ? null : UploadFile('image', bytes, _imageName);
     setState(() => _isSaving = true);
     try {
-      await _adminCatalog.updateDestination(widget.wisataEdit!.id, {
-        'name': namaCtrl.text.trim(),
-        'location': lokasiCtrl.text.trim(),
-        'description': deskCtrl.text.trim(),
-        'ticket_price': price,
-        'opening_hours': jamCtrl.text.trim(),
-        'destination_category_guid': _categoryGuid,
-      });
-      if (_sessionGeneration != AuthSession.instance.sessionGeneration) return;
-
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Row(children: [
-            const Icon(Icons.check_circle_rounded,
-                color: Colors.white, size: 18),
-            const SizedBox(width: 10),
-            Text(widget.wisataEdit != null
-                ? 'Data wisata berhasil diubah!'
-                : 'Wisata baru berhasil ditambahkan!'),
-          ]),
-          backgroundColor: _C.tealDark,
-          behavior: SnackBarBehavior.floating,
-          shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          margin: const EdgeInsets.all(16),
-        ),
-      );
+      if (edit == null) {
+        await _repository.createDestination(fields, image: upload);
+      } else {
+        await _repository.updateDestination(edit.id, fields, image: upload);
+      }
+      if (!mounted || !_session.isCurrentGeneration(_sessionGeneration)) return;
+      _snack(
+          edit != null
+              ? 'Data wisata berhasil diubah!'
+              : 'Wisata baru berhasil ditambahkan!',
+          error: false);
       Navigator.pop(context, true);
     } catch (e) {
-      if (!mounted ||
-          _sessionGeneration != AuthSession.instance.sessionGeneration) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Row(children: [
-            const Icon(Icons.error_rounded, color: Colors.white, size: 18),
-            const SizedBox(width: 10),
-            Expanded(child: Text('Gagal menyimpan: $e')),
-          ]),
-          backgroundColor: _C.danger,
-          behavior: SnackBarBehavior.floating,
-          shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          margin: const EdgeInsets.all(16),
-        ),
-      );
+      if (!mounted || !_session.isCurrentGeneration(_sessionGeneration)) return;
+      if (e is ApiException && e.outcomeUnknown) {
+        // Tidak diulang otomatis: simpan tidak idempoten.
+        _snack(edit == null
+            ? 'Hasil penyimpanan belum pasti (${e.message}). Periksa Daftar '
+                'Wisata sebelum menyimpan ulang agar tidak terjadi duplikat.'
+            : 'Hasil penyimpanan belum pasti (${e.message}). Periksa data '
+                'wisata sebelum menyimpan ulang.');
+      } else {
+        _snack('Gagal menyimpan: ${adminErrorMessage(e)}');
+      }
     } finally {
       if (mounted) setState(() => _isSaving = false);
     }
@@ -517,6 +511,8 @@ class _TambahWisataScreenState extends State<TambahWisataScreen> {
                     ),
                     const SizedBox(height: 12),
                     _kategoriPicker(),
+                    const SizedBox(height: 12),
+                    _timezonePicker(),
                     const SizedBox(height: 24),
 
                     // ── Detail ───────────────────────────────────
@@ -539,11 +535,18 @@ class _TambahWisataScreenState extends State<TambahWisataScreen> {
                             child: _field(
                           ctrl: hargaCtrl,
                           label: 'Harga Tiket',
-                          hint: 'Rp 25.000 / Gratis',
+                          hint: 'Rupiah, 0 = gratis',
                           icon: Icons.local_activity_rounded,
-                          validator: (v) => (v == null || v.trim().isEmpty)
-                              ? 'Wajib diisi'
-                              : null,
+                          keyboardType: TextInputType.number,
+                          formatters: [FilteringTextInputFormatter.digitsOnly],
+                          validator: (v) {
+                            final text = v?.trim() ?? '';
+                            if (text.isEmpty) return 'Wajib diisi';
+                            final price = int.tryParse(text);
+                            return price == null || price < 0
+                                ? 'Bilangan bulat ≥ 0'
+                                : null;
+                          },
                         )),
                         const SizedBox(width: 12),
                         Expanded(
@@ -583,35 +586,6 @@ class _TambahWisataScreenState extends State<TambahWisataScreen> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            // Progress bar upload (hanya muncul saat upload)
-            if (_uploadProgress != null) ...[
-              Row(
-                children: [
-                  Icon(Icons.cloud_upload_rounded, color: _C.teal, size: 14),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(4),
-                      child: LinearProgressIndicator(
-                        value: _uploadProgress,
-                        backgroundColor: _C.border,
-                        valueColor: AlwaysStoppedAnimation<Color>(_C.teal),
-                        minHeight: 5,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Text(
-                    '${((_uploadProgress ?? 0) * 100).toInt()}%',
-                    style: TextStyle(
-                        color: _C.teal,
-                        fontSize: 11,
-                        fontWeight: FontWeight.w700),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 10),
-            ],
             SizedBox(
               width: double.infinity,
               height: 54,
@@ -637,7 +611,7 @@ class _TambahWisataScreenState extends State<TambahWisataScreen> {
                           ),
                           const SizedBox(width: 10),
                           Text(
-                            _uploadProgress != null
+                            _imageBytes != null
                                 ? 'Mengupload foto...'
                                 : 'Menyimpan...',
                             style: const TextStyle(
@@ -672,9 +646,9 @@ class _TambahWisataScreenState extends State<TambahWisataScreen> {
 
   // ── Photo Uploader ────────────────────────────────────────
   Widget _photoUploader() {
-    // Punya gambar jika: file baru dipilih ATAU sudah ada URL dari Storage
-    final hasImage =
-        _imageFile != null || (_imagePath != null && _imagePath!.isNotEmpty);
+    // Punya gambar jika: foto baru dipilih ATAU destinasi sudah punya gambar di server
+    final hasImage = _imageBytes != null ||
+        (widget.wisataEdit?.imageUrl?.isNotEmpty ?? false);
 
     return GestureDetector(
       onTap: _showImagePicker,
@@ -785,7 +759,7 @@ class _TambahWisataScreenState extends State<TambahWisataScreen> {
                             fontSize: 14,
                             fontWeight: FontWeight.w700)),
                     const SizedBox(height: 4),
-                    Text('Kamera atau galeri · JPG, PNG',
+                    Text('Kamera atau galeri · JPEG, PNG, WebP · maks 5 MB',
                         style: TextStyle(color: _C.textMuted, fontSize: 11.5)),
                   ],
                 ),
@@ -795,23 +769,72 @@ class _TambahWisataScreenState extends State<TambahWisataScreen> {
   }
 
   Widget _buildPreviewImage() {
-    // Prioritas 1: file baru yang baru dipilih (belum diupload)
-    if (_imageFile != null) {
-      return Image.file(_imageFile!,
+    // Prioritas 1: foto baru yang baru dipilih (belum diunggah)
+    final bytes = _imageBytes;
+    if (bytes != null) {
+      return Image.memory(bytes,
           fit: BoxFit.cover, errorBuilder: (_, __, ___) => _placeholder());
     }
-    // Prioritas 2: URL dari Firebase Storage (sudah tersimpan)
-    if (_imagePath != null) {
-      final path = _imagePath!;
-      if (path.startsWith('http')) {
-        return Image.network(path,
-            fit: BoxFit.cover, errorBuilder: (_, __, ___) => _placeholder());
-      }
-      if (path.startsWith('assets/')) {
-        return Image.asset(path, fit: BoxFit.cover);
-      }
+    // Prioritas 2: gambar yang tersimpan di Laravel (endpoint admin)
+    final edit = widget.wisataEdit;
+    if (edit != null && (edit.imageUrl?.isNotEmpty ?? false)) {
+      return ApiImage(
+        imageUrl: edit.imageUrl,
+        adminGuid: edit.id,
+        fit: BoxFit.cover,
+        repository: widget.repository,
+        placeholder: (_) => _placeholder(),
+      );
     }
     return _placeholder();
+  }
+
+  // ── Zona waktu destinasi (IANA) ───────────────────────────
+  Widget _timezonePicker() {
+    final zones = <String>{...kAdminTimezones, _timezone}.toList();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text('Zona Waktu',
+            style: TextStyle(
+                color: _C.text, fontSize: 12.5, fontWeight: FontWeight.w700)),
+        const SizedBox(height: 7),
+        DropdownButtonFormField<String>(
+          key: const ValueKey('timezone-field'),
+          initialValue: _timezone,
+          isExpanded: true,
+          items: [
+            for (final zone in zones)
+              DropdownMenuItem(value: zone, child: Text(timezoneLabel(zone))),
+          ],
+          onChanged: _isSaving
+              ? null
+              : (value) {
+                  if (value != null) setState(() => _timezone = value);
+                },
+          decoration: InputDecoration(
+            prefixIcon: const Padding(
+              padding: EdgeInsets.only(left: 14, right: 10),
+              child: Icon(Icons.public_rounded, color: _C.teal, size: 18),
+            ),
+            prefixIconConstraints:
+                const BoxConstraints(minWidth: 0, minHeight: 0),
+            filled: true,
+            fillColor: _C.surface,
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(14),
+              borderSide: const BorderSide(color: _C.border, width: 1.2),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(14),
+              borderSide: const BorderSide(color: _C.teal, width: 1.5),
+            ),
+            contentPadding:
+                const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          ),
+        ),
+      ],
+    );
   }
 
   Widget _placeholder() => Container(
@@ -973,6 +996,8 @@ class _TambahWisataScreenState extends State<TambahWisataScreen> {
     required String hint,
     required IconData icon,
     int maxLines = 1,
+    TextInputType? keyboardType,
+    List<TextInputFormatter>? formatters,
     String? Function(String?)? validator,
   }) {
     return Column(
@@ -985,6 +1010,8 @@ class _TambahWisataScreenState extends State<TambahWisataScreen> {
         TextFormField(
           controller: ctrl,
           maxLines: maxLines,
+          keyboardType: keyboardType,
+          inputFormatters: formatters,
           validator: validator,
           style: TextStyle(color: _C.text, fontSize: 14),
           decoration: InputDecoration(
@@ -1040,7 +1067,7 @@ class _TambahWisataScreenState extends State<TambahWisataScreen> {
         Wrap(
           spacing: 8,
           runSpacing: 8,
-          children: (_categories.data ?? <Category>[]).map((category) {
+          children: _categories.items.map((category) {
             final k = {'label': category.name, 'icon': Icons.explore_rounded};
             final selected = _categoryGuid == category.guid;
             return GestureDetector(

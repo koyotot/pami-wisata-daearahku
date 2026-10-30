@@ -11,8 +11,10 @@ import 'package:google_fonts/google_fonts.dart';
 
 import '../data/app_data.dart';
 import '../data/catalog_state.dart';
+import '../data/booking_state.dart';
 import '../data/business_repository.dart';
 import '../services/auth_session.dart';
+import '../widgets/api_image.dart';
 import 'detail_wisata_screen.dart';
 
 // ── Palet & font (sama dengan home_screen.dart) ──────────────
@@ -46,7 +48,10 @@ class BerandaUserScreen extends StatefulWidget {
   /// yang ada di MainNavigationScreen.
   final VoidCallback? onBukaMenu;
 
-  const BerandaUserScreen({super.key, this.onBukaMenu});
+  /// True saat tab ini tampil; jumlah pendaftaran dimuat ulang ketika tab dibuka kembali.
+  final bool active;
+
+  const BerandaUserScreen({super.key, this.onBukaMenu, this.active = true});
 
   @override
   State<BerandaUserScreen> createState() => _BerandaUserScreenState();
@@ -98,7 +103,14 @@ class _BerandaUserScreenState extends State<BerandaUserScreen>
     _catalog.categories.addListener(_changed);
     _catalog.destinations.addListener(_changed);
     AuthSession.instance.sessionChanges.addListener(_sessionChanged);
+    BookingEvents.changed.addListener(_loadBookingCount);
     _muatData();
+  }
+
+  @override
+  void didUpdateWidget(BerandaUserScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.active && !oldWidget.active) _loadBookingCount();
   }
 
   void _sessionChanged() {
@@ -107,16 +119,25 @@ class _BerandaUserScreenState extends State<BerandaUserScreen>
     _loadBookingCount();
   }
 
+  int _bookingCountRequest = 0;
+
   Future<void> _loadBookingCount() async {
     final session = AuthSession.instance;
     if (!session.authenticated.value || !session.deviceSessionReady) return;
     final generation = session.sessionGeneration;
+    final request = ++_bookingCountRequest;
     try {
-      final page = await BusinessRepository().bookings();
-      if (!mounted || generation != session.sessionGeneration) return;
-      setState(() => _bookingCount = page.meta?['total'] as int?);
+      final total = await loadBookingTotal(BusinessRepository());
+      if (!mounted ||
+          generation != session.sessionGeneration ||
+          request != _bookingCountRequest) {
+        return;
+      }
+      setState(() => _bookingCount = total);
     } catch (_) {
-      if (mounted && generation == session.sessionGeneration) {
+      if (mounted &&
+          generation == session.sessionGeneration &&
+          request == _bookingCountRequest) {
         setState(() => _bookingCount = null);
       }
     }
@@ -138,6 +159,7 @@ class _BerandaUserScreenState extends State<BerandaUserScreen>
   @override
   void dispose() {
     AuthSession.instance.sessionChanges.removeListener(_sessionChanged);
+    BookingEvents.changed.removeListener(_loadBookingCount);
     _catalog.dispose();
     _searchCtrl.dispose();
     _fadeCtrl.dispose();
@@ -984,6 +1006,13 @@ class _WisataCardState extends State<_WisataCard> {
   }
 
   Widget _wisataImage(Wisata w) {
+    // Destinasi Laravel: gambar dimuat lewat API (imagePath selalu null).
+    if (w.isLaravel) {
+      return ApiImage(
+          imageUrl: w.imageUrl,
+          fit: BoxFit.cover,
+          placeholder: (_) => _placeholder());
+    }
     final path = w.imagePath;
 
     if (path == null || path.isEmpty) return _placeholder();

@@ -1,43 +1,45 @@
-# Phase 5: migrasi administrasi Laravel
+# Phase 5: administrasi Laravel — penyelesaian fungsional
 
-## Kontrak yang diaudit
+Kontrak lengkap: `docs/api_contract_phase4_5.md`. Autentikasi terpadu: `docs/phase5_unified_auth.md` (tidak diubah).
 
-Seluruh path di bawah relatif terhadap `/api/v1`. Operasi admin memakai Bearer Laravel; role dan status akun diverifikasi server. `auth/me` mengembalikan `guid`, `role` integer dan `status`. Role minimal 1 untuk booking, destinasi, dan kuota; kategori dan akun admin memerlukan role 2.
+## Status akhir: FUNCTIONALLY COMPLETE (batas operasional di bawah)
 
-| Operasi | Kontrak backend |
+Semua operasi administrasi memakai Laravel/MySQL dan AuthSession (Bearer). Tidak ada Firestore atau Firebase Storage pada layar admin aktif.
+
+## Yang diselesaikan
+
+| Butir PRD | Implementasi |
 | --- | --- |
-| Dashboard | Tidak ada endpoint statistik admin. |
-| Booking | `GET admin/bookings`, halaman 15 item dengan `data`, `links`, `meta`; `POST admin/bookings/{guid}/approve` atau `reject`, body `reason` opsional maksimal 255 karakter. Resource berisi identitas, snapshot destinasi, tanggal, jumlah, kontak, harga, status dan waktu. |
-| Detail booking | `GET bookings/{guid}` hanya untuk pemilik, bahkan jika pemanggil admin. Data detail admin terbatas pada resource daftar; tidak ada endpoint refresh detail individual admin. |
-| Katalog | `GET categories`, `GET destinations`, `GET destinations/{guid}` publik; `POST`, `PATCH`, `DELETE categories/{guid}` dan `destinations/{guid}` dilindungi role. Daftar hanya resource aktif; DELETE menonaktifkan. POST kategori memerlukan `name`, `slug`; destinasi memerlukan `destination_category_guid`, `name`, `location`, `description`, `ticket_price`, `opening_hours`, `timezone`. |
-| Kuota | `GET destinations/{guid}/quotas` berpaginasi dan `PUT` dengan `visit_date`, `capacity`, `booking_opens_at`, `booking_closes_at`. `capacity` adalah total, bukan sisa. Kapasitas di bawah alokasi menghasilkan 422. |
-| Dokumen | `GET bookings/{guid}/documents` dan download `documents/{invoice|ticket}` tersedia untuk pemilik atau admin sesuai kondisi backend; bukan bukti pembayaran. Tidak ada kontrak QR legacy. |
-| Akun admin | `POST admin/accounts` dan `PATCH admin/accounts/{guid}` tersedia untuk role 2; endpoint daftar dan hapus tidak tersedia. |
+| Booking admin (4) | `daftar_pendaftar_screen`: filter status di server, semua halaman + dedupe, detail via `GET admin/bookings/{guid}` (tombol keputusan aktif setelah detail terbaca), approve / reject dengan alasan opsional, guard double submit per GUID, tanpa perubahan status optimistis. `booking_not_pending` / `approval_deadline_passed` → baca ulang detail; timeout → rekonsiliasi via detail, tidak ada pengulangan otomatis. Gratis → `confirmed`, berbayar → `awaiting_payment`, reject → `rejected`. |
+| Destinasi (5) | Create, edit, nonaktifkan, daftar nonaktif (`admin/destinations?status=`), reaktivasi (`PATCH is_active`; 409 `category_inactive`). Form tambah tidak lagi diblokir: mengirim `destination_category_guid`, `name`, `location`, `description`, `ticket_price`, `opening_hours`, `timezone` (dropdown IANA `Asia/Jakarta`, `Asia/Makassar`, `Asia/Jayapura`). Daftar katalog segar setelah refresh. |
+| Kategori (6, role 2) | `kelola_kategori_screen`: daftar termasuk nonaktif, buat, ubah, nonaktifkan/aktifkan; slug unik (422); kategori masih dipakai destinasi aktif → 409 `category_in_use`; relasi tidak dirusak. |
+| Kuota (7, role ≥ 1) | `kelola_kuota_screen`: kapasitas total, alokasi, dan sisa sebagai tiga nilai berbeda; `visit_date`, `capacity`, `booking_opens_at`, `booking_closes_at` dikirim UTC `Z`; validasi server (kapasitas ≥ alokasi, jendela valid, serialisasi konkuren). |
+| Gambar (8) | Multipart `image` (JPEG/PNG/WebP ≤ 5 MB) pada create/edit atau `POST destinations/{guid}/image`. Backend tidak lagi membocorkan `image_path`; menyajikan `image_url` relatif berversi + endpoint media. Flutter memuat lewat `ApiImage` (bekerja dengan header Host emulator). File lama dihapus setelah referensi baru tersimpan. |
+| Akun admin (9, role 2) | `kelola_admin_screen`: daftar (`GET admin/accounts`), buat admin (role 1), suspend/aktifkan, ubah role. Tidak dapat mengubah role/status sendiri; superadmin aktif terakhir dilindungi; akun terdampak dicabut sesinya seketika. Tanpa Firebase sebagai sumber akun. |
 
-Approval gratis menghasilkan `confirmed`, berbayar `awaiting_payment`; penolakan menghasilkan `rejected`. Aksi pada booking yang tidak lagi `pending_approval` atau kedaluwarsa menghasilkan 409. Backend juga menggunakan 409 untuk alasan lain, termasuk kapasitas, jendela booking dan konflik idempotensi; kode itu sendiri bukan bukti satu penyebab. Keputusan admin tidak mempunyai kontrak idempotensi: hasil timeout tidak boleh dianggap gagal atau berhasil dan tidak boleh diulang otomatis; muat ulang daftar untuk memeriksa status.
+Sisi Flutter: `lib/data/admin_state.dart` (`PagedListController`, `AdminBookingDecider`, guard, pemetaan error), `lib/screens/admin_common.dart`, layar di atas, entri dashboard (Kuota role ≥ 1; Kategori & Admin hanya role 2 — hanya UX, backend tetap otoritas).
 
-Gambar memakai multipart `image` JPEG/PNG/WebP maksimum 5 MB. Backend menyimpan path pada disk default; konfigurasi default tidak menjamin URL publik. Pembacaan katalog aktif oleh pengguna dan admin menggunakan sumber Laravel yang sama. Server memvalidasi perubahan dan menyerialkan update kuota terhadap alokasi; hal ini belum membuktikan perilaku MySQL bersamaan di lingkungan nyata.
+## Keamanan (diverifikasi)
 
-## Rekonsiliasi Phase 4
+Semua dengan HTTP nyata + MySQL (E2E Skenario D) dan tes fitur:
 
-Intent booking yang hasilnya tidak pasti tetap disimpan per akun. Replay yang diizinkan memakai payload dan `Idempotency-Key` yang sama dan dapat membuat booking jika request awal belum tiba; hasil replay adalah snapshot awal dan detail pengguna perlu diambil lagi. Tidak ada endpoint pencarian berdasarkan key. Jangan membuka intent yang belum terpecahkan untuk membuat booking baru. Retensi dan pembersihan key, concurrency MySQL, scheduler, dan alur pengguna → admin → pengguna perlu verifikasi nyata. Lihat `phase4_booking_migration.md` untuk batas lebih lanjut.
+- Role 0 → 403 pada seluruh endpoint admin (booking, destinasi, kategori, akun, kuota).
+- Role 1 → 403 pada endpoint role 2 (kategori, daftar/buat/ubah akun).
+- Tanpa token → 401. User A tidak dapat membaca/membatalkan/mengunduh dokumen/membaca intent milik User B (404 atau `not_found` tanpa data).
+- Logout, perubahan role, dan suspend mencabut akses seketika (token lama 401); login akun suspended ditolak.
+- Approve vs reject vs cancel serentak di MySQL: tepat satu menang, riwayat konsisten.
+- Google Login role 1/2 → 403 di `AuthService` (tidak diubah; diuji dengan mock verifier).
 
-## Blocker dan dependensi legacy
+## Hasil verifikasi
 
-- Endpoint admin untuk detail individual, daftar resource nonaktif/reakivasi, statistik, sisa kuota, serta daftar/hapus akun admin belum tersedia. Jangan menyimpulkan kuota tersisa dari data lokal.
-- Akses gambar publik dan upload perlu kontrak penyimpanan/deployment yang terverifikasi.
-- Review, check-in, pembayaran, FCM, dan data Firebase historis berada di luar migrasi. Tidak ada pemetaan identitas Firebase atau ID wisata historis ke GUID Laravel yang terverifikasi.
-- `app_data.dart` masih memuat helper Firestore historis; layar bukti/review/profil legacy masih mempunyai dependensi Firestore. Aturan Firestore terpasang belum diaudit; tidak ada data historis yang dihapus.
+Sama dengan tabel di `phase4_booking_migration.md`: Laravel 50 tes PASS, MySQL konkurensi 7 PASS, E2E A–D 4 PASS, Flutter 185 PASS, analyzer 0 error / 237 warning+info (baseline 263), `git diff --check` PASS. Android Emulator/perangkat, ID token Google nyata, FCM/SMTP nyata: NOT VERIFIED.
 
-## Verifikasi
+## Risiko yang belum selesai
 
-- PASS: `flutter test --no-pub`, 43 tes. Tes admin baru memeriksa kontrak HTTP mock; tes lain mencakup sesi, katalog, favorit, intent booking dan widget smoke. Ini tidak membuktikan backend nyata.
-- PASS: `git diff --check` untuk perubahan terlacak; file baru ditinjau bersama perubahan.
-- FAIL: `flutter analyze --no-pub`, 257 warning/info di seluruh proyek; tidak ada error kompilasi yang dilaporkan.
-- NOT VERIFIED: admin double submit, konflik 409, pagination/deduplikasi dan respons terlambat pada widget admin; otorisasi non-admin terhadap server nyata; alur pengguna ? admin ? pengguna, MySQL bersamaan, FCM di perangkat, dan tampilan aktual.
-
-## Status implementasi lokal
-
-Login admin lama memakai AuthSession dan `auth/me`; seed dan login Firestore dihapus. Dashboard memakai total resource daftar dan booking terbaru Laravel; rating tidak tersedia. Daftar booking admin memakai seluruh halaman, GUID, keputusan server dan refresh tanpa perubahan status optimistis. Detail ditampilkan dari resource daftar, bukan endpoint detail admin. Daftar/edit/penonaktifan destinasi memakai Laravel. Repository menyediakan metode create destinasi, CRUD kategori dan GET/PUT kuota, namun metode tersebut belum terhubung ke layar operasional kategori/kuota. Form tambah destinasi diblokir karena tidak memiliki input timezone wajib; perubahan gambar juga diblokir. Layar kelola admin Firestore dinonaktifkan; create/update akun Laravel belum tersambung. Dengan batas ini acceptance criteria Phase 5 belum terpenuhi.
-
-Belum siap produksi. Diperlukan penyelesaian input/UI dalam ruang lingkup yang disepakati, kontrak yang kurang, serta verifikasi end-to-end backend nyata sebelum penggunaan operasional.
+1. Flow `image_picker`, tiga pemilih tanggal/waktu, dan tampilan visual hanya diuji pada level kontrak HTTP dan widget; tidak pada perangkat.
+2. Tidak ada endpoint hapus gambar; "Hapus Foto" diganti "Batalkan Foto Baru".
+3. Jam kuota dipilih di zona waktu perangkat dan dikirim UTC; aturan "tutup sebelum hari kunjungan" dinilai server di zona waktu destinasi (pesan 422 ditampilkan).
+4. Daftar terurut terbaru dapat melewatkan baris yang bergeser antar halaman saat paging; dedupe hanya menghapus duplikat, tarik-segarkan memulihkan.
+5. `AdminDashboard` tidak diuji widget (dependensi GoogleFonts); gating role diuji pada level fungsi.
+6. Dashboard tidak punya endpoint statistik; angka diambil dari total daftar. Rating tidak tersedia.
+7. Pembayaran, review, check-in tetap di luar cakupan; lihat risiko di `phase4_booking_migration.md`.

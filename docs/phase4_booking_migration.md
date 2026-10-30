@@ -1,34 +1,54 @@
-# Phase 4: booking dan kuota
+# Phase 4: booking dan kuota — penyelesaian fungsional
 
-## Kontrak Laravel yang diaudit
+Kontrak lengkap: `docs/api_contract_phase4_5.md`. Backend: `pami-wisata-daerahku-api/docs/handoff/PHASE-4-5-COMPLETION.md`.
 
-Semua endpoint berikut berada di `/api/v1` dan memerlukan Bearer Laravel. `GET bookings` mengembalikan booking pemilik token, 15 per halaman, dengan `links` dan `meta`; `GET bookings/{guid}` juga dibatasi pemilik dan mengembalikan 404 untuk booking yang tidak ditemukan atau bukan miliknya. `POST bookings` menerima `destination_guid`, `visit_date` (`YYYY-MM-DD`), `quantity`, `visitor_name`, `visitor_email`, `visitor_phone`, `notes` opsional, dan header `Idempotency-Key`. Identitas pemilik ditentukan server dari token, bukan input klien. Resource menyediakan nomor booking, snapshot destinasi, harga, status dan waktu; status bukan status Firestore.
+## Status akhir: FUNCTIONALLY COMPLETE (batas operasional di bawah)
 
-`GET/PUT destinations/{guid}/quotas` hanya untuk admin; resource hanya memuat kapasitas total, bukan sisa. Tidak ada endpoint ketersediaan pengguna atau pembatalan. Backend memeriksa kuota dan alokasi dalam transaksi saat POST dan dapat mengembalikan 409 dengan pesan aktual, termasuk `Quota is unavailable.` atau `Insufficient capacity.`; 409 juga dipakai untuk konflik lain. Tidak ada endpoint pencarian berdasarkan key. Endpoint dokumen dan admin approve/reject tersedia, tetapi integrasinya di luar Phase 4. Pembayaran, review, dan check-in tidak dimigrasikan.
+Booking berjalan end-to-end terhadap Laravel/MySQL: ketersediaan → buat booking → riwayat/detail → pembatalan → dokumen → keputusan admin → status terbaru di sisi pengguna. Tidak ada operasi booking aktif yang membaca atau menulis Firestore.
 
-## Idempotensi dan batas operasional
+## Yang diselesaikan
 
-Backend mengunci record berdasarkan pengguna, operasi dan key; payload berbeda dengan key yang sama menghasilkan 409. Replay POST dengan key dan payload identik mengembalikan hasil pembuatan yang tersimpan. Hasil replay merupakan snapshot awal: gunakan GET detail untuk status terbaru. Transaksi dan penguncian backend belum dibuktikan terhadap MySQL dan concurrency nyata dalam pekerjaan ini. Record memiliki `expires_at` tujuh hari; retensi efektif dan kebijakan pembersihan harus diverifikasi sebelum mengandalkan replay jangka panjang.
+| Butir PRD | Implementasi |
+| --- | --- |
+| Ketersediaan & kuota (3.2) | `GET destinations/{guid}/availability`: kapasitas total, alokasi, sisa, status, jendela booking, dihitung server dari alokasi nyata, tanpa data pemesan. Formulir menampilkannya dan menonaktifkan kirim bila tidak `open` atau jumlah > sisa; POST tetap memeriksa ulang di dalam transaksi. |
+| Pembatalan (3.3) | `POST bookings/{guid}/cancel`: hanya pemilik, hanya `pending_approval`; kapasitas dilepas atomic sekali; pembatalan ganda 409 `booking_already_cancelled`; booking terproses 409 `booking_not_cancellable`. Tanpa refund/pembatalan pembayaran. |
+| Idempotensi & rekonsiliasi (3.4) | Key dan payload dipertahankan; tidak ada retry POST otomatis; `GET booking-intents/{key}` (terikat pengguna+key) → `completed` / `not_found` (kirim ulang aman) / `abandoned`; `POST booking-intents/{key}/abandon` sebagai jalur keluar aman (key ditombstone, create terlambat ditolak). Replay membaca status terkini. Key > 7 hari ditolak `idempotency_key_expired`, tidak dibuka kembali. |
+| Error handling (3.5) | 409 membawa `code` terstruktur; Flutter memetakan tiap kode ke pesan spesifik (`lib/data/booking_errors.dart`). |
+| Dokumen (3.6) | Metadata dan unduhan PDF lewat Bearer Laravel; hanya pemilik/admin. Invoice = konfirmasi booking, bukan bukti pembayaran. Tidak ada QR legacy. |
 
-HTTP 401, 403, 404, 409, 422, 429, 5xx dan kegagalan jaringan tidak boleh ditafsirkan sebagai keberhasilan. Timeout atau respons server yang tidak pasti bukan bukti bahwa booking gagal. Jangan mengirim niat baru sampai transaksi tidak pasti direkonsiliasi secara aman.
+Sisi Flutter: `lib/data/booking_intent.dart` (mesin intent), `booking_state.dart` (riwayat semua halaman + dedupe, detail, pembatalan, dokumen, penolakan respons sesi lama), `booking_errors.dart`, layar `daftar_kunjungan`, `bukti_pendaftaran`, `detail_wisata`, penghitung beranda/profil dari `meta.total`.
 
-Intent tersimpan di secure storage berdasarkan GUID pengguna sebelum POST. Jika hasil belum diketahui, pengguna diminta secara eksplisit untuk mengirim ulang payload dan key lama; replay dapat membuat booking jika permintaan pertama belum sampai. Respons yang masih tidak pasti mempertahankan intent. Respons detail dipakai setelah pembuatan; formulir dan respons lama dijaga saat sesi berubah. Intent yang tidak dapat direkonsiliasi tetap memblokir pembuatan baru untuk akun tersebut. `AuthSession` saat ini menampilkan pesan umum untuk 409, bukan pesan konflik aktual Laravel; pembedaan konflik kuota dari konflik lain belum tersedia di UI.
+## Perubahan perilaku yang disengaja
 
-Riwayat memuat semua halaman dan mengambil detail terkini ketika dibuka. Filter lama hanya mencakup `pending_approval`, `confirmed`, dan `rejected`; status lain ditampilkan apa adanya. QR dan review Firestore tidak diaktifkan untuk booking Laravel. Konfirmasi lama yang membuat QR lokal tidak dibuka; setelah berhasil, layar formulir menampilkan nomor dan status server. Ini adalah perubahan perilaku yang diperlukan untuk menghindari bukti operasional palsu; kesetaraan penuh dengan UX lama belum tercapai. Penghitung beranda/profil tidak otomatis diperbarui pada setiap perubahan status saat layar tetap terbuka.
+- Email pengunjung kini wajib di formulir (backend memang mewajibkannya; sebelumnya berlabel opsional).
+- QR lokal tidak dibuat untuk booking Laravel; review/ulasan Firestore tidak dapat dicapai untuk booking Laravel.
+- `image_path` tidak lagi dipakai sebagai URL; gambar lewat `image_url` + `ApiImage`.
+- Riwayat masih difilter di klien oleh tiga ubin lama; status lain tampil di "Semua". Filter status server sudah ada di loader dan teruji, belum ada kontrol UI.
 
-## Inventaris historis Firestore
+## Inventaris historis Firestore (tidak berubah, tidak dihapus)
 
-`pendaftar` menyimpan `userId`, nama dan kontak pengunjung, nama wisata, tanggal, jumlah, nomor bukti, catatan, status `menunggu`/`disetujui`/`ditolak`, dan waktu pembuatan. Data historis memakai UID Firebase dan nama wisata, bukan GUID destinasi Laravel; versi campuran mungkin telah menyimpan GUID Laravel sebagai `userId`. Nama atau email tidak membuktikan pemetaan identitas maupun destinasi. Tidak ada impor otomatis atau penghapusan data historis. Migrasi memerlukan pemetaan pengguna dan destinasi terverifikasi serta proses terpisah.
+`pendaftar` (UID Firebase, nama wisata, status `menunggu/disetujui/ditolak`) dan `ulasan` tetap ada sebagai data historis; tidak ada pemetaan terverifikasi ke GUID pengguna/destinasi Laravel sehingga tidak diimpor. Kode Firestore yang tersisa (ulasan, hapus akun, riwayat ulasan) hanya dapat dicapai akun non-Laravel.
 
-Pembaca/penulis legacy meliputi `app_data.dart`, layar daftar kunjungan, riwayat/bukti, beranda, profil, dashboard dan daftar pendaftar admin. Admin Firebase membaca dan mengubah `pendaftar`; booking Laravel tidak muncul pada alur admin lama. Aturan Firestore yang terpasang belum diverifikasi. Review dan check-in masih terkait data legacy.
+## Hasil verifikasi
 
-## Kesiapan Phase 5
+| Pemeriksaan | Hasil |
+| --- | --- |
+| `php artisan test` (SQLite) | PASS — 50 tes, 368 assertion |
+| `php artisan test -c phpunit.mysql.xml` (MySQL 8.4 nyata, proses PHP paralel) | PASS — 7 tes: tanpa overselling (24 pemesan, kapasitas 10 → tepat 10), kuantitas campuran, key identik serentak → 1 booking, cancel serentak → rilis sekali, approve/reject/cancel balapan → tepat satu menang, penurunan kuota vs booking, kursi bebas setelah cancel. Lulus 3× berturut-turut. |
+| `php artisan test -c phpunit.e2e.xml` (server HTTP nyata + MySQL) | PASS — Skenario A, B, C, D (132 assertion), termasuk dokumen PDF terbit lewat queue + scheduler command nyata |
+| `flutter test --no-pub` | PASS — 185 tes (59 lama + 126 baru) |
+| `flutter analyze --no-pub` | 0 error; 4 warning + 233 info = 237 (baseline 263: 0 error). Tidak ada isu baru pada file yang disentuh; file baru bersih. Semua sisa adalah lint lama (mis. `prefer_const_constructors` di `profil_user_screen`, field tak terpakai) |
+| `git diff --check` | PASS (Flutter dan Laravel) |
+| Android Emulator / perangkat | NOT VERIFIED — `adb`/emulator tidak tersedia di mesin ini |
+| Google Login admin → 403 | PASS dengan verifier Firebase yang di-mock (`AuthSecurityTest`); NOT VERIFIED dengan ID token Firebase nyata |
+| FCM/SMTP nyata, secure storage di perangkat | NOT VERIFIED |
 
-Sebelum operasional, sediakan alur admin Laravel untuk melihat dan memutuskan booking, dan sepakati akses ketersediaan pengguna, pembatalan, rekonsiliasi transaksi serta retensi key. Verifikasi integrasi nyata, otorisasi, scheduler, concurrency MySQL dan perangkat. Jangan menganggap alur admin Firebase dapat menyetujui booking Laravel.
+## Risiko yang belum selesai
 
-## Hasil verifikasi lokal
-
-- PASS: `flutter test` (39 tes), termasuk mock repository intent untuk replay identik, konflik awal, 422 saat rekonsiliasi, double tap dan respons sesi lama; tes API mock memeriksa Bearer dan key. Tes katalog, favorit dan autentikasi yang ada juga lulus.
-- FAIL: `flutter analyze` keluar dengan 252 temuan lint dan warning di seluruh proyek; bukan bukti keberhasilan analisis bersih.
-- PASS: `git diff --check` pada perubahan terlacak. File baru juga perlu ditinjau bersama diff.
-- NOT VERIFIED: integrasi Laravel dan MySQL nyata, kuota tersedia/habis dan concurrency nyata, device/secure storage, UI/widget riwayat dan pagination, isolasi lintas akun secara end-to-end, serta aturan Firestore terpasang. Pembatalan dan pratinjau ketersediaan tidak dapat diuji karena endpoint pengguna tidak tersedia.
+1. **Pembayaran**: tidak ada integrasi; `awaiting_payment` berarti menunggu pembayaran, bukan lunas. Booking terproses tidak dapat dibatalkan pengguna (butuh kebijakan refund/pembayaran).
+2. **Unduhan PDF**: hanya disimpan ke direktori sementara aplikasi dan jalurnya ditampilkan; tidak ada penampil/berbagi karena tidak ada dependency baru. Perlu keputusan (mis. `open_filex`/`share_plus`) sebelum rilis.
+3. **Cutoff kunjungan** (25 j 15 m create, 1 j 15 m approve) masih sementara.
+4. **Pembersihan record idempotensi** tidak ada (record tetap sebagai penanda).
+5. Metadata dokumen dapat menampilkan dokumen yang file PDF-nya belum siap (unduh → 404; UI menyatakan "belum siap").
+6. Server pengujian satu-thread: konkurensi dibuktikan lintas proses di level service, bukan lewat banyak koneksi HTTP simultan.
+7. Tampilan visual panel baru, picker, dan perilaku di perangkat belum diverifikasi.

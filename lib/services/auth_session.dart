@@ -8,9 +8,40 @@ import '../data/app_data.dart';
 class ApiException implements Exception {
   final String message;
   final int? status;
-  const ApiException(this.message, [this.status]);
+
+  /// Stable machine-readable Laravel `code` (e.g. `insufficient_capacity`), or a local
+  /// transport code: `timeout`, `network`, `invalid_response`.
+  final String? code;
+
+  /// Optional Laravel `context` object that accompanies a structured conflict.
+  final Map<String, dynamic>? context;
+  const ApiException(this.message, [this.status, this.code, this.context]);
+
+  /// True when the request may have reached the server and its effect is unknown, so a
+  /// mutation must be reconciled rather than treated as failed or blindly repeated.
+  bool get outcomeUnknown =>
+      code == 'timeout' ||
+      code == 'network' ||
+      code == 'invalid_response' ||
+      (status != null && status! >= 500);
+
   @override
   String toString() => message;
+}
+
+/// A file part for [AuthSession.requestMultipart]; bytes are kept so a retried request
+/// after token refresh can rebuild the multipart body.
+class UploadFile {
+  final String field;
+  final List<int> bytes;
+  final String filename;
+  const UploadFile(this.field, this.bytes, this.filename);
+}
+
+class BinaryResponse {
+  final Uint8List bytes;
+  final String contentType;
+  const BinaryResponse(this.bytes, this.contentType);
 }
 
 abstract class SessionStore {
@@ -66,10 +97,7 @@ class AuthSession {
       : client = client ?? http.Client(),
         store = store ?? const SecureSessionStore();
 
-  Future<Map<String, dynamic>> _sendEnvelope(String method, String path,
-      {Map<String, dynamic>? body,
-      String? token,
-      Map<String, String>? headers}) async {
+  Uri _uri(String path) {
     final base = Uri.tryParse(baseUrl);
     if (base == null ||
         !base.hasAuthority ||
@@ -78,66 +106,131 @@ class AuthSession {
       throw const ApiException(
           'Konfigurasi API_BASE_URL belum valid. Gunakan HTTPS untuk rilis.');
     }
+    return Uri.parse('${baseUrl.replaceFirst(RegExp(r'/+$'), '')}/$path');
+  }
+
+  Map<String, String> _headers(
+      {String? token, bool json = true, Map<String, String>? extra}) {
+    final base = Uri.parse(baseUrl);
+    return {
+      'Accept': 'application/json',
+      if (json) 'Content-Type': 'application/json',
+
+      // Khusus Android Emulator + Laragon development
+      if (kDebugMode && base.host == '127.0.0.1' && base.port == 8080)
+        'Host': 'pami-wisata-daerahku-api.test',
+
+      if (token != null) 'Authorization': 'Bearer $token',
+      ...?extra,
+    };
+  }
+
+  /// Sends [request] and maps transport failures; non-2xx handling stays with callers.
+  Future<http.Response> _transport(http.BaseRequest request) async {
     try {
-      final request = http.Request(method,
-          Uri.parse('${baseUrl.replaceFirst(RegExp(r'/+$'), '')}/$path'));
-      request.headers.addAll({
-        'Accept': 'application/json',
-        'Content-Type': 'application/json',
-
-        // Khusus Android Emulator + Laragon development
-        if (kDebugMode && base.host == '127.0.0.1' && base.port == 8080)
-          'Host': 'pami-wisata-daerahku-api.test',
-
-        if (token != null) 'Authorization': 'Bearer $token',
-        ...?headers,
-      });
-      if (body != null) request.body = jsonEncode(body);
-      final response = await client
+      return await client
           .send(request)
           .then(http.Response.fromStream)
           .timeout(const Duration(seconds: 20));
-      Map<String, dynamic> decoded = {};
-      try {
-        decoded = jsonDecode(response.body) as Map<String, dynamic>;
-      } catch (_) {/* Non-JSON error pages are never shown to users. */}
-      if (response.statusCode < 200 || response.statusCode >= 300) {
-        final errors = decoded['errors'];
-        final validation = errors is Map
-            ? errors.values
-                .whereType<List>()
-                .expand((v) => v)
-                .whereType<String>()
-                .join('\n')
-            : '';
-        throw ApiException(
-            response.statusCode == 422 && validation.isNotEmpty
-                ? validation
-                : switch (response.statusCode) {
-                    401 =>
-                      'Sesi atau kredensial tidak valid. Silakan masuk kembali.',
-                    403 => 'Akses tidak diizinkan.',
-                    404 => 'Wisata atau data tidak ditemukan.',
-                    409 => decoded['message'] is String
-                        ? decoded['message'] as String
-                        : 'Terjadi konflik. Silakan coba lagi.',
-                    429 => 'Terlalu banyak percobaan. Coba lagi nanti.',
-                    _ => 'Layanan sedang bermasalah. Silakan coba lagi.',
-                  },
-            response.statusCode);
-      }
-      if (!decoded.containsKey('data')) {
-        throw const ApiException('Respons layanan tidak valid.');
-      }
-      return decoded;
-    } on ApiException {
-      rethrow;
     } on TimeoutException {
-      throw const ApiException('Koneksi habis waktu. Silakan coba lagi.');
+      throw const ApiException(
+          'Koneksi habis waktu. Silakan coba lagi.', null, 'timeout');
     } catch (_) {
       throw const ApiException(
-          'Tidak dapat terhubung ke layanan. Periksa koneksi Anda.');
+          'Tidak dapat terhubung ke layanan. Periksa koneksi Anda.',
+          null,
+          'network');
     }
+  }
+
+  Map<String, dynamic> _decode(http.Response response) {
+    try {
+      return jsonDecode(utf8.decode(response.bodyBytes))
+          as Map<String, dynamic>;
+    } catch (_) {
+      /* Non-JSON error pages are never shown to users. */
+      return {};
+    }
+  }
+
+  ApiException _failure(http.Response response, Map<String, dynamic> decoded) {
+    final errors = decoded['errors'];
+    final validation = errors is Map
+        ? errors.values
+            .whereType<List>()
+            .expand((v) => v)
+            .whereType<String>()
+            .join('\n')
+        : '';
+    final code = decoded['code'] is String ? decoded['code'] as String : null;
+    final context = decoded['context'] is Map<String, dynamic>
+        ? decoded['context'] as Map<String, dynamic>
+        : null;
+    return ApiException(
+        response.statusCode == 422 && validation.isNotEmpty
+            ? validation
+            : switch (response.statusCode) {
+                401 =>
+                  'Sesi atau kredensial tidak valid. Silakan masuk kembali.',
+                403 => 'Akses tidak diizinkan.',
+                404 => 'Wisata atau data tidak ditemukan.',
+                409 => decoded['message'] is String
+                    ? decoded['message'] as String
+                    : 'Terjadi konflik. Silakan coba lagi.',
+                429 => 'Terlalu banyak percobaan. Coba lagi nanti.',
+                _ => 'Layanan sedang bermasalah. Silakan coba lagi.',
+              },
+        response.statusCode,
+        code,
+        context);
+  }
+
+  Map<String, dynamic> _envelope(http.Response response) {
+    final decoded = _decode(response);
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      throw _failure(response, decoded);
+    }
+    if (!decoded.containsKey('data')) {
+      throw ApiException('Respons layanan tidak valid.', response.statusCode,
+          'invalid_response');
+    }
+    return decoded;
+  }
+
+  Future<Map<String, dynamic>> _sendEnvelope(String method, String path,
+      {Map<String, dynamic>? body,
+      String? token,
+      Map<String, String>? headers}) async {
+    final request = http.Request(method, _uri(path));
+    request.headers.addAll(_headers(token: token, extra: headers));
+    if (body != null) request.body = jsonEncode(body);
+    return _envelope(await _transport(request));
+  }
+
+  Future<Map<String, dynamic>> _sendMultipart(String method, String path,
+      {required Map<String, String> fields,
+      required List<UploadFile> files,
+      String? token}) async {
+    final request = http.MultipartRequest(method, _uri(path));
+    request.headers.addAll(_headers(token: token, json: false));
+    request.fields.addAll(fields);
+    for (final file in files) {
+      // Laravel validates the real file content, not the client-declared type.
+      request.files.add(http.MultipartFile.fromBytes(file.field, file.bytes,
+          filename: file.filename));
+    }
+    return _envelope(await _transport(request));
+  }
+
+  Future<BinaryResponse> _sendBinary(String path, {String? token}) async {
+    final request = http.Request('GET', _uri(path));
+    request.headers.addAll(_headers(token: token, json: false));
+    final response = await _transport(request);
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      throw _failure(response, _decode(response));
+    }
+    return BinaryResponse(response.bodyBytes,
+        response.headers['content-type'] ?? 'application/octet-stream');
   }
 
   Future<Map<String, dynamic>> _send(String method, String path,
@@ -203,9 +296,12 @@ class AuthSession {
         'password': password,
         'password_confirmation': confirmation
       });
-  Future<void> google(String idToken) =>
-      _authenticate('auth/google', {'id_token': idToken});
-  Future<void> _authenticate(String path, Map<String, dynamic> body) async {
+  /// Google Login hanya untuk role 0; sesi role lain ditolak dan dibersihkan.
+  Future<void> google(String idToken) => _authenticate(
+      'auth/google', {'id_token': idToken},
+      allowedRoles: const {0});
+  Future<void> _authenticate(String path, Map<String, dynamic> body,
+      {Set<int>? allowedRoles}) async {
     var generation = ++_generation;
     _logoutGeneration = null;
     authenticating = true;
@@ -239,7 +335,7 @@ class AuthSession {
       if (generation != _generation) {
         throw const ApiException('Permintaan masuk sudah dibatalkan.');
       }
-      await me();
+      await me(allowedRoles: allowedRoles);
       if (generation == _generation) authenticating = false;
     } catch (_) {
       if (generation == _generation && _logoutGeneration != generation) {
@@ -305,14 +401,32 @@ class AuthSession {
   }
 
   Future<Map<String, dynamic>> requestEnvelope(String method, String path,
-      {Map<String, dynamic>? body, Map<String, String>? headers}) async {
+          {Map<String, dynamic>? body, Map<String, String>? headers}) =>
+      _authorized((token) => _sendEnvelope(method, path,
+          body: body, token: token, headers: headers));
+
+  /// Authenticated multipart request (e.g. image upload). Use POST with a `_method`
+  /// field to spoof PATCH, because PHP does not parse multipart bodies for PATCH.
+  Future<Map<String, dynamic>> requestMultipart(String method, String path,
+          {Map<String, String> fields = const {},
+          List<UploadFile> files = const []}) =>
+      _authorized((token) => _sendMultipart(method, path,
+          fields: fields, files: files, token: token));
+
+  /// Authenticated binary download (documents, protected images).
+  Future<BinaryResponse> requestBytes(String path) =>
+      _authorized((token) => _sendBinary(path, token: token));
+
+  /// Unauthenticated binary download (public catalog images).
+  Future<BinaryResponse> publicBytes(String path) => _sendBinary(path);
+
+  /// Runs [send] with the current access token, refreshing once on 401 and
+  /// discarding any result that belongs to an older session generation.
+  Future<T> _authorized<T>(Future<T> Function(String token) send) async {
     final generation = _generation;
     final token = _tokens?['access_token'] as String?;
     if (token == null) throw const ApiException('Silakan masuk kembali.', 401);
-    Future<Map<String, dynamic>> send(String accessToken) =>
-        _sendEnvelope(method, path,
-            body: body, token: accessToken, headers: headers);
-    Map<String, dynamic> result;
+    T result;
     try {
       result = await send(token);
     } on ApiException catch (e) {
@@ -337,16 +451,31 @@ class AuthSession {
     return result;
   }
 
-  Future<void> me() async {
+  Future<void> me({Set<int>? allowedRoles}) async {
     final generation = _generation;
     final data = await request('GET', 'auth/me');
     if (generation != _generation || _logoutGeneration == generation) {
       throw const ApiException('Sesi telah berakhir.', 401);
     }
+    final issuedToken = _tokens?['access_token'] as String?;
     try {
       _user(data);
-    } catch (_) {
-      if (generation == _generation) await clear();
+      if (allowedRoles != null && !allowedRoles.contains(role)) {
+        throw const ApiException(
+            'Masuk dengan Google hanya untuk pengguna. '
+            'Admin wajib masuk dengan email dan password.',
+            403);
+      }
+    } catch (e) {
+      if (generation == _generation) {
+        await clear();
+        // Best-effort: cabut token Laravel yang sempat diterbitkan.
+        if (e is ApiException && allowedRoles != null && issuedToken != null) {
+          try {
+            await _sendEnvelope('POST', 'auth/logout', token: issuedToken);
+          } catch (_) {}
+        }
+      }
       rethrow;
     }
     deviceSessionReady = true;

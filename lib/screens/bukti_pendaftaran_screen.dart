@@ -14,6 +14,8 @@ import 'package:firebase_auth/firebase_auth.dart' as fb_auth;
 import 'package:google_fonts/google_fonts.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import '../data/app_data.dart';
+import '../data/booking_errors.dart';
+import '../data/booking_state.dart';
 import '../data/business_repository.dart';
 import '../services/auth_session.dart';
 
@@ -69,9 +71,16 @@ _StatusStyle _styleFor(String status) {
     case 'menunggu':
       return const _StatusStyle(
           _amber, Color(0xFFD97706), 'Menunggu', Icons.hourglass_top_rounded);
+    case 'cancelled':
+      return const _StatusStyle(_textMuted, Color(0xFF5B6B85),
+          'Dibatalkan', Icons.block_rounded);
+    case 'expired':
+      return const _StatusStyle(_textMuted, Color(0xFF5B6B85),
+          'Kedaluwarsa', Icons.timer_off_rounded);
     default:
-      return _StatusStyle(
-          _amber, const Color(0xFFD97706), status, Icons.hourglass_top_rounded);
+      // awaiting_payment / payment_* dan status lain: label Indonesia dari server.
+      return _StatusStyle(_amber, const Color(0xFFD97706),
+          bookingStatusLabel(status), Icons.hourglass_top_rounded);
   }
 }
 
@@ -81,12 +90,12 @@ Pendaftar _fromBooking(Booking booking) {
     id: booking.guid,
     userId: '',
     namaPengunjung: booking.visitorName,
-    noTelepon: json['visitor_phone'] as String,
-    email: json['visitor_email'] as String,
+    noTelepon: booking.visitorPhone,
+    email: booking.visitorEmail,
     wisata: booking.destinationName,
-    tanggal: json['visit_date'] as String,
-    jumlahOrang: json['quantity'] as int,
-    nomorBukti: json['booking_number'] as String,
+    tanggal: booking.visitDate,
+    jumlahOrang: booking.quantity,
+    nomorBukti: booking.bookingNumber,
     catatan: json['notes'] as String? ?? '',
     status: booking.status,
   );
@@ -181,12 +190,18 @@ class BuktiPendaftaranScreen extends StatefulWidget {
 
 class _BuktiPendaftaranScreenState extends State<BuktiPendaftaranScreen> {
   String? _filter; // null = semua, atau 'menunggu' / 'disetujui' / 'ditolak'
-  int _streamGeneration = 0;
+
+  /// Riwayat dari Laravel (semua halaman, tanpa duplikat). Respons lama atau dari sesi
+  /// sebelumnya tidak pernah menimpa data yang lebih baru.
+  final _bookings = UserBookingsState();
 
   @override
   void initState() {
     super.initState();
     AuthSession.instance.sessionChanges.addListener(_refresh);
+    BookingEvents.changed.addListener(_loadBookings);
+    _bookings.addListener(_changed);
+    _loadBookings();
   }
 
   @override
@@ -195,44 +210,31 @@ class _BuktiPendaftaranScreenState extends State<BuktiPendaftaranScreen> {
     if (widget.active && !oldWidget.active) _refresh();
   }
 
-  Stream<List<Pendaftar>> _pendaftaranStream() async* {
-    final session = AuthSession.instance;
-    if (!session.authenticated.value || !session.deviceSessionReady) {
-      throw const ApiException('Silakan masuk kembali.', 401);
-    }
-    final generation = session.sessionGeneration;
-    final repository = BusinessRepository();
-    final items = <Pendaftar>[];
-    var page = 1;
-    while (true) {
-      final result = await repository.bookings(query: {'page': '$page'});
-      if (generation != session.sessionGeneration) {
-        throw const ApiException('Sesi telah berakhir.', 401);
-      }
-      for (final booking in result.items) {
-        items.add(_fromBooking(booking));
-      }
-      final lastPage = result.meta?['last_page'];
-      if (lastPage is! int || page >= lastPage) break;
-      page++;
-    }
-    yield items;
+  void _changed() {
+    if (mounted) setState(() {});
   }
 
-  late Stream<List<Pendaftar>> _stream = _pendaftaranStream();
+  void _loadBookings() {
+    final session = AuthSession.instance;
+    if (!session.authenticated.value || !session.deviceSessionReady) {
+      _bookings.reset();
+      return;
+    }
+    _bookings.load();
+  }
 
   void _refresh() {
     if (!mounted) return;
-    setState(() {
-      _filter = null;
-      _streamGeneration++;
-      _stream = _pendaftaranStream();
-    });
+    setState(() => _filter = null);
+    _loadBookings();
   }
 
   @override
   void dispose() {
     AuthSession.instance.sessionChanges.removeListener(_refresh);
+    BookingEvents.changed.removeListener(_loadBookings);
+    _bookings.removeListener(_changed);
+    _bookings.dispose();
     super.dispose();
   }
 
@@ -261,12 +263,12 @@ class _BuktiPendaftaranScreenState extends State<BuktiPendaftaranScreen> {
       ),
       child: Scaffold(
         backgroundColor: _background,
-        body: StreamBuilder<List<Pendaftar>>(
-          key: ValueKey(_streamGeneration),
-          stream: _stream,
-          builder: (context, snap) {
-            final isLoading = snap.connectionState == ConnectionState.waiting;
-            final semua = snap.data ?? [];
+        body: Builder(
+          builder: (context) {
+            final isLoading = _bookings.loading && _bookings.items.isEmpty;
+            final hasError = _bookings.error != null && _bookings.items.isEmpty;
+            final byGuid = {for (final b in _bookings.items) b.guid: b};
+            final semua = _bookings.items.map(_fromBooking).toList();
             final tampil = _filter == null
                 ? semua
                 : semua.where((p) => _matches(p.status, _filter!)).toList();
@@ -290,13 +292,13 @@ class _BuktiPendaftaranScreenState extends State<BuktiPendaftaranScreen> {
                       child: CircularProgressIndicator(color: _blue),
                     ),
                   )
-                else if (snap.hasError)
+                else if (hasError)
                   SliverFillRemaining(
                     hasScrollBody: false,
                     child: Center(
                         child:
                             Column(mainAxisSize: MainAxisSize.min, children: [
-                      Text('${snap.error}'),
+                      Text(bookingErrorMessage(_bookings.error!)),
                       TextButton(
                           onPressed: _refresh, child: const Text('Coba lagi')),
                     ])),
@@ -321,7 +323,11 @@ class _BuktiPendaftaranScreenState extends State<BuktiPendaftaranScreen> {
                               // saat filter berganti.
                               key: ValueKey(p.id ?? p.nomorBukti),
                               index: i,
-                              child: _TicketCard(pendaftar: p, isLaravel: true),
+                              child: _TicketCard(
+                                  pendaftar: p,
+                                  booking: byGuid[p.id],
+                                  isLaravel: true,
+                                  onChanged: _bookings.replace),
                             );
                           },
                           childCount: tampil.length,
@@ -759,9 +765,19 @@ class _FadeSlide extends StatelessWidget {
 // ══════════════════════════════════════════════════════════
 class _TicketCard extends StatefulWidget {
   final Pendaftar pendaftar;
+
+  /// Booking Laravel asal [pendaftar]; null untuk data historis.
+  final Booking? booking;
   final bool isLaravel;
 
-  const _TicketCard({required this.pendaftar, this.isLaravel = false});
+  /// Dipanggil dengan salinan booking terbaru dari server (detail / hasil pembatalan).
+  final ValueChanged<Booking>? onChanged;
+
+  const _TicketCard(
+      {required this.pendaftar,
+      this.booking,
+      this.isLaravel = false,
+      this.onChanged});
 
   @override
   State<_TicketCard> createState() => _TicketCardState();
@@ -769,23 +785,49 @@ class _TicketCard extends StatefulWidget {
 
 class _TicketCardState extends State<_TicketCard> {
   bool _expanded = false;
-  bool _loadingDetail = false;
-  Pendaftar? _detail;
   bool _sudahUlasan = false;
   String? _statusSebelumnya;
+  BookingDetailController? _controller;
 
   @override
   void initState() {
     super.initState();
     _statusSebelumnya = widget.pendaftar.status;
+    final booking = widget.booking;
+    if (widget.isLaravel && booking != null) {
+      _controller = BookingDetailController(BusinessRepository(), booking)
+        ..addListener(_controllerChanged);
+      _emitted = booking;
+    }
     if (!widget.isLaravel && widget.pendaftar.status == 'disetujui') {
       _cekSudahUlasan();
     }
   }
 
+  Booking? _emitted;
+
+  void _controllerChanged() {
+    if (!mounted) return;
+    setState(() {});
+    final booking = _controller?.booking;
+    if (booking != null && !identical(booking, _emitted)) {
+      _emitted = booking;
+      widget.onChanged?.call(booking);
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller?.removeListener(_controllerChanged);
+    _controller?.dispose();
+    super.dispose();
+  }
+
   @override
   void didUpdateWidget(_TicketCard oldWidget) {
     super.didUpdateWidget(oldWidget);
+    final fresh = widget.booking;
+    if (fresh != null && _controller != null) _controller!.adopt(fresh);
     final statusBaru = widget.pendaftar.status;
     if (_statusSebelumnya != null &&
         _statusSebelumnya != statusBaru &&
@@ -890,8 +932,12 @@ class _TicketCardState extends State<_TicketCard> {
 
   @override
   Widget build(BuildContext context) {
-    final p = _detail ?? widget.pendaftar;
-    final isApproved = p.status == 'disetujui';
+    final controller = _controller;
+    final p = controller != null
+        ? _fromBooking(controller.booking)
+        : widget.pendaftar;
+    // Hanya data historis (Firestore) yang memiliki QR/ulasan lokal; booking Laravel tidak.
+    final isApproved = !widget.isLaravel && p.status == 'disetujui';
     final st = _styleFor(p.status);
 
     return Container(
@@ -916,7 +962,10 @@ class _TicketCardState extends State<_TicketCard> {
           _buildTicketHeader(p, st),
           _buildDashedDivider(),
           _buildTicketBody(p),
-          if (p.catatan.isNotEmpty || p.email.isNotEmpty) _buildExpandBtn(p),
+          if (widget.isLaravel ||
+              p.catatan.isNotEmpty ||
+              p.email.isNotEmpty)
+            _buildExpandBtn(p),
           if (isApproved) _buildUlasanButton(),
         ],
       ),
@@ -924,7 +973,7 @@ class _TicketCardState extends State<_TicketCard> {
   }
 
   Widget _buildTicketHeader(Pendaftar p, _StatusStyle st) {
-    final isApproved = p.status == 'disetujui';
+    final isApproved = !widget.isLaravel && p.status == 'disetujui';
     final wisata = widget.isLaravel ? null : _cariWisata(p.wisata);
 
     return Material(
@@ -1126,49 +1175,76 @@ class _TicketCardState extends State<_TicketCard> {
     );
   }
 
+  Future<void> _toggleExpand() async {
+    final controller = _controller;
+    if (controller == null || _expanded) {
+      setState(() => _expanded = !_expanded);
+      return;
+    }
+    setState(() => _expanded = true);
+    // Saat dibuka: ambil detail terkini dan dokumen dari server (tanpa menunggu).
+    controller.refresh();
+    controller.loadDocuments();
+  }
+
+  void _snack(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+  }
+
+  Future<void> _confirmCancel(BookingDetailController c) async {
+    if (c.cancelling) return;
+    final yes = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Batalkan pendaftaran?'),
+        content: Text(
+            'Pendaftaran ${c.booking.bookingNumber} untuk ${c.booking.destinationName} akan dibatalkan dan kuota dilepas. Tindakan ini tidak dapat dibatalkan.'),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Kembali')),
+          TextButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('Batalkan pendaftaran')),
+        ],
+      ),
+    );
+    if (yes != true || !mounted) return;
+    final ok = await c.cancel();
+    if (!mounted) return;
+    _snack(ok
+        ? 'Pendaftaran dibatalkan. Status dari server: ${bookingStatusLabel(c.booking.status)}.'
+        : (c.message ?? 'Pendaftaran belum dapat dibatalkan.'));
+  }
+
+  Future<void> _download(BookingDetailController c, String type) async {
+    final saved = await c.download(type);
+    if (!mounted) return;
+    _snack(saved != null
+        ? 'Dokumen berhasil diambil dan disimpan sementara di ${saved.path}. '
+            'Aplikasi ini belum memiliki pembaca PDF; buka file tersebut dengan aplikasi lain.'
+        : (c.message ?? 'Dokumen belum dapat diunduh.'));
+  }
+
   Widget _buildExpandBtn(Pendaftar p) {
-    return GestureDetector(
-      onTap: () async {
-        if (!widget.isLaravel || _expanded) {
-          setState(() => _expanded = !_expanded);
-          return;
-        }
-        if (_loadingDetail || p.id == null) return;
-        final generation = AuthSession.instance.sessionGeneration;
-        setState(() => _loadingDetail = true);
-        try {
-          final booking = await BusinessRepository().booking(p.id!);
-          if (!mounted || generation != AuthSession.instance.sessionGeneration)
-            return;
-          setState(() {
-            _detail = _fromBooking(booking);
-            _expanded = true;
-          });
-        } catch (error) {
-          if (!mounted || generation != AuthSession.instance.sessionGeneration)
-            return;
-          ScaffoldMessenger.of(context)
-              .showSnackBar(SnackBar(content: Text('$error')));
-        } finally {
-          if (mounted && generation == AuthSession.instance.sessionGeneration) {
-            setState(() => _loadingDetail = false);
-          }
-        }
-      },
-      behavior: HitTestBehavior.opaque,
-      child: Container(
-        decoration: const BoxDecoration(
-          border: Border(top: BorderSide(color: _border, width: 1)),
-        ),
-        child: Column(
-          children: [
-            Padding(
+    final c = _controller;
+    return Container(
+      decoration: const BoxDecoration(
+        border: Border(top: BorderSide(color: _border, width: 1)),
+      ),
+      child: Column(
+        children: [
+          GestureDetector(
+            onTap: _toggleExpand,
+            behavior: HitTestBehavior.opaque,
+            child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   Text(
-                    _loadingDetail
+                    (c?.refreshing ?? false)
                         ? 'Memuat...'
                         : (_expanded ? 'Sembunyikan detail' : 'Lihat detail'),
                     style: _font(12, FontWeight.w700, _blue),
@@ -1183,39 +1259,137 @@ class _TicketCardState extends State<_TicketCard> {
                 ],
               ),
             ),
-            AnimatedSize(
-              duration: const Duration(milliseconds: 250),
-              curve: Curves.easeInOut,
-              child: _expanded
-                  ? Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.fromLTRB(18, 0, 18, 18),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          if (p.email.isNotEmpty) ...[
-                            _InfoItem(
-                              icon: Icons.email_rounded,
-                              label: 'Email',
-                              value: p.email,
-                            ),
-                            const SizedBox(height: 10),
-                          ],
-                          if (p.catatan.isNotEmpty)
-                            _InfoItem(
-                              icon: Icons.notes_rounded,
-                              label: 'Catatan',
-                              value: p.catatan,
-                            ),
+          ),
+          AnimatedSize(
+            duration: const Duration(milliseconds: 250),
+            curve: Curves.easeInOut,
+            child: _expanded
+                ? Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.fromLTRB(18, 0, 18, 18),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        if (p.email.isNotEmpty) ...[
+                          _InfoItem(
+                            icon: Icons.email_rounded,
+                            label: 'Email',
+                            value: p.email,
+                          ),
+                          const SizedBox(height: 10),
                         ],
-                      ),
-                    )
-                  : const SizedBox(width: double.infinity),
-            ),
-          ],
-        ),
+                        if (p.catatan.isNotEmpty)
+                          _InfoItem(
+                            icon: Icons.notes_rounded,
+                            label: 'Catatan',
+                            value: p.catatan,
+                          ),
+                        if (c != null) ..._buildServerDetail(c),
+                      ],
+                    ),
+                  )
+                : const SizedBox(width: double.infinity),
+          ),
+        ],
       ),
     );
+  }
+
+  /// Status server, pembatalan dan dokumen untuk booking Laravel.
+  List<Widget> _buildServerDetail(BookingDetailController c) {
+    final b = c.booking;
+    final note = bookingStatusNote(b.status);
+    final docs = c.documents;
+    return [
+      const SizedBox(height: 10),
+      _InfoItem(
+        icon: Icons.payments_rounded,
+        label: 'Total',
+        value: '${b.currency} ${b.totalAmount}',
+      ),
+      const SizedBox(height: 10),
+      Text('Status: ${bookingStatusLabel(b.status)}',
+          key: const ValueKey('detailStatus'),
+          style: _font(13, FontWeight.w700, _navy)),
+      if (note != null)
+        Padding(
+          padding: const EdgeInsets.only(top: 2),
+          child: Text(note, style: _font(12, FontWeight.w500, _textMuted)),
+        ),
+      if (c.message != null)
+        Padding(
+          padding: const EdgeInsets.only(top: 8),
+          child: Text(c.message!,
+              key: const ValueKey('detailMessage'),
+              style: _font(12, FontWeight.w600, _red)),
+        ),
+      if (b.cancellable) ...[
+        const SizedBox(height: 12),
+        SizedBox(
+          width: double.infinity,
+          child: OutlinedButton(
+            key: const ValueKey('cancelBooking'),
+            style: OutlinedButton.styleFrom(
+                foregroundColor: _red, side: const BorderSide(color: _red)),
+            onPressed: c.cancelling ? null : () => _confirmCancel(c),
+            child: c.cancelling
+                ? const SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2))
+                : const Text('Batalkan Pendaftaran'),
+          ),
+        ),
+      ],
+      const SizedBox(height: 14),
+      Text('Dokumen', style: _font(13, FontWeight.w800, _navy)),
+      const SizedBox(height: 6),
+      if (c.loadingDocuments)
+        const SizedBox(
+            width: 18,
+            height: 18,
+            child: CircularProgressIndicator(strokeWidth: 2))
+      else if (c.documentsError != null)
+        Row(children: [
+          Expanded(
+              child: Text(c.documentsError!,
+                  style: _font(12, FontWeight.w500, _red))),
+          TextButton(
+              onPressed: c.loadDocuments, child: const Text('Coba lagi')),
+        ])
+      else if (docs != null) ...[
+        if (docs.invoice == null && docs.ticket == null)
+          Text('Dokumen belum diterbitkan.',
+              style: _font(12, FontWeight.w500, _textMuted)),
+        if (docs.invoice != null)
+          _documentRow(c, 'invoice', 'Konfirmasi pendaftaran (invoice)'),
+        if (docs.ticket != null) _documentRow(c, 'ticket', 'Tiket'),
+        if (docs.invoice != null)
+          Padding(
+            padding: const EdgeInsets.only(top: 4),
+            child: Text(
+                'Invoice adalah konfirmasi pendaftaran, bukan bukti pembayaran.',
+                style: _font(11.5, FontWeight.w500, _textMuted)),
+          ),
+      ],
+    ];
+  }
+
+  Widget _documentRow(BookingDetailController c, String type, String label) {
+    final busy = c.downloading == type;
+    return Row(children: [
+      Expanded(child: Text(label, style: _font(12.5, FontWeight.w600, _navy))),
+      TextButton(
+        key: ValueKey('download_$type'),
+        onPressed: c.downloading != null ? null : () => _download(c, type),
+        child: busy
+            ? const SizedBox(
+                width: 16,
+                height: 16,
+                child: CircularProgressIndicator(strokeWidth: 2))
+            : const Text('Unduh'),
+      ),
+    ]);
   }
 
   Widget _buildUlasanButton() {

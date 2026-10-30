@@ -89,7 +89,7 @@ void main() {
           client: MockClient((request) async {
             paths.add(request.url.path);
             return request.url.path.endsWith('/me')
-                ? ok(user('u', role: 1))
+                ? ok(user('u', role: 0))
                 : ok(tokens('u'));
           }));
       if (method == 'google') {
@@ -98,10 +98,50 @@ void main() {
         await session.register(
             'User', 'u@example.test', 'password', 'password');
       }
-      expect(session.role, 1);
+      expect(session.role, 0);
       expect(paths, ['/api/v1/auth/$method', '/api/v1/auth/me']);
     });
   }
+  for (final role in [1, 2]) {
+    test('google login rejects and revokes role $role session', () async {
+      final store = MemoryStore();
+      final paths = <String>[];
+      String? logoutAuth;
+      final session = AuthSession(
+          baseUrl: 'https://api.example.test/api/v1',
+          store: store,
+          client: MockClient((request) async {
+            paths.add(request.url.path);
+            if (request.url.path.endsWith('/logout')) {
+              logoutAuth = request.headers['Authorization'];
+              return ok({'message': 'Logged out.'});
+            }
+            return request.url.path.endsWith('/me')
+                ? ok(user('admin', role: role))
+                : ok(tokens('admin'));
+          }));
+      await expectLater(session.google('firebase-id-token'),
+          throwsA(isA<ApiException>().having((e) => e.status, 'status', 403)));
+      expect(session.authenticated.value, isFalse);
+      expect(session.role, isNull);
+      expect(session.deviceSessionReady, isFalse);
+      expect(currentUser, isNull);
+      expect(store.value, isNull);
+      expect(logoutAuth, 'Bearer access-admin');
+      expect(paths.last, '/api/v1/auth/logout');
+    });
+  }
+  test('google exchange failure leaves no session', () async {
+    final store = MemoryStore();
+    final session = AuthSession(
+        baseUrl: 'https://api.example.test/api/v1',
+        store: store,
+        client: MockClient((request) async => http.Response('{}', 401)));
+    await expectLater(
+        session.google('bad'), throwsA(isA<ApiException>()));
+    expect(session.authenticated.value, isFalse);
+    expect(store.value, isNull);
+  });
   test('failed account switch clears previous identity', () async {
     var attempts = 0;
     final store = MemoryStore();

@@ -13,6 +13,7 @@ import 'package:firebase_auth/firebase_auth.dart' as fb_auth;
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../data/app_data.dart';
+import '../data/booking_state.dart';
 import '../data/business_repository.dart';
 import '../data/favorite_state.dart';
 import 'home_screen.dart';
@@ -74,7 +75,11 @@ class ProfilUserScreen extends StatefulWidget {
   /// diisi perpindahan ke tab Beranda. Jika null, memakai Navigator.maybePop.
   final VoidCallback? onKembali;
 
-  const ProfilUserScreen({super.key, this.onBukaMenu, this.onKembali});
+  /// True saat tab ini tampil; jumlah pendaftaran dimuat ulang ketika tab dibuka kembali.
+  final bool active;
+
+  const ProfilUserScreen(
+      {super.key, this.onBukaMenu, this.onKembali, this.active = true});
 
   @override
   State<ProfilUserScreen> createState() => _ProfilUserScreenState();
@@ -103,8 +108,17 @@ class _ProfilUserScreenState extends State<ProfilUserScreen>
       end: Offset.zero,
     ).animate(CurvedAnimation(parent: _animCtrl, curve: Curves.easeOutCubic));
     AuthSession.instance.sessionChanges.addListener(_sessionChanged);
+    BookingEvents.changed.addListener(_loadJumlahPendaftaran);
     _loadJumlahPendaftaran();
   }
+
+  @override
+  void didUpdateWidget(ProfilUserScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.active && !oldWidget.active) _loadJumlahPendaftaran();
+  }
+
+  int _jumlahRequest = 0;
 
   void _sessionChanged() {
     if (!mounted) return;
@@ -117,25 +131,33 @@ class _ProfilUserScreenState extends State<ProfilUserScreen>
     _loadJumlahPendaftaran();
   }
 
-  // Ambil jumlah pendaftaran milik user yang sedang login langsung dari
-  // Firestore (sumber kebenaran yang sama dipakai BuktiPendaftaranScreen),
-  // bukan dari `daftarPendaftar` yang cuma list sementara di RAM dan akan
-  // kosong lagi setiap kali app dibuka ulang.
+  // Akun Laravel: jumlah pendaftaran dari API Laravel (meta.total). Hanya akun lama
+  // (non-Laravel) yang masih menghitung data historis dari Firestore, langsung dari
+  // koleksi (bukan dari `daftarPendaftar`, list sementara di RAM).
   Future<void> _loadJumlahPendaftaran() async {
     final session = AuthSession.instance;
     final generation = session.sessionGeneration;
+    final request = ++_jumlahRequest;
     if (currentUser?.isLaravel == true &&
         session.authenticated.value &&
         session.deviceSessionReady) {
       try {
-        final page = await BusinessRepository().bookings();
-        if (!mounted || generation != session.sessionGeneration) return;
+        final total = await loadBookingTotal(BusinessRepository());
+        if (!mounted ||
+            generation != session.sessionGeneration ||
+            request != _jumlahRequest) {
+          return;
+        }
         setState(() {
-          _jumlahPendaftaran = page.meta?['total'] as int?;
+          _jumlahPendaftaran = total;
           _loadingJumlah = false;
         });
       } catch (_) {
-        if (!mounted || generation != session.sessionGeneration) return;
+        if (!mounted ||
+            generation != session.sessionGeneration ||
+            request != _jumlahRequest) {
+          return;
+        }
         setState(() => _loadingJumlah = false);
       }
       return;
@@ -180,6 +202,7 @@ class _ProfilUserScreenState extends State<ProfilUserScreen>
   @override
   void dispose() {
     AuthSession.instance.sessionChanges.removeListener(_sessionChanged);
+    BookingEvents.changed.removeListener(_loadJumlahPendaftaran);
     _animCtrl.dispose();
     super.dispose();
   }

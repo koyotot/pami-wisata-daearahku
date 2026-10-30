@@ -10,6 +10,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
+import '../data/admin_state.dart';
 import '../data/app_data.dart';
 import '../data/business_repository.dart';
 import '../services/auth_session.dart';
@@ -18,6 +19,7 @@ import 'tambah_wisata_screen.dart';
 import 'daftar_wisata_screen.dart';
 import 'daftar_pendaftar_screen.dart';
 import 'kelola_admin_screen.dart';
+import 'kelola_kategori_screen.dart';
 
 // ── Palet & font (sama dengan home_screen.dart) ──────────────
 class _C {
@@ -84,7 +86,10 @@ class _AdminDashboardState extends State<AdminDashboard>
 
   bool _memuat = false;
 
-  bool get _isSuperAdmin => AuthSession.instance.role == 2;
+  bool get _isSuperAdmin => canManageAdmins(AuthSession.instance.role);
+  bool get _canManageCategories =>
+      canManageCategories(AuthSession.instance.role);
+  bool get _canManageQuota => canManageQuota(AuthSession.instance.role);
   bool get _canAccess => AuthSession.instance.authenticated.value &&
       AuthSession.instance.deviceSessionReady &&
       (AuthSession.instance.role == 1 || AuthSession.instance.role == 2);
@@ -132,10 +137,13 @@ class _AdminDashboardState extends State<AdminDashboard>
       _bookingCount = null;
     });
     try {
-      final destinations = await _repository.destinations();
+      final destinations = await _repository
+          .adminDestinations(query: {'status': 'active', 'per_page': '1'});
       final bookings = await _repository.adminBookings();
       if (!mounted ||
-          _sessionGeneration != AuthSession.instance.sessionGeneration) return;
+          _sessionGeneration != AuthSession.instance.sessionGeneration) {
+        return;
+      }
       setState(() {
         _destinationCount = destinations.meta?['total'] as int?;
         _bookingCount = bookings.meta?['total'] as int?;
@@ -234,7 +242,7 @@ class _AdminDashboardState extends State<AdminDashboard>
         _MenuAdmin(
           icon: Icons.delete_sweep_rounded,
           label: 'Hapus Wisata',
-          sub: 'Hapus permanen',
+          sub: 'Nonaktifkan / aktifkan',
           color: _C.danger,
           onTap: () =>
               _buka(const DaftarWisataScreen(mode: 'hapus'), refresh: true),
@@ -249,10 +257,26 @@ class _AdminDashboardState extends State<AdminDashboard>
         onTap: () => _buka(const DaftarPendaftarScreen()),
       );
 
+  _MenuAdmin get _menuKuota => _MenuAdmin(
+        icon: Icons.event_available_rounded,
+        label: 'Kelola Kuota',
+        sub: 'Kapasitas & jendela booking per destinasi',
+        color: _C.teal,
+        onTap: () => _buka(const DaftarWisataScreen(mode: 'kuota')),
+      );
+
+  _MenuAdmin get _menuKategori => _MenuAdmin(
+        icon: Icons.category_rounded,
+        label: 'Kelola Kategori',
+        sub: 'Tambah, ubah & nonaktifkan kategori',
+        color: _C.purple,
+        onTap: () => _buka(const KelolaKategoriScreen()),
+      );
+
   _MenuAdmin get _menuKelolaAdmin => _MenuAdmin(
         icon: Icons.manage_accounts_rounded,
         label: 'Kelola Admin',
-        sub: 'Tambah & hapus akun administrator',
+        sub: 'Tambah akun & atur peran/status administrator',
         color: _C.blueDeep,
         onTap: () => _buka(const KelolaAdminScreen()),
       );
@@ -573,6 +597,14 @@ class _AdminDashboardState extends State<AdminDashboard>
           _sectionLabel('Lainnya'),
           const SizedBox(height: 14),
           _wideCard(_menuPendaftar),
+          if (_canManageQuota) ...[
+            const SizedBox(height: 12),
+            _wideCard(_menuKuota),
+          ],
+          if (_canManageCategories) ...[
+            const SizedBox(height: 12),
+            _wideCard(_menuKategori),
+          ],
           if (_isSuperAdmin) ...[
             const SizedBox(height: 12),
             _wideCard(_menuKelolaAdmin),
@@ -919,6 +951,26 @@ class _AdminDashboardState extends State<AdminDashboard>
                     _menuPendaftar.onTap();
                   },
                 ),
+                if (_canManageQuota)
+                  _drawerItem(
+                    icon: _menuKuota.icon,
+                    color: _menuKuota.color,
+                    label: _menuKuota.label,
+                    onTap: () {
+                      _scaffoldKey.currentState?.closeDrawer();
+                      _menuKuota.onTap();
+                    },
+                  ),
+                if (_canManageCategories)
+                  _drawerItem(
+                    icon: _menuKategori.icon,
+                    color: _menuKategori.color,
+                    label: _menuKategori.label,
+                    onTap: () {
+                      _scaffoldKey.currentState?.closeDrawer();
+                      _menuKategori.onTap();
+                    },
+                  ),
                 if (_isSuperAdmin)
                   _drawerItem(
                     icon: _menuKelolaAdmin.icon,

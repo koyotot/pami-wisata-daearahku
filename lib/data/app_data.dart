@@ -37,6 +37,15 @@ class Wisata {
   double rating;
   bool isLaravel;
 
+  /// Laravel-only fields. [imageUrl] is relative to the API base URL (load it with
+  /// `ApiImage`); [imagePath] stays null for Laravel destinations because the backend
+  /// `image_path` is an internal storage path, not a URL.
+  String? imageUrl;
+  String categoryGuid;
+  String timezone;
+  int ticketPrice;
+  bool isActive;
+
   Wisata({
     required this.id,
     required this.nama,
@@ -48,23 +57,27 @@ class Wisata {
     this.imagePath,
     this.rating = 4.5,
     this.isLaravel = false,
+    this.imageUrl,
+    this.categoryGuid = '',
+    this.timezone = 'Asia/Jakarta',
+    this.ticketPrice = 0,
+    this.isActive = true,
   });
 
   factory Wisata.fromDestination(Destination destination) {
-    final json = destination.json;
-    final image = json['image_path'] as String?;
     return Wisata(
       id: destination.guid,
       nama: destination.name,
-      lokasi: json['location'] as String? ?? '',
-      deskripsi: json['description'] as String? ?? '',
-      hargaTiket: '${json['currency'] ?? 'IDR'} ${json['ticket_price'] ?? ''}',
-      jamBuka: json['opening_hours'] as String? ?? '',
+      lokasi: destination.location,
+      deskripsi: destination.description,
+      hargaTiket: '${destination.currency} ${destination.ticketPrice}',
+      jamBuka: destination.openingHours,
       kategori: destination.category?.name ?? '',
-      imagePath: image != null &&
-              (image.startsWith('https://') || image.startsWith('http://'))
-          ? image
-          : null,
+      imageUrl: destination.imageUrl,
+      categoryGuid: destination.categoryGuid,
+      timezone: destination.timezone,
+      ticketPrice: destination.ticketPrice,
+      isActive: destination.isActive,
       isLaravel: true,
     );
   }

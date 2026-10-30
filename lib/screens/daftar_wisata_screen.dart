@@ -1,17 +1,21 @@
 // ============================================================
 // lib/screens/daftar_wisata_screen.dart
-// REDESIGN: Biru terang — selaras dengan TambahWisataScreen & Dashboard
+// REDESIGN: Biru terang - selaras dengan TambahWisataScreen & Dashboard
+// Daftar destinasi dari Laravel (endpoint admin, termasuk nonaktif).
 // ============================================================
-import 'dart:io';
+import 'dart:async';
 import 'package:flutter/material.dart';
-import '../services/auth_session.dart';
+import '../data/admin_state.dart';
 import '../data/app_data.dart';
 import '../data/business_repository.dart';
-import '../services/api_client.dart';
-import 'tambah_wisata_screen.dart';
+import '../services/auth_session.dart';
+import '../widgets/api_image.dart';
+import 'admin_common.dart';
 import 'detail_wisata_screen.dart';
+import 'kelola_kuota_screen.dart';
+import 'tambah_wisata_screen.dart';
 
-// ── Palet (selaras dengan TambahWisataScreen & Dashboard) ───
+// -- Palet (selaras dengan TambahWisataScreen & Dashboard) ---
 class _C {
   static const blue = Color(0xFF1976D2);
   static const blueDeep = Color(0xFF1558B0);
@@ -32,8 +36,7 @@ class _C {
   static const gold = orange;
 }
 
-// ── Palette (identik dengan TambahWisataScreen) ─────────────
-// ── Warna per-kategori ───────────────────────────────────────
+// -- Warna per-kategori ---------------------------------------
 const _kColor = {
   'Semua': _C.teal,
   'Pantai': Color(0xFF38BDF8),
@@ -57,8 +60,11 @@ const _kIcon = {
 };
 
 class DaftarWisataScreen extends StatefulWidget {
-  final String mode; // 'view' | 'edit' | 'hapus'
-  const DaftarWisataScreen({super.key, this.mode = 'view'});
+  final String mode; // 'view' | 'edit' | 'hapus' | 'kuota'
+  final BusinessRepository? repository;
+  final AuthSession? session;
+  const DaftarWisataScreen(
+      {super.key, this.mode = 'view', this.repository, this.session});
 
   @override
   State<DaftarWisataScreen> createState() => _DaftarWisataScreenState();
@@ -67,68 +73,63 @@ class DaftarWisataScreen extends StatefulWidget {
 class _DaftarWisataScreenState extends State<DaftarWisataScreen>
     with SingleTickerProviderStateMixin {
   String _cari = '';
+  String _status = 'active';
+  String? _categoryGuid;
 
   late final AnimationController _fabCtrl;
-  bool _deleting = false;
-  final _adminCatalog = BusinessRepository();
-  final _repository = BusinessRepository();
-  final _catalog = RequestState<ApiPage<Destination>>();
-  final _categories = RequestState<List<Category>>();
+  late final BusinessRepository _repository =
+      widget.repository ?? BusinessRepository();
+  late final AuthSession _session = widget.session ?? AuthSession.instance;
+  late final PagedListController<Destination> _catalog;
+  late final PagedListController<Category> _categories;
+  final _guard = InFlightGuard();
   final _searchController = TextEditingController();
-  String? _categoryGuid;
+  Timer? _debounce;
 
   void _update() {
     if (mounted) setState(() {});
   }
 
-  Future<void> _loadCategories() => _categories.load(() async {
-        final categories = <Category>[];
-        var page = 1;
-        while (true) {
-          final result = await _repository.categories(query: {'page': '$page'});
-          categories.addAll(result.items);
-          if (result.links?['next'] == null) return categories;
-          page++;
-        }
-      });
-
-  Future<void> _loadCatalog({bool next = false}) async {
-    final previous = next ? _catalog.data : null;
-    if (!next) _catalog.data = null;
-    final page =
-        next ? ((previous?.meta?['current_page'] as int? ?? 0) + 1) : 1;
-    final category = _categoryGuid;
+  Map<String, String> get _filters {
     final search = _cari.trim();
-    await _catalog.load(() async {
-      final result = await _repository.destinations(query: {
-        'page': '$page',
-        if (category != null) 'category': category,
-        if (search.isNotEmpty) 'search': search,
-      });
-      final items = <String, Destination>{
-        for (final item in previous?.items ?? <Destination>[]) item.guid: item,
-        for (final item in result.items) item.guid: item,
-      };
-      return ApiPage(items.values.toList(), result.meta, result.links);
-    });
+    return {
+      'status': _status,
+      if (_categoryGuid != null) 'category': _categoryGuid!,
+      if (search.isNotEmpty) 'search': search,
+    };
   }
 
+  Future<void> _loadCategories() => _categories.load();
+
+  Future<void> _loadCatalog() => _catalog.load(filters: _filters);
+
   Future<void> _refreshView() async {
-    await Future.wait([_loadCategories(), _loadCatalog()]);
+    await Future.wait([
+      if (widget.mode == 'view') _loadCategories(),
+      _loadCatalog(),
+    ]);
+  }
+
+  void _onSearch(String value) {
+    setState(() => _cari = value);
+    _debounce?.cancel();
+    _debounce = Timer(const Duration(milliseconds: 350), _loadCatalog);
   }
 
   List<Wisata> get _filtered =>
-      _catalog.data?.items.map(Wisata.fromDestination).toList() ?? [];
+      _catalog.items.map(Wisata.fromDestination).toList();
 
   String get _judul => switch (widget.mode) {
         'edit' => 'Ubah Data Wisata',
         'hapus' => 'Hapus Data Wisata',
+        'kuota' => 'Kelola Kuota',
         _ => 'Daftar Wisata',
       };
 
   Color get _accentColor => switch (widget.mode) {
         'edit' => const Color(0xFFA78BFA),
         'hapus' => _C.danger,
+        'kuota' => const Color(0xFF26A69A),
         _ => _C.teal,
       };
 
@@ -139,16 +140,26 @@ class _DaftarWisataScreenState extends State<DaftarWisataScreen>
       vsync: this,
       duration: const Duration(milliseconds: 600),
     )..forward();
-    _catalog.addListener(_update);
-    _categories.addListener(_update);
-    AuthSession.instance.sessionChanges.addListener(_sessionChanged);
+    _catalog = PagedListController<Destination>(
+      session: _session,
+      keyOf: (destination) => destination.guid,
+      fetchPage: (page, filters) => _repository.adminDestinations(
+          query: {...filters, 'page': '$page', 'per_page': '50'}),
+    )..addListener(_update);
+    _categories = PagedListController<Category>(
+      session: _session,
+      keyOf: (category) => category.guid,
+      fetchPage: (page, _) =>
+          _repository.categories(query: {'page': '$page'}),
+    )..addListener(_update);
+    _guard.addListener(_update);
+    _session.sessionChanges.addListener(_sessionChanged);
     _refreshView();
   }
 
   void _sessionChanged() {
-    if (widget.mode != 'view') {
-      _catalog.reset();
-      _categories.reset();
+    if (_session.authenticated.value && _session.deviceSessionReady) {
+      _refreshView();
     }
   }
 
@@ -156,20 +167,29 @@ class _DaftarWisataScreenState extends State<DaftarWisataScreen>
 
   @override
   void dispose() {
-    AuthSession.instance.sessionChanges.removeListener(_sessionChanged);
+    _debounce?.cancel();
+    _session.sessionChanges.removeListener(_sessionChanged);
     _fabCtrl.dispose();
     _searchController.dispose();
-    _catalog.dispose();
-    _categories.dispose();
+    _guard
+      ..removeListener(_update)
+      ..dispose();
+    _catalog
+      ..removeListener(_update)
+      ..dispose();
+    _categories
+      ..removeListener(_update)
+      ..dispose();
     super.dispose();
   }
 
-  // ── Dialog hapus ─────────────────────────────────────────
-  void _hapus(Wisata w) {
-    final generation = AuthSession.instance.sessionGeneration;
-    showDialog(
+  // -- Dialog nonaktifkan / aktifkan kembali ----------------
+  Future<bool> _konfirmasi(Wisata w) async {
+    final nonaktifkan = w.isActive;
+    final warna = nonaktifkan ? _C.danger : _C.teal;
+    final ok = await showDialog<bool>(
       context: context,
-      builder: (_) => Dialog(
+      builder: (ctx) => Dialog(
         backgroundColor: _C.card,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
         child: Padding(
@@ -180,14 +200,17 @@ class _DaftarWisataScreenState extends State<DaftarWisataScreen>
               Container(
                 padding: const EdgeInsets.all(18),
                 decoration: BoxDecoration(
-                  color: _C.danger.withValues(alpha: 0.12),
+                  color: warna.withValues(alpha: 0.12),
                   shape: BoxShape.circle,
-                  border: Border.all(color: _C.danger.withValues(alpha: 0.3)),
+                  border: Border.all(color: warna.withValues(alpha: 0.3)),
                 ),
-                child: Icon(Icons.delete_rounded, color: _C.danger, size: 36),
+                child: Icon(
+                    nonaktifkan ? Icons.delete_rounded : Icons.restore_rounded,
+                    color: warna,
+                    size: 36),
               ),
               const SizedBox(height: 20),
-              Text('Hapus Wisata?',
+              Text(nonaktifkan ? 'Hapus Wisata?' : 'Aktifkan Kembali?',
                   style: const TextStyle(
                     color: _C.text,
                     fontWeight: FontWeight.w800,
@@ -195,7 +218,9 @@ class _DaftarWisataScreenState extends State<DaftarWisataScreen>
                   )),
               const SizedBox(height: 10),
               Text(
-                '"${w.nama}" akan dinonaktifkan dari katalog.',
+                nonaktifkan
+                    ? '"${w.nama}" akan dinonaktifkan dari katalog.'
+                    : '"${w.nama}" akan ditampilkan kembali di katalog.',
                 textAlign: TextAlign.center,
                 style: const TextStyle(
                     color: _C.textMuted, fontSize: 13, height: 1.5),
@@ -204,17 +229,12 @@ class _DaftarWisataScreenState extends State<DaftarWisataScreen>
               Row(children: [
                 Expanded(
                   child: OutlinedButton(
-                    onPressed: () => Navigator.pop(context),
+                    onPressed: () => Navigator.pop(ctx, false),
                     style: OutlinedButton.styleFrom(
                       padding: const EdgeInsets.symmetric(vertical: 14),
-                      shape: const RoundedRectangleBorder(
-                          borderRadius: BorderRadius.only(
-                        topLeft: Radius.circular(14),
-                        topRight: Radius.circular(14),
-                        bottomLeft: Radius.circular(14),
-                        bottomRight: Radius.circular(14),
-                      )),
-                      side: BorderSide(color: _C.border),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14)),
+                      side: const BorderSide(color: _C.border),
                       foregroundColor: _C.textMuted,
                     ),
                     child: const Text('Batal'),
@@ -224,56 +244,66 @@ class _DaftarWisataScreenState extends State<DaftarWisataScreen>
                 Expanded(
                   child: ElevatedButton(
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: _C.danger,
+                      backgroundColor: warna,
                       foregroundColor: Colors.white,
                       padding: const EdgeInsets.symmetric(vertical: 14),
                       elevation: 0,
-                      shape: const RoundedRectangleBorder(
-                          borderRadius: BorderRadius.only(
-                        topLeft: Radius.circular(14),
-                        topRight: Radius.circular(14),
-                        bottomLeft: Radius.circular(14),
-                        bottomRight: Radius.circular(14),
-                      )),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14)),
                     ),
-                    onPressed: _deleting
-                        ? null
-                        : () async {
-                            if (_deleting ||
-                                generation !=
-                                    AuthSession.instance.sessionGeneration)
-                              return;
-                            setState(() => _deleting = true);
-                            try {
-                              await _adminCatalog.deactivateDestination(w.id);
-                              if (!mounted || generation != AuthSession.instance.sessionGeneration) return;
-                              Navigator.pop(context);
-                              await _refreshView();
-                              if (!mounted || generation != AuthSession.instance.sessionGeneration) return;
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                    content: Text('Wisata dinonaktifkan')),
-                              );
-                            } catch (e) {
-                              if (!mounted || generation != AuthSession.instance.sessionGeneration) return;
-                              Navigator.pop(context);
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                    content:
-                                        Text('Gagal menonaktifkan wisata: $e')),
-                              );
-                              await _refreshView();
-                            } finally {
-                              if (mounted) setState(() => _deleting = false);
-                            }
-                          },
-                    child: const Text('Hapus',
-                        style: TextStyle(fontWeight: FontWeight.w700)),
+                    onPressed: () => Navigator.pop(ctx, true),
+                    child: Text(nonaktifkan ? 'Hapus' : 'Aktifkan',
+                        style: const TextStyle(fontWeight: FontWeight.w700)),
                   ),
                 ),
               ]),
             ],
           ),
+        ),
+      ),
+    );
+    return ok == true;
+  }
+
+  Future<void> _toggleActive(Wisata w) async {
+    if (_guard.isBusy(w.id)) return;
+    final nonaktifkan = w.isActive;
+    final yakin = await _konfirmasi(w);
+    if (!yakin || !mounted) return;
+    final generation = _session.sessionGeneration;
+    await _guard.run<void>(w.id, () async {
+      try {
+        if (nonaktifkan) {
+          await _repository.deactivateDestination(w.id);
+        } else {
+          await _repository.reactivateDestination(w.id);
+        }
+        if (!mounted || !_session.isCurrentGeneration(generation)) return;
+        showAdminSnack(
+            context,
+            nonaktifkan
+                ? 'Wisata dinonaktifkan'
+                : 'Wisata diaktifkan kembali');
+      } catch (e) {
+        if (!mounted || !_session.isCurrentGeneration(generation)) return;
+        showAdminSnack(context, adminErrorMessage(e), error: true);
+      }
+      if (mounted && _session.isCurrentGeneration(generation)) {
+        await _loadCatalog();
+      }
+    });
+  }
+
+  void _bukaKuota(Wisata w) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => KelolaKuotaScreen(
+          destinationGuid: w.id,
+          destinationName: w.nama,
+          timezone: w.timezone,
+          repository: widget.repository,
+          session: widget.session,
         ),
       ),
     );
@@ -284,7 +314,7 @@ class _DaftarWisataScreenState extends State<DaftarWisataScreen>
     final accent = _accentColor;
     final filtered = _filtered;
 
-    final total = _catalog.data?.meta?['total'] ?? filtered.length;
+    final total = _catalog.total ?? filtered.length;
 
     return Scaffold(
       backgroundColor: _C.bg,
@@ -429,8 +459,10 @@ class _DaftarWisataScreenState extends State<DaftarWisataScreen>
                               widget.mode == 'edit'
                                   ? 'Pilih wisata yang ingin diubah'
                                   : widget.mode == 'hapus'
-                                      ? 'Pilih wisata yang ingin dihapus'
-                                      : '$total destinasi tersedia',
+                                      ? 'Nonaktifkan atau aktifkan kembali wisata'
+                                      : widget.mode == 'kuota'
+                                          ? 'Pilih wisata untuk mengatur kuota'
+                                          : '$total destinasi ditemukan',
                               style: TextStyle(
                                 color: Colors.white.withValues(alpha: 0.88),
                                 fontSize: 12.5,
@@ -494,8 +526,7 @@ class _DaftarWisataScreenState extends State<DaftarWisataScreen>
                                   color: _C.textMuted, size: 18),
                               onPressed: () {
                                 _searchController.clear();
-                                setState(() => _cari = '');
-                                _loadCatalog();
+                                _onSearch('');
                               },
                             )
                           : null,
@@ -508,12 +539,26 @@ class _DaftarWisataScreenState extends State<DaftarWisataScreen>
                       contentPadding: const EdgeInsets.symmetric(
                           horizontal: 16, vertical: 14),
                     ),
-                    onChanged: (v) {
-                      setState(() => _cari = v);
-                      _loadCatalog();
-                    },
+                    onChanged: _onSearch,
                   ),
                 ),
+              ),
+            ),
+
+            // ── Filter status: aktif / nonaktif / semua ──────────
+            SliverToBoxAdapter(
+              child: AdminFilterChips<String>(
+                options: const [
+                  ('Aktif', 'active'),
+                  ('Nonaktif', 'inactive'),
+                  ('Semua', 'all'),
+                ],
+                selected: _status,
+                onSelected: (value) {
+                  if (value == _status) return;
+                  setState(() => _status = value);
+                  _loadCatalog();
+                },
               ),
             ),
 
@@ -526,9 +571,9 @@ class _DaftarWisataScreenState extends State<DaftarWisataScreen>
                     scrollDirection: Axis.horizontal,
                     physics: const BouncingScrollPhysics(),
                     padding: const EdgeInsets.fromLTRB(16, 14, 16, 0),
-                    itemCount: 1 + (_categories.data?.length ?? 0),
+                    itemCount: 1 + _categories.items.length,
                     itemBuilder: (_, i) {
-                      final category = i == 0 ? null : _categories.data![i - 1];
+                      final category = i == 0 ? null : _categories.items[i - 1];
                       final k = category?.name ?? 'Semua';
                       final sel = _categoryGuid == category?.guid;
                       final col = _kColor[k] ?? _C.teal;
@@ -587,7 +632,7 @@ class _DaftarWisataScreenState extends State<DaftarWisataScreen>
             if (widget.mode == 'view' && _categories.error != null)
               SliverToBoxAdapter(
                   child: TextButton(
-                onPressed: _categories.retry,
+                onPressed: _loadCategories,
                 child: const Text('Gagal memuat kategori. Coba lagi'),
               )),
 
@@ -619,16 +664,22 @@ class _DaftarWisataScreenState extends State<DaftarWisataScreen>
             ),
 
             // ── Kosong ──────────────────────────────────────────
-            if (_catalog.loading && _catalog.data == null)
+            if (!_catalog.hasLoaded && _catalog.error == null)
               const SliverFillRemaining(
                   child: Center(child: CircularProgressIndicator()))
-            else if (_catalog.error != null && _catalog.data == null)
+            else if (_catalog.error != null && filtered.isEmpty)
               SliverFillRemaining(
                   child: Center(
-                      child: TextButton(
-                onPressed: _catalog.retry,
-                child: const Text('Gagal memuat wisata. Coba lagi'),
-              )))
+                      child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                    Text(adminErrorMessage(_catalog.error!),
+                        textAlign: TextAlign.center),
+                    TextButton(
+                      onPressed: _loadCatalog,
+                      child: const Text('Gagal memuat wisata. Coba lagi'),
+                    ),
+                  ])))
             else if (filtered.isEmpty)
               SliverFillRemaining(
                 child: Center(
@@ -667,16 +718,21 @@ class _DaftarWisataScreenState extends State<DaftarWisataScreen>
                 sliver: SliverList(
                   delegate: SliverChildBuilderDelegate(
                     (_, i) => _WisataCard(
+                      key: ValueKey(filtered[i].id),
                       wisata: filtered[i],
                       mode: widget.mode,
                       accent: accent,
-                      onTap: () => Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) =>
-                              DetailWisataScreen(wisata: filtered[i]),
-                        ),
-                      ),
+                      busy: _guard.isBusy(filtered[i].id),
+                      onKuota: () => _bukaKuota(filtered[i]),
+                      onTap: () => widget.mode == 'kuota'
+                          ? _bukaKuota(filtered[i])
+                          : Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) =>
+                                    DetailWisataScreen(wisata: filtered[i]),
+                              ),
+                            ),
                       onEdit: () async {
                         final ok = await Navigator.push<bool>(
                           context,
@@ -687,24 +743,12 @@ class _DaftarWisataScreenState extends State<DaftarWisataScreen>
                         );
                         if (ok == true) await _muatData();
                       },
-                      onHapus: () => _hapus(filtered[i]),
+                      onHapus: () => _toggleActive(filtered[i]),
                     ),
                     childCount: filtered.length,
                   ),
                 ),
               ),
-            if (_catalog.data?.links?['next'] != null)
-              SliverToBoxAdapter(
-                  child: Center(
-                      child: TextButton(
-                onPressed:
-                    _catalog.loading ? null : () => _loadCatalog(next: true),
-                child: Text(_catalog.loading
-                    ? 'Memuat...'
-                    : _catalog.error != null
-                        ? 'Coba lagi'
-                        : 'Muat lebih banyak'),
-              ))),
           ],
         ),
       ),
@@ -747,15 +791,19 @@ class _WisataCard extends StatelessWidget {
   final Wisata wisata;
   final String mode;
   final Color accent;
-  final VoidCallback onTap, onEdit, onHapus;
+  final bool busy;
+  final VoidCallback onTap, onEdit, onHapus, onKuota;
 
   const _WisataCard({
+    super.key,
     required this.wisata,
     required this.mode,
     required this.accent,
+    required this.busy,
     required this.onTap,
     required this.onEdit,
     required this.onHapus,
+    required this.onKuota,
   });
 
   Color get _badgeColor => (_kColor[wisata.kategori] ?? _C.teal);
@@ -781,7 +829,7 @@ class _WisataCard extends StatelessWidget {
         child: Material(
           color: Colors.transparent,
           child: InkWell(
-            onTap: mode == 'view' ? onTap : null,
+            onTap: mode == 'view' || mode == 'kuota' ? onTap : null,
             splashColor: _C.teal.withValues(alpha: 0.08),
             highlightColor: _C.teal.withValues(alpha: 0.04),
             child: Column(
@@ -848,6 +896,24 @@ class _WisataCard extends StatelessWidget {
                         ),
                       ),
                     ),
+                    if (!wisata.isActive)
+                      Positioned(
+                        top: 44,
+                        left: 12,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 10, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: _C.danger.withValues(alpha: 0.9),
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          child: const Text('Nonaktif',
+                              style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 10.5,
+                                  fontWeight: FontWeight.w800)),
+                        ),
+                      ),
                     // badge harga
                     Positioned(
                       top: 12,
@@ -872,7 +938,10 @@ class _WisataCard extends StatelessWidget {
                             const Icon(Icons.local_offer_rounded,
                                 color: _C.gold, size: 11),
                             const SizedBox(width: 4),
-                            Text(wisata.hargaTiket,
+                            Text(
+                                wisata.isLaravel
+                                    ? formatMoney(wisata.ticketPrice, 'IDR')
+                                    : wisata.hargaTiket,
                                 style: const TextStyle(
                                     color: _C.navy,
                                     fontSize: 10.5,
@@ -885,7 +954,7 @@ class _WisataCard extends StatelessWidget {
                     Positioned(
                       bottom: 12,
                       left: 14,
-                      right: mode != 'view' ? 62 : 14,
+                      right: mode == 'edit' ? 108 : (mode != 'view' ? 62 : 14),
                       child: Text(
                         wisata.nama,
                         maxLines: 1,
@@ -909,20 +978,52 @@ class _WisataCard extends StatelessWidget {
                       Positioned(
                         bottom: 10,
                         right: 10,
-                        child: _overlayBtn(
-                          icon: Icons.edit_rounded,
-                          color: const Color(0xFFA78BFA),
-                          onTap: onEdit,
+                        child: Row(
+                          children: [
+                            _overlayBtn(
+                              icon: Icons.event_available_rounded,
+                              color: const Color(0xFF26A69A),
+                              onTap: onKuota,
+                            ),
+                            const SizedBox(width: 8),
+                            _overlayBtn(
+                              icon: Icons.edit_rounded,
+                              color: const Color(0xFFA78BFA),
+                              onTap: onEdit,
+                            ),
+                          ],
                         ),
                       )
                     else if (mode == 'hapus')
                       Positioned(
                         bottom: 10,
                         right: 10,
+                        child: busy
+                            ? const SizedBox(
+                                width: 38,
+                                height: 38,
+                                child: Padding(
+                                  padding: EdgeInsets.all(8),
+                                  child: CircularProgressIndicator(
+                                      strokeWidth: 2.5, color: Colors.white),
+                                ),
+                              )
+                            : _overlayBtn(
+                                icon: wisata.isActive
+                                    ? Icons.delete_rounded
+                                    : Icons.restore_rounded,
+                                color: wisata.isActive ? _C.danger : _C.teal,
+                                onTap: onHapus,
+                              ),
+                      )
+                    else if (mode == 'kuota')
+                      Positioned(
+                        bottom: 10,
+                        right: 10,
                         child: _overlayBtn(
-                          icon: Icons.delete_rounded,
-                          color: _C.danger,
-                          onTap: onHapus,
+                          icon: Icons.event_available_rounded,
+                          color: const Color(0xFF26A69A),
+                          onTap: onKuota,
                         ),
                       ),
                   ],
@@ -983,7 +1084,7 @@ class _WisataCard extends StatelessWidget {
                                   fontWeight: FontWeight.w600)),
                         ]),
                       ),
-                      if (mode == 'view') ...[
+                      if (mode == 'view' || mode == 'kuota') ...[
                         const SizedBox(width: 8),
                         Container(
                           padding: const EdgeInsets.all(8),
@@ -1041,52 +1142,24 @@ class _WisataCard extends StatelessWidget {
     );
   }
 
+  // Gambar dimuat lewat ApiClient; endpoint admin dipakai agar destinasi
+  // nonaktif tetap tampil.
   Widget _buildImage() {
-    final path = wisata.imagePath;
     final col = _kColor[wisata.kategori] ?? _C.teal;
-    if (path == null || path.isEmpty) {
-      return Container(
-        color: col.withValues(alpha: 0.08),
-        child: Center(
-          child: Icon(_kIcon[wisata.kategori] ?? Icons.landscape_rounded,
-              color: col.withValues(alpha: 0.3), size: 52),
-        ),
-      );
-    }
-    if (path.startsWith('assets/')) return Image.asset(path, fit: BoxFit.cover);
-    if (path.startsWith('http://') || path.startsWith('https://')) {
-      return Image.network(
-        path,
-        fit: BoxFit.cover,
-        loadingBuilder: (_, child, progress) {
-          if (progress == null) return child;
-          return Container(
-            color: col.withValues(alpha: 0.07),
-            child: Center(
-              child: CircularProgressIndicator(
-                value: progress.expectedTotalBytes != null
-                    ? progress.cumulativeBytesLoaded /
-                        progress.expectedTotalBytes!
-                    : null,
-                color: col,
-                strokeWidth: 2,
-              ),
-            ),
-          );
-        },
-        errorBuilder: (_, __, ___) => Container(
-          color: col.withValues(alpha: 0.07),
-          child: Icon(Icons.broken_image_rounded,
-              color: col.withValues(alpha: 0.3), size: 40),
-        ),
-      );
-    }
-    return Image.file(File(path),
-        fit: BoxFit.cover,
-        errorBuilder: (_, __, ___) => Container(
-              color: col.withValues(alpha: 0.07),
-              child: Icon(Icons.broken_image_rounded,
-                  color: col.withValues(alpha: 0.3), size: 40),
-            ));
+    Widget placeholder(BuildContext context) => Container(
+          color: col.withValues(alpha: 0.08),
+          child: Center(
+            child: Icon(_kIcon[wisata.kategori] ?? Icons.landscape_rounded,
+                color: col.withValues(alpha: 0.3), size: 52),
+          ),
+        );
+    return ApiImage(
+      imageUrl: wisata.imageUrl,
+      adminGuid: wisata.id,
+      fit: BoxFit.cover,
+      width: double.infinity,
+      height: 190,
+      placeholder: placeholder,
+    );
   }
 }

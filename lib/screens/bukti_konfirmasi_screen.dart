@@ -12,6 +12,7 @@ import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import '../data/app_data.dart';
+import '../widgets/api_image.dart';
 import 'main_navigation_screen.dart';
 
 // ── Palet (sama dengan home_screen) ──────────────────────────
@@ -41,6 +42,9 @@ TextStyle _font(
       letterSpacing: letterSpacing,
     );
 
+/// Konfirmasi LAMA dengan QR lokal. TIDAK dipakai untuk booking Laravel: nomor dan status
+/// yang sah berasal dari server (lihat DaftarKunjunganScreen dan BuktiPendaftaranScreen),
+/// dan aplikasi tidak membuat QR sendiri. Tidak ada navigasi aktif ke layar ini.
 class BuktiKonfirmasiScreen extends StatefulWidget {
   final Pendaftar pendaftaran;
   final Wisata wisata;
@@ -652,6 +656,12 @@ class _BuktiKonfirmasiScreenState extends State<BuktiKonfirmasiScreen>
           ),
         );
 
+    if (widget.wisata.isLaravel) {
+      return ApiImage(
+          imageUrl: widget.wisata.imageUrl,
+          fit: BoxFit.cover,
+          placeholder: (_) => placeholder());
+    }
     final path = widget.wisata.imagePath;
     if (path == null || path.isEmpty) return placeholder();
 

@@ -14,6 +14,7 @@ import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../data/app_data.dart';
 import '../data/catalog_state.dart';
+import '../widgets/api_image.dart';
 import 'detail_wisata_screen.dart';
 
 // ── Palet (sama dengan home_screen) ──────────────────────────
@@ -678,6 +679,13 @@ class _Thumb extends StatelessWidget {
           ),
         );
 
+    // Destinasi Laravel: gambar dimuat lewat API (imagePath selalu null).
+    if (wisata.isLaravel) {
+      return ApiImage(
+          imageUrl: wisata.imageUrl,
+          fit: BoxFit.cover,
+          placeholder: (_) => placeholder());
+    }
     if (path == null || path.isEmpty) return placeholder();
     if (path.startsWith('http://') || path.startsWith('https://')) {
       return Image.network(

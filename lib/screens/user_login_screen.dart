@@ -149,7 +149,6 @@ class _UserLoginScreenState extends State<UserLoginScreen>
     if (_isLoading) return;
     final session = AuthSession.instance;
     final generation = session.sessionGeneration;
-    var cleanupGeneration = generation;
     setState(() {
       _isLoading = true;
       _errorMsg = null;
@@ -169,7 +168,6 @@ class _UserLoginScreenState extends State<UserLoginScreen>
         throw const ApiException('Identitas Google tidak tersedia.');
       }
       await session.google(token);
-      cleanupGeneration = session.sessionGeneration;
       if (mounted) _openMainNavigation();
     } on ApiException catch (e) {
       if (mounted) setState(() => _errorMsg = e.message);
@@ -185,9 +183,11 @@ class _UserLoginScreenState extends State<UserLoginScreen>
         setState(() => _errorMsg = 'Tidak dapat masuk dengan Google.');
       }
     } finally {
-      if (session.isCurrentGeneration(cleanupGeneration)) {
+      // Sesi Firebase hanya perantara; selalu dibersihkan, termasuk saat
+      // Laravel menolak sesi Google (generasi sudah berganti oleh clear()).
+      try {
         await fb_auth.FirebaseAuth.instance.signOut();
-      }
+      } catch (_) {}
       if (mounted) setState(() => _isLoading = false);
     }
   }

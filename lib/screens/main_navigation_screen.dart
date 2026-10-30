@@ -95,7 +95,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
   void _bukaMenu() => _scaffoldKey.currentState?.openDrawer();
 
   List<Widget> get _tabs => [
-        BerandaUserScreen(onBukaMenu: _bukaMenu),
+        BerandaUserScreen(onBukaMenu: _bukaMenu, active: _selectedIndex == 0),
         CariWisataScreen(
           embedded: true,
           onBukaMenu: _bukaMenu, // tombol ☰ membuka drawer
@@ -111,6 +111,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
           onKembali: () => _gotoTab(0), // tombol kembali -> tab Beranda
         ),
         ProfilUserScreen(
+          active: _selectedIndex == 3,
           onBukaMenu: _bukaMenu, // tombol ☰ membuka drawer
           onKembali: () => _gotoTab(0), // tombol kembali -> tab Beranda
         ),
