@@ -32,6 +32,8 @@ class Destination {
   String get openingHours => json['opening_hours'] as String? ?? '';
   String get timezone => json['timezone'] as String? ?? 'Asia/Jakarta';
   bool get isActive => json['is_active'] as bool? ?? true;
+  double? get ratingAverage => (json['rating_average'] as num?)?.toDouble();
+  int get ratingCount => (json['rating_count'] as num?)?.toInt() ?? 0;
 
   /// Path relative to the API base URL (versioned by Laravel), or null without a picture.
   /// `image_path` is never used: it is an internal storage path, not a URL.
@@ -73,7 +75,37 @@ class Booking {
 
   /// Server-computed: true only while the owner may still cancel (pending approval).
   bool get cancellable => json['cancellable'] == true;
-  DateTime? get createdAt => DateTime.tryParse(json['created_at'] as String? ?? '');
+  bool get canCheckIn => json['can_check_in'] == true;
+  bool get canReview => json['can_review'] == true;
+  DateTime? get checkedInAt =>
+      DateTime.tryParse(json['checked_in_at'] as String? ?? '');
+  Review? get review =>
+      json['review'] is Json ? Review(json['review'] as Json) : null;
+  DateTime? get createdAt =>
+      DateTime.tryParse(json['created_at'] as String? ?? '');
+}
+
+class Review {
+  final Json json;
+  Review(this.json) {
+    guid;
+  }
+  String get guid => json['guid'] as String;
+  String get bookingGuid => json['booking_guid'] as String? ?? '';
+  String get destinationGuid => json['destination_guid'] as String;
+  String get destinationName => json['destination_name'] as String? ?? '';
+  int get rating => (json['rating'] as num).toInt();
+  String get comment => json['comment'] as String;
+  DateTime? get createdAt =>
+      DateTime.tryParse(json['created_at'] as String? ?? '');
+}
+
+class ProfileStatistics {
+  final Json json;
+  ProfileStatistics(this.json);
+  int get bookings => (json['bookings'] as num).toInt();
+  int get reviews => (json['reviews'] as num).toInt();
+  int get visits => (json['visits'] as num).toInt();
 }
 
 /// Server-computed availability for one destination and visit date.
@@ -90,8 +122,10 @@ class Availability {
   int get remaining => (json['remaining'] as num?)?.toInt() ?? 0;
   String get status => json['status'] as String;
   bool get isOpen => status == 'open';
-  DateTime? get opensAt => DateTime.tryParse(json['booking_opens_at'] as String? ?? '');
-  DateTime? get closesAt => DateTime.tryParse(json['booking_closes_at'] as String? ?? '');
+  DateTime? get opensAt =>
+      DateTime.tryParse(json['booking_opens_at'] as String? ?? '');
+  DateTime? get closesAt =>
+      DateTime.tryParse(json['booking_closes_at'] as String? ?? '');
 }
 
 /// Administrative quota row: total capacity, allocated and remaining are distinct values.
@@ -105,8 +139,10 @@ class QuotaEntry {
   int get capacity => (json['capacity'] as num?)?.toInt() ?? 0;
   int get allocated => (json['allocated'] as num?)?.toInt() ?? 0;
   int get remaining => (json['remaining'] as num?)?.toInt() ?? 0;
-  DateTime? get opensAt => DateTime.tryParse(json['booking_opens_at'] as String? ?? '');
-  DateTime? get closesAt => DateTime.tryParse(json['booking_closes_at'] as String? ?? '');
+  DateTime? get opensAt =>
+      DateTime.tryParse(json['booking_opens_at'] as String? ?? '');
+  DateTime? get closesAt =>
+      DateTime.tryParse(json['booking_closes_at'] as String? ?? '');
 }
 
 /// Result of reconciling a create attempt by its Idempotency-Key.
@@ -195,9 +231,8 @@ class BusinessRepository {
           headers: {'Idempotency-Key': idempotencyKey}));
 
   /// Only a booking still awaiting approval can be cancelled (owner only).
-  Future<Booking> cancelBooking(String guid) async => Booking(await api.object(
-      'POST', 'bookings/${_id(guid)}/cancel',
-      authenticated: true));
+  Future<Booking> cancelBooking(String guid) async => Booking(await api
+      .object('POST', 'bookings/${_id(guid)}/cancel', authenticated: true));
 
   /// Server-side availability. Pass [visitDate] (`YYYY-MM-DD`) for one day, otherwise
   /// [from]/[to] bound a range (default: next 60 days).
@@ -216,8 +251,7 @@ class BusinessRepository {
 
   // ── Booking reconciliation ─────────────────────────────────
   Future<BookingIntentState> bookingIntent(String key) async =>
-      BookingIntentState(await api.object(
-          'GET', 'booking-intents/${_id(key)}',
+      BookingIntentState(await api.object('GET', 'booking-intents/${_id(key)}',
           authenticated: true));
 
   /// Safe exit for an intent that cannot be reconciled: the server refuses any later
@@ -228,6 +262,26 @@ class BusinessRepository {
           authenticated: true));
 
   // ── Documents ──────────────────────────────────────────────
+  Future<ProfileStatistics> profileStatistics() async => ProfileStatistics(
+      await api.object('GET', 'profile/statistics', authenticated: true));
+
+  Future<ApiPage<Review>> reviews({Map<String, String>? query}) =>
+      api.collection(_path('reviews', query), Review.new, authenticated: true);
+
+  Future<ApiPage<Review>> destinationReviews(String guid,
+          {Map<String, String>? query}) =>
+      api.collection(
+          _path('destinations/${_id(guid)}/reviews', query), Review.new);
+
+  Future<Review> createReview(
+          String bookingGuid, int rating, String comment) async =>
+      Review(await api.object('POST', 'bookings/${_id(bookingGuid)}/review',
+          authenticated: true, body: {'rating': rating, 'comment': comment}));
+
+  Future<Booking> checkIn(String bookingGuid) async =>
+      Booking(await api.object('POST', 'bookings/${_id(bookingGuid)}/check-in',
+          authenticated: true));
+
   Future<BookingDocuments> bookingDocuments(String guid) async =>
       BookingDocuments(await api.object(
           'GET', 'bookings/${_id(guid)}/documents',
@@ -242,9 +296,8 @@ class BusinessRepository {
   Future<ApiPage<Booking>> adminBookings({Map<String, String>? query}) =>
       api.collection(_path('admin/bookings', query), Booking.new,
           authenticated: true);
-  Future<Booking> adminBooking(String guid) async => Booking(await api.object(
-      'GET', 'admin/bookings/${_id(guid)}',
-      authenticated: true));
+  Future<Booking> adminBooking(String guid) async => Booking(await api
+      .object('GET', 'admin/bookings/${_id(guid)}', authenticated: true));
   Future<Booking> decideBooking(String guid,
           {required bool approve, String? reason}) async =>
       Booking(await api.object('POST',
@@ -271,7 +324,8 @@ class BusinessRepository {
       return Destination(await api.object('POST', 'destinations',
           authenticated: true, body: fields));
     }
-    return Destination(await api.session.requestMultipart('POST', 'destinations',
+    return Destination(await api.session.requestMultipart(
+        'POST', 'destinations',
         fields: _formFields(fields), files: [image]).then(_data));
   }
 
@@ -333,8 +387,8 @@ class BusinessRepository {
 
   /// Fields: `visit_date`, `capacity`, `booking_opens_at`, `booking_closes_at`
   /// (timestamps with an explicit offset, e.g. UTC `...Z`).
-  Future<QuotaEntry> saveQuota(String guid, Json fields) async => QuotaEntry(
-      await api.object('PUT', 'destinations/${_id(guid)}/quotas',
+  Future<QuotaEntry> saveQuota(String guid, Json fields) async =>
+      QuotaEntry(await api.object('PUT', 'destinations/${_id(guid)}/quotas',
           authenticated: true, body: fields));
   Future<Json> putQuota(String guid, Json fields) =>
       api.object('PUT', 'destinations/${_id(guid)}/quotas',
@@ -345,8 +399,8 @@ class BusinessRepository {
   Future<ApiPage<AdminAccount>> adminAccounts({Map<String, String>? query}) =>
       api.collection(_path('admin/accounts', query), AdminAccount.new,
           authenticated: true);
-  Future<AdminAccount> createAdminAccount(Json fields) async => AdminAccount(
-      await api.object('POST', 'admin/accounts',
+  Future<AdminAccount> createAdminAccount(Json fields) async =>
+      AdminAccount(await api.object('POST', 'admin/accounts',
           authenticated: true, body: fields));
   Future<AdminAccount> updateAdminAccount(String guid, Json fields) async =>
       AdminAccount(await api.object('PATCH', 'admin/accounts/${_id(guid)}',

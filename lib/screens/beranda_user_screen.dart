@@ -878,7 +878,9 @@ class _WisataCardState extends State<_WisataCard> {
                                   color: _C.orange, size: 13),
                               const SizedBox(width: 3),
                               Text(
-                                w.isLaravel ? '-' : w.rating.toStringAsFixed(1),
+                                w.ratingCount == 0
+                                    ? '-'
+                                    : w.rating.toStringAsFixed(1),
                                 style: _font(10.5, FontWeight.w800, _C.navy),
                               ),
                             ],

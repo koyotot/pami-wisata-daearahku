@@ -46,7 +46,7 @@ class ApiClient {
         ? await session.requestEnvelope(method, path,
             body: body, headers: headers)
         : await session.publicEnvelope(method, path, body: body);
-    if (authenticated && generation != session.sessionGeneration) {
+    if (authenticated && !session.isCurrentGeneration(generation)) {
       throw const ApiException('Sesi telah berakhir.', 401);
     }
     return result;

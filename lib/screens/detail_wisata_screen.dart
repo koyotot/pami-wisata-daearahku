@@ -11,6 +11,7 @@ import '../data/favorite_state.dart';
 import '../services/api_client.dart';
 import '../services/auth_session.dart';
 import '../widgets/api_image.dart';
+import '../widgets/reviews_sheet.dart';
 import 'daftar_kunjungan_screen.dart';
 
 // ── Palet (sama dengan home_screen.dart) ─────────────────────
@@ -334,31 +335,45 @@ class _DetailWisataScreenState extends State<DetailWisataScreen>
                       Positioned(
                         bottom: 20,
                         right: 20,
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 10, vertical: 6),
-                          decoration: BoxDecoration(
-                            color: Colors.black.withValues(alpha: 0.55),
-                            borderRadius: BorderRadius.circular(10),
-                            border: Border.all(
-                                color: _C.gold.withValues(alpha: 0.3),
-                                width: 1),
+                        child: InkWell(
+                          onTap: () => showModalBottomSheet(
+                            context: context,
+                            backgroundColor: Colors.transparent,
+                            isScrollControlled: true,
+                            builder: (_) => ReviewsSheet(destinationGuid: w.id),
                           ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(Icons.star_rounded,
-                                  color: _C.gold, size: 14),
-                              const SizedBox(width: 4),
-                              Text(
-                                w.isLaravel ? '-' : w.rating.toStringAsFixed(1),
-                                style: TextStyle(
-                                  color: _C.goldLight,
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w800,
-                                ),
+                          child: Semantics(
+                            button: true,
+                            label: 'Lihat ulasan',
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 10, vertical: 6),
+                              decoration: BoxDecoration(
+                                color: Colors.black.withValues(alpha: 0.55),
+                                borderRadius: BorderRadius.circular(10),
+                                border: Border.all(
+                                    color: _C.gold.withValues(alpha: 0.3),
+                                    width: 1),
                               ),
-                            ],
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(Icons.star_rounded,
+                                      color: _C.gold, size: 14),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    w.ratingCount == 0
+                                        ? '-'
+                                        : w.rating.toStringAsFixed(1),
+                                    style: TextStyle(
+                                      color: _C.goldLight,
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w800,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
                           ),
                         ),
                       ),
@@ -651,7 +666,7 @@ class _DetailWisataScreenState extends State<DetailWisataScreen>
                 ),
                 // Tombol Daftar Kunjungan
                 Expanded(
-                  child: GestureDetector(
+                  child: InkWell(
                     onTap: () => Navigator.push(
                       context,
                       MaterialPageRoute(

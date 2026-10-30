@@ -48,7 +48,7 @@ class TambahWisataScreen extends StatefulWidget {
 class _TambahWisataScreenState extends State<TambahWisataScreen> {
   final _formKey = GlobalKey<FormState>();
   late TextEditingController namaCtrl, lokasiCtrl, deskCtrl, hargaCtrl, jamCtrl;
-  double _rating = 4.5;
+  double _rating = 0;
   Uint8List? _imageBytes; // Gambar baru yang dipilih (belum diunggah)
   String _imageName = 'destination.jpg';
   bool _isSaving = false;
@@ -74,12 +74,14 @@ class _TambahWisataScreenState extends State<TambahWisataScreen> {
     namaCtrl = TextEditingController(text: w?.nama ?? '');
     lokasiCtrl = TextEditingController(text: w?.lokasi ?? '');
     deskCtrl = TextEditingController(text: w?.deskripsi ?? '');
-    hargaCtrl = TextEditingController(text: w == null ? '' : '${w.ticketPrice}');
+    hargaCtrl =
+        TextEditingController(text: w == null ? '' : '${w.ticketPrice}');
     jamCtrl = TextEditingController(text: w?.jamBuka ?? '');
-    _rating = w?.rating ?? 4.5;
+    _rating = (w?.ratingCount ?? 0) > 0 ? w!.rating : 0;
     _categoryGuid =
         (w?.categoryGuid.isNotEmpty ?? false) ? w!.categoryGuid : null;
-    _timezone = (w?.timezone.isNotEmpty ?? false) ? w!.timezone : kAdminTimezones.first;
+    _timezone =
+        (w?.timezone.isNotEmpty ?? false) ? w!.timezone : kAdminTimezones.first;
     _sessionGeneration = _session.sessionGeneration;
     _categories = PagedListController<Category>(
       session: _session,
@@ -274,7 +276,8 @@ class _TambahWisataScreenState extends State<TambahWisataScreen> {
       'opening_hours': jamCtrl.text.trim(),
       'timezone': _timezone,
     };
-    final upload = bytes == null ? null : UploadFile('image', bytes, _imageName);
+    final upload =
+        bytes == null ? null : UploadFile('image', bytes, _imageName);
     setState(() => _isSaving = true);
     try {
       if (edit == null) {
@@ -566,7 +569,7 @@ class _TambahWisataScreenState extends State<TambahWisataScreen> {
                     // ── Rating ───────────────────────────────────
                     _sectionLabel(isEdit ? 'Rating Destinasi' : 'Rating Awal'),
                     const SizedBox(height: 14),
-                    _ratingPicker(locked: true),
+                    _ratingPicker(),
                   ],
                 ),
               ),
@@ -867,12 +870,7 @@ class _TambahWisataScreenState extends State<TambahWisataScreen> {
   // ── Form field ────────────────────────────────────────────
 
   // ── Rating Picker ─────────────────────────────────────────
-  // locked = true  → mode Edit: rating tidak boleh diubah manual oleh admin,
-  //                   karena ke depannya nilai ini akan dihitung otomatis
-  //                   dari ulasan pengunjung asli.
-  // locked = false → mode Tambah Baru: admin boleh isi rating awal sebagai
-  //                   estimasi sementara sebelum ada ulasan sama sekali.
-  Widget _ratingPicker({required bool locked}) {
+  Widget _ratingPicker() {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -902,7 +900,7 @@ class _TambahWisataScreenState extends State<TambahWisataScreen> {
                     Icon(Icons.star_rounded, color: _C.gold, size: 14),
                     const SizedBox(width: 4),
                     Text(
-                      _rating.toStringAsFixed(1),
+                      _rating == 0 ? '-' : _rating.toStringAsFixed(1),
                       style: TextStyle(
                         color: _C.gold,
                         fontWeight: FontWeight.w800,
@@ -916,7 +914,7 @@ class _TambahWisataScreenState extends State<TambahWisataScreen> {
           ),
           const SizedBox(height: 12),
           Opacity(
-            opacity: locked ? 0.45 : 1,
+            opacity: 0.45,
             child: Row(
               children: List.generate(5, (i) {
                 final starVal = i + 1.0;
@@ -930,54 +928,19 @@ class _TambahWisataScreenState extends State<TambahWisataScreen> {
                   color: _C.gold,
                   size: 36,
                 );
-                if (locked) {
-                  // Tidak ada GestureDetector — bintang sekadar tampilan.
-                  return Expanded(child: star);
-                }
-                return Expanded(
-                  child: GestureDetector(
-                    onTapDown: (d) {
-                      // Tap kiri bintang = 0.5, kanan = 1.0
-                      setState(() => _rating =
-                          (d.localPosition.dx < 20) ? halfVal : starVal);
-                    },
-                    child: star,
-                  ),
-                );
+                return Expanded(child: star);
               }),
             ),
           ),
           const SizedBox(height: 8),
-          if (locked) ...[
+          ...[
             Row(
               children: [
                 Icon(Icons.lock_outline_rounded, size: 13, color: _C.textDim),
                 const SizedBox(width: 6),
                 Expanded(
                   child: Text(
-                    'Rating dikunci — akan dihitung otomatis dari ulasan pengunjung, bukan diatur manual oleh admin.',
-                    style:
-                        TextStyle(color: _C.textDim, fontSize: 11, height: 1.4),
-                  ),
-                ),
-              ],
-            ),
-          ] else ...[
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text('1.0', style: TextStyle(color: _C.textDim, fontSize: 11)),
-                Text('5.0', style: TextStyle(color: _C.textDim, fontSize: 11)),
-              ],
-            ),
-            const SizedBox(height: 6),
-            Row(
-              children: [
-                Icon(Icons.info_outline_rounded, size: 13, color: _C.textDim),
-                const SizedBox(width: 6),
-                Expanded(
-                  child: Text(
-                    'Estimasi awal sebelum ada ulasan pengunjung. Setelah destinasi punya ulasan asli, rating akan terkunci dan dihitung otomatis.',
+                    'Rating dikunci — dihitung otomatis dari ulasan pengunjung, bukan diatur manual oleh admin.',
                     style:
                         TextStyle(color: _C.textDim, fontSize: 11, height: 1.4),
                   ),

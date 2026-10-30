@@ -32,7 +32,8 @@ String bookingStatusLabel(String status) => switch (status) {
 String? bookingStatusNote(String status) => switch (status) {
       'awaiting_payment' =>
         'Pendaftaran disetujui dan menunggu pembayaran. Status ini belum berarti pembayaran diterima.',
-      'payment_verification' || 'payment_review' =>
+      'payment_verification' ||
+      'payment_review' =>
         'Pembayaran sedang diproses. Status ini belum berarti pembayaran diterima.',
       'pending_approval' => 'Menunggu persetujuan pengelola.',
       _ => null,
@@ -228,6 +229,8 @@ class BookingDetailController extends ChangeNotifier {
   Booking booking;
   bool refreshing = false;
   bool cancelling = false;
+  bool checkingIn = false;
+  bool reviewing = false;
   String? message;
   BookingDocuments? documents;
   bool loadingDocuments = false;
@@ -242,12 +245,16 @@ class BookingDetailController extends ChangeNotifier {
       : _generation = repository.api.session.sessionGeneration;
 
   bool get _sessionValid =>
-      !_disposed && _generation == repository.api.session.sessionGeneration;
+      !_disposed && repository.api.session.isCurrentGeneration(_generation);
 
   /// Takes a copy from the list when nothing is in flight. Silent (no notification), so it
   /// is safe to call while the owner widget is rebuilding.
   void adopt(Booking fresh) {
-    if (fresh.guid != booking.guid || cancelling || refreshing) return;
+    if (fresh.guid != booking.guid ||
+        cancelling ||
+        refreshing ||
+        checkingIn ||
+        reviewing) return;
     booking = fresh;
   }
 
@@ -284,8 +291,8 @@ class BookingDetailController extends ChangeNotifier {
       final result = await repository.cancelBooking(booking.guid);
       if (!_sessionValid) return false;
       if (result.guid != booking.guid) {
-        throw const ApiException('Respons layanan tidak valid.', null,
-            'invalid_response');
+        throw const ApiException(
+            'Respons layanan tidak valid.', null, 'invalid_response');
       }
       booking = result;
       confirmed = true;
@@ -310,6 +317,71 @@ class BookingDetailController extends ChangeNotifier {
       }
     }
     return confirmed;
+  }
+
+  Future<bool> checkIn() async {
+    if (!_sessionValid || checkingIn || !booking.canCheckIn) return false;
+    checkingIn = true;
+    message = null;
+    _notify();
+    try {
+      final fresh = await repository.checkIn(booking.guid);
+      if (!_sessionValid) return false;
+      if (fresh.guid != booking.guid || fresh.checkedInAt == null) {
+        throw const ApiException(
+            'Respons layanan tidak valid.', null, 'invalid_response');
+      }
+      booking = fresh;
+      BookingEvents.notify();
+      return true;
+    } catch (e) {
+      if (!_sessionValid) return false;
+      message = bookingErrorMessage(e, mutation: true);
+      if (e is ApiException && (e.status == 409 || e.outcomeUnknown)) {
+        await refresh();
+        if (_sessionValid && booking.checkedInAt != null)
+          BookingEvents.notify();
+      }
+      return false;
+    } finally {
+      if (_sessionValid) {
+        checkingIn = false;
+        _notify();
+      }
+    }
+  }
+
+  Future<bool> submitReview(int rating, String comment) async {
+    if (!_sessionValid || reviewing || !booking.canReview) return false;
+    reviewing = true;
+    message = null;
+    _notify();
+    try {
+      final review =
+          await repository.createReview(booking.guid, rating, comment);
+      if (!_sessionValid) return false;
+      if (review.bookingGuid != booking.guid) {
+        throw const ApiException(
+            'Respons layanan tidak valid.', null, 'invalid_response');
+      }
+      booking = Booking(
+          {...booking.json, 'can_review': false, 'review': review.json});
+      BookingEvents.notify();
+      return true;
+    } catch (e) {
+      if (!_sessionValid) return false;
+      message = bookingErrorMessage(e, mutation: true);
+      if (e is ApiException && (e.status == 409 || e.outcomeUnknown)) {
+        await refresh();
+        if (_sessionValid && booking.review != null) BookingEvents.notify();
+      }
+      return false;
+    } finally {
+      if (_sessionValid) {
+        reviewing = false;
+        _notify();
+      }
+    }
   }
 
   Future<void> loadDocuments() async {

@@ -4,15 +4,12 @@
 // - Header: tombol kembali (kiri) + tombol drawer (kanan)
 // - Kartu statistik (Menunggu / Disetujui / Ditolak) = filter
 // - Kartu tiket modern dengan strip status berwarna
-// Butuh package: google_fonts, cloud_firestore, firebase_auth, qr_flutter
+// Butuh package: google_fonts
 // ============================================================
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart' as fb_auth;
 import 'package:google_fonts/google_fonts.dart';
-import 'package:qr_flutter/qr_flutter.dart';
 import '../data/app_data.dart';
 import '../data/booking_errors.dart';
 import '../data/booking_state.dart';
@@ -31,7 +28,6 @@ const _green = Color(0xFF10B981);
 const _greenDeep = Color(0xFF059669);
 const _red = Color(0xFFE5484D);
 const _amber = Color(0xFFF59E0B);
-const _sheetBg = Color(0xFFEAF2FC);
 
 TextStyle _font(
   double size,
@@ -72,11 +68,11 @@ _StatusStyle _styleFor(String status) {
       return const _StatusStyle(
           _amber, Color(0xFFD97706), 'Menunggu', Icons.hourglass_top_rounded);
     case 'cancelled':
-      return const _StatusStyle(_textMuted, Color(0xFF5B6B85),
-          'Dibatalkan', Icons.block_rounded);
+      return const _StatusStyle(
+          _textMuted, Color(0xFF5B6B85), 'Dibatalkan', Icons.block_rounded);
     case 'expired':
-      return const _StatusStyle(_textMuted, Color(0xFF5B6B85),
-          'Kedaluwarsa', Icons.timer_off_rounded);
+      return const _StatusStyle(_textMuted, Color(0xFF5B6B85), 'Kedaluwarsa',
+          Icons.timer_off_rounded);
     default:
       // awaiting_payment / payment_* dan status lain: label Indonesia dari server.
       return _StatusStyle(_amber, const Color(0xFFD97706),
@@ -785,7 +781,7 @@ class _TicketCard extends StatefulWidget {
 
 class _TicketCardState extends State<_TicketCard> {
   bool _expanded = false;
-  bool _sudahUlasan = false;
+  bool get _sudahUlasan => _controller?.booking.review != null;
   String? _statusSebelumnya;
   BookingDetailController? _controller;
 
@@ -798,9 +794,6 @@ class _TicketCardState extends State<_TicketCard> {
       _controller = BookingDetailController(BusinessRepository(), booking)
         ..addListener(_controllerChanged);
       _emitted = booking;
-    }
-    if (!widget.isLaravel && widget.pendaftar.status == 'disetujui') {
-      _cekSudahUlasan();
     }
   }
 
@@ -834,7 +827,6 @@ class _TicketCardState extends State<_TicketCard> {
         mounted) {
       _statusSebelumnya = statusBaru;
       if (statusBaru == 'disetujui') {
-        _cekSudahUlasan();
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
           content: Row(children: [
             const Icon(Icons.check_circle_rounded, color: _green, size: 18),
@@ -874,28 +866,18 @@ class _TicketCardState extends State<_TicketCard> {
     }
   }
 
-  Future<void> _cekSudahUlasan() async {
-    final uid = fb_auth.FirebaseAuth.instance.currentUser?.uid ?? '';
-    if (uid.isEmpty || widget.pendaftar.id == null) return;
-    final snap = await FirebaseFirestore.instance
-        .collection('ulasan')
-        .where('userId', isEqualTo: uid)
-        .where('pendaftaranId', isEqualTo: widget.pendaftar.id)
-        .limit(1)
-        .get();
-    if (!mounted) return;
-    setState(() => _sudahUlasan = snap.docs.isNotEmpty);
-  }
-
   void _bukaFormUlasan() {
+    final controller = _controller;
+    if (controller == null || !controller.booking.canReview) return;
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
       isScrollControlled: true,
       builder: (_) => _FormUlasanSheet(
         pendaftar: widget.pendaftar,
+        controller: controller,
         onSelesai: () {
-          if (mounted) setState(() => _sudahUlasan = true);
+          if (mounted) setState(() {});
         },
       ),
     );
@@ -921,23 +903,12 @@ class _TicketCardState extends State<_TicketCard> {
     );
   }
 
-  void _showTiketSheet(Pendaftar p) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (_) => _TiketBottomSheet(pendaftar: p),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     final controller = _controller;
     final p = controller != null
         ? _fromBooking(controller.booking)
         : widget.pendaftar;
-    // Hanya data historis (Firestore) yang memiliki QR/ulasan lokal; booking Laravel tidak.
-    final isApproved = !widget.isLaravel && p.status == 'disetujui';
     final st = _styleFor(p.status);
 
     return Container(
@@ -946,12 +917,12 @@ class _TicketCardState extends State<_TicketCard> {
         color: Colors.white,
         borderRadius: BorderRadius.circular(26),
         border: Border.all(
-          color: isApproved ? _green.withValues(alpha: 0.45) : _border,
-          width: isApproved ? 1.5 : 1.2,
+          color: _border,
+          width: 1.2,
         ),
         boxShadow: [
           BoxShadow(
-            color: (isApproved ? _green : _blue).withValues(alpha: 0.12),
+            color: _blue.withValues(alpha: 0.12),
             blurRadius: 22,
             offset: const Offset(0, 10),
           ),
@@ -962,18 +933,16 @@ class _TicketCardState extends State<_TicketCard> {
           _buildTicketHeader(p, st),
           _buildDashedDivider(),
           _buildTicketBody(p),
-          if (widget.isLaravel ||
-              p.catatan.isNotEmpty ||
-              p.email.isNotEmpty)
+          if (widget.isLaravel || p.catatan.isNotEmpty || p.email.isNotEmpty)
             _buildExpandBtn(p),
-          if (isApproved) _buildUlasanButton(),
+          if (_controller?.booking.canReview == true || _sudahUlasan)
+            _buildUlasanButton(),
         ],
       ),
     );
   }
 
   Widget _buildTicketHeader(Pendaftar p, _StatusStyle st) {
-    final isApproved = !widget.isLaravel && p.status == 'disetujui';
     final wisata = widget.isLaravel ? null : _cariWisata(p.wisata);
 
     return Material(
@@ -998,44 +967,12 @@ class _TicketCardState extends State<_TicketCard> {
                 ),
               ),
             ),
-            // area tap (buka tiket QR bila disetujui)
-            Positioned.fill(
-              child: InkWell(
-                onTap: isApproved ? () => _showTiketSheet(p) : null,
-                splashColor: Colors.white.withValues(alpha: 0.12),
-                highlightColor: Colors.transparent,
-              ),
-            ),
             // status (kiri atas)
             Positioned(
               top: 12,
               left: 12,
               child: _StatusBadge(status: p.status, onPhoto: true),
             ),
-            // petunjuk QR (kanan atas)
-            if (isApproved)
-              Positioned(
-                top: 12,
-                right: 12,
-                child: Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 9, vertical: 6),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.95),
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Icon(Icons.qr_code_2_rounded,
-                          color: _blue, size: 14),
-                      const SizedBox(width: 4),
-                      Text('Lihat tiket QR',
-                          style: _font(10.5, FontWeight.w800, _blue)),
-                    ],
-                  ),
-                ),
-              ),
             // nama wisata + nomor bukti (kiri bawah)
             Positioned(
               left: 16,
@@ -1189,7 +1126,8 @@ class _TicketCardState extends State<_TicketCard> {
 
   void _snack(String message) {
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+    ScaffoldMessenger.of(context)
+        .showSnackBar(SnackBar(content: Text(message)));
   }
 
   Future<void> _confirmCancel(BookingDetailController c) async {
@@ -1323,6 +1261,18 @@ class _TicketCardState extends State<_TicketCard> {
               key: const ValueKey('detailMessage'),
               style: _font(12, FontWeight.w600, _red)),
         ),
+      if (b.checkedInAt != null)
+        Text('Sudah check-in', style: _font(12, FontWeight.w600, _greenDeep)),
+      if (b.canCheckIn) ...[
+        const SizedBox(height: 12),
+        SizedBox(
+            width: double.infinity,
+            child: OutlinedButton(
+              key: const ValueKey('checkInBooking'),
+              onPressed: c.checkingIn ? null : c.checkIn,
+              child: Text(c.checkingIn ? 'Memproses...' : 'Check-in Kunjungan'),
+            )),
+      ],
       if (b.cancellable) ...[
         const SizedBox(height: 12),
         SizedBox(
@@ -1448,10 +1398,12 @@ class _TicketCardState extends State<_TicketCard> {
 class _FormUlasanSheet extends StatefulWidget {
   final Pendaftar pendaftar;
   final VoidCallback onSelesai;
+  final BookingDetailController controller;
 
   const _FormUlasanSheet({
     required this.pendaftar,
     required this.onSelesai,
+    required this.controller,
   });
 
   @override
@@ -1480,8 +1432,13 @@ class _FormUlasanSheetState extends State<_FormUlasanSheet> {
   }
 
   Future<void> _submit() async {
+    if (_isLoading) return;
     if (_rating == 0) {
       setState(() => _error = 'Pilih rating bintang terlebih dahulu.');
+      return;
+    }
+    if (_isiCtrl.text.trim().length > 2000) {
+      setState(() => _error = 'Ulasan maksimal 2000 karakter.');
       return;
     }
     if (_isiCtrl.text.trim().isEmpty) {
@@ -1495,17 +1452,17 @@ class _FormUlasanSheetState extends State<_FormUlasanSheet> {
     });
 
     try {
-      final uid = fb_auth.FirebaseAuth.instance.currentUser?.uid ?? '';
-      await FirebaseFirestore.instance.collection('ulasan').add({
-        'userId': uid,
-        'pendaftaranId': widget.pendaftar.id,
-        'namaWisata': widget.pendaftar.wisata,
-        'rating': _rating,
-        'isi': _isiCtrl.text.trim(),
-        'createdAt': FieldValue.serverTimestamp(),
-      });
-
+      final success =
+          await widget.controller.submitReview(_rating, _isiCtrl.text.trim());
       if (!mounted) return;
+      if (!success) {
+        setState(() {
+          _error = widget.controller.message ??
+              'Ulasan belum dapat dikirim. Muat ulang status pendaftaran.';
+          _isLoading = false;
+        });
+        return;
+      }
       final messenger = ScaffoldMessenger.of(context);
       Navigator.pop(context);
       widget.onSelesai();
@@ -1518,6 +1475,7 @@ class _FormUlasanSheetState extends State<_FormUlasanSheet> {
         duration: const Duration(seconds: 2),
       ));
     } catch (e) {
+      if (!mounted) return;
       setState(() {
         _error = 'Gagal mengirim ulasan, coba lagi.';
         _isLoading = false;
@@ -1826,355 +1784,3 @@ class _StatusBadge extends StatelessWidget {
 // ══════════════════════════════════════════════════════════
 //  TIKET BOTTOM SHEET — muncul saat kartu disetujui diklik
 // ══════════════════════════════════════════════════════════
-class _TiketBottomSheet extends StatelessWidget {
-  final Pendaftar pendaftar;
-  const _TiketBottomSheet({required this.pendaftar});
-
-  @override
-  Widget build(BuildContext context) {
-    final p = pendaftar;
-    // Data yang diencode ke QR
-    final qrData =
-        'WISATA_DAERAHKU|${p.nomorBukti}|${p.wisata}|${p.namaPengunjung}|${p.tanggal}|${p.jumlahOrang}';
-
-    return DraggableScrollableSheet(
-      initialChildSize: 0.88,
-      minChildSize: 0.5,
-      maxChildSize: 0.95,
-      builder: (_, scrollCtrl) => Container(
-        decoration: const BoxDecoration(
-          color: _sheetBg,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(30)),
-        ),
-        child: SingleChildScrollView(
-          controller: scrollCtrl,
-          physics: const BouncingScrollPhysics(),
-          child: Column(
-            children: [
-              // Handle bar
-              Container(
-                margin: const EdgeInsets.only(top: 12, bottom: 4),
-                width: 42,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: _border,
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-
-              // Header
-              Padding(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 22, vertical: 12),
-                child: Row(
-                  children: [
-                    Container(
-                      width: 42,
-                      height: 42,
-                      decoration: BoxDecoration(
-                        color: _green.withValues(alpha: 0.14),
-                        borderRadius: BorderRadius.circular(14),
-                      ),
-                      child: const Icon(Icons.qr_code_2_rounded,
-                          color: _greenDeep, size: 22),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text('Tiket Resmi',
-                              style: _font(17, FontWeight.w800, _navy,
-                                  letterSpacing: -0.4)),
-                          Text('Tunjukkan ke petugas loket',
-                              style: _font(12, FontWeight.w500, _textMuted)),
-                        ],
-                      ),
-                    ),
-                    GestureDetector(
-                      onTap: () => Navigator.pop(context),
-                      child: Container(
-                        width: 36,
-                        height: 36,
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          shape: BoxShape.circle,
-                          border: Border.all(color: _border),
-                        ),
-                        child: const Icon(Icons.close_rounded,
-                            color: _textMuted, size: 18),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-
-              // ── Kartu Tiket ──────────────────────────────────
-              Padding(
-                padding: const EdgeInsets.fromLTRB(20, 8, 20, 28),
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(28),
-                    border: Border.all(
-                        color: _green.withValues(alpha: 0.35), width: 1.5),
-                    boxShadow: [
-                      BoxShadow(
-                        color: _blue.withValues(alpha: 0.14),
-                        blurRadius: 26,
-                        offset: const Offset(0, 12),
-                      ),
-                    ],
-                  ),
-                  child: Column(
-                    children: [
-                      // ── Stripe header ────────────────────────
-                      Container(
-                        width: double.infinity,
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 20, vertical: 18),
-                        decoration: const BoxDecoration(
-                          gradient: LinearGradient(
-                            colors: [Color(0xFF2386E8), _blueDeep],
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                          ),
-                          borderRadius:
-                              BorderRadius.vertical(top: Radius.circular(26)),
-                        ),
-                        child: Row(
-                          children: [
-                            const Icon(Icons.verified_rounded,
-                                color: Colors.white, size: 20),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: Text(
-                                p.wisata,
-                                maxLines: 2,
-                                overflow: TextOverflow.ellipsis,
-                                style: _font(17, FontWeight.w800, Colors.white,
-                                    letterSpacing: -0.3),
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 10, vertical: 5),
-                              decoration: BoxDecoration(
-                                color: Colors.white,
-                                borderRadius: BorderRadius.circular(20),
-                              ),
-                              child: Text('✓ VALID',
-                                  style: _font(10, FontWeight.w800, _greenDeep,
-                                      letterSpacing: 0.8)),
-                            ),
-                          ],
-                        ),
-                      ),
-
-                      // ── QR Code ──────────────────────────────
-                      Padding(
-                        padding: const EdgeInsets.all(24),
-                        child: Column(
-                          children: [
-                            Container(
-                              padding: const EdgeInsets.all(14),
-                              decoration: BoxDecoration(
-                                color: Colors.white,
-                                borderRadius: BorderRadius.circular(22),
-                                border: Border.all(color: _border, width: 1.4),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: _blue.withValues(alpha: 0.12),
-                                    blurRadius: 20,
-                                    offset: const Offset(0, 8),
-                                  ),
-                                ],
-                              ),
-                              child: QrImageView(
-                                data: qrData,
-                                version: QrVersions.auto,
-                                size: 200,
-                                backgroundColor: Colors.white,
-                                eyeStyle: const QrEyeStyle(
-                                  eyeShape: QrEyeShape.square,
-                                  color: _navy,
-                                ),
-                                dataModuleStyle: const QrDataModuleStyle(
-                                  dataModuleShape: QrDataModuleShape.square,
-                                  color: _navy,
-                                ),
-                              ),
-                            ),
-                            const SizedBox(height: 18),
-
-                            // Kode booking
-                            GestureDetector(
-                              onTap: () {
-                                Clipboard.setData(
-                                    ClipboardData(text: p.nomorBukti));
-                                ScaffoldMessenger.of(context)
-                                    .showSnackBar(SnackBar(
-                                  content: Text('Kode disalin!',
-                                      style: _font(
-                                          13, FontWeight.w600, Colors.white)),
-                                  backgroundColor: _greenDeep,
-                                  behavior: SnackBarBehavior.floating,
-                                  shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(14)),
-                                  duration: const Duration(seconds: 2),
-                                ));
-                              },
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(
-                                    horizontal: 18, vertical: 11),
-                                decoration: BoxDecoration(
-                                  color: _orange.withValues(alpha: 0.12),
-                                  borderRadius: BorderRadius.circular(16),
-                                  border: Border.all(
-                                      color: _orange.withValues(alpha: 0.4)),
-                                ),
-                                child: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    const Icon(
-                                        Icons.confirmation_number_rounded,
-                                        color: Color(0xFFE08600),
-                                        size: 17),
-                                    const SizedBox(width: 8),
-                                    Flexible(
-                                      child: Text(
-                                        p.nomorBukti,
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                        style: _font(15, FontWeight.w800,
-                                            const Color(0xFFE08600),
-                                            letterSpacing: 0.8),
-                                      ),
-                                    ),
-                                    const SizedBox(width: 8),
-                                    const Icon(Icons.copy_rounded,
-                                        color: _textMuted, size: 14),
-                                  ],
-                                ),
-                              ),
-                            ),
-                            const SizedBox(height: 8),
-                            Text('Tap kode untuk menyalin',
-                                style: _font(11, FontWeight.w500, _textMuted)),
-                          ],
-                        ),
-                      ),
-
-                      // ── Notch divider ─────────────────────────
-                      _notchDivider(),
-
-                      // ── Info rows ─────────────────────────────
-                      Padding(
-                        padding: const EdgeInsets.fromLTRB(20, 14, 20, 18),
-                        child: Column(
-                          children: [
-                            _tiketRow(
-                                Icons.person_rounded, 'Nama', p.namaPengunjung),
-                            _tiketRow(Icons.calendar_today_rounded, 'Tanggal',
-                                p.tanggal),
-                            _tiketRow(Icons.group_rounded, 'Jumlah',
-                                '${p.jumlahOrang} orang'),
-                            _tiketRow(
-                                Icons.phone_rounded, 'Telepon', p.noTelepon),
-                          ],
-                        ),
-                      ),
-
-                      // ── Footer ───────────────────────────────
-                      Container(
-                        width: double.infinity,
-                        padding: const EdgeInsets.symmetric(vertical: 15),
-                        decoration: BoxDecoration(
-                          color: _green.withValues(alpha: 0.08),
-                          borderRadius: const BorderRadius.vertical(
-                              bottom: Radius.circular(26)),
-                        ),
-                        child: Column(
-                          children: [
-                            const Icon(Icons.verified_rounded,
-                                color: _greenDeep, size: 19),
-                            const SizedBox(height: 4),
-                            Text(
-                              'Wisata Daerahku  ·  Tiket Resmi Terverifikasi',
-                              textAlign: TextAlign.center,
-                              style: _font(11, FontWeight.w600, _greenDeep,
-                                  letterSpacing: 0.2),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _notchDivider() {
-    return SizedBox(
-      height: 22,
-      child: Row(
-        children: [
-          Container(
-            width: 16,
-            height: 22,
-            decoration: const BoxDecoration(
-              color: _sheetBg,
-              borderRadius: BorderRadius.horizontal(right: Radius.circular(11)),
-            ),
-          ),
-          const Expanded(
-            child: CustomPaint(
-              painter: _DashedLinePainter(color: _border),
-            ),
-          ),
-          Container(
-            width: 16,
-            height: 22,
-            decoration: const BoxDecoration(
-              color: _sheetBg,
-              borderRadius: BorderRadius.horizontal(left: Radius.circular(11)),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _tiketRow(IconData icon, String label, String value) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 7),
-      child: Row(
-        children: [
-          Container(
-            width: 32,
-            height: 32,
-            decoration: BoxDecoration(
-              color: _blue.withValues(alpha: 0.10),
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: Icon(icon, size: 15, color: _blue),
-          ),
-          const SizedBox(width: 12),
-          SizedBox(
-            width: 64,
-            child: Text(label, style: _font(12, FontWeight.w500, _textMuted)),
-          ),
-          Expanded(
-            child: Text(value, style: _font(13, FontWeight.w700, _navy)),
-          ),
-        ],
-      ),
-    );
-  }
-}

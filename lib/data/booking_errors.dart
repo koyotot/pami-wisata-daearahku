@@ -54,6 +54,16 @@ String bookingErrorMessage(Object error, {bool mutation = false}) {
       return 'Pendaftaran ini sudah diproses sehingga tidak dapat dibatalkan.';
     case 'booking_already_cancelled':
       return 'Pendaftaran ini sudah dibatalkan sebelumnya.';
+    case 'check_in_duplicate':
+      return 'Pendaftaran ini sudah check-in sebelumnya.';
+    case 'check_in_not_eligible':
+      return 'Check-in hanya tersedia untuk pendaftaran yang sudah dikonfirmasi.';
+    case 'check_in_wrong_date':
+      return 'Check-in hanya tersedia pada tanggal kunjungan sesuai zona waktu destinasi.';
+    case 'review_duplicate':
+      return 'Ulasan untuk pendaftaran ini sudah dikirim.';
+    case 'review_not_eligible':
+      return 'Ulasan hanya tersedia setelah pendaftaran dikonfirmasi dan sudah check-in.';
   }
   if (error.outcomeUnknown) {
     return mutation

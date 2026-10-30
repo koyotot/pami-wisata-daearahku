@@ -1,6 +1,6 @@
 // ============================================================
 // lib/screens/user_login_screen.dart
-// Package: google_fonts, firebase_auth, cloud_firestore
+// Package: google_fonts, firebase_auth
 // ============================================================
 
 import 'package:flutter/material.dart';

@@ -296,10 +296,11 @@ class AuthSession {
         'password': password,
         'password_confirmation': confirmation
       });
+
   /// Google Login hanya untuk role 0; sesi role lain ditolak dan dibersihkan.
-  Future<void> google(String idToken) => _authenticate(
-      'auth/google', {'id_token': idToken},
-      allowedRoles: const {0});
+  Future<void> google(String idToken) =>
+      _authenticate('auth/google', {'id_token': idToken},
+          allowedRoles: const {0});
   Future<void> _authenticate(String path, Map<String, dynamic> body,
       {Set<int>? allowedRoles}) async {
     var generation = ++_generation;
@@ -488,7 +489,10 @@ class AuthSession {
     final generation = _generation;
     final data =
         await request('PATCH', 'profile', body: {'name': name, 'phone': phone});
-    if (generation == _generation) _user(data);
+    if (!isCurrentGeneration(generation)) {
+      throw const ApiException('Sesi telah berakhir.', 401);
+    }
+    _user(data);
   }
 
 // =====================================================

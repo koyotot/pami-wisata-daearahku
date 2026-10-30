@@ -5,17 +5,17 @@ import '../services/auth_session.dart';
 // Tema: biru terang — sama dengan home, login, beranda, dan drawer.
 // Header punya tombol KEMBALI (ke Beranda) dan tombol MENU (☰)
 // yang membuka drawer.
-// Package: google_fonts, firebase_auth, cloud_firestore
+// Package: google_fonts, firebase_auth
 // ============================================================
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:firebase_auth/firebase_auth.dart' as fb_auth;
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../data/app_data.dart';
 import '../data/booking_state.dart';
 import '../data/business_repository.dart';
 import '../data/favorite_state.dart';
+import '../widgets/reviews_sheet.dart';
 import 'home_screen.dart';
 import 'user_login_screen.dart';
 
@@ -32,7 +32,6 @@ class _C {
   static const textDim = Color(0xFF9AA7BC);
   static const border = Color(0xFFDCE4F0);
   static const danger = Color(0xFFE5484D);
-  static const success = Color(0xFF2E9E6B);
   static const warning = Color(0xFFE08600);
 
   // Alias agar kode sheet/dialog lama tetap jalan dengan warna baru
@@ -93,8 +92,9 @@ class _ProfilUserScreenState extends State<ProfilUserScreen>
 
   bool _loadingJumlah = true;
   int? _jumlahPendaftaran;
-  int _jumlahUlasan = 0;
-  int _jumlahDikunjungi = 0;
+  int? _jumlahUlasan;
+  int? _jumlahDikunjungi;
+  String? _jumlahError;
 
   @override
   void initState() {
@@ -123,79 +123,46 @@ class _ProfilUserScreenState extends State<ProfilUserScreen>
   void _sessionChanged() {
     if (!mounted) return;
     setState(() {
+      _jumlahError = null;
       _jumlahPendaftaran = null;
-      _jumlahUlasan = 0;
-      _jumlahDikunjungi = 0;
+      _jumlahUlasan = null;
+      _jumlahDikunjungi = null;
       _loadingJumlah = true;
     });
     _loadJumlahPendaftaran();
   }
 
-  // Akun Laravel: jumlah pendaftaran dari API Laravel (meta.total). Hanya akun lama
-  // (non-Laravel) yang masih menghitung data historis dari Firestore, langsung dari
-  // koleksi (bukan dari `daftarPendaftar`, list sementara di RAM).
   Future<void> _loadJumlahPendaftaran() async {
     final session = AuthSession.instance;
     final generation = session.sessionGeneration;
     final request = ++_jumlahRequest;
-    if (currentUser?.isLaravel == true &&
-        session.authenticated.value &&
-        session.deviceSessionReady) {
-      try {
-        final total = await loadBookingTotal(BusinessRepository());
-        if (!mounted ||
-            generation != session.sessionGeneration ||
-            request != _jumlahRequest) {
-          return;
-        }
-        setState(() {
-          _jumlahPendaftaran = total;
-          _loadingJumlah = false;
-        });
-      } catch (_) {
-        if (!mounted ||
-            generation != session.sessionGeneration ||
-            request != _jumlahRequest) {
-          return;
-        }
-        setState(() => _loadingJumlah = false);
-      }
+    if (!session.authenticated.value || !session.deviceSessionReady) {
+      if (mounted) setState(() => _loadingJumlah = false);
       return;
     }
-    final uid = currentUser?.isLaravel == true ? '' : (currentUser?.id ?? '');
-    if (uid.isEmpty) {
-      setState(() => _loadingJumlah = false);
-      return;
-    }
+    setState(() {
+      _loadingJumlah = true;
+      _jumlahError = null;
+    });
     try {
-      final results = await Future.wait([
-        FirebaseFirestore.instance
-            .collection('pendaftar')
-            .where('userId', isEqualTo: uid)
-            .count()
-            .get(),
-        FirebaseFirestore.instance
-            .collection('ulasan')
-            .where('userId', isEqualTo: uid)
-            .count()
-            .get(),
-        FirebaseFirestore.instance
-            .collection('kunjungan')
-            .where('userId', isEqualTo: uid)
-            .count()
-            .get(),
-      ]);
-
-      if (!mounted || generation != session.sessionGeneration) return;
+      final counts = await BusinessRepository().profileStatistics();
+      if (!mounted ||
+          !session.isCurrentGeneration(generation) ||
+          request != _jumlahRequest) return;
       setState(() {
-        _jumlahPendaftaran = results[0].count ?? 0;
-        _jumlahUlasan = results[1].count ?? 0;
-        _jumlahDikunjungi = results[2].count ?? 0;
+        _jumlahPendaftaran = counts.bookings;
+        _jumlahUlasan = counts.reviews;
+        _jumlahDikunjungi = counts.visits;
         _loadingJumlah = false;
       });
     } catch (_) {
-      if (!mounted || generation != session.sessionGeneration) return;
-      setState(() => _loadingJumlah = false);
+      if (!mounted ||
+          !session.isCurrentGeneration(generation) ||
+          request != _jumlahRequest) return;
+      setState(() {
+        _loadingJumlah = false;
+        _jumlahError = 'Statistik profil belum dapat dimuat.';
+      });
     }
   }
 
@@ -264,19 +231,10 @@ class _ProfilUserScreenState extends State<ProfilUserScreen>
         namaAwal: currentUser?.namaLengkap ?? '',
         teleponAwal: currentUser?.noTelepon ?? '',
         onSimpan: (nama, telepon) async {
-          final uid = currentUser?.id ?? '';
-          if (uid.isEmpty) return;
-          if (currentUser?.isLaravel == true) {
-            await AuthSession.instance.updateProfile(nama, telepon);
-          } else {
-            await FirebaseFirestore.instance
-                .collection('users')
-                .doc(uid)
-                .update({'namaLengkap': nama, 'noTelepon': telepon});
-          }
-          currentUser?.namaLengkap = nama;
-          currentUser?.noTelepon = telepon;
-          if (!mounted) return;
+          final session = AuthSession.instance;
+          final generation = session.sessionGeneration;
+          await session.updateProfile(nama, telepon);
+          if (!mounted || !session.isCurrentGeneration(generation)) return;
           setState(() {});
           ScaffoldMessenger.of(context).showSnackBar(SnackBar(
             content: const Text('Profil berhasil diperbarui!'),
@@ -296,9 +254,7 @@ class _ProfilUserScreenState extends State<ProfilUserScreen>
       context: context,
       backgroundColor: Colors.transparent,
       isScrollControlled: true,
-      builder: (_) => _RiwayatUlasanSheet(
-          userId:
-              currentUser?.isLaravel == true ? '' : (currentUser?.id ?? '')),
+      builder: (_) => const ReviewsSheet(),
     );
   }
 
@@ -329,17 +285,8 @@ class _ProfilUserScreenState extends State<ProfilUserScreen>
   }
 
   void _bukaGantiPassword(BuildContext context) {
-    if (currentUser?.isLaravel == true) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-          content: Text('Fitur ini belum tersedia untuk akun API.')));
-      return;
-    }
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.transparent,
-      isScrollControlled: true,
-      builder: (_) => const _GantiPasswordSheet(),
-    );
+    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text('Fitur ini belum tersedia untuk akun API.')));
   }
 
   void _kembali() {
@@ -394,6 +341,12 @@ class _ProfilUserScreenState extends State<ProfilUserScreen>
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               _buildHeaderCard(user, tahunBergabung),
+                              if (_jumlahError != null)
+                                TextButton.icon(
+                                  onPressed: _loadJumlahPendaftaran,
+                                  icon: const Icon(Icons.refresh_rounded),
+                                  label: Text('$_jumlahError Coba lagi'),
+                                ),
                               const SizedBox(height: 26),
 
                               // Wisata Tersimpan
@@ -738,14 +691,18 @@ class _ProfilUserScreenState extends State<ProfilUserScreen>
                     const SizedBox(width: 8),
                     _statCard(
                       icon: Icons.location_on_rounded,
-                      value: _loadingJumlah ? '–' : '$_jumlahDikunjungi',
+                      value: _loadingJumlah || _jumlahDikunjungi == null
+                          ? '–'
+                          : '$_jumlahDikunjungi',
                       label: 'Dikunjungi',
                       iconColor: _C.blue,
                     ),
                     const SizedBox(width: 8),
                     _statCard(
                       icon: Icons.star_rounded,
-                      value: _loadingJumlah ? '–' : '$_jumlahUlasan',
+                      value: _loadingJumlah || _jumlahUlasan == null
+                          ? '–'
+                          : '$_jumlahUlasan',
                       label: 'Ulasan',
                       iconColor: const Color(0xFF26A69A),
                     ),
@@ -1043,148 +1000,10 @@ class _ProfilUserScreenState extends State<ProfilUserScreen>
   }
 
   void _konfirmasiHapusAkun(BuildContext context) {
-    if (currentUser?.isLaravel == true) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-          content: Text('Fitur ini belum tersedia untuk akun API.')));
-      return;
-    }
-    final passwordCtrl = TextEditingController();
-    bool obscure = true;
-
-    showDialog(
-      context: context,
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setDialogState) => AlertDialog(
-          backgroundColor: _C.card,
-          shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-          title: Text('Hapus Akun?',
-              style: TextStyle(color: _C.danger, fontWeight: FontWeight.w800)),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Semua data akun kamu akan dihapus secara permanen dan tidak bisa dikembalikan.',
-                style: TextStyle(color: _C.textMuted, height: 1.5),
-              ),
-              const SizedBox(height: 16),
-              Text('Konfirmasi dengan password kamu:',
-                  style: TextStyle(
-                      color: _C.text,
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600)),
-              const SizedBox(height: 8),
-              TextField(
-                controller: passwordCtrl,
-                obscureText: obscure,
-                style: TextStyle(color: _C.text, fontSize: 14),
-                decoration: InputDecoration(
-                  hintText: 'Masukkan password',
-                  hintStyle: TextStyle(color: _C.textDim, fontSize: 13),
-                  suffixIcon: IconButton(
-                    icon: Icon(
-                        obscure
-                            ? Icons.visibility_outlined
-                            : Icons.visibility_off_outlined,
-                        color: _C.textDim,
-                        size: 18),
-                    onPressed: () => setDialogState(() => obscure = !obscure),
-                  ),
-                  filled: true,
-                  fillColor: _C.bg,
-                  enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide(color: _C.border, width: 1.2),
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide(color: _C.danger, width: 1.5),
-                  ),
-                  contentPadding:
-                      const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                ),
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx),
-              child: Text('Batal', style: TextStyle(color: _C.textMuted)),
-            ),
-            TextButton(
-              onPressed: () async {
-                final pw = passwordCtrl.text.trim();
-                if (pw.isEmpty) return;
-                Navigator.pop(ctx);
-
-                try {
-                  final fbUser = fb_auth.FirebaseAuth.instance.currentUser;
-                  if (fbUser == null || fbUser.email == null) return;
-
-                  // Re-autentikasi wajib sebelum hapus akun
-                  final cred = fb_auth.EmailAuthProvider.credential(
-                    email: fbUser.email!,
-                    password: pw,
-                  );
-                  await fbUser.reauthenticateWithCredential(cred);
-
-                  final uid = fbUser.uid;
-
-                  // Hapus data Firestore milik user
-                  final batch = FirebaseFirestore.instance.batch();
-                  final colRefs = ['users', 'pendaftar', 'ulasan', 'kunjungan'];
-                  for (final col in colRefs) {
-                    if (col == 'users') {
-                      batch.delete(FirebaseFirestore.instance
-                          .collection('users')
-                          .doc(uid));
-                    } else {
-                      final snap = await FirebaseFirestore.instance
-                          .collection(col)
-                          .where('userId', isEqualTo: uid)
-                          .get();
-                      for (final doc in snap.docs) {
-                        batch.delete(doc.reference);
-                      }
-                    }
-                  }
-                  await batch.commit();
-
-                  // Hapus akun Firebase Auth
-                  await fbUser.delete();
-
-                  currentUser = null;
-                  if (!context.mounted) return;
-                  _keLogin(context);
-                } on fb_auth.FirebaseAuthException catch (e) {
-                  if (!context.mounted) return;
-                  final pesan = e.code == 'wrong-password' ||
-                          e.code == 'invalid-credential'
-                      ? 'Password salah. Akun tidak dihapus.'
-                      : 'Gagal: ${e.message}';
-                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                    content: Text(pesan),
-                    backgroundColor: _C.danger,
-                    behavior: SnackBarBehavior.floating,
-                    shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(10)),
-                  ));
-                }
-              },
-              child: Text('Hapus',
-                  style:
-                      TextStyle(color: _C.danger, fontWeight: FontWeight.w800)),
-            ),
-          ],
-        ),
-      ),
-    );
+    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text('Fitur ini belum tersedia untuk akun API.')));
   }
 
-  // ══════════════════════════════════════════════════════════
-  //  LOGOUT BUTTON
-  // ══════════════════════════════════════════════════════════
   Widget _buildLogoutButton(BuildContext context) {
     return Material(
       color: Colors.transparent,
@@ -1271,509 +1090,6 @@ class _MenuItemData {
 
 // ════════════════════════════════════════════════════════════
 //  BOTTOM SHEET — Ubah Password (Firebase Auth)
-// ════════════════════════════════════════════════════════════
-class _GantiPasswordSheet extends StatefulWidget {
-  const _GantiPasswordSheet();
-
-  @override
-  State<_GantiPasswordSheet> createState() => _GantiPasswordSheetState();
-}
-
-class _GantiPasswordSheetState extends State<_GantiPasswordSheet> {
-  final _lamaCtrl = TextEditingController();
-  final _baruCtrl = TextEditingController();
-  final _konfirmasiCtrl = TextEditingController();
-
-  bool _obscureLama = true;
-  bool _obscureBaru = true;
-  bool _obscureKonfirmasi = true;
-  bool _isLoading = false;
-  String? _errorMsg;
-
-  @override
-  void initState() {
-    super.initState();
-    // Supaya strength meter & indikator kecocokan ikut update live
-    // setiap kali pengguna mengetik, dan error lama otomatis hilang.
-    _lamaCtrl.addListener(_onFieldChanged);
-    _baruCtrl.addListener(_onFieldChanged);
-    _konfirmasiCtrl.addListener(_onFieldChanged);
-  }
-
-  void _onFieldChanged() {
-    if (_errorMsg != null) {
-      setState(() => _errorMsg = null);
-    } else {
-      setState(() {});
-    }
-  }
-
-  @override
-  void dispose() {
-    _lamaCtrl.dispose();
-    _baruCtrl.dispose();
-    _konfirmasiCtrl.dispose();
-    super.dispose();
-  }
-
-  // 0–5: panjang, panjang ekstra, huruf besar, angka, simbol.
-  int _calcStrength(String pw) {
-    if (pw.isEmpty) return 0;
-    int score = 0;
-    if (pw.length >= 6) score++;
-    if (pw.length >= 10) score++;
-    if (RegExp(r'[A-Z]').hasMatch(pw)) score++;
-    if (RegExp(r'[0-9]').hasMatch(pw)) score++;
-    if (RegExp(r'[^A-Za-z0-9]').hasMatch(pw)) score++;
-    return score;
-  }
-
-  Future<void> _submit() async {
-    final lama = _lamaCtrl.text;
-    final baru = _baruCtrl.text;
-    final konfirmasi = _konfirmasiCtrl.text;
-
-    if (lama.isEmpty || baru.isEmpty || konfirmasi.isEmpty) {
-      setState(() => _errorMsg = 'Semua kolom wajib diisi.');
-      return;
-    }
-    if (baru.length < 6) {
-      setState(() => _errorMsg = 'Password baru minimal 6 karakter.');
-      return;
-    }
-    if (baru != konfirmasi) {
-      setState(() => _errorMsg = 'Konfirmasi password baru tidak cocok.');
-      return;
-    }
-    if (baru == lama) {
-      setState(
-          () => _errorMsg = 'Password baru tidak boleh sama dengan yang lama.');
-      return;
-    }
-
-    setState(() {
-      _errorMsg = null;
-      _isLoading = true;
-    });
-
-    try {
-      final user = fb_auth.FirebaseAuth.instance.currentUser;
-      if (user == null || user.email == null) {
-        throw fb_auth.FirebaseAuthException(
-          code: 'no-user',
-          message: 'Sesi berakhir, silakan login kembali.',
-        );
-      }
-
-      // 1. Re-autentikasi dengan password lama (wajib oleh Firebase
-      //    sebelum mengubah credential sensitif seperti password).
-      final cred = fb_auth.EmailAuthProvider.credential(
-        email: user.email!,
-        password: lama,
-      );
-      await user.reauthenticateWithCredential(cred);
-
-      // 2. Update password baru ke Firebase Auth.
-      await user.updatePassword(baru);
-
-      if (!mounted) return;
-      Navigator.pop(context);
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: const Text('Password berhasil diperbarui!'),
-        backgroundColor: _C.tealDark,
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-        duration: const Duration(seconds: 2),
-      ));
-    } on fb_auth.FirebaseAuthException catch (e) {
-      String pesan;
-      switch (e.code) {
-        case 'wrong-password':
-        case 'invalid-credential':
-          pesan = 'Password lama yang kamu masukkan salah.';
-          break;
-        case 'weak-password':
-          pesan = 'Password baru terlalu lemah, gunakan kombinasi lebih kuat.';
-          break;
-        case 'requires-recent-login':
-          pesan =
-              'Sesi login sudah lama. Silakan keluar dan masuk kembali sebelum mengubah password.';
-          break;
-        case 'too-many-requests':
-          pesan = 'Terlalu banyak percobaan. Coba lagi nanti.';
-          break;
-        case 'no-user':
-          pesan = e.message ?? 'Sesi berakhir, silakan login kembali.';
-          break;
-        default:
-          pesan = 'Terjadi kesalahan. Silakan coba lagi.';
-      }
-      setState(() {
-        _errorMsg = pesan;
-        _isLoading = false;
-      });
-    } catch (_) {
-      setState(() {
-        _errorMsg = 'Terjadi kesalahan tidak terduga.';
-        _isLoading = false;
-      });
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      // Naik mengikuti keyboard supaya field terakhir tidak tertutup.
-      padding:
-          EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
-      child: Container(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            colors: [_C.card, const Color(0xFFE6F0FC)],
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-          ),
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
-          border: Border.all(color: _C.teal.withValues(alpha: 0.14), width: 1),
-        ),
-        padding: const EdgeInsets.fromLTRB(20, 14, 20, 24),
-        child: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Drag handle
-              Center(
-                child: Container(
-                  width: 40,
-                  height: 4,
-                  margin: const EdgeInsets.only(bottom: 20),
-                  decoration: BoxDecoration(
-                    color: _C.border,
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                ),
-              ),
-
-              // ── Header ikon glow di tengah ──────────────────
-              Center(
-                child: Stack(
-                  alignment: Alignment.center,
-                  children: [
-                    Container(
-                      width: 88,
-                      height: 88,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: _C.teal.withValues(alpha: 0.08),
-                      ),
-                    ),
-                    Container(
-                      width: 62,
-                      height: 62,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        gradient: LinearGradient(
-                          colors: [_C.teal, _C.tealDark],
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                        ),
-                        boxShadow: [
-                          BoxShadow(
-                            color: _C.teal.withValues(alpha: 0.45),
-                            blurRadius: 22,
-                            spreadRadius: 1,
-                            offset: const Offset(0, 6),
-                          ),
-                        ],
-                      ),
-                      child: const Icon(Icons.lock_reset_rounded,
-                          color: Colors.white, size: 30),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 14),
-              Center(
-                child: Text('Ubah Password',
-                    style: TextStyle(
-                        color: _C.text,
-                        fontWeight: FontWeight.w800,
-                        fontSize: 18)),
-              ),
-              const SizedBox(height: 4),
-              Center(
-                child: Text('Perbarui kata sandi akun kamu',
-                    style: TextStyle(color: _C.textMuted, fontSize: 12.5)),
-              ),
-              const SizedBox(height: 14),
-              Center(
-                child: Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
-                  decoration: BoxDecoration(
-                    color: _C.teal.withValues(alpha: 0.08),
-                    borderRadius: BorderRadius.circular(20),
-                    border: Border.all(color: _C.teal.withValues(alpha: 0.2)),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(Icons.shield_outlined, color: _C.teal, size: 13),
-                      const SizedBox(width: 6),
-                      Text('Minimal 6 karakter, makin unik makin aman',
-                          style:
-                              TextStyle(color: _C.textMuted, fontSize: 11.5)),
-                    ],
-                  ),
-                ),
-              ),
-              const SizedBox(height: 24),
-
-              if (_errorMsg != null) ...[
-                _ErrorBanner(message: _errorMsg!),
-                const SizedBox(height: 16),
-              ],
-
-              _fieldLabel('Password Lama'),
-              const SizedBox(height: 8),
-              _SheetPasswordField(
-                controller: _lamaCtrl,
-                obscure: _obscureLama,
-                onToggle: () => setState(() => _obscureLama = !_obscureLama),
-              ),
-              const SizedBox(height: 16),
-
-              _fieldLabel('Password Baru'),
-              const SizedBox(height: 8),
-              _SheetPasswordField(
-                controller: _baruCtrl,
-                obscure: _obscureBaru,
-                onToggle: () => setState(() => _obscureBaru = !_obscureBaru),
-              ),
-              _buildStrengthMeter(_baruCtrl.text),
-              const SizedBox(height: 16),
-
-              _fieldLabel('Konfirmasi Password Baru'),
-              const SizedBox(height: 8),
-              _SheetPasswordField(
-                controller: _konfirmasiCtrl,
-                obscure: _obscureKonfirmasi,
-                onToggle: () =>
-                    setState(() => _obscureKonfirmasi = !_obscureKonfirmasi),
-                onSubmit: (_) => _submit(),
-              ),
-              _buildMatchIndicator(),
-              const SizedBox(height: 24),
-
-              GestureDetector(
-                onTap: _isLoading ? null : _submit,
-                child: Container(
-                  width: double.infinity,
-                  height: 52,
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: _isLoading
-                          ? [_C.tealDark, _C.tealDark]
-                          : [_C.teal, _C.tealDark],
-                      begin: Alignment.centerLeft,
-                      end: Alignment.centerRight,
-                    ),
-                    borderRadius: BorderRadius.circular(14),
-                    boxShadow: _isLoading
-                        ? []
-                        : [
-                            BoxShadow(
-                              color: _C.teal.withValues(alpha: 0.4),
-                              blurRadius: 16,
-                              offset: const Offset(0, 6),
-                            ),
-                          ],
-                  ),
-                  child: Center(
-                    child: _isLoading
-                        ? const SizedBox(
-                            width: 22,
-                            height: 22,
-                            child: CircularProgressIndicator(
-                                color: Colors.white, strokeWidth: 2.5),
-                          )
-                        : Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: const [
-                              Text(
-                                'Simpan Password',
-                                style: TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 15,
-                                  fontWeight: FontWeight.w800,
-                                  letterSpacing: 0.3,
-                                ),
-                              ),
-                              SizedBox(width: 8),
-                              Icon(Icons.check_rounded,
-                                  color: Colors.white, size: 18),
-                            ],
-                          ),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  // ── Indikator kekuatan password baru ────────────────────────
-  Widget _buildStrengthMeter(String pw) {
-    if (pw.isEmpty) return const SizedBox(height: 0);
-
-    final score = _calcStrength(pw);
-    late String label;
-    late Color color;
-    late double fraction;
-    if (score <= 2) {
-      label = 'Lemah';
-      color = _C.danger;
-      fraction = 0.33;
-    } else if (score == 3) {
-      label = 'Sedang';
-      color = _C.warning;
-      fraction = 0.66;
-    } else {
-      label = 'Kuat';
-      color = _C.success;
-      fraction = 1.0;
-    }
-
-    return Padding(
-      padding: const EdgeInsets.only(top: 9),
-      child: Row(
-        children: [
-          Expanded(
-            child: LayoutBuilder(
-              builder: (context, constraints) => Stack(
-                children: [
-                  Container(
-                    height: 5,
-                    decoration: BoxDecoration(
-                      color: _C.border,
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                  ),
-                  AnimatedContainer(
-                    duration: const Duration(milliseconds: 250),
-                    height: 5,
-                    width: constraints.maxWidth * fraction,
-                    decoration: BoxDecoration(
-                      color: color,
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-          const SizedBox(width: 10),
-          Text(label,
-              style: TextStyle(
-                  color: color, fontSize: 11, fontWeight: FontWeight.w700)),
-        ],
-      ),
-    );
-  }
-
-  // ── Indikator kecocokan konfirmasi password ─────────────────
-  Widget _buildMatchIndicator() {
-    final konfirmasi = _konfirmasiCtrl.text;
-    if (konfirmasi.isEmpty) return const SizedBox(height: 0);
-
-    final cocok = konfirmasi == _baruCtrl.text;
-    final color = cocok ? _C.success : _C.danger;
-
-    return Padding(
-      padding: const EdgeInsets.only(top: 8),
-      child: Row(
-        children: [
-          Icon(cocok ? Icons.check_circle_rounded : Icons.cancel_rounded,
-              color: color, size: 14),
-          const SizedBox(width: 6),
-          Text(cocok ? 'Password cocok' : 'Belum cocok dengan password baru',
-              style: TextStyle(color: color, fontSize: 11.5)),
-        ],
-      ),
-    );
-  }
-
-  Widget _fieldLabel(String label) => Text(
-        label,
-        style: TextStyle(
-          color: _C.text,
-          fontWeight: FontWeight.w700,
-          fontSize: 13,
-          letterSpacing: 0.2,
-        ),
-      );
-}
-
-class _SheetPasswordField extends StatelessWidget {
-  final TextEditingController controller;
-  final bool obscure;
-  final VoidCallback onToggle;
-  final ValueChanged<String>? onSubmit;
-
-  const _SheetPasswordField({
-    required this.controller,
-    required this.obscure,
-    required this.onToggle,
-    this.onSubmit,
-  });
-
-  @override
-  Widget build(BuildContext context) => TextField(
-        controller: controller,
-        obscureText: obscure,
-        onSubmitted: onSubmit,
-        textInputAction: TextInputAction.next,
-        style: TextStyle(color: _C.text, fontSize: 14),
-        decoration: InputDecoration(
-          hintText: 'Masukkan password',
-          hintStyle: TextStyle(color: _C.textDim, fontSize: 14),
-          prefixIcon: Padding(
-            padding: const EdgeInsets.only(left: 14, right: 10),
-            child: Icon(Icons.lock_rounded, color: _C.teal, size: 18),
-          ),
-          prefixIconConstraints:
-              const BoxConstraints(minWidth: 0, minHeight: 0),
-          suffixIcon: IconButton(
-            icon: Icon(
-              obscure
-                  ? Icons.visibility_outlined
-                  : Icons.visibility_off_outlined,
-              color: _C.textDim,
-              size: 18,
-            ),
-            onPressed: onToggle,
-          ),
-          filled: true,
-          fillColor: _C.bg,
-          enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(14),
-            borderSide: BorderSide(color: _C.border, width: 1.2),
-          ),
-          focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(14),
-            borderSide: BorderSide(color: _C.teal, width: 1.5),
-          ),
-          contentPadding:
-              const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-        ),
-      );
-}
-
-// ════════════════════════════════════════════════════════════
-//  BOTTOM SHEET — Edit Profil
 // ════════════════════════════════════════════════════════════
 class _EditProfilSheet extends StatefulWidget {
   final String namaAwal;
@@ -1958,123 +1274,6 @@ class _EditProfilSheetState extends State<_EditProfilSheet> {
 
 // ════════════════════════════════════════════════════════════
 //  BOTTOM SHEET — Riwayat Ulasan
-// ════════════════════════════════════════════════════════════
-class _RiwayatUlasanSheet extends StatelessWidget {
-  final String userId;
-  const _RiwayatUlasanSheet({required this.userId});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      constraints:
-          BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.75),
-      padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
-      decoration: BoxDecoration(
-        color: _C.card,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Center(
-            child: Container(
-              width: 40,
-              height: 4,
-              decoration: BoxDecoration(
-                  color: _C.border, borderRadius: BorderRadius.circular(2)),
-            ),
-          ),
-          const SizedBox(height: 16),
-          Text('Riwayat Ulasan',
-              style: TextStyle(
-                  color: _C.text, fontSize: 18, fontWeight: FontWeight.w800)),
-          const SizedBox(height: 16),
-          Expanded(
-            child: userId.isEmpty
-                ? Center(
-                    child: Text('Belum ada ulasan.',
-                        style: TextStyle(color: _C.textMuted)))
-                : StreamBuilder<QuerySnapshot>(
-                    stream: FirebaseFirestore.instance
-                        .collection('ulasan')
-                        .where('userId', isEqualTo: userId)
-                        .snapshots(),
-                    builder: (context, snap) {
-                      if (snap.connectionState == ConnectionState.waiting) {
-                        return const Center(child: CircularProgressIndicator());
-                      }
-                      final docs = (snap.data?.docs ?? [])
-                        ..sort((a, b) {
-                          final at = (a.data() as Map)['createdAt'];
-                          final bt = (b.data() as Map)['createdAt'];
-                          if (at == null || bt == null) return 0;
-                          return (bt as Timestamp).compareTo(at as Timestamp);
-                        });
-                      if (docs.isEmpty) {
-                        return Center(
-                          child: Text('Belum ada ulasan.',
-                              style: TextStyle(color: _C.textMuted)),
-                        );
-                      }
-                      return ListView.separated(
-                        itemCount: docs.length,
-                        separatorBuilder: (_, __) =>
-                            Divider(color: _C.border.withValues(alpha: 0.5)),
-                        itemBuilder: (context, i) {
-                          final data = docs[i].data() as Map<String, dynamic>;
-                          final nama =
-                              data['namaWisata'] as String? ?? 'Wisata';
-                          final isi = data['isi'] as String? ?? '';
-                          final rating = (data['rating'] as num?)?.toInt() ?? 0;
-                          return Padding(
-                            padding: const EdgeInsets.symmetric(vertical: 8),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Row(
-                                  children: [
-                                    Icon(Icons.place_rounded,
-                                        color: _C.teal, size: 14),
-                                    const SizedBox(width: 4),
-                                    Text(nama,
-                                        style: TextStyle(
-                                            color: _C.text,
-                                            fontWeight: FontWeight.w700,
-                                            fontSize: 13)),
-                                    const Spacer(),
-                                    Row(
-                                      children: List.generate(
-                                          5,
-                                          (s) => Icon(Icons.star_rounded,
-                                              size: 13,
-                                              color: s < rating
-                                                  ? _C.gold
-                                                  : _C.border)),
-                                    ),
-                                  ],
-                                ),
-                                const SizedBox(height: 4),
-                                Text(isi,
-                                    style: TextStyle(
-                                        color: _C.textMuted,
-                                        fontSize: 12.5,
-                                        height: 1.4)),
-                              ],
-                            ),
-                          );
-                        },
-                      );
-                    },
-                  ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-// ════════════════════════════════════════════════════════════
-//  BOTTOM SHEET — Notifikasi
 // ════════════════════════════════════════════════════════════
 class _NotifikasiSheet extends StatefulWidget {
   const _NotifikasiSheet();

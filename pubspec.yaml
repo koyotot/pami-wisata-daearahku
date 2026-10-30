@@ -13,9 +13,6 @@ dependencies:
   image_picker: ^1.2.2
   firebase_core: ^3.6.0
   firebase_auth: ^5.3.1
-  cloud_firestore: ^5.4.4
-  firebase_storage: ^12.3.2
-  qr_flutter: ^4.1.0
   http: ^1.2.2
   google_fonts: ^8.2.1
   flutter_secure_storage: ^11.2.0
