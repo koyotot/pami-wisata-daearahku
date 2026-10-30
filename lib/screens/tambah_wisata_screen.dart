@@ -4,14 +4,14 @@
 // Dependency: image_picker (tambah ke pubspec.yaml)
 // ============================================================
 import 'dart:io';
-import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:http/http.dart' as http;
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../data/app_data.dart';
+import '../data/business_repository.dart';
+import '../services/api_client.dart';
+import '../services/auth_session.dart';
 
 // ── Palet (sama dengan home_screen.dart) ─────────────────────
 class _C {
@@ -45,21 +45,47 @@ class TambahWisataScreen extends StatefulWidget {
 class _TambahWisataScreenState extends State<TambahWisataScreen> {
   final _formKey = GlobalKey<FormState>();
   late TextEditingController namaCtrl, lokasiCtrl, deskCtrl, hargaCtrl, jamCtrl;
-  String _kat = 'Alam';
   double _rating = 4.5;
   String? _imagePath; // URL dari Storage (atau URL lama saat edit)
   File? _imageFile; // File lokal yang baru dipilih (belum diupload)
   double? _uploadProgress; // 0.0–1.0 saat upload berlangsung
   bool _isSaving = false;
 
-  final List<Map<String, dynamic>> _kategoriList = [
-    {'label': 'Alam', 'icon': Icons.terrain_rounded},
-    {'label': 'Budaya', 'icon': Icons.account_balance_rounded},
-    {'label': 'Pantai', 'icon': Icons.beach_access_rounded},
-    {'label': 'Bahari', 'icon': Icons.sailing_rounded},
-    {'label': 'Kuliner', 'icon': Icons.restaurant_rounded},
-    {'label': 'Lainnya', 'icon': Icons.explore_rounded},
-  ];
+  final _repository = BusinessRepository();
+  final _adminCatalog = BusinessRepository();
+  final _categories = RequestState<List<Category>>();
+  String? _categoryGuid;
+  int? _sessionGeneration;
+
+  Future<void> _load() => _categories.load(() async {
+        final all = <Category>[];
+        var page = 1;
+        while (true) {
+          final result = await _repository.categories(query: {'page': '$page'});
+          all.addAll(result.items);
+          if (result.links?['next'] == null) break;
+          page++;
+        }
+        final edit = widget.wisataEdit;
+        if (edit != null) {
+          final destination = await _repository.destination(edit.id);
+          if (mounted &&
+              _sessionGeneration == AuthSession.instance.sessionGeneration) {
+            _categoryGuid =
+                destination.json['destination_category_guid'] as String?;
+            hargaCtrl.text = '${destination.json['ticket_price']}';
+          }
+        }
+        return all;
+      });
+
+  void _onCategories() {
+    if (mounted) setState(() {});
+  }
+
+  void _onSession() {
+    _categories.reset();
+  }
 
   @override
   void initState() {
@@ -68,15 +94,21 @@ class _TambahWisataScreenState extends State<TambahWisataScreen> {
     namaCtrl = TextEditingController(text: w?.nama ?? '');
     lokasiCtrl = TextEditingController(text: w?.lokasi ?? '');
     deskCtrl = TextEditingController(text: w?.deskripsi ?? '');
-    hargaCtrl = TextEditingController(text: w?.hargaTiket ?? '');
+    hargaCtrl = TextEditingController(
+        text: w?.hargaTiket.replaceFirst(RegExp(r'^IDR '), '') ?? '');
     jamCtrl = TextEditingController(text: w?.jamBuka ?? '');
-    _kat = w?.kategori ?? 'Alam';
     _rating = w?.rating ?? 4.5;
     _imagePath = w?.imagePath;
+    _sessionGeneration = AuthSession.instance.sessionGeneration;
+    _categories.addListener(_onCategories);
+    AuthSession.instance.sessionChanges.addListener(_onSession);
+    _load();
   }
 
   @override
   void dispose() {
+    AuthSession.instance.sessionChanges.removeListener(_onSession);
+    _categories.dispose();
     namaCtrl.dispose();
     lokasiCtrl.dispose();
     deskCtrl.dispose();
@@ -200,92 +232,44 @@ class _TambahWisataScreenState extends State<TambahWisataScreen> {
   }
 
   // ── Upload foto ke Cloudinary ────────────────────────────
-  Future<String?> _uploadImage(File file, String wisataId) async {
-    const cloudName = 'dtd6wjojn';
-    const uploadPreset = 'bzabqtms';
-    final url =
-        Uri.parse('https://api.cloudinary.com/v1_1/$cloudName/image/upload');
-
-    final request = http.MultipartRequest('POST', url)
-      ..fields['upload_preset'] = uploadPreset
-      ..fields['public_id'] = wisataId
-      ..files.add(await http.MultipartFile.fromPath('file', file.path));
-
-    setState(() => _uploadProgress = 0.3); // indikator sederhana
-
-    final response = await request.send();
-    final resBody = await response.stream.bytesToString();
-
-    setState(() => _uploadProgress = null);
-
-    if (response.statusCode == 200) {
-      final data = jsonDecode(resBody);
-      return data['secure_url'] as String;
-    } else {
-      throw Exception('Upload gagal: $resBody');
-    }
-  }
-
-  // ── Simpan ────────────────────────────────────────────────
   Future<void> _simpan() async {
-    if (!_formKey.currentState!.validate()) return;
+    if (_isSaving || !_formKey.currentState!.validate()) return;
+    if (widget.wisataEdit == null) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text(
+              'Penambahan belum tersedia: zona waktu wajib belum tersedia pada formulir.')));
+      return;
+    }
+    if (_sessionGeneration != AuthSession.instance.sessionGeneration ||
+        _categoryGuid == null ||
+        _categories.loading ||
+        _categories.error != null) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text('Kategori belum tersedia. Muat ulang dan coba lagi.')));
+      return;
+    }
+    final price = int.tryParse(hargaCtrl.text.trim());
+    if (price == null || price < 0) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text('Harga harus berupa bilangan bulat nonnegatif.')));
+      return;
+    }
+    if (_imageFile != null || _imagePath != widget.wisataEdit!.imagePath) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text('Perubahan foto belum tersedia melalui layanan ini.')));
+      return;
+    }
     setState(() => _isSaving = true);
-
     try {
-      if (widget.wisataEdit != null) {
-        // ── Mode Edit ──────────────────────────────────────
-        final w = widget.wisataEdit!;
-
-        // Upload foto baru jika ada
-        if (_imageFile != null) {
-          _imagePath = await _uploadImage(_imageFile!, w.id);
-        }
-        // Jika _imageFile null dan _imagePath null → foto dihapus (set null)
-        // Jika _imageFile null dan _imagePath ada → pakai URL lama
-
-        w
-          ..nama = namaCtrl.text.trim()
-          ..lokasi = lokasiCtrl.text.trim()
-          ..deskripsi = deskCtrl.text.trim()
-          ..hargaTiket = hargaCtrl.text.trim()
-          ..jamBuka = jamCtrl.text.trim()
-          ..kategori = _kat
-          ..rating = _rating
-          ..imagePath = _imagePath;
-
-        await FirebaseFirestore.instance
-            .collection('wisata')
-            .doc(w.id)
-            .set(w.toMap());
-      } else {
-        // ── Mode Tambah Baru ───────────────────────────────
-        final wisataId = nextWisataId();
-
-        // Upload foto jika dipilih
-        String? uploadedUrl;
-        if (_imageFile != null) {
-          uploadedUrl = await _uploadImage(_imageFile!, wisataId);
-        }
-
-        final wisataBaru = Wisata(
-          id: wisataId,
-          nama: namaCtrl.text.trim(),
-          lokasi: lokasiCtrl.text.trim(),
-          deskripsi: deskCtrl.text.trim(),
-          hargaTiket: hargaCtrl.text.trim(),
-          jamBuka: jamCtrl.text.trim(),
-          kategori: _kat,
-          rating: _rating,
-          imagePath: uploadedUrl, // URL Storage, bukan path lokal
-        );
-
-        await FirebaseFirestore.instance
-            .collection('wisata')
-            .doc(wisataBaru.id)
-            .set(wisataBaru.toMap());
-
-        daftarWisata.add(wisataBaru);
-      }
+      await _adminCatalog.updateDestination(widget.wisataEdit!.id, {
+        'name': namaCtrl.text.trim(),
+        'location': lokasiCtrl.text.trim(),
+        'description': deskCtrl.text.trim(),
+        'ticket_price': price,
+        'opening_hours': jamCtrl.text.trim(),
+        'destination_category_guid': _categoryGuid,
+      });
+      if (_sessionGeneration != AuthSession.instance.sessionGeneration) return;
 
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -307,7 +291,8 @@ class _TambahWisataScreenState extends State<TambahWisataScreen> {
       );
       Navigator.pop(context, true);
     } catch (e) {
-      if (!mounted) return;
+      if (!mounted ||
+          _sessionGeneration != AuthSession.instance.sessionGeneration) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Row(children: [
@@ -578,7 +563,7 @@ class _TambahWisataScreenState extends State<TambahWisataScreen> {
                     // ── Rating ───────────────────────────────────
                     _sectionLabel(isEdit ? 'Rating Destinasi' : 'Rating Awal'),
                     const SizedBox(height: 14),
-                    _ratingPicker(locked: isEdit),
+                    _ratingPicker(locked: true),
                   ],
                 ),
               ),
@@ -1047,13 +1032,21 @@ class _TambahWisataScreenState extends State<TambahWisataScreen> {
             style: TextStyle(
                 color: _C.text, fontSize: 12.5, fontWeight: FontWeight.w700)),
         const SizedBox(height: 10),
+        if (_categories.loading) const CircularProgressIndicator(),
+        if (_categories.error != null)
+          TextButton(
+              onPressed: _load,
+              child: const Text('Gagal memuat kategori. Coba lagi')),
         Wrap(
           spacing: 8,
           runSpacing: 8,
-          children: _kategoriList.map((k) {
-            final selected = _kat == k['label'];
+          children: (_categories.data ?? <Category>[]).map((category) {
+            final k = {'label': category.name, 'icon': Icons.explore_rounded};
+            final selected = _categoryGuid == category.guid;
             return GestureDetector(
-              onTap: () => setState(() => _kat = k['label']),
+              onTap: () => setState(() {
+                _categoryGuid = category.guid;
+              }),
               child: AnimatedContainer(
                 duration: const Duration(milliseconds: 200),
                 padding:
@@ -1073,7 +1066,7 @@ class _TambahWisataScreenState extends State<TambahWisataScreen> {
                     Icon(k['icon'] as IconData,
                         size: 14, color: selected ? _C.teal : _C.textMuted),
                     const SizedBox(width: 6),
-                    Text(k['label'],
+                    Text(k['label'] as String,
                         style: TextStyle(
                             color: selected ? _C.teal : _C.textMuted,
                             fontSize: 12.5,

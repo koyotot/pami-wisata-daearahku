@@ -68,6 +68,14 @@ class BusinessRepository {
     await api.object('DELETE', 'favorites/${_id(guid)}', authenticated: true);
   }
 
+  Future<ApiPage<Booking>> adminBookings({Map<String, String>? query}) =>
+      api.collection(_path('admin/bookings', query), Booking.new,
+          authenticated: true);
+  Future<Booking> decideBooking(String guid, {required bool approve}) async =>
+      Booking(await api.object('POST',
+          'admin/bookings/${_id(guid)}/${approve ? 'approve' : 'reject'}',
+          authenticated: true));
+
   Future<ApiPage<Booking>> bookings({Map<String, String>? query}) => api
       .collection(_path('bookings', query), Booking.new, authenticated: true);
   Future<Booking> booking(String guid) async => Booking(
@@ -77,4 +85,30 @@ class BusinessRepository {
           authenticated: true,
           body: fields,
           headers: {'Idempotency-Key': idempotencyKey}));
+  Future<Destination> createDestination(Json fields) async =>
+      Destination(await api.object('POST', 'destinations',
+          authenticated: true, body: fields));
+  Future<Destination> updateDestination(String guid, Json fields) async =>
+      Destination(await api.object('PATCH', 'destinations/${_id(guid)}',
+          authenticated: true, body: fields));
+  Future<void> deactivateDestination(String guid) async {
+    await api.object('DELETE', 'destinations/${_id(guid)}',
+        authenticated: true);
+  }
+
+  Future<Category> createCategory(Json fields) async => Category(await api
+      .object('POST', 'categories', authenticated: true, body: fields));
+  Future<Category> updateCategory(String guid, Json fields) async =>
+      Category(await api.object('PATCH', 'categories/${_id(guid)}',
+          authenticated: true, body: fields));
+  Future<void> deactivateCategory(String guid) async {
+    await api.object('DELETE', 'categories/${_id(guid)}', authenticated: true);
+  }
+
+  Future<ApiPage<Json>> quotas(String guid, {int page = 1}) => api.collection(
+      'destinations/${_id(guid)}/quotas?page=$page', (json) => json,
+      authenticated: true);
+  Future<Json> putQuota(String guid, Json fields) =>
+      api.object('PUT', 'destinations/${_id(guid)}/quotas',
+          authenticated: true, body: fields);
 }

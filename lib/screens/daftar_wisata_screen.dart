@@ -4,7 +4,7 @@
 // ============================================================
 import 'dart:io';
 import 'package:flutter/material.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
+import '../services/auth_session.dart';
 import '../data/app_data.dart';
 import '../data/business_repository.dart';
 import '../services/api_client.dart';
@@ -67,10 +67,10 @@ class DaftarWisataScreen extends StatefulWidget {
 class _DaftarWisataScreenState extends State<DaftarWisataScreen>
     with SingleTickerProviderStateMixin {
   String _cari = '';
-  final String _kat = 'Semua';
 
   late final AnimationController _fabCtrl;
-  bool _isLoadingData = true;
+  bool _deleting = false;
+  final _adminCatalog = BusinessRepository();
   final _repository = BusinessRepository();
   final _catalog = RequestState<ApiPage<Destination>>();
   final _categories = RequestState<List<Category>>();
@@ -117,17 +117,8 @@ class _DaftarWisataScreenState extends State<DaftarWisataScreen>
     await Future.wait([_loadCategories(), _loadCatalog()]);
   }
 
-  List<Wisata> get _filtered => widget.mode == 'view'
-      ? (_catalog.data?.items.map(Wisata.fromDestination).toList() ?? [])
-      : daftarWisata.where((w) {
-          final q = _cari.toLowerCase();
-          final matchCari = _cari.isEmpty ||
-              w.nama.toLowerCase().contains(q) ||
-              w.lokasi.toLowerCase().contains(q) ||
-              w.kategori.toLowerCase().contains(q);
-          final matchKat = _kat == 'Semua' || w.kategori == _kat;
-          return matchCari && matchKat;
-        }).toList();
+  List<Wisata> get _filtered =>
+      _catalog.data?.items.map(Wisata.fromDestination).toList() ?? [];
 
   String get _judul => switch (widget.mode) {
         'edit' => 'Ubah Data Wisata',
@@ -148,23 +139,24 @@ class _DaftarWisataScreenState extends State<DaftarWisataScreen>
       vsync: this,
       duration: const Duration(milliseconds: 600),
     )..forward();
-    if (widget.mode == 'view') {
-      _catalog.addListener(_update);
-      _categories.addListener(_update);
-      _refreshView();
-    } else {
-      _muatData();
+    _catalog.addListener(_update);
+    _categories.addListener(_update);
+    AuthSession.instance.sessionChanges.addListener(_sessionChanged);
+    _refreshView();
+  }
+
+  void _sessionChanged() {
+    if (widget.mode != 'view') {
+      _catalog.reset();
+      _categories.reset();
     }
   }
 
-  Future<void> _muatData() async {
-    await loadWisataFromFirestore();
-    if (!mounted) return;
-    setState(() => _isLoadingData = false);
-  }
+  Future<void> _muatData() => _refreshView();
 
   @override
   void dispose() {
+    AuthSession.instance.sessionChanges.removeListener(_sessionChanged);
     _fabCtrl.dispose();
     _searchController.dispose();
     _catalog.dispose();
@@ -174,6 +166,7 @@ class _DaftarWisataScreenState extends State<DaftarWisataScreen>
 
   // ── Dialog hapus ─────────────────────────────────────────
   void _hapus(Wisata w) {
+    final generation = AuthSession.instance.sessionGeneration;
     showDialog(
       context: context,
       builder: (_) => Dialog(
@@ -202,7 +195,7 @@ class _DaftarWisataScreenState extends State<DaftarWisataScreen>
                   )),
               const SizedBox(height: 10),
               Text(
-                '"${w.nama}" akan dihapus permanen.',
+                '"${w.nama}" akan dinonaktifkan dari katalog.',
                 textAlign: TextAlign.center,
                 style: const TextStyle(
                     color: _C.textMuted, fontSize: 13, height: 1.5),
@@ -243,28 +236,37 @@ class _DaftarWisataScreenState extends State<DaftarWisataScreen>
                         bottomRight: Radius.circular(14),
                       )),
                     ),
-                    onPressed: () async {
-                      await FirebaseFirestore.instance
-                          .collection('wisata')
-                          .doc(w.id)
-                          .delete();
-                      setState(() => daftarWisata.remove(w));
-                      if (!mounted) return;
-                      Navigator.pop(context);
-                      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                        content: const Row(children: [
-                          Icon(Icons.check_circle,
-                              color: Colors.white, size: 16),
-                          SizedBox(width: 8),
-                          Text('Wisata berhasil dihapus'),
-                        ]),
-                        backgroundColor: _C.danger,
-                        behavior: SnackBarBehavior.floating,
-                        margin: const EdgeInsets.all(16),
-                        shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12)),
-                      ));
-                    },
+                    onPressed: _deleting
+                        ? null
+                        : () async {
+                            if (_deleting ||
+                                generation !=
+                                    AuthSession.instance.sessionGeneration)
+                              return;
+                            setState(() => _deleting = true);
+                            try {
+                              await _adminCatalog.deactivateDestination(w.id);
+                              if (!mounted || generation != AuthSession.instance.sessionGeneration) return;
+                              Navigator.pop(context);
+                              await _refreshView();
+                              if (!mounted || generation != AuthSession.instance.sessionGeneration) return;
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                    content: Text('Wisata dinonaktifkan')),
+                              );
+                            } catch (e) {
+                              if (!mounted || generation != AuthSession.instance.sessionGeneration) return;
+                              Navigator.pop(context);
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                    content:
+                                        Text('Gagal menonaktifkan wisata: $e')),
+                              );
+                              await _refreshView();
+                            } finally {
+                              if (mounted) setState(() => _deleting = false);
+                            }
+                          },
                     child: const Text('Hapus',
                         style: TextStyle(fontWeight: FontWeight.w700)),
                   ),
@@ -282,23 +284,12 @@ class _DaftarWisataScreenState extends State<DaftarWisataScreen>
     final accent = _accentColor;
     final filtered = _filtered;
 
-    if (widget.mode != 'view' && _isLoadingData) {
-      return Scaffold(
-        backgroundColor: _C.bg,
-        body: const Center(
-          child: CircularProgressIndicator(color: _C.teal),
-        ),
-      );
-    }
-
-    final total = widget.mode == 'view'
-        ? (_catalog.data?.meta?['total'] ?? filtered.length)
-        : daftarWisata.length;
+    final total = _catalog.data?.meta?['total'] ?? filtered.length;
 
     return Scaffold(
       backgroundColor: _C.bg,
       body: RefreshIndicator(
-        onRefresh: widget.mode == 'view' ? _refreshView : _muatData,
+        onRefresh: _refreshView,
         child: CustomScrollView(
           physics: const BouncingScrollPhysics(),
           slivers: [
@@ -504,7 +495,7 @@ class _DaftarWisataScreenState extends State<DaftarWisataScreen>
                               onPressed: () {
                                 _searchController.clear();
                                 setState(() => _cari = '');
-                                if (widget.mode == 'view') _loadCatalog();
+                                _loadCatalog();
                               },
                             )
                           : null,
@@ -519,7 +510,7 @@ class _DaftarWisataScreenState extends State<DaftarWisataScreen>
                     ),
                     onChanged: (v) {
                       setState(() => _cari = v);
-                      if (widget.mode == 'view') _loadCatalog();
+                      _loadCatalog();
                     },
                   ),
                 ),
@@ -628,14 +619,10 @@ class _DaftarWisataScreenState extends State<DaftarWisataScreen>
             ),
 
             // ── Kosong ──────────────────────────────────────────
-            if (widget.mode == 'view' &&
-                _catalog.loading &&
-                _catalog.data == null)
+            if (_catalog.loading && _catalog.data == null)
               const SliverFillRemaining(
                   child: Center(child: CircularProgressIndicator()))
-            else if (widget.mode == 'view' &&
-                _catalog.error != null &&
-                _catalog.data == null)
+            else if (_catalog.error != null && _catalog.data == null)
               SliverFillRemaining(
                   child: Center(
                       child: TextButton(
@@ -706,7 +693,7 @@ class _DaftarWisataScreenState extends State<DaftarWisataScreen>
                   ),
                 ),
               ),
-            if (widget.mode == 'view' && _catalog.data?.links?['next'] != null)
+            if (_catalog.data?.links?['next'] != null)
               SliverToBoxAdapter(
                   child: Center(
                       child: TextButton(

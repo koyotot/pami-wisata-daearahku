@@ -6,7 +6,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 
-import 'admin_login.dart';
 import 'user_login_screen.dart';
 
 // Font: Plus Jakarta Sans (modern, ramah, enak dibaca di HP)
@@ -76,15 +75,9 @@ class HomeScreen extends StatelessWidget {
                       const SizedBox(height: 22),
                       _ActionButton(
                         icon: Icons.explore_rounded,
-                        label: 'Masuk sebagai Pengunjung',
+                        label: 'Masuk',
                         filled: true,
                         onTap: () => _open(context, const UserLoginScreen()),
-                      ),
-                      const SizedBox(height: 12),
-                      _ActionButton(
-                        icon: Icons.admin_panel_settings_rounded,
-                        label: 'Masuk sebagai Admin',
-                        onTap: () => _open(context, const AdminLogin()),
                       ),
                       const SizedBox(height: 14),
                       Text(

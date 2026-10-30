@@ -22,8 +22,16 @@ class MemoryStore implements SessionStore {
   }
 }
 
-Map<String, dynamic> user(String id) =>
-    {'guid': id, 'name': 'User', 'email': 'user@example.test', 'phone': null};
+Map<String, dynamic> user(String id,
+        {int role = 0, String status = 'active'}) =>
+    {
+      'guid': id,
+      'name': 'User',
+      'email': 'user@example.test',
+      'phone': null,
+      'role': role,
+      'status': status
+    };
 Map<String, dynamic> tokens(String id) => {
       'access_token': 'access-$id',
       'refresh_token': 'refresh-$id',
@@ -32,6 +40,159 @@ Map<String, dynamic> tokens(String id) => {
 http.Response ok(Map<String, dynamic> data) =>
     http.Response(jsonEncode({'data': data}), 200);
 void main() {
+  for (final role in [0, 1, 2]) {
+    test('login and restore validate role $role from auth/me', () async {
+      final store = MemoryStore();
+      final client = MockClient((request) async {
+        if (request.url.path.endsWith('/login')) return ok(tokens('u'));
+        return ok(user('u', role: role));
+      });
+      final session = AuthSession(
+          baseUrl: 'https://api.example.test/api/v1',
+          store: store,
+          client: client);
+      await session.login('u@example.test', 'password');
+      expect(session.role, role);
+      expect(session.status, 'active');
+      final restored = AuthSession(
+          baseUrl: 'https://api.example.test/api/v1',
+          store: store,
+          client: client);
+      await restored.restore();
+      expect(restored.role, role);
+      expect(restored.authenticated.value, isTrue);
+    });
+  }
+  for (final identity in [user('u', status: 'suspended'), user('u', role: 3)]) {
+    test('login rejects inactive or unknown identity $identity', () async {
+      final store = MemoryStore();
+      final session = AuthSession(
+          baseUrl: 'https://api.example.test/api/v1',
+          store: store,
+          client: MockClient((request) async =>
+              request.url.path.endsWith('/login')
+                  ? ok(tokens('u'))
+                  : ok(identity)));
+      await expectLater(session.login('u@example.test', 'password'),
+          throwsA(isA<ApiException>()));
+      expect(session.authenticated.value, isFalse);
+      expect(session.role, isNull);
+      expect(store.value, isNull);
+    });
+  }
+  for (final method in ['google', 'register']) {
+    test('$method uses role from auth/me', () async {
+      final paths = <String>[];
+      final session = AuthSession(
+          baseUrl: 'https://api.example.test/api/v1',
+          store: MemoryStore(),
+          client: MockClient((request) async {
+            paths.add(request.url.path);
+            return request.url.path.endsWith('/me')
+                ? ok(user('u', role: 1))
+                : ok(tokens('u'));
+          }));
+      if (method == 'google') {
+        await session.google('firebase-id-token');
+      } else {
+        await session.register(
+            'User', 'u@example.test', 'password', 'password');
+      }
+      expect(session.role, 1);
+      expect(paths, ['/api/v1/auth/$method', '/api/v1/auth/me']);
+    });
+  }
+  test('failed account switch clears previous identity', () async {
+    var attempts = 0;
+    final store = MemoryStore();
+    final session = AuthSession(
+        baseUrl: 'https://api.example.test/api/v1',
+        store: store,
+        client: MockClient((request) async {
+          if (request.url.path.endsWith('/me'))
+            return ok(user('admin', role: 2));
+          return ++attempts == 1
+              ? ok(tokens('admin'))
+              : http.Response('{}', 401);
+        }));
+    await session.login('admin@example.test', 'password');
+    await expectLater(session.login('other@example.test', 'bad'),
+        throwsA(isA<ApiException>()));
+    expect(session.role, isNull);
+    expect(currentUser, isNull);
+    expect(session.authenticated.value, isFalse);
+    expect(store.value, isNull);
+  });
+  test('auth/me cannot restore identity while logout is in progress', () async {
+    final responseGate = Completer<void>();
+    final logoutGate = Completer<void>();
+    var meCalls = 0;
+    final session = AuthSession(
+      baseUrl: 'https://api.example.test/api/v1',
+      store: MemoryStore(),
+      client: MockClient((request) async {
+        if (request.url.path.endsWith('/login')) return ok(tokens('old'));
+        if (request.url.path.endsWith('/me')) {
+          if (meCalls++ > 0) await responseGate.future;
+          return ok(user('old', role: 2));
+        }
+        return ok({'message': 'Logged out.'});
+      }),
+    );
+    await session.login('admin@example.test', 'password');
+    final generation = session.sessionGeneration;
+    expect(session.isCurrentGeneration(generation), isTrue);
+    session.beforeDeviceLogout = () => logoutGate.future;
+    final pendingMe = session.me();
+    final pendingLogout = session.logout();
+    expect(session.isCurrentGeneration(generation), isFalse);
+    responseGate.complete();
+    await expectLater(pendingMe, throwsA(isA<ApiException>()));
+    expect(session.role, isNull);
+    expect(session.authenticated.value, isFalse);
+    logoutGate.complete();
+    await pendingLogout;
+    expect(session.isCurrentGeneration(generation), isFalse);
+  });
+  test('server role follows account changes and is cleared on logout',
+      () async {
+    var count = 0;
+    final session = AuthSession(
+      baseUrl: 'https://api.example.test/api/v1',
+      store: MemoryStore(),
+      client: MockClient((request) async {
+        if (request.url.path.endsWith('/login')) {
+          final data = tokens('${++count}');
+          (data['user'] as Map<String, dynamic>)['role'] = count == 1 ? 2 : 0;
+          return ok(data);
+        }
+        if (request.url.path.endsWith('/me'))
+          return ok(user('$count', role: count == 1 ? 2 : 0));
+        return ok({'message': 'Logged out.'});
+      }),
+    );
+    await session.login('admin@example.test', 'password');
+    expect(session.role, 2);
+    await session.login('user@example.test', 'password');
+    expect(session.role, 0);
+    await session.logout();
+    expect(session.role, isNull);
+  });
+
+  test('conflict exposes the backend business message', () async {
+    final session = AuthSession(
+      baseUrl: 'https://api.example.test/api/v1',
+      store: MemoryStore(),
+      client: MockClient((request) async => http.Response(
+          jsonEncode({'message': 'Booking is no longer awaiting approval.'}),
+          409)),
+    );
+    await expectLater(
+        session.login('user@example.test', 'password'),
+        throwsA(isA<ApiException>().having((e) => e.message, 'message',
+            'Booking is no longer awaiting approval.')));
+  });
+
   test('failed device removal does not block logout', () async {
     var loggedOut = false;
     final session = AuthSession(
@@ -39,6 +200,7 @@ void main() {
       store: MemoryStore(),
       client: MockClient((request) async {
         if (request.url.path.endsWith('/login')) return ok(tokens('1'));
+        if (request.url.path.endsWith('/me')) return ok(user('1'));
         if (request.url.path.endsWith('/devices')) {
           return request.method == 'DELETE'
               ? http.Response('{}', 500)
@@ -70,6 +232,7 @@ void main() {
         if (request.url.path.endsWith('/login')) {
           return ok(tokens('${++logins}'));
         }
+        if (request.url.path.endsWith('/me')) return ok(user('$logins'));
         if (request.url.path.endsWith('/devices')) {
           final auth = request.headers['Authorization']!;
           operations.add('${request.method} $auth');
@@ -89,13 +252,15 @@ void main() {
     manager.updateToken('device-token');
     await session.login('a@example.test', 'password');
     await started.future;
-    await session.login('b@example.test', 'password');
+    final switching = session.login('b@example.test', 'password');
     firstPut.complete();
+    await switching;
     // Queue a logout after the second registration and wait for both operations.
     await secondStarted.future;
     await session.logout();
     expect(operations, [
       'PUT Bearer access-1',
+      'DELETE Bearer access-1',
       'PUT Bearer access-2',
       'DELETE Bearer access-2',
     ]);
@@ -112,6 +277,7 @@ void main() {
           if (request.url.path.endsWith('/login')) {
             return ok(tokens('${++logins}'));
           }
+          if (request.url.path.endsWith('/me')) return ok(user('$logins'));
           await gate.future;
           return ok({'message': 'Logged out.'});
         }));
@@ -146,12 +312,15 @@ void main() {
       () async {
     final store = MemoryStore();
     var refreshes = 0;
+    var meCalls = 0;
     final gate = Completer<void>();
     final session = AuthSession(
         baseUrl: 'https://api.example.test/api/v1',
         store: store,
         client: MockClient((request) async {
           if (request.url.path.endsWith('/login')) return ok(tokens('old'));
+          if (request.url.path.endsWith('/me') && meCalls++ == 0)
+            return ok(user('old'));
           if (request.url.path.endsWith('/refresh')) {
             refreshes++;
             await gate.future;
@@ -175,11 +344,14 @@ void main() {
       () async {
     final store = MemoryStore();
     var refreshes = 0;
+    var meCalls = 0;
     final session = AuthSession(
         baseUrl: 'https://api.example.test/api/v1',
         store: store,
         client: MockClient((request) async {
           if (request.url.path.endsWith('/login')) return ok(tokens('old'));
+          if (request.url.path.endsWith('/me') && meCalls++ == 0)
+            return ok(user('old'));
           if (request.url.path.endsWith('/refresh')) refreshes++;
           return http.Response('{}', 401);
         }));
@@ -193,11 +365,14 @@ void main() {
       () async {
     final store = MemoryStore();
     final gate = Completer<void>();
+    var meCalls = 0;
     final session = AuthSession(
         baseUrl: 'https://api.example.test/api/v1',
         store: store,
         client: MockClient((request) async {
           if (request.url.path.endsWith('/login')) return ok(tokens('old'));
+          if (request.url.path.endsWith('/me') && meCalls++ == 0)
+            return ok(user('old'));
           await gate.future;
           return ok(user('old'));
         }));
@@ -205,7 +380,7 @@ void main() {
     final pending = session.me();
     await session.clear();
     gate.complete();
-    await pending;
+    await expectLater(pending, throwsA(isA<ApiException>()));
     expect(currentUser, isNull);
     expect(store.value, isNull);
   });

@@ -40,6 +40,22 @@ http.Response _favorites(List<String> ids, {int lastPage = 1}) => http.Response(
     }),
     200);
 
+http.Response _me(http.Request request) {
+  final name = request.headers['Authorization']!.split('-').last;
+  return http.Response(
+      jsonEncode({
+        'data': {
+          'guid': 'user-$name',
+          'name': name,
+          'email': '$name@test.test',
+          'phone': null,
+          'role': 0,
+          'status': 'active'
+        }
+      }),
+      200);
+}
+
 void main() {
   test('token refresh during mutation keeps repeated toggles locked', () async {
     final refresh = Completer<http.Response>();
@@ -51,6 +67,7 @@ void main() {
       store: _Store(),
       client: MockClient((request) async {
         if (request.url.path.endsWith('/auth/login')) return _session('a');
+        if (request.url.path.endsWith('/auth/me')) return _me(request);
         if (request.url.path.endsWith('/auth/refresh')) {
           refreshStarted.complete();
           return refresh.future;
@@ -91,6 +108,7 @@ void main() {
       store: _Store(),
       client: MockClient((request) async {
         if (request.url.path.endsWith('/auth/login')) return _session('a');
+        if (request.url.path.endsWith('/auth/me')) return _me(request);
         if (offline) throw http.ClientException('offline');
         return _favorites(['d1']);
       }),
@@ -114,6 +132,7 @@ void main() {
       store: _Store(),
       client: MockClient((request) async {
         if (request.url.path.endsWith('/auth/login')) return _session('a');
+        if (request.url.path.endsWith('/auth/me')) return _me(request);
         return request.url.queryParameters['page'] == '1'
             ? _favorites(['d1'], lastPage: 2)
             : _favorites(['d1', 'd2'], lastPage: 2);
@@ -137,6 +156,7 @@ void main() {
       store: _Store(),
       client: MockClient((request) async {
         if (request.url.path.endsWith('/auth/login')) return _session('a');
+        if (request.url.path.endsWith('/auth/me')) return _me(request);
         if (request.method == 'GET') return _favorites(saved ? ['d1'] : []);
         writes++;
         started.complete();
@@ -177,6 +197,7 @@ void main() {
         if (request.url.path.endsWith('/auth/login')) {
           return _session(jsonDecode(request.body)['email'] as String);
         }
+        if (request.url.path.endsWith('/auth/me')) return _me(request);
         if (request.headers['Authorization'] == 'Bearer access-a') {
           if (delayA) return old.future;
           return _favorites(['a-only']);

@@ -1,11 +1,11 @@
 import 'services/auth_session.dart';
 import 'services/fcm_device_manager.dart';
-import 'screens/main_navigation_screen.dart';
+import 'screens/session_destination.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'firebase_options.dart';
-import 'screens/home_screen.dart';
+import 'screens/user_login_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -35,10 +35,12 @@ class WisataDaerahkuApp extends StatefulWidget {
 class _WisataDaerahkuAppState extends State<WisataDaerahkuApp> {
   final _navigator = GlobalKey<NavigatorState>();
   final _messenger = GlobalKey<ScaffoldMessengerState>();
+  bool _routeAfterAccountChange = false;
   @override
   void initState() {
     super.initState();
     AuthSession.instance.authenticated.addListener(_sessionChanged);
+    AuthSession.instance.sessionChanges.addListener(_sessionStateChanged);
     widget.fcm.start(onForeground: (message) {
       if (AuthSession.instance.authenticated.value &&
           message.data['notification_guid'] is String) {
@@ -50,15 +52,29 @@ class _WisataDaerahkuAppState extends State<WisataDaerahkuApp> {
   }
 
   void _sessionChanged() {
-    if (!AuthSession.instance.authenticated.value) {
+    final session = AuthSession.instance;
+    if (!session.authenticated.value) {
+      _routeAfterAccountChange = session.authenticating;
       _navigator.currentState?.pushAndRemoveUntil(
-          MaterialPageRoute(builder: (_) => const HomeScreen()), (_) => false);
+          MaterialPageRoute(builder: (_) => const UserLoginScreen()), (_) => false);
+    } else if (_routeAfterAccountChange) {
+      _routeAfterAccountChange = false;
+      _navigator.currentState?.pushAndRemoveUntil(
+          MaterialPageRoute(builder: (_) => sessionDestination()), (_) => false);
+    }
+  }
+
+  void _sessionStateChanged() {
+    final session = AuthSession.instance;
+    if (!session.authenticated.value && !session.authenticating) {
+      _routeAfterAccountChange = false;
     }
   }
 
   @override
   void dispose() {
     AuthSession.instance.authenticated.removeListener(_sessionChanged);
+    AuthSession.instance.sessionChanges.removeListener(_sessionStateChanged);
     widget.fcm.dispose();
     super.dispose();
   }
@@ -132,9 +148,7 @@ class _WisataDaerahkuAppState extends State<WisataDaerahkuApp> {
           color: Colors.white,
         ),
       ),
-      home: AuthSession.instance.authenticated.value
-          ? const MainNavigationScreen()
-          : const HomeScreen(),
+      home: sessionDestination(),
     );
   }
 }

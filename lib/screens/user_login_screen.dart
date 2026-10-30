@@ -10,7 +10,7 @@ import 'package:firebase_auth/firebase_auth.dart' as fb_auth;
 import '../services/auth_session.dart';
 
 import '../data/app_data.dart';
-import 'main_navigation_screen.dart';
+import 'session_destination.dart';
 import 'user_register_screen.dart';
 
 // ── Warna & font: sama dengan home_screen.dart ────────────────
@@ -100,6 +100,8 @@ class _UserLoginScreenState extends State<UserLoginScreen>
   // ── Login Firebase ─────────────────────────────────────────
   Future<void> _login() async {
     if (_isLoading) return;
+    final session = AuthSession.instance;
+    final generation = session.sessionGeneration;
 
     FocusScope.of(context).unfocus();
 
@@ -120,7 +122,10 @@ class _UserLoginScreenState extends State<UserLoginScreen>
 
     try {
       await fb_auth.FirebaseAuth.instance.signOut();
-      await AuthSession.instance.login(email, password);
+      if (!session.isCurrentGeneration(generation)) {
+        throw const ApiException('Permintaan masuk sudah dibatalkan.');
+      }
+      await session.login(email, password);
       if (!mounted) return;
       setState(() => _isLoading = false);
       _openMainNavigation();
@@ -142,19 +147,29 @@ class _UserLoginScreenState extends State<UserLoginScreen>
 
   Future<void> _googleLogin() async {
     if (_isLoading) return;
+    final session = AuthSession.instance;
+    final generation = session.sessionGeneration;
+    var cleanupGeneration = generation;
     setState(() {
       _isLoading = true;
       _errorMsg = null;
     });
     try {
       await fb_auth.FirebaseAuth.instance.signOut();
+      if (!session.isCurrentGeneration(generation)) {
+        throw const ApiException('Permintaan masuk sudah dibatalkan.');
+      }
       final credential = await fb_auth.FirebaseAuth.instance
           .signInWithProvider(fb_auth.GoogleAuthProvider());
       final token = await credential.user?.getIdToken();
+      if (!session.isCurrentGeneration(generation)) {
+        throw const ApiException('Permintaan masuk sudah dibatalkan.');
+      }
       if (token == null) {
         throw const ApiException('Identitas Google tidak tersedia.');
       }
-      await AuthSession.instance.google(token);
+      await session.google(token);
+      cleanupGeneration = session.sessionGeneration;
       if (mounted) _openMainNavigation();
     } on ApiException catch (e) {
       if (mounted) setState(() => _errorMsg = e.message);
@@ -170,7 +185,9 @@ class _UserLoginScreenState extends State<UserLoginScreen>
         setState(() => _errorMsg = 'Tidak dapat masuk dengan Google.');
       }
     } finally {
-      await fb_auth.FirebaseAuth.instance.signOut();
+      if (session.isCurrentGeneration(cleanupGeneration)) {
+        await fb_auth.FirebaseAuth.instance.signOut();
+      }
       if (mounted) setState(() => _isLoading = false);
     }
   }
@@ -179,7 +196,7 @@ class _UserLoginScreenState extends State<UserLoginScreen>
     Navigator.pushReplacement(
       context,
       PageRouteBuilder(
-        pageBuilder: (_, __, ___) => const MainNavigationScreen(),
+        pageBuilder: (_, __, ___) => sessionDestination(),
         transitionsBuilder: (_, animation, __, child) => FadeTransition(
           opacity: animation,
           child: child,

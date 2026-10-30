@@ -115,6 +115,20 @@ void main() {
                 }),
                 200);
           }
+          if (request.url.path.endsWith('/auth/me')) {
+            return http.Response(
+                jsonEncode({
+                  'data': {
+                    'guid': 'u',
+                    'name': 'U',
+                    'email': 'u@example.test',
+                    'phone': null,
+                    'role': 0,
+                    'status': 'active'
+                  }
+                }),
+                200);
+          }
           expect(request.headers['Authorization'], 'Bearer access');
           expect(request.headers['Idempotency-Key'], 'same-key');
           return http.Response(

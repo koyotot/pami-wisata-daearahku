@@ -1,12 +1,14 @@
 // ============================================================
 // lib/screens/daftar_pendaftar_screen.dart
-// REDESIGN: Biru terang — selaras dengan halaman admin lainnya
+// REDESIGN: Biru terang â€” selaras dengan halaman admin lainnya
 // ============================================================
 import 'package:flutter/material.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
+import '../data/business_repository.dart';
+import '../services/api_client.dart';
+import '../services/auth_session.dart';
 import '../data/app_data.dart';
 
-// ── Palet (selaras dengan TambahWisataScreen & Dashboard) ───
+// â”€â”€ Palet (selaras dengan TambahWisataScreen & Dashboard) â”€â”€â”€
 class _C {
   static const blue = Color(0xFF1976D2);
   static const blueDeep = Color(0xFF1558B0);
@@ -35,31 +37,83 @@ class DaftarPendaftarScreen extends StatefulWidget {
 }
 
 class _DaftarPendaftarScreenState extends State<DaftarPendaftarScreen> {
-  bool _isLoading = true;
+  final _repository = BusinessRepository();
+  final _state = RequestState<List<Pendaftar>>();
 
   @override
   void initState() {
     super.initState();
+    _state.addListener(_changed);
+    AuthSession.instance.sessionChanges.addListener(_sessionChanged);
     _muatData();
   }
 
-  Future<void> _muatData() async {
-    // Tanpa userId = ambil SEMUA pendaftaran dari semua user
-    await loadPendaftarFromFirestore();
-    if (!mounted) return;
-    setState(() => _isLoading = false);
+  void _changed() {
+    if (mounted) setState(() {});
+  }
+
+  void _sessionChanged() {
+    _state.reset();
+    if (AuthSession.instance.authenticated.value &&
+        AuthSession.instance.deviceSessionReady) _muatData();
   }
 
   @override
-  Widget build(BuildContext context) {
-    final list = daftarPendaftar;
+  void dispose() {
+    AuthSession.instance.sessionChanges.removeListener(_sessionChanged);
+    _state.removeListener(_changed);
+    _state.dispose();
+    super.dispose();
+  }
 
-    if (_isLoading) {
+  Future<void> _muatData() => _state.load(() async {
+        final items = <String, Pendaftar>{};
+        var page = 1;
+        while (true) {
+          final result =
+              await _repository.adminBookings(query: {'page': '$page'});
+          for (final booking in result.items) {
+            final json = booking.json;
+            items[booking.guid] = Pendaftar(
+              id: booking.guid,
+              userId: '',
+              namaPengunjung: booking.visitorName,
+              noTelepon: json['visitor_phone'] as String,
+              email: json['visitor_email'] as String,
+              wisata: booking.destinationName,
+              tanggal: json['visit_date'] as String,
+              jumlahOrang: json['quantity'] as int,
+              nomorBukti: json['booking_number'] as String,
+              catatan: json['notes'] as String? ?? '',
+              status: booking.status,
+            );
+          }
+          final last = result.meta?['last_page'];
+          if (last is! int)
+            throw const ApiException('Respons halaman tidak valid.');
+          if (page >= last) break;
+          page++;
+        }
+        return items.values.toList();
+      });
+
+  @override
+  Widget build(BuildContext context) {
+    final list = _state.data ?? <Pendaftar>[];
+    if (_state.loading && _state.data == null) {
       return const Scaffold(
         backgroundColor: _C.bg,
+        body: Center(child: CircularProgressIndicator(color: _C.teal)),
+      );
+    }
+    if (_state.error != null) {
+      return Scaffold(
+        backgroundColor: _C.bg,
         body: Center(
-          child: CircularProgressIndicator(color: _C.teal),
-        ),
+            child: Column(mainAxisSize: MainAxisSize.min, children: [
+          Text(_state.error.toString(), textAlign: TextAlign.center),
+          TextButton(onPressed: _muatData, child: const Text('Coba lagi')),
+        ])),
       );
     }
 
@@ -72,7 +126,7 @@ class _DaftarPendaftarScreenState extends State<DaftarPendaftarScreen> {
         child: CustomScrollView(
           physics: const BouncingScrollPhysics(),
           slivers: [
-            // ── SliverAppBar ──────────────────────────────────────
+            // â”€â”€ SliverAppBar â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
             SliverAppBar(
               expandedHeight: 210,
               floating: false,
@@ -228,7 +282,7 @@ class _DaftarPendaftarScreenState extends State<DaftarPendaftarScreen> {
               ),
             ),
 
-            // ── Ringkasan status ─────────────────────────────────
+            // â”€â”€ Ringkasan status â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
             if (list.isNotEmpty)
               SliverToBoxAdapter(
                 child: Padding(
@@ -237,7 +291,7 @@ class _DaftarPendaftarScreenState extends State<DaftarPendaftarScreen> {
                 ),
               ),
 
-            // ── Konten ───────────────────────────────────────────
+            // â”€â”€ Konten â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
             if (list.isEmpty)
               SliverFillRemaining(
                 child: Center(
@@ -278,7 +332,10 @@ class _DaftarPendaftarScreenState extends State<DaftarPendaftarScreen> {
                 padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
                 sliver: SliverList(
                   delegate: SliverChildBuilderDelegate(
-                    (_, i) => _PendaftarCard(pendaftar: list[i]),
+                    (_, i) => _PendaftarCard(
+                        key: ValueKey(list[i].id),
+                        pendaftar: list[i],
+                        onRefresh: _muatData),
                     childCount: list.length,
                   ),
                 ),
@@ -290,10 +347,12 @@ class _DaftarPendaftarScreenState extends State<DaftarPendaftarScreen> {
   }
 }
 
-// ── Card Pendaftar ─────────────────────────────────────────────
+// â”€â”€ Card Pendaftar â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 class _PendaftarCard extends StatefulWidget {
   final Pendaftar pendaftar;
-  const _PendaftarCard({required this.pendaftar});
+  final Future<void> Function() onRefresh;
+  const _PendaftarCard(
+      {super.key, required this.pendaftar, required this.onRefresh});
 
   @override
   State<_PendaftarCard> createState() => _PendaftarCardState();
@@ -304,7 +363,7 @@ class _PendaftarCardState extends State<_PendaftarCard> {
 
   static _statusCfg(String status) {
     switch (status) {
-      case 'disetujui':
+      case 'confirmed':
         return (
           color: const Color(0xFF10B981),
           bg: const Color(0x1A10B981),
@@ -312,7 +371,7 @@ class _PendaftarCardState extends State<_PendaftarCard> {
           label: 'Disetujui',
           icon: Icons.check_circle_rounded,
         );
-      case 'ditolak':
+      case 'rejected':
         return (
           color: const Color(0xFFEF4444),
           bg: const Color(0x1AEF4444),
@@ -325,28 +384,38 @@ class _PendaftarCardState extends State<_PendaftarCard> {
           color: const Color(0xFFF59E0B),
           bg: const Color(0x1AF59E0B),
           border: const Color(0x40F59E0B),
-          label: 'Menunggu',
+          label: status == 'pending_approval' ? 'Menunggu' : status,
           icon: Icons.hourglass_top_rounded,
         );
     }
   }
 
   Future<void> _updateStatus(String newStatus) async {
-    final docId = widget.pendaftar.id;
-    if (docId == null) return;
+    final guid = widget.pendaftar.id;
+    if (guid == null ||
+        _isUpdating ||
+        widget.pendaftar.status != 'pending_approval') return;
+    final generation = AuthSession.instance.sessionGeneration;
     setState(() => _isUpdating = true);
     try {
-      await FirebaseFirestore.instance
-          .collection('pendaftar')
-          .doc(docId)
-          .update({'status': newStatus});
-      widget.pendaftar.status = newStatus;
+      await BusinessRepository()
+          .decideBooking(guid, approve: newStatus == 'disetujui');
+      if (generation == AuthSession.instance.sessionGeneration) {
+        await widget.onRefresh();
+      }
+    } catch (error) {
+      if (mounted && generation == AuthSession.instance.sessionGeneration) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(error.toString())));
+        await widget.onRefresh();
+      }
     } finally {
       if (mounted) setState(() => _isUpdating = false);
     }
   }
 
   void _konfirmasiAksi(String aksi) {
+    final generation = AuthSession.instance.sessionGeneration;
     final isSetujui = aksi == 'disetujui';
     showDialog(
       context: context,
@@ -405,7 +474,9 @@ class _PendaftarCardState extends State<_PendaftarCard> {
             ),
             onPressed: () {
               Navigator.pop(ctx);
-              _updateStatus(aksi);
+              if (generation == AuthSession.instance.sessionGeneration) {
+                _updateStatus(aksi);
+              }
             },
             child: Text(isSetujui ? 'Setujui' : 'Tolak',
                 style:
@@ -440,7 +511,7 @@ class _PendaftarCardState extends State<_PendaftarCard> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // ── Header kartu ─────────────────────────────
+            // â”€â”€ Header kartu â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
@@ -495,7 +566,7 @@ class _PendaftarCardState extends State<_PendaftarCard> {
                       ],
                     ),
                   ),
-                  // ── Badge status dinamis ──────────────
+                  // â”€â”€ Badge status dinamis â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
                   Container(
                     padding:
                         const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
@@ -521,7 +592,7 @@ class _PendaftarCardState extends State<_PendaftarCard> {
               ),
             ),
 
-            // ── Detail ───────────────────────────────────
+            // â”€â”€ Detail â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
             Padding(
               padding: const EdgeInsets.all(16),
               child: Column(
@@ -584,8 +655,8 @@ class _PendaftarCardState extends State<_PendaftarCard> {
                     ],
                   ),
 
-                  // ── Tombol Approve / Reject (hanya saat menunggu) ──
-                  if (p.status == 'menunggu') ...[
+                  // â”€â”€ Tombol Approve / Reject (hanya saat menunggu) â”€â”€
+                  if (p.status == 'pending_approval') ...[
                     const SizedBox(height: 14),
                     _isUpdating
                         ? const Center(
@@ -705,7 +776,7 @@ class _PendaftarCardState extends State<_PendaftarCard> {
           child: Text(label,
               style: const TextStyle(color: _C.textDim, fontSize: 12)),
         ),
-        const Text('  ·  ', style: TextStyle(color: _C.border, fontSize: 12)),
+        const Text('  Â·  ', style: TextStyle(color: _C.border, fontSize: 12)),
         Expanded(
           child: Text(
             value,
@@ -721,16 +792,16 @@ class _PendaftarCardState extends State<_PendaftarCard> {
   }
 }
 
-// ── Ringkasan jumlah per status ────────────────────────────────
+// â”€â”€ Ringkasan jumlah per status â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 class _RingkasanRow extends StatelessWidget {
   final List<Pendaftar> list;
   const _RingkasanRow({required this.list});
 
   @override
   Widget build(BuildContext context) {
-    final setuju = list.where((p) => p.status == 'disetujui').length;
-    final tolak = list.where((p) => p.status == 'ditolak').length;
-    final tunggu = list.length - setuju - tolak;
+    final setuju = list.where((p) => const {'confirmed', 'awaiting_payment', 'payment_verification', 'payment_review'}.contains(p.status)).length;
+    final tolak = list.where((p) => p.status == 'rejected').length;
+    final tunggu = list.where((p) => p.status == 'pending_approval').length;
 
     final items = <(String, int, Color, IconData)>[
       ('Total', list.length, _C.blue, Icons.groups_rounded),

@@ -11,8 +11,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../data/app_data.dart';
-import 'admin_login.dart'; // untuk currentAdmin
-import 'home_screen.dart';
+import '../data/business_repository.dart';
+import '../services/auth_session.dart';
+import 'session_destination.dart';
 import 'tambah_wisata_screen.dart';
 import 'daftar_wisata_screen.dart';
 import 'daftar_pendaftar_screen.dart';
@@ -83,41 +84,79 @@ class _AdminDashboardState extends State<AdminDashboard>
 
   bool _memuat = false;
 
-  bool get _isSuperAdmin => currentAdmin?.isSuperAdmin == true;
-  String get _namaAdmin => currentAdmin?.namaLengkap ?? 'Administrator';
-  String get _avgRating {
-    if (daftarWisata.isEmpty) return '-';
-    final avg = daftarWisata.map((w) => w.rating).reduce((a, b) => a + b) /
-        daftarWisata.length;
-    return avg.toStringAsFixed(1);
+  bool get _isSuperAdmin => AuthSession.instance.role == 2;
+  bool get _canAccess => AuthSession.instance.authenticated.value &&
+      AuthSession.instance.deviceSessionReady &&
+      (AuthSession.instance.role == 1 || AuthSession.instance.role == 2);
+  String get _namaAdmin => currentUser?.namaLengkap ?? 'Administrator';
+  final _repository = BusinessRepository();
+  int? _destinationCount;
+  int? _bookingCount;
+  List<Booking>? _recent;
+  String? _loadError;
+  late final int _sessionGeneration;
+
+  void _sessionChanged() {
+    if (!mounted) return;
+    if (AuthSession.instance.sessionGeneration != _sessionGeneration) {
+      _recent = null;
+      _destinationCount = null;
+      _bookingCount = null;
+    }
+    setState(() {});
   }
 
   @override
   void initState() {
     super.initState();
+    _sessionGeneration = AuthSession.instance.sessionGeneration;
+    AuthSession.instance.sessionChanges.addListener(_sessionChanged);
     _ctrl = AnimationController(
         vsync: this, duration: const Duration(milliseconds: 700))
       ..forward();
     _fade = CurvedAnimation(parent: _ctrl, curve: Curves.easeOut);
     _slide = Tween<Offset>(begin: const Offset(0, 0.06), end: Offset.zero)
         .animate(CurvedAnimation(parent: _ctrl, curve: Curves.easeOutCubic));
-    _muatData();
+    if (_canAccess) {
+      _muatData();
+    }
   }
 
   Future<void> _muatData() async {
     if (_memuat) return;
-    setState(() => _memuat = true);
+    setState(() {
+      _memuat = true;
+      _loadError = null;
+      _recent = null;
+      _destinationCount = null;
+      _bookingCount = null;
+    });
     try {
-      await loadWisataFromFirestore();
-      await loadPendaftarFromFirestore();
-    } catch (_) {
-      // abaikan; data lama tetap ditampilkan
+      final destinations = await _repository.destinations();
+      final bookings = await _repository.adminBookings();
+      if (!mounted ||
+          _sessionGeneration != AuthSession.instance.sessionGeneration) return;
+      setState(() {
+        _destinationCount = destinations.meta?['total'] as int?;
+        _bookingCount = bookings.meta?['total'] as int?;
+        _recent = bookings.items.take(3).toList();
+      });
+    } catch (e) {
+      if (mounted &&
+          _sessionGeneration == AuthSession.instance.sessionGeneration) {
+        setState(() => _loadError = e.toString());
+      }
+    } finally {
+      if (mounted &&
+          _sessionGeneration == AuthSession.instance.sessionGeneration) {
+        setState(() => _memuat = false);
+      }
     }
-    if (mounted) setState(() => _memuat = false);
   }
 
   @override
   void dispose() {
+    AuthSession.instance.sessionChanges.removeListener(_sessionChanged);
     _ctrl.dispose();
     super.dispose();
   }
@@ -130,10 +169,12 @@ class _AdminDashboardState extends State<AdminDashboard>
     });
   }
 
-  void _logout() {
-    currentAdmin = null; // reset state login
-    Navigator.pushAndRemoveUntil(context,
-        MaterialPageRoute(builder: (_) => const HomeScreen()), (_) => false);
+  Future<void> _logout() async {
+    try {
+      await AuthSession.instance.logout();
+    } catch (_) {
+      // Local credentials are cleared even when the network logout fails.
+    }
   }
 
   Future<void> _konfirmasiLogout() async {
@@ -221,6 +262,9 @@ class _AdminDashboardState extends State<AdminDashboard>
   // ══════════════════════════════════════════════════════════
   @override
   Widget build(BuildContext context) {
+    if (!_canAccess || _sessionGeneration != AuthSession.instance.sessionGeneration) {
+      return sessionDestination();
+    }
     final inset = MediaQuery.of(context).padding.top;
     final heroH = inset + 236;
 
@@ -447,13 +491,13 @@ class _AdminDashboardState extends State<AdminDashboard>
   Widget _buildStats() {
     return Row(
       children: [
-        _statCard(
-            Icons.map_rounded, '${daftarWisata.length}', 'Destinasi', _C.blue),
+        _statCard(Icons.map_rounded, _destinationCount?.toString() ?? '-',
+            'Destinasi', _C.blue),
         const SizedBox(width: 10),
-        _statCard(Icons.people_rounded, '${daftarPendaftar.length}',
+        _statCard(Icons.people_rounded, _bookingCount?.toString() ?? '-',
             'Pendaftar', _C.orange),
         const SizedBox(width: 10),
-        _statCard(Icons.star_rounded, _avgRating, 'Rata-rata', _C.teal),
+        _statCard(Icons.star_rounded, '-', 'Rata-rata', _C.teal),
       ],
     );
   }
@@ -697,7 +741,13 @@ class _AdminDashboardState extends State<AdminDashboard>
 
   // ── Pendaftar terbaru (3 terakhir) ─────────────────────────
   Widget _buildPendaftarTerbaru() {
-    final terbaru = daftarPendaftar.reversed.take(3).toList();
+    final terbaru = _recent ?? <Booking>[];
+    if (_recent == null) {
+      return Center(
+          child: Text(_memuat
+              ? 'Memuat data...'
+              : (_loadError ?? 'Data belum tersedia.')));
+    }
 
     if (terbaru.isEmpty) {
       return Container(
@@ -763,8 +813,8 @@ class _AdminDashboardState extends State<AdminDashboard>
     );
   }
 
-  Widget _pendaftarTile(Pendaftar p) {
-    final nama = p.namaPengunjung.trim();
+  Widget _pendaftarTile(Booking p) {
+    final nama = p.visitorName.trim();
     final inisial = nama.isEmpty ? '?' : nama[0].toUpperCase();
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 13),
@@ -795,7 +845,7 @@ class _AdminDashboardState extends State<AdminDashboard>
                     overflow: TextOverflow.ellipsis,
                     style: _font(13.5, FontWeight.w800, _C.navy)),
                 const SizedBox(height: 2),
-                Text('${p.wisata}  ·  ${p.tanggal}',
+                Text('${p.destinationName}  ·  ${p.json['visit_date'] ?? '-'}',
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: _font(11.5, FontWeight.w500, _C.textMuted)),
@@ -809,7 +859,7 @@ class _AdminDashboardState extends State<AdminDashboard>
               color: _C.orange.withValues(alpha: 0.12),
               borderRadius: BorderRadius.circular(12),
             ),
-            child: Text('${p.jumlahOrang} org',
+            child: Text('${p.json['quantity'] ?? '-'} org',
                 style: _font(11, FontWeight.w800, const Color(0xFFE08600))),
           ),
         ],

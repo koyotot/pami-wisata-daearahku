@@ -25,6 +25,19 @@ Map<String, dynamic> _login() => {
       }
     };
 
+http.Response _me() => http.Response(
+    jsonEncode({
+      'data': {
+        'guid': 'user-a',
+        'name': 'A',
+        'email': 'a@example.test',
+        'phone': null,
+        'role': 0,
+        'status': 'active'
+      }
+    }),
+    200);
+
 void main() {
   test('favorite operations use Laravel bearer and destination GUID', () async {
     final requests = <http.Request>[];
@@ -35,6 +48,7 @@ void main() {
         if (request.url.path.endsWith('/auth/login')) {
           return http.Response(jsonEncode(_login()), 200);
         }
+        if (request.url.path.endsWith('/auth/me')) return _me();
         requests.add(request);
         final favorite = {
           'guid': 'favorite-1',
@@ -97,10 +111,12 @@ void main() {
       final session = AuthSession(
         baseUrl: 'https://example.test/api/v1',
         store: _Store(),
-        client: MockClient((request) async =>
-            request.url.path.endsWith('/auth/login')
+        client: MockClient(
+            (request) async => request.url.path.endsWith('/auth/login')
                 ? http.Response(jsonEncode(_login()), 200)
-                : http.Response('{"message":"error"}', status)),
+                : request.url.path.endsWith('/auth/me')
+                    ? _me()
+                    : http.Response('{"message":"error"}', status)),
       );
       await session.login('a@example.test', 'password');
       await expectLater(
@@ -118,6 +134,7 @@ void main() {
         if (request.url.path.endsWith('/auth/login')) {
           return http.Response(jsonEncode(_login()), 200);
         }
+        if (request.url.path.endsWith('/auth/me')) return _me();
         throw http.ClientException('offline');
       }),
     );
@@ -130,10 +147,12 @@ void main() {
     final session = AuthSession(
       baseUrl: 'https://example.test/api/v1',
       store: _Store(),
-      client: MockClient((request) async =>
-          request.url.path.endsWith('/auth/login')
+      client:
+          MockClient((request) async => request.url.path.endsWith('/auth/login')
               ? http.Response(jsonEncode(_login()), 200)
-              : http.Response('{"message":"unauthenticated"}', 401)),
+              : request.url.path.endsWith('/auth/me')
+                  ? _me()
+                  : http.Response('{"message":"unauthenticated"}', 401)),
     );
     await session.login('a@example.test', 'password');
     await expectLater(

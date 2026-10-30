@@ -215,6 +215,7 @@ class _ProfilUserScreenState extends State<ProfilUserScreen>
 
     if (konfirmasi != true) return;
 
+    final generation = AuthSession.instance.sessionGeneration;
     try {
       await AuthSession.instance.logout();
     } catch (_) {
@@ -223,8 +224,10 @@ class _ProfilUserScreenState extends State<ProfilUserScreen>
             content: Text(
                 'Sesi lokal dihapus. Pencabutan sesi server belum dapat dikonfirmasi.')));
     }
+    if (AuthSession.instance.sessionGeneration != generation + 1 ||
+        AuthSession.instance.authenticated.value) return;
     await fb_auth.FirebaseAuth.instance.signOut();
-    currentUser = null;
+    if (AuthSession.instance.sessionGeneration != generation + 1) return;
     if (!context.mounted) return;
     _keLogin(context);
   }

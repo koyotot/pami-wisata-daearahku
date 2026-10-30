@@ -20,6 +20,7 @@ import 'bukti_pendaftaran_screen.dart';
 import 'profil_user_screen.dart';
 import 'home_screen.dart';
 import 'user_login_screen.dart';
+import 'session_destination.dart';
 
 // ── Palet & font (sama dengan home_screen.dart) ──────────────
 class _C {
@@ -67,7 +68,25 @@ class MainNavigationScreen extends StatefulWidget {
 
 class _MainNavigationScreenState extends State<MainNavigationScreen> {
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
+  late final int _sessionGeneration;
   int _selectedIndex = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _sessionGeneration = AuthSession.instance.sessionGeneration;
+    AuthSession.instance.sessionChanges.addListener(_sessionChanged);
+  }
+
+  void _sessionChanged() {
+    if (mounted) setState(() {});
+  }
+
+  @override
+  void dispose() {
+    AuthSession.instance.sessionChanges.removeListener(_sessionChanged);
+    super.dispose();
+  }
 
   void _gotoTab(int index) {
     setState(() => _selectedIndex = index);
@@ -122,6 +141,11 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final session = AuthSession.instance;
+    if (!session.authenticated.value || !session.deviceSessionReady ||
+        session.role != 0 || session.sessionGeneration != _sessionGeneration) {
+      return sessionDestination();
+    }
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: const SystemUiOverlayStyle(
         systemNavigationBarColor: Colors.white,
@@ -502,6 +526,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
 
     if (yakin != true) return;
 
+    final generation = AuthSession.instance.sessionGeneration;
     try {
       await AuthSession.instance.logout();
     } catch (_) {
@@ -510,8 +535,10 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
             content: Text(
                 'Sesi lokal dihapus. Pencabutan sesi server belum dapat dikonfirmasi.')));
     }
+    if (AuthSession.instance.sessionGeneration != generation + 1 ||
+        AuthSession.instance.authenticated.value) return;
     await fb_auth.FirebaseAuth.instance.signOut();
-    currentUser = null;
+    if (AuthSession.instance.sessionGeneration != generation + 1) return;
     if (!mounted) return;
 
     _keLogin(context);

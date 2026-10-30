@@ -40,8 +40,15 @@ class AuthSession {
   final ValueNotifier<int> sessionChanges = ValueNotifier(0);
   Map<String, dynamic>? _tokens;
   Future<void>? _refreshing;
+  int? _refreshGeneration;
   int _generation = 0;
+  int? _logoutGeneration;
   int get sessionGeneration => _generation;
+  bool isCurrentGeneration(int generation) =>
+      generation == _generation && _logoutGeneration != generation;
+  int? role;
+  String? status;
+  bool authenticating = false;
   bool deviceSessionReady = false;
   void Function()? deviceSessionChanged;
   Future<void> Function()? beforeDeviceLogout;
@@ -111,7 +118,9 @@ class AuthSession {
                       'Sesi atau kredensial tidak valid. Silakan masuk kembali.',
                     403 => 'Akses tidak diizinkan.',
                     404 => 'Wisata atau data tidak ditemukan.',
-                    409 => 'Terjadi konflik. Silakan coba lagi.',
+                    409 => decoded['message'] is String
+                        ? decoded['message'] as String
+                        : 'Terjadi konflik. Silakan coba lagi.',
                     429 => 'Terlalu banyak percobaan. Coba lagi nanti.',
                     _ => 'Layanan sedang bermasalah. Silakan coba lagi.',
                   },
@@ -146,6 +155,19 @@ class AuthSession {
       _sendEnvelope(method, path, body: body);
 
   void _user(Map<String, dynamic> data) {
+    final nextRole = data['role'];
+    if (data['guid'] is! String ||
+        (data['guid'] as String).isEmpty ||
+        data['name'] is! String ||
+        data['email'] is! String ||
+        nextRole is! int ||
+        ![0, 1, 2].contains(nextRole) ||
+        data['status'] != 'active') {
+      throw const ApiException(
+          'Akun tidak aktif atau respons identitas tidak valid.', 403);
+    }
+    role = nextRole;
+    status = 'active';
     currentUser = User(
         id: data['guid'] as String,
         namaLengkap: data['name'] as String,
@@ -169,12 +191,6 @@ class AuthSession {
     });
     if (generation != _generation) return;
     _tokens = data;
-    _user(data['user']);
-    final sessionWasReady = deviceSessionReady;
-    deviceSessionReady = true;
-    authenticated.value = true;
-    if (!sessionWasReady) sessionChanges.value++;
-    deviceSessionChanged?.call();
   }
 
   Future<void> login(String email, String password) =>
@@ -190,21 +206,45 @@ class AuthSession {
   Future<void> google(String idToken) =>
       _authenticate('auth/google', {'id_token': idToken});
   Future<void> _authenticate(String path, Map<String, dynamic> body) async {
-    final generation = ++_generation;
-    deviceSessionReady = false;
+    var generation = ++_generation;
+    _logoutGeneration = null;
+    authenticating = true;
+    role = null;
+    status = null;
+    currentUser = null;
+    authenticated.value = false;
     sessionChanges.value++;
-    deviceSessionChanged?.call();
     try {
+      if (_tokens != null && deviceSessionReady) {
+        try {
+          await beforeDeviceLogout?.call();
+        } catch (_) {}
+      }
+      if (generation != _generation || _logoutGeneration == generation) {
+        throw const ApiException('Permintaan masuk sudah dibatalkan.');
+      }
+      generation = ++_generation;
+      _tokens = null;
+      deviceSessionReady = false;
+      sessionChanges.value++;
+      deviceSessionChanged?.call();
+      await _persist(() async {
+        if (generation == _generation) await store.clear();
+      });
+      if (generation != _generation) {
+        throw const ApiException('Permintaan masuk sudah dibatalkan.');
+      }
       final data = await _send('POST', path, body: body);
       await _save(data, generation);
       if (generation != _generation) {
         throw const ApiException('Permintaan masuk sudah dibatalkan.');
       }
+      await me();
+      if (generation == _generation) authenticating = false;
     } catch (_) {
-      if (generation == _generation && _tokens != null) {
-        deviceSessionReady = true;
-        sessionChanges.value++;
-        deviceSessionChanged?.call();
+      if (generation == _generation && _logoutGeneration != generation) {
+        authenticating = false;
+        await clear();
       }
       rethrow;
     }
@@ -217,18 +257,27 @@ class AuthSession {
       if (raw == null || generation != _generation) return;
       _tokens = jsonDecode(raw) as Map<String, dynamic>;
       await me();
-      if (generation == _generation) {
-        deviceSessionReady = true;
-        authenticated.value = true;
-        deviceSessionChanged?.call();
-      }
     } catch (_) {
       if (generation == _generation) await clear();
     }
   }
 
-  Future<void> refresh() =>
-      _refreshing ??= _refresh().whenComplete(() => _refreshing = null);
+  Future<void> refresh() {
+    if (_refreshing != null && _refreshGeneration == _generation) {
+      return _refreshing!;
+    }
+    final generation = _generation;
+    _refreshGeneration = generation;
+    final pending = _refresh();
+    _refreshing = pending;
+    return pending.whenComplete(() {
+      if (identical(_refreshing, pending)) {
+        _refreshing = null;
+        _refreshGeneration = null;
+      }
+    });
+  }
+
   Future<void> _refresh() async {
     final generation = _generation;
     final token = _tokens?['refresh_token'];
@@ -282,13 +331,28 @@ class AuthSession {
         rethrow;
       }
     }
+    if (generation != _generation) {
+      throw const ApiException('Sesi telah berakhir.', 401);
+    }
     return result;
   }
 
   Future<void> me() async {
     final generation = _generation;
     final data = await request('GET', 'auth/me');
-    if (generation == _generation) _user(data);
+    if (generation != _generation || _logoutGeneration == generation) {
+      throw const ApiException('Sesi telah berakhir.', 401);
+    }
+    try {
+      _user(data);
+    } catch (_) {
+      if (generation == _generation) await clear();
+      rethrow;
+    }
+    deviceSessionReady = true;
+    authenticated.value = true;
+    sessionChanges.value++;
+    deviceSessionChanged?.call();
   }
 
   Future<void> updateProfile(String name, String phone) async {
@@ -343,11 +407,20 @@ class AuthSession {
 
   Future<void> logout() async {
     final generation = _generation;
+    _logoutGeneration = generation;
+    authenticating = false;
+    role = null;
+    status = null;
+    currentUser = null;
+    authenticated.value = false;
+    sessionChanges.value++;
     try {
       try {
         await beforeDeviceLogout?.call();
       } catch (_) {}
-      if (_refreshing != null) await _refreshing;
+      if (_refreshing != null && _refreshGeneration == generation) {
+        await _refreshing;
+      }
       if (generation == _generation && _tokens != null) {
         await request('POST', 'auth/logout');
       }
@@ -358,7 +431,11 @@ class AuthSession {
 
   Future<void> clear() async {
     _generation++;
+    _logoutGeneration = null;
+    authenticating = false;
     _tokens = null;
+    role = null;
+    status = null;
     deviceSessionReady = false;
     currentUser = null;
     authenticated.value = false;
