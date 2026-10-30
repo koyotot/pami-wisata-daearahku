@@ -2,6 +2,7 @@
 // lib/data/app_data.dart  ← SATU-SATUNYA sumber model data
 // ============================================================
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'business_repository.dart';
 
 // ── Model User ─────────────────────────────────────────────
 class User {
@@ -34,6 +35,7 @@ class Wisata {
   String id, nama, lokasi, deskripsi, hargaTiket, jamBuka, kategori;
   String? imagePath;
   double rating;
+  bool isLaravel;
 
   Wisata({
     required this.id,
@@ -45,7 +47,27 @@ class Wisata {
     required this.kategori,
     this.imagePath,
     this.rating = 4.5,
+    this.isLaravel = false,
   });
+
+  factory Wisata.fromDestination(Destination destination) {
+    final json = destination.json;
+    final image = json['image_path'] as String?;
+    return Wisata(
+      id: destination.guid,
+      nama: destination.name,
+      lokasi: json['location'] as String? ?? '',
+      deskripsi: json['description'] as String? ?? '',
+      hargaTiket: '${json['currency'] ?? 'IDR'} ${json['ticket_price'] ?? ''}',
+      jamBuka: json['opening_hours'] as String? ?? '',
+      kategori: destination.category?.name ?? '',
+      imagePath: image != null &&
+              (image.startsWith('https://') || image.startsWith('http://'))
+          ? image
+          : null,
+      isLaravel: true,
+    );
+  }
 
   // Untuk simpan ke Firestore
   Map<String, dynamic> toMap() => {

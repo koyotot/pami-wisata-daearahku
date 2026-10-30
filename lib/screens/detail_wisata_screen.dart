@@ -1,4 +1,4 @@
-// ============================================================
+﻿// ============================================================
 // lib/screens/detail_wisata_screen.dart
 // Tema: biru terang — sama dengan home, login, beranda, dan profil
 // ============================================================
@@ -8,6 +8,9 @@ import 'package:flutter/services.dart';
 import 'package:firebase_auth/firebase_auth.dart' as fb_auth;
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../data/app_data.dart';
+import '../data/business_repository.dart';
+import '../services/api_client.dart';
+import '../services/auth_session.dart';
 import 'daftar_kunjungan_screen.dart';
 
 // ── Palet (sama dengan home_screen.dart) ─────────────────────
@@ -45,6 +48,8 @@ class DetailWisataScreen extends StatefulWidget {
 
 class _DetailWisataScreenState extends State<DetailWisataScreen>
     with SingleTickerProviderStateMixin {
+  final _repository = BusinessRepository();
+  final _detail = RequestState<Destination>();
   late AnimationController _animCtrl;
   late Animation<double> _fadeAnim;
   late Animation<Offset> _slideAnim;
@@ -74,11 +79,41 @@ class _DetailWisataScreenState extends State<DetailWisataScreen>
       statusBarIconBrightness: Brightness.light,
     ));
 
+    _detail.addListener(_detailChanged);
+    _loadDetail();
     _cekStatusSimpan();
+  }
+
+  void _detailChanged() {
+    if (mounted) setState(() {});
+  }
+
+  void _loadDetail() {
+    final id = widget.wisata.id;
+    _detail.load(() async {
+      final destination = await _repository.destination(id);
+      if (destination.guid != id) {
+        throw const ApiException('Identitas wisata tidak sesuai.');
+      }
+      return destination;
+    });
+  }
+
+  @override
+  void didUpdateWidget(covariant DetailWisataScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.wisata.id != widget.wisata.id) {
+      _isSaved = false;
+      _savedDocId = null;
+      _loadDetail();
+      _cekStatusSimpan();
+    }
   }
 
   @override
   void dispose() {
+    _detail.removeListener(_detailChanged);
+    _detail.dispose();
     _animCtrl.dispose();
     super.dispose();
   }
@@ -102,13 +137,14 @@ class _DetailWisataScreenState extends State<DetailWisataScreen>
   Future<void> _cekStatusSimpan() async {
     final uid = fb_auth.FirebaseAuth.instance.currentUser?.uid;
     if (uid == null) return;
+    final id = widget.wisata.id;
     final snap = await FirebaseFirestore.instance
         .collection('wisataTersimpan')
         .where('userId', isEqualTo: uid)
-        .where('wisataId', isEqualTo: widget.wisata.id)
+        .where('wisataId', isEqualTo: id)
         .limit(1)
         .get();
-    if (!mounted) return;
+    if (!mounted || widget.wisata.id != id) return;
     setState(() {
       _isSaved = snap.docs.isNotEmpty;
       _savedDocId = snap.docs.isNotEmpty ? snap.docs.first.id : null;
@@ -143,10 +179,10 @@ class _DetailWisataScreenState extends State<DetailWisataScreen>
             await FirebaseFirestore.instance.collection('wisataTersimpan').add({
           'userId': uid,
           'wisataId': widget.wisata.id,
-          'namaWisata': widget.wisata.nama,
-          'lokasi': widget.wisata.lokasi,
-          'kategori': widget.wisata.kategori,
-          'imagePath': widget.wisata.imagePath ?? '',
+          'namaWisata': Wisata.fromDestination(_detail.data!).nama,
+          'lokasi': Wisata.fromDestination(_detail.data!).lokasi,
+          'kategori': Wisata.fromDestination(_detail.data!).kategori,
+          'imagePath': Wisata.fromDestination(_detail.data!).imagePath ?? '',
           'savedAt': FieldValue.serverTimestamp(),
         });
         if (!mounted) return;
@@ -181,7 +217,29 @@ class _DetailWisataScreenState extends State<DetailWisataScreen>
 
   @override
   Widget build(BuildContext context) {
-    final w = widget.wisata;
+    final destination = _detail.data;
+    if (_detail.loading ||
+        _detail.error != null ||
+        destination == null ||
+        destination.guid != widget.wisata.id) {
+      final error = _detail.error;
+      final message = error is ApiException && error.status == 404
+          ? 'Wisata tidak ditemukan.'
+          : error?.toString() ?? 'Memuat wisata...';
+      return Scaffold(
+        appBar: AppBar(),
+        body: Center(
+          child: error == null
+              ? const CircularProgressIndicator()
+              : Column(mainAxisSize: MainAxisSize.min, children: [
+                  Text(message),
+                  TextButton(
+                      onPressed: _detail.retry, child: const Text('Coba lagi')),
+                ]),
+        ),
+      );
+    }
+    final w = Wisata.fromDestination(destination);
 
     return Scaffold(
       backgroundColor: _C.bg,
@@ -315,7 +373,7 @@ class _DetailWisataScreenState extends State<DetailWisataScreen>
                                   color: _C.gold, size: 14),
                               const SizedBox(width: 4),
                               Text(
-                                widget.wisata.rating.toStringAsFixed(1),
+                                w.isLaravel ? '-' : w.rating.toStringAsFixed(1),
                                 style: TextStyle(
                                   color: _C.goldLight,
                                   fontSize: 12,
@@ -513,7 +571,7 @@ class _DetailWisataScreenState extends State<DetailWisataScreen>
                               child: Text(
                                 w.deskripsi.isNotEmpty
                                     ? w.deskripsi
-                                    : 'Nikmati pengalaman tak terlupakan di ${w.nama}.',
+                                    : 'Deskripsi belum tersedia.',
                                 style: TextStyle(
                                   color: _C.textMuted,
                                   fontSize: 14,
@@ -619,8 +677,7 @@ class _DetailWisataScreenState extends State<DetailWisataScreen>
                     onTap: () => Navigator.push(
                       context,
                       MaterialPageRoute(
-                        builder: (_) =>
-                            DaftarKunjunganScreen(wisata: widget.wisata),
+                        builder: (_) => DaftarKunjunganScreen(wisata: w),
                       ),
                     ),
                     child: Container(

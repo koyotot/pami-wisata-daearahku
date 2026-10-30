@@ -6,6 +6,8 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../data/app_data.dart';
+import '../data/business_repository.dart';
+import '../services/api_client.dart';
 import 'tambah_wisata_screen.dart';
 import 'detail_wisata_screen.dart';
 
@@ -65,31 +67,67 @@ class DaftarWisataScreen extends StatefulWidget {
 class _DaftarWisataScreenState extends State<DaftarWisataScreen>
     with SingleTickerProviderStateMixin {
   String _cari = '';
-  String _kat = 'Semua';
+  final String _kat = 'Semua';
 
   late final AnimationController _fabCtrl;
   bool _isLoadingData = true;
+  final _repository = BusinessRepository();
+  final _catalog = RequestState<ApiPage<Destination>>();
+  final _categories = RequestState<List<Category>>();
+  final _searchController = TextEditingController();
+  String? _categoryGuid;
 
-  static const _kategoriList = [
-    'Semua',
-    'Pantai',
-    'Budaya',
-    'Alam',
-    'Bahari',
-    'Kuliner',
-    'Kota',
-    'Lainnya',
-  ];
+  void _update() {
+    if (mounted) setState(() {});
+  }
 
-  List<Wisata> get _filtered => daftarWisata.where((w) {
-        final q = _cari.toLowerCase();
-        final matchCari = _cari.isEmpty ||
-            w.nama.toLowerCase().contains(q) ||
-            w.lokasi.toLowerCase().contains(q) ||
-            w.kategori.toLowerCase().contains(q);
-        final matchKat = _kat == 'Semua' || w.kategori == _kat;
-        return matchCari && matchKat;
-      }).toList();
+  Future<void> _loadCategories() => _categories.load(() async {
+        final categories = <Category>[];
+        var page = 1;
+        while (true) {
+          final result = await _repository.categories(query: {'page': '$page'});
+          categories.addAll(result.items);
+          if (result.links?['next'] == null) return categories;
+          page++;
+        }
+      });
+
+  Future<void> _loadCatalog({bool next = false}) async {
+    final previous = next ? _catalog.data : null;
+    if (!next) _catalog.data = null;
+    final page =
+        next ? ((previous?.meta?['current_page'] as int? ?? 0) + 1) : 1;
+    final category = _categoryGuid;
+    final search = _cari.trim();
+    await _catalog.load(() async {
+      final result = await _repository.destinations(query: {
+        'page': '$page',
+        if (category != null) 'category': category,
+        if (search.isNotEmpty) 'search': search,
+      });
+      final items = <String, Destination>{
+        for (final item in previous?.items ?? <Destination>[]) item.guid: item,
+        for (final item in result.items) item.guid: item,
+      };
+      return ApiPage(items.values.toList(), result.meta, result.links);
+    });
+  }
+
+  Future<void> _refreshView() async {
+    await Future.wait([_loadCategories(), _loadCatalog()]);
+  }
+
+  List<Wisata> get _filtered => widget.mode == 'view'
+      ? (_catalog.data?.items.map(Wisata.fromDestination).toList() ?? [])
+      : daftarWisata.where((w) {
+          final q = _cari.toLowerCase();
+          final matchCari = _cari.isEmpty ||
+              w.nama.toLowerCase().contains(q) ||
+              w.lokasi.toLowerCase().contains(q) ||
+              w.kategori.toLowerCase().contains(q);
+          final matchKat = _kat == 'Semua' || w.kategori == _kat;
+          return matchCari && matchKat;
+        }).toList();
 
   String get _judul => switch (widget.mode) {
         'edit' => 'Ubah Data Wisata',
@@ -110,7 +148,13 @@ class _DaftarWisataScreenState extends State<DaftarWisataScreen>
       vsync: this,
       duration: const Duration(milliseconds: 600),
     )..forward();
-    _muatData();
+    if (widget.mode == 'view') {
+      _catalog.addListener(_update);
+      _categories.addListener(_update);
+      _refreshView();
+    } else {
+      _muatData();
+    }
   }
 
   Future<void> _muatData() async {
@@ -122,6 +166,9 @@ class _DaftarWisataScreenState extends State<DaftarWisataScreen>
   @override
   void dispose() {
     _fabCtrl.dispose();
+    _searchController.dispose();
+    _catalog.dispose();
+    _categories.dispose();
     super.dispose();
   }
 
@@ -235,7 +282,7 @@ class _DaftarWisataScreenState extends State<DaftarWisataScreen>
     final accent = _accentColor;
     final filtered = _filtered;
 
-    if (_isLoadingData) {
+    if (widget.mode != 'view' && _isLoadingData) {
       return Scaffold(
         backgroundColor: _C.bg,
         body: const Center(
@@ -244,373 +291,435 @@ class _DaftarWisataScreenState extends State<DaftarWisataScreen>
       );
     }
 
+    final total = widget.mode == 'view'
+        ? (_catalog.data?.meta?['total'] ?? filtered.length)
+        : daftarWisata.length;
+
     return Scaffold(
       backgroundColor: _C.bg,
-      body: CustomScrollView(
-        physics: const BouncingScrollPhysics(),
-        slivers: [
-          // ── SliverAppBar ────────────────────────────────────
-          SliverAppBar(
-            expandedHeight: 210,
-            floating: false,
-            pinned: true,
-            snap: false,
-            backgroundColor: const Color(0xFF1558B0),
-            elevation: 0,
-            leading: GestureDetector(
-              onTap: () => Navigator.pop(context),
-              child: Container(
-                margin: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.22),
-                  borderRadius: BorderRadius.circular(12),
-                  border:
-                      Border.all(color: Colors.white.withValues(alpha: 0.35)),
-                ),
-                child: const Icon(Icons.arrow_back_ios_new_rounded,
-                    size: 16, color: Colors.white),
-              ),
-            ),
-            actions: widget.mode == 'view'
-                ? [
-                    Container(
-                      margin:
-                          const EdgeInsets.only(right: 12, top: 8, bottom: 8),
-                      padding: const EdgeInsets.symmetric(horizontal: 12),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.22),
-                        borderRadius: BorderRadius.circular(10),
-                        border: Border.all(
-                            color: Colors.white.withValues(alpha: 0.35)),
-                      ),
-                      child: Row(
-                        children: [
-                          const Icon(Icons.landscape_rounded,
-                              color: Colors.white, size: 13),
-                          const SizedBox(width: 5),
-                          Text('${daftarWisata.length}',
-                              style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w800)),
-                        ],
-                      ),
-                    ),
-                  ]
-                : null,
-            flexibleSpace: FlexibleSpaceBar(
-              collapseMode: CollapseMode.parallax,
-              background: Container(
-                decoration: const BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: [
-                      Color(0xFF2A93F0),
-                      Color(0xFF1976D2),
-                      Color(0xFF1558B0)
-                    ],
-                    stops: [0.0, 0.5, 1.0],
+      body: RefreshIndicator(
+        onRefresh: widget.mode == 'view' ? _refreshView : _muatData,
+        child: CustomScrollView(
+          physics: const BouncingScrollPhysics(),
+          slivers: [
+            // ── SliverAppBar ────────────────────────────────────
+            SliverAppBar(
+              expandedHeight: 210,
+              floating: false,
+              pinned: true,
+              snap: false,
+              backgroundColor: const Color(0xFF1558B0),
+              elevation: 0,
+              leading: GestureDetector(
+                onTap: () => Navigator.pop(context),
+                child: Container(
+                  margin: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.22),
+                    borderRadius: BorderRadius.circular(12),
+                    border:
+                        Border.all(color: Colors.white.withValues(alpha: 0.35)),
                   ),
-                ),
-                child: Stack(
-                  children: [
-                    // Teks header
-                    Positioned(
-                      left: 20,
-                      right: 20,
-                      bottom: 46,
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 10, vertical: 5),
-                            decoration: BoxDecoration(
-                              color: Colors.white.withValues(alpha: 0.16),
-                              borderRadius: BorderRadius.circular(20),
-                              border: Border.all(
-                                  color: Colors.white.withValues(alpha: 0.28)),
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Container(
-                                  width: 6,
-                                  height: 6,
-                                  decoration: BoxDecoration(
-                                    color: accent,
-                                    shape: BoxShape.circle,
-                                  ),
-                                ),
-                                const SizedBox(width: 7),
-                                Text(
-                                  widget.mode == 'edit'
-                                      ? 'UBAH DESTINASI'
-                                      : widget.mode == 'hapus'
-                                          ? 'HAPUS DESTINASI'
-                                          : 'DESTINASI NUSANTARA',
-                                  style: const TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.w800,
-                                    letterSpacing: 1.8,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          const SizedBox(height: 12),
-                          Text(
-                            _judul,
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 32,
-                              fontWeight: FontWeight.w800,
-                              letterSpacing: -0.8,
-                              height: 1.1,
-                              shadows: [
-                                Shadow(
-                                  color: Color(0x33000000),
-                                  blurRadius: 12,
-                                  offset: Offset(0, 3),
-                                ),
-                              ],
-                            ),
-                          ),
-                          const SizedBox(height: 6),
-                          Text(
-                            widget.mode == 'edit'
-                                ? 'Pilih wisata yang ingin diubah'
-                                : widget.mode == 'hapus'
-                                    ? 'Pilih wisata yang ingin dihapus'
-                                    : '${daftarWisata.length} destinasi tersedia',
-                            style: TextStyle(
-                              color: Colors.white.withValues(alpha: 0.88),
-                              fontSize: 12.5,
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    // Tepi bawah melengkung menyatu dengan konten
-                    Positioned(
-                      left: 0,
-                      right: 0,
-                      bottom: -1,
-                      child: Container(
-                        height: 26,
-                        decoration: BoxDecoration(
-                          color: _C.bg,
-                          borderRadius: const BorderRadius.vertical(
-                              top: Radius.circular(26)),
-                        ),
-                      ),
-                    ),
-                  ],
+                  child: const Icon(Icons.arrow_back_ios_new_rounded,
+                      size: 16, color: Colors.white),
                 ),
               ),
-            ),
-          ),
-
-          // ── Search bar ──────────────────────────────────────
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(16, 14, 16, 0),
-              child: Container(
-                decoration: BoxDecoration(
-                  color: _C.surface,
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: _C.border),
-                  boxShadow: [
-                    BoxShadow(
-                      color: _C.blue.withValues(alpha: 0.08),
-                      blurRadius: 16,
-                      offset: const Offset(0, 6),
-                    ),
-                  ],
-                ),
-                child: TextField(
-                  style: const TextStyle(color: _C.text, fontSize: 14),
-                  decoration: InputDecoration(
-                    hintText: 'Cari nama, lokasi, atau kategori...',
-                    hintStyle: const TextStyle(color: _C.textDim, fontSize: 13),
-                    prefixIcon: const Icon(Icons.search_rounded,
-                        color: _C.teal, size: 20),
-                    suffixIcon: _cari.isNotEmpty
-                        ? IconButton(
-                            icon: const Icon(Icons.close_rounded,
-                                color: _C.textMuted, size: 18),
-                            onPressed: () => setState(() => _cari = ''),
-                          )
-                        : null,
-                    filled: true,
-                    fillColor: Colors.transparent,
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(16),
-                      borderSide: BorderSide.none,
-                    ),
-                    contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 16, vertical: 14),
-                  ),
-                  onChanged: (v) => setState(() => _cari = v),
-                ),
-              ),
-            ),
-          ),
-
-          // ── Filter kategori (mode view) ─────────────────────
-          if (widget.mode == 'view')
-            SliverToBoxAdapter(
-              child: SizedBox(
-                height: 56,
-                child: ListView.builder(
-                  scrollDirection: Axis.horizontal,
-                  physics: const BouncingScrollPhysics(),
-                  padding: const EdgeInsets.fromLTRB(16, 14, 16, 0),
-                  itemCount: _kategoriList.length,
-                  itemBuilder: (_, i) {
-                    final k = _kategoriList[i];
-                    final sel = _kat == k;
-                    final col = _kColor[k] ?? _C.teal;
-                    return GestureDetector(
-                      onTap: () => setState(() => _kat = k),
-                      child: AnimatedContainer(
-                        duration: const Duration(milliseconds: 200),
-                        margin: const EdgeInsets.only(right: 8),
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 14, vertical: 6),
+              actions: widget.mode == 'view'
+                  ? [
+                      Container(
+                        margin:
+                            const EdgeInsets.only(right: 12, top: 8, bottom: 8),
+                        padding: const EdgeInsets.symmetric(horizontal: 12),
                         decoration: BoxDecoration(
-                          color: sel ? col : _C.surface,
-                          borderRadius: BorderRadius.circular(20),
+                          color: Colors.white.withValues(alpha: 0.22),
+                          borderRadius: BorderRadius.circular(10),
                           border: Border.all(
-                            color: sel ? col : _C.border,
-                            width: 1,
-                          ),
-                          boxShadow: sel
-                              ? [
-                                  BoxShadow(
-                                      color: col.withValues(alpha: 0.40),
-                                      blurRadius: 10,
-                                      offset: const Offset(0, 3))
-                                ]
-                              : [],
+                              color: Colors.white.withValues(alpha: 0.35)),
                         ),
                         child: Row(
-                          mainAxisSize: MainAxisSize.min,
                           children: [
-                            Icon(_kIcon[k] ?? Icons.place_rounded,
-                                size: 13,
-                                color: sel ? Colors.white : _C.textDim),
+                            const Icon(Icons.landscape_rounded,
+                                color: Colors.white, size: 13),
                             const SizedBox(width: 5),
-                            Text(k,
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w700,
-                                  color: sel ? Colors.white : _C.textMuted,
-                                )),
+                            Text('$total',
+                                style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w800)),
                           ],
                         ),
                       ),
-                    );
-                  },
+                    ]
+                  : null,
+              flexibleSpace: FlexibleSpaceBar(
+                collapseMode: CollapseMode.parallax,
+                background: Container(
+                  decoration: const BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [
+                        Color(0xFF2A93F0),
+                        Color(0xFF1976D2),
+                        Color(0xFF1558B0)
+                      ],
+                      stops: [0.0, 0.5, 1.0],
+                    ),
+                  ),
+                  child: Stack(
+                    children: [
+                      // Teks header
+                      Positioned(
+                        left: 20,
+                        right: 20,
+                        bottom: 46,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 10, vertical: 5),
+                              decoration: BoxDecoration(
+                                color: Colors.white.withValues(alpha: 0.16),
+                                borderRadius: BorderRadius.circular(20),
+                                border: Border.all(
+                                    color:
+                                        Colors.white.withValues(alpha: 0.28)),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Container(
+                                    width: 6,
+                                    height: 6,
+                                    decoration: BoxDecoration(
+                                      color: accent,
+                                      shape: BoxShape.circle,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 7),
+                                  Text(
+                                    widget.mode == 'edit'
+                                        ? 'UBAH DESTINASI'
+                                        : widget.mode == 'hapus'
+                                            ? 'HAPUS DESTINASI'
+                                            : 'DESTINASI NUSANTARA',
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.w800,
+                                      letterSpacing: 1.8,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(height: 12),
+                            Text(
+                              _judul,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 32,
+                                fontWeight: FontWeight.w800,
+                                letterSpacing: -0.8,
+                                height: 1.1,
+                                shadows: [
+                                  Shadow(
+                                    color: Color(0x33000000),
+                                    blurRadius: 12,
+                                    offset: Offset(0, 3),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(height: 6),
+                            Text(
+                              widget.mode == 'edit'
+                                  ? 'Pilih wisata yang ingin diubah'
+                                  : widget.mode == 'hapus'
+                                      ? 'Pilih wisata yang ingin dihapus'
+                                      : '$total destinasi tersedia',
+                              style: TextStyle(
+                                color: Colors.white.withValues(alpha: 0.88),
+                                fontSize: 12.5,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      // Tepi bawah melengkung menyatu dengan konten
+                      Positioned(
+                        left: 0,
+                        right: 0,
+                        bottom: -1,
+                        child: Container(
+                          height: 26,
+                          decoration: BoxDecoration(
+                            color: _C.bg,
+                            borderRadius: const BorderRadius.vertical(
+                                top: Radius.circular(26)),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ),
 
-          // ── Counter ─────────────────────────────────────────
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(20, 18, 20, 4),
-              child: Row(
-                children: [
-                  Container(
-                    width: 3,
-                    height: 12,
-                    decoration: BoxDecoration(
-                        color: accent, borderRadius: BorderRadius.circular(4)),
+            // ── Search bar ──────────────────────────────────────
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 14, 16, 0),
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: _C.surface,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: _C.border),
+                    boxShadow: [
+                      BoxShadow(
+                        color: _C.blue.withValues(alpha: 0.08),
+                        blurRadius: 16,
+                        offset: const Offset(0, 6),
+                      ),
+                    ],
                   ),
-                  const SizedBox(width: 8),
-                  Text(
-                    '${filtered.length} wisata ditemukan',
-                    style: const TextStyle(
-                      color: _C.textMuted,
-                      fontSize: 11.5,
-                      fontWeight: FontWeight.w700,
-                      letterSpacing: 0.5,
+                  child: TextField(
+                    controller: _searchController,
+                    style: const TextStyle(color: _C.text, fontSize: 14),
+                    decoration: InputDecoration(
+                      hintText: widget.mode == 'view'
+                          ? 'Cari nama wisata...'
+                          : 'Cari nama, lokasi, atau kategori...',
+                      hintStyle:
+                          const TextStyle(color: _C.textDim, fontSize: 13),
+                      prefixIcon: const Icon(Icons.search_rounded,
+                          color: _C.teal, size: 20),
+                      suffixIcon: _cari.isNotEmpty
+                          ? IconButton(
+                              icon: const Icon(Icons.close_rounded,
+                                  color: _C.textMuted, size: 18),
+                              onPressed: () {
+                                _searchController.clear();
+                                setState(() => _cari = '');
+                                if (widget.mode == 'view') _loadCatalog();
+                              },
+                            )
+                          : null,
+                      filled: true,
+                      fillColor: Colors.transparent,
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(16),
+                        borderSide: BorderSide.none,
+                      ),
+                      contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 16, vertical: 14),
                     ),
+                    onChanged: (v) {
+                      setState(() => _cari = v);
+                      if (widget.mode == 'view') _loadCatalog();
+                    },
                   ),
-                ],
+                ),
               ),
             ),
-          ),
 
-          // ── Kosong ──────────────────────────────────────────
-          if (filtered.isEmpty)
-            SliverFillRemaining(
-              child: Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
+            // ── Filter kategori (mode view) ─────────────────────
+            if (widget.mode == 'view')
+              SliverToBoxAdapter(
+                child: SizedBox(
+                  height: 56,
+                  child: ListView.builder(
+                    scrollDirection: Axis.horizontal,
+                    physics: const BouncingScrollPhysics(),
+                    padding: const EdgeInsets.fromLTRB(16, 14, 16, 0),
+                    itemCount: 1 + (_categories.data?.length ?? 0),
+                    itemBuilder: (_, i) {
+                      final category = i == 0 ? null : _categories.data![i - 1];
+                      final k = category?.name ?? 'Semua';
+                      final sel = _categoryGuid == category?.guid;
+                      final col = _kColor[k] ?? _C.teal;
+                      return GestureDetector(
+                        onTap: () {
+                          setState(() => _categoryGuid = category?.guid);
+                          _loadCatalog();
+                        },
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 200),
+                          margin: const EdgeInsets.only(right: 8),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 14, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: sel ? col : _C.surface,
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(
+                              color: sel ? col : _C.border,
+                              width: 1,
+                            ),
+                            boxShadow: sel
+                                ? [
+                                    BoxShadow(
+                                        color: col.withValues(alpha: 0.40),
+                                        blurRadius: 10,
+                                        offset: const Offset(0, 3))
+                                  ]
+                                : [],
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(_kIcon[k] ?? Icons.place_rounded,
+                                  size: 13,
+                                  color: sel ? Colors.white : _C.textDim),
+                              const SizedBox(width: 5),
+                              Text(k,
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w700,
+                                    color: sel ? Colors.white : _C.textMuted,
+                                  )),
+                            ],
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              ),
+
+            // ── Counter ─────────────────────────────────────────
+            if (widget.mode == 'view' && _categories.loading)
+              const SliverToBoxAdapter(
+                  child: Center(child: CircularProgressIndicator())),
+            if (widget.mode == 'view' && _categories.error != null)
+              SliverToBoxAdapter(
+                  child: TextButton(
+                onPressed: _categories.retry,
+                child: const Text('Gagal memuat kategori. Coba lagi'),
+              )),
+
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(20, 18, 20, 4),
+                child: Row(
                   children: [
                     Container(
-                      padding: const EdgeInsets.all(28),
+                      width: 3,
+                      height: 12,
                       decoration: BoxDecoration(
-                        color: _C.teal.withValues(alpha: 0.07),
-                        shape: BoxShape.circle,
-                        border: Border.all(
-                            color: _C.teal.withValues(alpha: 0.15), width: 1.5),
-                      ),
-                      child: Icon(Icons.search_off_rounded,
-                          size: 44, color: _C.teal.withValues(alpha: 0.5)),
+                          color: accent,
+                          borderRadius: BorderRadius.circular(4)),
                     ),
-                    const SizedBox(height: 20),
-                    const Text('Tidak ada wisata ditemukan',
-                        style: TextStyle(
-                          color: _C.text,
-                          fontSize: 16,
-                          fontWeight: FontWeight.w800,
-                        )),
-                    const SizedBox(height: 6),
-                    const Text('Coba kata kunci atau filter lain.',
-                        style: TextStyle(color: _C.textMuted, fontSize: 13)),
+                    const SizedBox(width: 8),
+                    Text(
+                      '${filtered.length} wisata ditemukan',
+                      style: const TextStyle(
+                        color: _C.textMuted,
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: 0.5,
+                      ),
+                    ),
                   ],
                 ),
               ),
-            )
-          else
-            SliverPadding(
-              padding: const EdgeInsets.fromLTRB(16, 10, 16, 110),
-              sliver: SliverList(
-                delegate: SliverChildBuilderDelegate(
-                  (_, i) => _WisataCard(
-                    wisata: filtered[i],
-                    mode: widget.mode,
-                    accent: accent,
-                    onTap: () => Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => DetailWisataScreen(wisata: filtered[i]),
+            ),
+
+            // ── Kosong ──────────────────────────────────────────
+            if (widget.mode == 'view' &&
+                _catalog.loading &&
+                _catalog.data == null)
+              const SliverFillRemaining(
+                  child: Center(child: CircularProgressIndicator()))
+            else if (widget.mode == 'view' &&
+                _catalog.error != null &&
+                _catalog.data == null)
+              SliverFillRemaining(
+                  child: Center(
+                      child: TextButton(
+                onPressed: _catalog.retry,
+                child: const Text('Gagal memuat wisata. Coba lagi'),
+              )))
+            else if (filtered.isEmpty)
+              SliverFillRemaining(
+                child: Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(28),
+                        decoration: BoxDecoration(
+                          color: _C.teal.withValues(alpha: 0.07),
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                              color: _C.teal.withValues(alpha: 0.15),
+                              width: 1.5),
+                        ),
+                        child: Icon(Icons.search_off_rounded,
+                            size: 44, color: _C.teal.withValues(alpha: 0.5)),
                       ),
-                    ),
-                    onEdit: () async {
-                      final ok = await Navigator.push<bool>(
+                      const SizedBox(height: 20),
+                      const Text('Tidak ada wisata ditemukan',
+                          style: TextStyle(
+                            color: _C.text,
+                            fontSize: 16,
+                            fontWeight: FontWeight.w800,
+                          )),
+                      const SizedBox(height: 6),
+                      const Text('Coba kata kunci atau filter lain.',
+                          style: TextStyle(color: _C.textMuted, fontSize: 13)),
+                    ],
+                  ),
+                ),
+              )
+            else
+              SliverPadding(
+                padding: const EdgeInsets.fromLTRB(16, 10, 16, 110),
+                sliver: SliverList(
+                  delegate: SliverChildBuilderDelegate(
+                    (_, i) => _WisataCard(
+                      wisata: filtered[i],
+                      mode: widget.mode,
+                      accent: accent,
+                      onTap: () => Navigator.push(
                         context,
                         MaterialPageRoute(
                           builder: (_) =>
-                              TambahWisataScreen(wisataEdit: filtered[i]),
+                              DetailWisataScreen(wisata: filtered[i]),
                         ),
-                      );
-                      if (ok == true) await _muatData();
-                    },
-                    onHapus: () => _hapus(filtered[i]),
+                      ),
+                      onEdit: () async {
+                        final ok = await Navigator.push<bool>(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) =>
+                                TambahWisataScreen(wisataEdit: filtered[i]),
+                          ),
+                        );
+                        if (ok == true) await _muatData();
+                      },
+                      onHapus: () => _hapus(filtered[i]),
+                    ),
+                    childCount: filtered.length,
                   ),
-                  childCount: filtered.length,
                 ),
               ),
-            ),
-        ],
+            if (widget.mode == 'view' && _catalog.data?.links?['next'] != null)
+              SliverToBoxAdapter(
+                  child: Center(
+                      child: TextButton(
+                onPressed:
+                    _catalog.loading ? null : () => _loadCatalog(next: true),
+                child: Text(_catalog.loading
+                    ? 'Memuat...'
+                    : _catalog.error != null
+                        ? 'Coba lagi'
+                        : 'Muat lebih banyak'),
+              ))),
+          ],
+        ),
       ),
 
       // ── FAB ─────────────────────────────────────────────────

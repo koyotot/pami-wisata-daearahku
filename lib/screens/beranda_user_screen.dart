@@ -10,6 +10,7 @@ import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../data/app_data.dart';
+import '../data/catalog_state.dart';
 import 'detail_wisata_screen.dart';
 
 // ── Palet & font (sama dengan home_screen.dart) ──────────────
@@ -54,16 +55,35 @@ class _BerandaUserScreenState extends State<BerandaUserScreen>
   String _kategoriTerpilih = 'Semua';
   final TextEditingController _searchCtrl = TextEditingController();
   late AnimationController _fadeCtrl;
-  bool _isLoadingData = true;
+  final _catalog = CatalogState();
+  bool get _isLoadingData =>
+      _catalog.destinations.loading || _catalog.categories.loading;
+  List<Map<String, dynamic>> get _kategoriList => [
+        {'label': 'Semua', 'icon': '\u{1F5FA}', 'guid': 'Semua'},
+        ...?_catalog.categories.data?.map((c) => {
+              'label': c.name,
+              'icon': const {
+                    'Alam': '\u{1F3D4}',
+                    'Budaya': '\u{1F3DB}',
+                    'Pantai': '\u{1F3D6}',
+                    'Bahari': '\u{1F41A}',
+                    'Kuliner': '\u{1F35C}'
+                  }[c.name] ??
+                  '\u{1F4CD}',
+              'guid': c.guid
+            }),
+      ];
+  List<Wisata> get _wisata =>
+      (_catalog.destinations.data ?? []).map(Wisata.fromDestination).toList();
 
-  final List<Map<String, dynamic>> _kategoriList = [
-    {'label': 'Semua', 'icon': '🗺️'},
-    {'label': 'Alam', 'icon': '🏔️'},
-    {'label': 'Budaya', 'icon': '🏛️'},
-    {'label': 'Pantai', 'icon': '🏖️'},
-    {'label': 'Bahari', 'icon': '🐚'},
-    {'label': 'Kuliner', 'icon': '🍜'},
-  ];
+  void _changed() {
+    if (mounted) setState(() {});
+  }
+
+  void _loadCatalog() => _catalog.loadDestinations(
+        category: _kategoriTerpilih == 'Semua' ? null : _kategoriTerpilih,
+        search: _searchCtrl.text,
+      );
 
   @override
   void initState() {
@@ -72,32 +92,35 @@ class _BerandaUserScreenState extends State<BerandaUserScreen>
       vsync: this,
       duration: const Duration(milliseconds: 800),
     )..forward();
+    _catalog.categories.addListener(_changed);
+    _catalog.destinations.addListener(_changed);
     _muatData();
   }
 
   // ── Logika data (tidak diubah) ─────────────────────────────
   Future<void> _muatData() async {
-    await loadWisataFromFirestore();
-    await loadPendaftarFromFirestore(userId: currentUser?.id);
-    if (!mounted) return;
-    setState(() => _isLoadingData = false);
+    await Future.wait([
+      _catalog.loadCategories(),
+      _catalog.loadDestinations(
+        category: _kategoriTerpilih == 'Semua' ? null : _kategoriTerpilih,
+        search: _searchCtrl.text,
+      )
+    ]);
+    try {
+      await loadPendaftarFromFirestore(userId: currentUser?.id);
+    } catch (_) {}
+    if (mounted) setState(() {});
   }
 
   @override
   void dispose() {
+    _catalog.dispose();
     _searchCtrl.dispose();
     _fadeCtrl.dispose();
     super.dispose();
   }
 
-  List<Wisata> get _filtered => daftarWisata.where((w) {
-        final cocokKat = _kategoriTerpilih == 'Semua' ||
-            w.kategori.toLowerCase() == _kategoriTerpilih.toLowerCase();
-        final q = _searchCtrl.text.toLowerCase();
-        final cocokQ = w.nama.toLowerCase().contains(q) ||
-            w.lokasi.toLowerCase().contains(q);
-        return cocokKat && cocokQ;
-      }).toList();
+  List<Wisata> get _filtered => _wisata;
 
   // ── Tampilan ───────────────────────────────────────────────
   @override
@@ -126,25 +149,29 @@ class _BerandaUserScreenState extends State<BerandaUserScreen>
                 parent: _fadeCtrl,
                 curve: Curves.easeOut,
               ),
-              child: SingleChildScrollView(
-                physics: const BouncingScrollPhysics(),
-                keyboardDismissBehavior:
-                    ScrollViewKeyboardDismissBehavior.onDrag,
-                child: Center(
-                  child: ConstrainedBox(
-                    constraints: const BoxConstraints(maxWidth: 560),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        _buildTopBar(),
-                        _buildHero(),
-                        _buildSearchBar(),
-                        const SizedBox(height: 16),
-                        _buildKategori(),
-                        _buildSectionTitle(),
-                        _buildWisataSection(),
-                        const SizedBox(height: 40),
-                      ],
+              child: RefreshIndicator(
+                onRefresh: _muatData,
+                child: SingleChildScrollView(
+                  physics: const BouncingScrollPhysics(
+                      parent: AlwaysScrollableScrollPhysics()),
+                  keyboardDismissBehavior:
+                      ScrollViewKeyboardDismissBehavior.onDrag,
+                  child: Center(
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 560),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          _buildTopBar(),
+                          _buildHero(),
+                          _buildSearchBar(),
+                          const SizedBox(height: 16),
+                          _buildKategori(),
+                          _buildSectionTitle(),
+                          _buildWisataSection(),
+                          const SizedBox(height: 40),
+                        ],
+                      ),
                     ),
                   ),
                 ),
@@ -361,8 +388,8 @@ class _BerandaUserScreenState extends State<BerandaUserScreen>
                 const SizedBox(height: 20),
                 Row(
                   children: [
-                    _statPill(Icons.place_rounded, '${daftarWisata.length}',
-                        'Destinasi'),
+                    _statPill(
+                        Icons.place_rounded, '${_wisata.length}', 'Destinasi'),
                     const SizedBox(width: 10),
                     _statPill(Icons.category_rounded,
                         '${_kategoriList.length - 1}', 'Kategori'),
@@ -437,11 +464,11 @@ class _BerandaUserScreenState extends State<BerandaUserScreen>
         ),
         child: TextField(
           controller: _searchCtrl,
-          onChanged: (_) => setState(() {}),
+          onChanged: (_) => _loadCatalog(),
           style: _font(14.5, FontWeight.w500, _C.navy),
           cursorColor: _C.blue,
           decoration: InputDecoration(
-            hintText: 'Cari nama atau lokasi wisata...',
+            hintText: 'Cari nama wisata...',
             hintStyle: _font(
               14,
               FontWeight.w400,
@@ -455,7 +482,7 @@ class _BerandaUserScreenState extends State<BerandaUserScreen>
                         color: _C.textMuted, size: 20),
                     onPressed: () {
                       _searchCtrl.clear();
-                      setState(() {});
+                      _loadCatalog();
                     },
                   )
                 : null,
@@ -485,10 +512,13 @@ class _BerandaUserScreenState extends State<BerandaUserScreen>
           final item = _kategoriList[i];
           final label = item['label'] as String;
           final icon = item['icon'] as String;
-          final selected = label == _kategoriTerpilih;
+          final selected = item['guid'] == _kategoriTerpilih;
 
           return GestureDetector(
-            onTap: () => setState(() => _kategoriTerpilih = label),
+            onTap: () {
+              setState(() => _kategoriTerpilih = item['guid'] as String);
+              _loadCatalog();
+            },
             child: AnimatedContainer(
               duration: const Duration(milliseconds: 220),
               curve: Curves.easeInOut,
@@ -594,6 +624,14 @@ class _BerandaUserScreenState extends State<BerandaUserScreen>
       );
     }
 
+    if (_catalog.categories.error != null ||
+        _catalog.destinations.error != null) {
+      return Center(
+          child: Column(children: [
+        const Text('Gagal memuat data wisata.'),
+        TextButton(onPressed: _muatData, child: const Text('Coba lagi')),
+      ]));
+    }
     final hasil = _filtered;
 
     if (hasil.isEmpty) {
@@ -794,7 +832,7 @@ class _WisataCardState extends State<_WisataCard> {
                                   color: _C.orange, size: 13),
                               const SizedBox(width: 3),
                               Text(
-                                w.rating.toStringAsFixed(1),
+                                w.isLaravel ? '-' : w.rating.toStringAsFixed(1),
                                 style: _font(10.5, FontWeight.w800, _C.navy),
                               ),
                             ],

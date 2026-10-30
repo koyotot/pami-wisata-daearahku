@@ -13,6 +13,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../data/app_data.dart';
+import '../data/catalog_state.dart';
 import 'detail_wisata_screen.dart';
 
 // ── Palet (sama dengan home_screen) ──────────────────────────
@@ -99,41 +100,45 @@ class _CariWisataScreenState extends State<CariWisataScreen> {
   String _kategori = _semua;
   bool _modeGrid = true; // true = grid majalah, false = daftar
 
+  final _catalog = CatalogState();
+  void _changed() {
+    if (mounted) setState(() {});
+  }
+
+  Future<void> _refresh() async {
+    await Future.wait([_catalog.loadCategories(), _loadCatalog()]);
+  }
+
+  Future<void> _loadCatalog() => _catalog.loadDestinations(
+      category: _kategori == _semua ? null : _kategori, search: _query);
+
   @override
   void initState() {
     super.initState();
-    loadWisataFromFirestore().then((_) {
-      if (mounted) setState(() {});
-    });
+    _catalog.categories.addListener(_changed);
+    _catalog.destinations.addListener(_changed);
+    _refresh();
   }
 
   @override
   void dispose() {
+    _catalog.dispose();
     _ctrl.dispose();
     _focus.dispose();
     super.dispose();
   }
 
-  List<String> get _daftarKategori =>
-      [_semua, ...daftarWisata.map((w) => w.kategori).toSet()];
+  List<Wisata> get _hasil =>
+      (_catalog.destinations.data ?? []).map(Wisata.fromDestination).toList();
 
-  List<Wisata> get _hasil {
-    final q = _query.trim().toLowerCase();
-    return daftarWisata.where((w) {
-      final cocokKategori = _kategori == _semua || w.kategori == _kategori;
-      final cocokQuery = q.isEmpty ||
-          w.nama.toLowerCase().contains(q) ||
-          w.lokasi.toLowerCase().contains(q) ||
-          w.kategori.toLowerCase().contains(q);
-      return cocokKategori && cocokQuery;
-    }).toList();
+  void _reset() {
+    setState(() {
+      _query = '';
+      _kategori = _semua;
+      _ctrl.clear();
+    });
+    _loadCatalog();
   }
-
-  void _reset() => setState(() {
-        _query = '';
-        _kategori = _semua;
-        _ctrl.clear();
-      });
 
   String _animKey(Wisata w) => '${w.nama}-$_kategori-$_query-$_modeGrid';
 
@@ -153,70 +158,90 @@ class _CariWisataScreenState extends State<CariWisataScreen> {
         body: GestureDetector(
           behavior: HitTestBehavior.translucent,
           onTap: () => FocusScope.of(context).unfocus(),
-          child: CustomScrollView(
-            physics: const BouncingScrollPhysics(),
-            slivers: [
-              _buildHeader(),
-              SliverToBoxAdapter(child: _buildCategoryChips()),
-              SliverToBoxAdapter(
-                  child: _buildSectionTitle(hasil.length, sedangMencari)),
-              if (hasil.isEmpty)
-                SliverFillRemaining(
-                    hasScrollBody: false, child: _notFoundState())
-              else if (_modeGrid) ...[
-                // Kartu besar (hasil pertama)
+          child: RefreshIndicator(
+            onRefresh: _refresh,
+            child: CustomScrollView(
+              physics: const BouncingScrollPhysics(),
+              slivers: [
+                _buildHeader(),
+                SliverToBoxAdapter(child: _buildCategoryChips()),
                 SliverToBoxAdapter(
-                  child: Padding(
-                    padding: const EdgeInsets.fromLTRB(20, 0, 20, 14),
-                    child: _FadeSlide(
-                      key: ValueKey(_animKey(hasil.first)),
-                      index: 0,
-                      child: _HeroCard(wisata: hasil.first),
+                    child: _buildSectionTitle(hasil.length, sedangMencari)),
+                if (_catalog.categories.loading ||
+                    _catalog.destinations.loading)
+                  const SliverFillRemaining(
+                      hasScrollBody: false,
+                      child: Center(child: CircularProgressIndicator()))
+                else if (_catalog.categories.error != null ||
+                    _catalog.destinations.error != null)
+                  SliverFillRemaining(
+                      hasScrollBody: false,
+                      child: Center(
+                          child:
+                              Column(mainAxisSize: MainAxisSize.min, children: [
+                        const Text('Gagal memuat data wisata.'),
+                        TextButton(
+                            onPressed: _refresh,
+                            child: const Text('Coba lagi')),
+                      ])))
+                else if (hasil.isEmpty)
+                  SliverFillRemaining(
+                      hasScrollBody: false, child: _notFoundState())
+                else if (_modeGrid) ...[
+                  // Kartu besar (hasil pertama)
+                  SliverToBoxAdapter(
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(20, 0, 20, 14),
+                      child: _FadeSlide(
+                        key: ValueKey(_animKey(hasil.first)),
+                        index: 0,
+                        child: _HeroCard(wisata: hasil.first),
+                      ),
                     ),
                   ),
-                ),
-                // Sisanya: grid 2 kolom
-                if (hasil.length > 1)
+                  // Sisanya: grid 2 kolom
+                  if (hasil.length > 1)
+                    SliverPadding(
+                      padding: const EdgeInsets.fromLTRB(20, 0, 20, 32),
+                      sliver: SliverGrid(
+                        gridDelegate:
+                            const SliverGridDelegateWithFixedCrossAxisCount(
+                          crossAxisCount: 2,
+                          mainAxisSpacing: 14,
+                          crossAxisSpacing: 14,
+                          mainAxisExtent: 228,
+                        ),
+                        delegate: SliverChildBuilderDelegate(
+                          (_, i) {
+                            final w = hasil[i + 1];
+                            return _FadeSlide(
+                              key: ValueKey(_animKey(w)),
+                              index: i + 1,
+                              child: _GridCard(wisata: w),
+                            );
+                          },
+                          childCount: hasil.length - 1,
+                        ),
+                      ),
+                    )
+                  else
+                    const SliverToBoxAdapter(child: SizedBox(height: 32)),
+                ] else
                   SliverPadding(
                     padding: const EdgeInsets.fromLTRB(20, 0, 20, 32),
-                    sliver: SliverGrid(
-                      gridDelegate:
-                          const SliverGridDelegateWithFixedCrossAxisCount(
-                        crossAxisCount: 2,
-                        mainAxisSpacing: 14,
-                        crossAxisSpacing: 14,
-                        mainAxisExtent: 228,
-                      ),
+                    sliver: SliverList(
                       delegate: SliverChildBuilderDelegate(
-                        (_, i) {
-                          final w = hasil[i + 1];
-                          return _FadeSlide(
-                            key: ValueKey(_animKey(w)),
-                            index: i + 1,
-                            child: _GridCard(wisata: w),
-                          );
-                        },
-                        childCount: hasil.length - 1,
+                        (_, i) => _FadeSlide(
+                          key: ValueKey(_animKey(hasil[i])),
+                          index: i,
+                          child: _ListCard(wisata: hasil[i]),
+                        ),
+                        childCount: hasil.length,
                       ),
-                    ),
-                  )
-                else
-                  const SliverToBoxAdapter(child: SizedBox(height: 32)),
-              ] else
-                SliverPadding(
-                  padding: const EdgeInsets.fromLTRB(20, 0, 20, 32),
-                  sliver: SliverList(
-                    delegate: SliverChildBuilderDelegate(
-                      (_, i) => _FadeSlide(
-                        key: ValueKey(_animKey(hasil[i])),
-                        index: i,
-                        child: _ListCard(wisata: hasil[i]),
-                      ),
-                      childCount: hasil.length,
                     ),
                   ),
-                ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
@@ -249,7 +274,7 @@ class _CariWisataScreenState extends State<CariWisataScreen> {
             const Icon(Icons.place_rounded, size: 14, color: Colors.white),
             const SizedBox(width: 5),
             Text(
-              '${daftarWisata.length} destinasi tersedia',
+              '${_hasil.length} destinasi tersedia',
               style: _font(11.5, FontWeight.w700, Colors.white),
             ),
           ],
@@ -355,7 +380,7 @@ class _CariWisataScreenState extends State<CariWisataScreen> {
               cursorColor: _blue,
               textInputAction: TextInputAction.search,
               decoration: InputDecoration(
-                hintText: 'Nama, lokasi, atau kategori...',
+                hintText: 'Cari nama wisata...',
                 hintStyle: _font(13, FontWeight.w500, _textMuted),
                 prefixIcon:
                     const Icon(Icons.search_rounded, color: _blue, size: 22),
@@ -363,16 +388,22 @@ class _CariWisataScreenState extends State<CariWisataScreen> {
                     ? IconButton(
                         icon: const Icon(Icons.close_rounded,
                             color: _textMuted, size: 18),
-                        onPressed: () => setState(() {
-                          _query = '';
-                          _ctrl.clear();
-                        }),
+                        onPressed: () {
+                          setState(() {
+                            _query = '';
+                            _ctrl.clear();
+                          });
+                          _loadCatalog();
+                        },
                       )
                     : null,
                 border: InputBorder.none,
                 contentPadding: const EdgeInsets.symmetric(vertical: 16),
               ),
-              onChanged: (v) => setState(() => _query = v),
+              onChanged: (v) {
+                setState(() => _query = v);
+                _loadCatalog();
+              },
             ),
           ),
         ),
@@ -414,23 +445,27 @@ class _CariWisataScreenState extends State<CariWisataScreen> {
 
   // ── Chip kategori ──────────────────────────────────────────
   Widget _buildCategoryChips() {
-    final kategori = _daftarKategori;
+    final kategori = _catalog.categories.data ?? [];
     return SizedBox(
       height: 62,
       child: ListView.separated(
         padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
         scrollDirection: Axis.horizontal,
         physics: const BouncingScrollPhysics(),
-        itemCount: kategori.length,
+        itemCount: kategori.length + 1,
         separatorBuilder: (_, __) => const SizedBox(width: 8),
         itemBuilder: (_, i) {
-          final k = kategori[i];
-          final aktif = k == _kategori;
+          final k = i == 0 ? _semua : kategori[i - 1].name;
+          final guid = i == 0 ? _semua : kategori[i - 1].guid;
+          final aktif = guid == _kategori;
           final warna = _kColor[k] ?? _blue;
           final ikon = _kIcon[k] ?? Icons.apps_rounded;
 
           return GestureDetector(
-            onTap: () => setState(() => _kategori = k),
+            onTap: () {
+              setState(() => _kategori = guid);
+              _loadCatalog();
+            },
             child: AnimatedContainer(
               duration: const Duration(milliseconds: 220),
               curve: Curves.easeOut,
