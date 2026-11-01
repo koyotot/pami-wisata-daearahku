@@ -53,10 +53,10 @@ class DefaultFirebaseOptions {
   }
 
   static const FirebaseOptions android = FirebaseOptions(
-    apiKey: 'AIzaSyCDplwXgv3IGBAKx21tBxVYqWFD4JEcbEc',
-    appId: '1:921185085021:android:2e007ced2f5a9be8664fb4',
-    messagingSenderId: '921185085021',
-    projectId: 'wisata-daerahku-3cf6b',
-    storageBucket: 'wisata-daerahku-3cf6b.firebasestorage.app',
+    apiKey: 'AIzaSyDED9ClHFoLeVerzsKc1RgzKKtcobLk8mI',
+    appId: '1:769381226723:android:1dbc95d2928b268ff54dd6',
+    messagingSenderId: '769381226723',
+    projectId: 'wisata-daerahku-37451',
+    storageBucket: 'wisata-daerahku-37451.firebasestorage.app',
   );
 }

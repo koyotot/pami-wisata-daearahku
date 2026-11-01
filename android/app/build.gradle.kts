@@ -2,7 +2,7 @@ plugins {
     id("com.android.application")
     id("kotlin-android")
     id("dev.flutter.flutter-gradle-plugin")
-    id("com.google.gms.google-services") version "4.4.2" apply false
+    id("com.google.gms.google-services") version "4.4.2"
 }
 
 android {
@@ -27,7 +27,19 @@ android {
         versionName = flutter.versionName
     }
 
+    signingConfigs {
+        create("wisataDebug") {
+            storeFile = file("wisata-debug.keystore")
+            storePassword = "android"
+            keyAlias = "androiddebugkey"
+            keyPassword = "android"
+        }
+    }
+
     buildTypes {
+        getByName("debug") {
+            signingConfig = signingConfigs.getByName("wisataDebug")
+        }
         release {
             signingConfig = signingConfigs.getByName("debug")
         }

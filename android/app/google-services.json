@@ -1,41 +1,41 @@
 {
   "project_info": {
-    "project_number": "921185085021",
-    "project_id": "wisata-daerahku-3cf6b",
-    "storage_bucket": "wisata-daerahku-3cf6b.firebasestorage.app"
+    "project_number": "769381226723",
+    "project_id": "wisata-daerahku-37451",
+    "storage_bucket": "wisata-daerahku-37451.firebasestorage.app"
   },
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:921185085021:android:2e007ced2f5a9be8664fb4",
+        "mobilesdk_app_id": "1:769381226723:android:1dbc95d2928b268ff54dd6",
         "android_client_info": {
           "package_name": "id.wisatadaerahku.app"
         }
       },
       "oauth_client": [
         {
-          "client_id": "921185085021-ti6f6crao1evmk9reajjvu83tao7gsga.apps.googleusercontent.com",
+          "client_id": "769381226723-9s4qb5mba4b98053mjqc114299qrl4gf.apps.googleusercontent.com",
           "client_type": 1,
           "android_info": {
             "package_name": "id.wisatadaerahku.app",
-            "certificate_hash": "8895cd7341cbca9aba9d82ca4ad54bc140541927"
+            "certificate_hash": "0f5ec547b3d56feb7eeee6a2a73913081b6ec97e"
           }
         },
         {
-          "client_id": "921185085021-qtnrpkam2pek07sojtr15tqkpfv6fio8.apps.googleusercontent.com",
+          "client_id": "769381226723-0f4ban10k84so70t7brp35kv2l8hidns.apps.googleusercontent.com",
           "client_type": 3
         }
       ],
       "api_key": [
         {
-          "current_key": "AIzaSyCDplwXgv3IGBAKx21tBxVYqWFD4JEcbEc"
+          "current_key": "AIzaSyDED9ClHFoLeVerzsKc1RgzKKtcobLk8mI"
         }
       ],
       "services": {
         "appinvite_service": {
           "other_platform_oauth_client": [
             {
-              "client_id": "921185085021-qtnrpkam2pek07sojtr15tqkpfv6fio8.apps.googleusercontent.com",
+              "client_id": "769381226723-0f4ban10k84so70t7brp35kv2l8hidns.apps.googleusercontent.com",
               "client_type": 3
             }
           ]
