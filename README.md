@@ -351,22 +351,9 @@ flutter config --android-sdk "<PATH_ANDROID_SDK>"
 
 ### 9.1 Cara aplikasi membaca `API_BASE_URL`
 
-Base URL dibaca sekali di `AuthSession` melalui:
+`AppConfig` membaca `APP_ENV` dan `API_BASE_URL` saat kompilasi melalui `--dart-define-from-file`. Gunakan `.env` untuk local, `.env.development` untuk emulator, atau `.env.production` untuk production. Salin `.env.example` sebagai titik awal jika diperlukan; file environment selain contoh diabaikan Git. Nilainya tidak rahasia dan tidak boleh berisi kredensial.
 
-```dart
-const String.fromEnvironment('API_BASE_URL')
-```
-
-sehingga **wajib** diberikan lewat `--dart-define`. Tidak ada nilai default. Hal yang diverifikasi dari
-`lib/services/auth_session.dart`:
-
-- Nilai harus berupa URL dengan skema `http` atau `https`.
-- Path endpoint ditambahkan langsung setelah base URL (`<API_BASE_URL>/auth/login`,
-  dst.), jadi **`API_BASE_URL` harus sudah memuat `/api/v1`**. Garis miring di akhir diabaikan.
-- Pada **build release**, skema selain `https` ditolak
-  (`Konfigurasi API_BASE_URL belum valid. Gunakan HTTPS untuk rilis.`). `http` hanya diterima
-  pada mode debug.
-- Bila `API_BASE_URL` kosong atau tidak valid, semua request gagal dengan pesan konfigurasi tersebut.
+Kedua nilai wajib diisi. URL harus memuat `/api/v1`; garis miring di akhir diabaikan. Production harus menggunakan HTTPS dan domain API sebenarnya, bukan placeholder atau localhost. Build release tetap memerlukan HTTPS. Setelah mengubah file environment, jalankan ulang `flutter run` atau build; hot reload tidak memperbarui nilai kompilasi.
 
 ### 9.2 Opsi A — `adb reverse` (direkomendasikan)
 
@@ -382,7 +369,7 @@ Lalu, dari terminal lain:
 
 ```powershell
 adb reverse tcp:8000 tcp:8000
-flutter run -d <DEVICE_ID> --dart-define=API_BASE_URL=http://127.0.0.1:8000/api/v1
+flutter run -d <DEVICE_ID> --dart-define-from-file=.env.development
 ```
 
 Format URL di atas sudah sesuai dengan cara kode membaca `API_BASE_URL` (memuat `/api/v1`).
@@ -397,7 +384,7 @@ agar Laragon memilih virtual host yang benar. Contoh:
 
 ```powershell
 adb reverse tcp:8080 tcp:8080
-flutter run -d <DEVICE_ID> --dart-define=API_BASE_URL=http://127.0.0.1:8080/api/v1
+flutter run -d <DEVICE_ID> --dart-define=APP_ENV=development --dart-define=API_BASE_URL=http://127.0.0.1:8080/api/v1
 ```
 
 Ini hanya berlaku bila virtual host Laragon Anda bernama `pami-wisata-daerahku-api.test`.
@@ -408,7 +395,7 @@ Jika berbeda, header tersebut perlu disesuaikan di kode (di luar cakupan README 
 Emulator Android dapat mengakses PC lewat `10.0.2.2`:
 
 ```powershell
-flutter run -d <DEVICE_ID> --dart-define=API_BASE_URL=http://10.0.2.2:8000/api/v1
+flutter run -d <DEVICE_ID> --dart-define=APP_ENV=development --dart-define=API_BASE_URL=http://10.0.2.2:8000/api/v1
 ```
 
 Server harus listen di alamat yang dapat dijangkau emulator. `php artisan serve --host=127.0.0.1`
@@ -563,7 +550,7 @@ Google Play services, karena bergantung pada layanan eksternal.
 ### 13.1 Build debug / pengujian
 
 ```powershell
-flutter build apk --debug --dart-define=API_BASE_URL=http://127.0.0.1:8000/api/v1
+flutter build apk --debug --dart-define-from-file=.env.development
 ```
 
 Hasil: `build\app\outputs\flutter-apk\app-debug.apk`.
@@ -571,9 +558,11 @@ Hasil: `build\app\outputs\flutter-apk\app-debug.apk`.
 ### 13.2 Build release
 
 ```powershell
-flutter build apk --dart-define=API_BASE_URL=https://<DOMAIN_API>/api/v1
-flutter build appbundle --dart-define=API_BASE_URL=https://<DOMAIN_API>/api/v1
+flutter build apk --release --dart-define-from-file=.env.production
+flutter build appbundle --release --dart-define-from-file=.env.production
 ```
+
+Isi domain API production yang sebenarnya di `.env.production` sebelum menjalankan build.
 
 Hasil: `build\app\outputs\flutter-apk\app-release.apk` dan
 `build\app\outputs\bundle\release\app-release.aab`.
@@ -607,7 +596,7 @@ Selain itu `namespace` Gradle masih `com.example.wisata_daerahku` (berbeda dari 
 | **Android SDK / lisensi bermasalah** | SDK tidak lengkap atau lisensi belum diterima | `flutter doctor -v`, lalu `flutter doctor --android-licenses`. Set `flutter config --android-sdk "<PATH>"` bila perlu. |
 | **`flutter.sdk not set in local.properties`** | `android/local.properties` belum ada | Jalankan `flutter pub get` atau buka proyek di Android Studio. |
 | **Build Gradle gagal terkait Java** | JDK bukan versi 17 | Pastikan `java -version` menunjukkan 17, atau arahkan Flutter ke JDK Android Studio: `flutter config --jdk-dir "<PATH_JDK>"`. |
-| **Pesan "Konfigurasi API_BASE_URL belum valid"** | `--dart-define=API_BASE_URL` tidak diberikan / bukan URL valid / `http` pada build release | Berikan URL lengkap termasuk `/api/v1`. Untuk release gunakan HTTPS. Setelah mengubah `--dart-define`, jalankan ulang (bukan hot reload). |
+| **Pesan "Konfigurasi API_BASE_URL belum valid"** | `APP_ENV` atau `API_BASE_URL` tidak valid / `http` pada build release | Berikan URL lengkap termasuk `/api/v1`. Untuk release gunakan HTTPS. Setelah mengubah `--dart-define`, jalankan ulang (bukan hot reload). |
 | **"Tidak dapat terhubung ke layanan"** | Backend tidak berjalan, port salah, atau emulator tidak bisa menjangkau host | Pastikan Laravel hidup dan dapat dibuka dari browser PC. Untuk `127.0.0.1` jalankan `adb reverse`; untuk `10.0.2.2` jalankan server dengan `--host=0.0.0.0`. |
 | **"Koneksi habis waktu"** | Timeout 20 detik terlampaui | Periksa backend lambat/macet, firewall Windows, atau jaringan. |
 | **`localhost` / `127.0.0.1` gagal di emulator** | Di emulator, `127.0.0.1` adalah emulator itu sendiri | Gunakan `adb reverse` ([9.2](#92-opsi-a--adb-reverse-direkomendasikan)) atau `10.0.2.2`. |

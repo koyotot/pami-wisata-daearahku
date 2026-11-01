@@ -1,4 +1,5 @@
 import 'services/auth_session.dart';
+import 'core/config/app_config.dart';
 import 'services/fcm_device_manager.dart';
 import 'screens/session_destination.dart';
 import 'package:flutter/material.dart';
@@ -9,6 +10,7 @@ import 'screens/user_login_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  AppConfig.validate();
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
@@ -56,11 +58,13 @@ class _WisataDaerahkuAppState extends State<WisataDaerahkuApp> {
     if (!session.authenticated.value) {
       _routeAfterAccountChange = session.authenticating;
       _navigator.currentState?.pushAndRemoveUntil(
-          MaterialPageRoute(builder: (_) => const UserLoginScreen()), (_) => false);
+          MaterialPageRoute(builder: (_) => const UserLoginScreen()),
+          (_) => false);
     } else if (_routeAfterAccountChange) {
       _routeAfterAccountChange = false;
       _navigator.currentState?.pushAndRemoveUntil(
-          MaterialPageRoute(builder: (_) => sessionDestination()), (_) => false);
+          MaterialPageRoute(builder: (_) => sessionDestination()),
+          (_) => false);
     }
   }
 
