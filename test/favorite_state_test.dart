@@ -50,6 +50,7 @@ http.Response _me(http.Request request) {
           'email': '$name@test.test',
           'phone': null,
           'role': 0,
+          'email_verified_at': '2026-01-01T00:00:00Z',
           'status': 'active'
         }
       }),

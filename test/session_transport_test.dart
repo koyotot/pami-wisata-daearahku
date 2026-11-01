@@ -29,6 +29,7 @@ Map<String, dynamic> _me(int role) => {
         'email': 'u@example.test',
         'phone': null,
         'role': role,
+        'email_verified_at': '2026-01-01T00:00:00Z',
         'status': 'active'
       }
     };
@@ -99,7 +100,8 @@ void main() {
       }
     });
 
-    test('timeouts, network failures, 5xx and malformed 2xx are unknown outcomes',
+    test(
+        'timeouts, network failures, 5xx and malformed 2xx are unknown outcomes',
         () async {
       var mode = 0;
       final session = await _session((request) async {
@@ -147,7 +149,11 @@ void main() {
       final session = await _session((request) async {
         seen = request;
         return _json({
-          'data': {'guid': 'd1', 'name': 'Candi', 'image_url': 'destinations/d1/image?v=1'}
+          'data': {
+            'guid': 'd1',
+            'name': 'Candi',
+            'image_url': 'destinations/d1/image?v=1'
+          }
         }, 201);
       });
       final repository = BusinessRepository(ApiClient(session));
@@ -212,8 +218,8 @@ void main() {
             }
           }, 422));
       try {
-        await BusinessRepository(ApiClient(session))
-            .uploadDestinationImage('d1', const UploadFile('image', [1], 'x.png'));
+        await BusinessRepository(ApiClient(session)).uploadDestinationImage(
+            'd1', const UploadFile('image', [1], 'x.png'));
         fail('expected ApiException');
       } on ApiException catch (e) {
         expect(e.status, 422);
@@ -259,8 +265,7 @@ void main() {
       expect(
           () => BusinessRepository(ApiClient(session))
               .downloadDocument('b1', 'ticket'),
-          throwsA(isA<ApiException>()
-              .having((e) => e.status, 'status', 404)));
+          throwsA(isA<ApiException>().having((e) => e.status, 'status', 404)));
     });
 
     test('a download finishing after logout is discarded', () async {
@@ -272,10 +277,8 @@ void main() {
       });
       final pending = BusinessRepository(ApiClient(session))
           .downloadDocument('b1', 'invoice');
-      final captured = expectLater(
-          pending,
-          throwsA(isA<ApiException>()
-              .having((e) => e.status, 'status', 401)));
+      final captured = expectLater(pending,
+          throwsA(isA<ApiException>().having((e) => e.status, 'status', 401)));
       await session.clear();
       gate.complete();
       await captured;

@@ -30,7 +30,8 @@ Map<String, dynamic> user(String id,
       'email': 'user@example.test',
       'phone': null,
       'role': role,
-      'status': status
+      'status': status,
+      'email_verified_at': '2026-01-01T00:00:00Z'
     };
 Map<String, dynamic> tokens(String id) => {
       'access_token': 'access-$id',
@@ -40,6 +41,57 @@ Map<String, dynamic> tokens(String id) => {
 http.Response ok(Map<String, dynamic> data) =>
     http.Response(jsonEncode({'data': data}), 200);
 void main() {
+  test('unverified register and restore stay gated until OTP activates session',
+      () async {
+    final store = MemoryStore();
+    var verified = false;
+    final paths = <String>[];
+    final client = MockClient((request) async {
+      paths.add(request.url.path);
+      if (request.url.path.endsWith('/register')) {
+        return ok({
+          ...tokens('u'),
+          'verification_required': true,
+          'expires_in_seconds': 600,
+          'resend_after_seconds': 60
+        });
+      }
+      if (request.url.path.endsWith('/me')) {
+        return ok({
+          ...user('u'),
+          'email_verified_at': verified ? '2026-01-01T00:00:00Z' : null
+        });
+      }
+      if (request.url.path.endsWith('/verify-otp')) {
+        expect(jsonDecode(request.body),
+            {'email': 'user@example.test', 'otp': '012345'});
+        verified = true;
+      }
+      return ok({'message': 'ok'});
+    });
+    final session = AuthSession(
+        baseUrl: 'https://api.example.test/api/v1',
+        store: store,
+        client: client);
+    await session.register('User', 'user@example.test', 'password', 'password');
+    expect(session.verificationRequired, isTrue);
+    expect(session.authenticated.value, isFalse);
+    expect(session.resendAfterSeconds, 60);
+    final restored = AuthSession(
+        baseUrl: 'https://api.example.test/api/v1',
+        store: store,
+        client: client);
+    await restored.restore();
+    expect(restored.verificationRequired, isTrue);
+    expect(restored.deviceSessionReady, isFalse);
+    await restored.verifyEmailOtp('user@example.test', '012345');
+    expect(store.value, isNotNull);
+    expect(restored.authenticated.value, isTrue);
+    expect(restored.deviceSessionReady, isTrue);
+    expect(restored.verificationRequired, isFalse);
+    expect(paths.last, endsWith('/me'));
+    expect(paths.where((path) => path.endsWith('/logout')), isEmpty);
+  });
   for (final role in [0, 1, 2]) {
     test('login and restore validate role $role from auth/me', () async {
       final store = MemoryStore();
@@ -137,8 +189,7 @@ void main() {
         baseUrl: 'https://api.example.test/api/v1',
         store: store,
         client: MockClient((request) async => http.Response('{}', 401)));
-    await expectLater(
-        session.google('bad'), throwsA(isA<ApiException>()));
+    await expectLater(session.google('bad'), throwsA(isA<ApiException>()));
     expect(session.authenticated.value, isFalse);
     expect(store.value, isNull);
   });

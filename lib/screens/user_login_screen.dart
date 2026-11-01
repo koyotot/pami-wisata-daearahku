@@ -1,3 +1,4 @@
+import 'auth_presentation.dart';
 // ============================================================
 // lib/screens/user_login_screen.dart
 // Package: google_fonts, firebase_auth
@@ -7,18 +8,66 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:firebase_auth/firebase_auth.dart' as fb_auth;
+import 'package:flutter/foundation.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 import '../services/auth_session.dart';
 
-import '../data/app_data.dart';
 import 'session_destination.dart';
 import 'user_register_screen.dart';
+import 'forgot_password_screen.dart';
+
+Future<void>? _googleInitialization;
+bool _googleFlowActive = false;
+
+@visibleForTesting
+Future<String?> googleFirebaseToken(bool Function() isCurrent,
+    {Future<String?> Function(String)? firebaseTokenForGoogle}) async {
+  if (kIsWeb || defaultTargetPlatform != TargetPlatform.android) {
+    final credential = await fb_auth.FirebaseAuth.instance
+        .signInWithProvider(fb_auth.GoogleAuthProvider());
+    return credential.user?.getIdToken();
+  }
+
+  final google = GoogleSignIn.instance;
+  final initialization = _googleInitialization ??= google.initialize();
+  try {
+    await initialization;
+  } catch (_) {
+    if (identical(_googleInitialization, initialization)) {
+      _googleInitialization = null;
+    }
+    rethrow;
+  }
+  if (!isCurrent()) {
+    throw const ApiException('Permintaan masuk sudah dibatalkan.');
+  }
+  try {
+    final account = await google.authenticate();
+    if (!isCurrent()) {
+      throw const ApiException('Permintaan masuk sudah dibatalkan.');
+    }
+    final idToken = account.authentication.idToken;
+    if (idToken == null || idToken.isEmpty) {
+      throw const ApiException('Identitas Google tidak tersedia.');
+    }
+    if (firebaseTokenForGoogle != null) {
+      return await firebaseTokenForGoogle(idToken);
+    }
+    final credential = await fb_auth.FirebaseAuth.instance.signInWithCredential(
+        fb_auth.GoogleAuthProvider.credential(idToken: idToken));
+    return credential.user?.getIdToken();
+  } finally {
+    try {
+      await google.signOut();
+    } catch (_) {}
+  }
+}
 
 // ── Warna & font: sama dengan home_screen.dart ────────────────
 class _C {
   static const blue = Color(0xFF1976D2);
   static const blueDeep = Color(0xFF1558B0);
   static const navy = Color(0xFF102D59);
-  static const orange = Color(0xFFFF9800);
   static const background = Color(0xFFF5F8FD);
   static const textMuted = Color(0xFF728099);
   static const border = Color(0xFFDCE4F0);
@@ -41,7 +90,12 @@ TextStyle _font(
     );
 
 class UserLoginScreen extends StatefulWidget {
-  const UserLoginScreen({super.key});
+  const UserLoginScreen(
+      {super.key, this.session, this.googleToken, this.firebaseSignOut});
+
+  final AuthSession? session;
+  final Future<String?> Function()? googleToken;
+  final Future<void> Function()? firebaseSignOut;
 
   @override
   State<UserLoginScreen> createState() => _UserLoginScreenState();
@@ -100,7 +154,7 @@ class _UserLoginScreenState extends State<UserLoginScreen>
   // ── Login Firebase ─────────────────────────────────────────
   Future<void> _login() async {
     if (_isLoading) return;
-    final session = AuthSession.instance;
+    final session = widget.session ?? AuthSession.instance;
     final generation = session.sessionGeneration;
 
     FocusScope.of(context).unfocus();
@@ -146,31 +200,41 @@ class _UserLoginScreenState extends State<UserLoginScreen>
   }
 
   Future<void> _googleLogin() async {
-    if (_isLoading) return;
-    final session = AuthSession.instance;
+    if (_isLoading || _googleFlowActive) return;
+    _googleFlowActive = true;
+    final session = widget.session ?? AuthSession.instance;
     final generation = session.sessionGeneration;
     setState(() {
       _isLoading = true;
       _errorMsg = null;
     });
     try {
-      await fb_auth.FirebaseAuth.instance.signOut();
+      await (widget.firebaseSignOut?.call() ??
+          fb_auth.FirebaseAuth.instance.signOut());
       if (!session.isCurrentGeneration(generation)) {
         throw const ApiException('Permintaan masuk sudah dibatalkan.');
       }
-      final credential = await fb_auth.FirebaseAuth.instance
-          .signInWithProvider(fb_auth.GoogleAuthProvider());
-      final token = await credential.user?.getIdToken();
+      final token = await (widget.googleToken?.call() ??
+          googleFirebaseToken(() => session.isCurrentGeneration(generation)));
       if (!session.isCurrentGeneration(generation)) {
         throw const ApiException('Permintaan masuk sudah dibatalkan.');
       }
-      if (token == null) {
+      if (token == null || token.isEmpty) {
         throw const ApiException('Identitas Google tidak tersedia.');
       }
       await session.google(token);
       if (mounted) _openMainNavigation();
     } on ApiException catch (e) {
       if (mounted) setState(() => _errorMsg = e.message);
+    } on GoogleSignInException catch (e) {
+      if (mounted && e.code != GoogleSignInExceptionCode.canceled) {
+        setState(() => _errorMsg = switch (e.code) {
+              GoogleSignInExceptionCode.clientConfigurationError ||
+              GoogleSignInExceptionCode.providerConfigurationError =>
+                'Konfigurasi Google Sign-In belum valid.',
+              _ => 'Tidak dapat masuk dengan Google. Silakan coba lagi.',
+            });
+      }
     } on fb_auth.FirebaseAuthException catch (e) {
       if (mounted &&
           !['web-context-cancelled', 'popup-closed-by-user', 'cancelled']
@@ -186,8 +250,10 @@ class _UserLoginScreenState extends State<UserLoginScreen>
       // Sesi Firebase hanya perantara; selalu dibersihkan, termasuk saat
       // Laravel menolak sesi Google (generasi sudah berganti oleh clear()).
       try {
-        await fb_auth.FirebaseAuth.instance.signOut();
+        await (widget.firebaseSignOut?.call() ??
+            fb_auth.FirebaseAuth.instance.signOut());
       } catch (_) {}
+      _googleFlowActive = false;
       if (mounted) setState(() => _isLoading = false);
     }
   }
@@ -218,18 +284,17 @@ class _UserLoginScreenState extends State<UserLoginScreen>
 
     if (!mounted) return;
 
-    if (berhasil == true && currentUser != null) {
+    if (berhasil == true) {
       _openMainNavigation();
     }
   }
 
   // ── Tampilan utama ─────────────────────────────────────────
-  static const double _headerHeight = 300;
-  static const double _cardOverlap = 56;
 
   @override
   Widget build(BuildContext context) {
-    return AnnotatedRegion<SystemUiOverlayStyle>(
+    return AuthTheme(
+        child: AnnotatedRegion<SystemUiOverlayStyle>(
       value: const SystemUiOverlayStyle(
         statusBarColor: Colors.transparent,
         statusBarIconBrightness: Brightness.light, // ikon putih di header biru
@@ -241,48 +306,36 @@ class _UserLoginScreenState extends State<UserLoginScreen>
         backgroundColor: Colors.white,
         body: LayoutBuilder(
           builder: (context, constraints) {
-            const cardTop = _headerHeight - _cardOverlap;
-
             return SingleChildScrollView(
               physics: const BouncingScrollPhysics(),
               keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
               child: ConstrainedBox(
                 constraints: BoxConstraints(minHeight: constraints.maxHeight),
-                child: Stack(
-                  children: [
-                    // Header pemandangan (ikut ter-scroll)
-                    Positioned(
-                      top: 0,
-                      left: 0,
-                      right: 0,
-                      height: _headerHeight,
-                      child: FadeTransition(
-                        opacity: _fadeAnim,
-                        child: _buildHeader(context),
-                      ),
-                    ),
-
-                    // Kartu form putih menimpa header
-                    Padding(
-                      padding: const EdgeInsets.only(top: cardTop),
-                      child: FadeTransition(
-                        opacity: _fadeAnim,
-                        child: SlideTransition(
-                          position: _slideAnim,
-                          child: _buildCard(
-                            minHeight: constraints.maxHeight - cardTop,
+                child: IntrinsicHeight(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      FadeTransition(
+                          opacity: _fadeAnim, child: _buildHeader(context)),
+                      Expanded(
+                        child: Container(
+                          color: const Color(0xFF102D59),
+                          child: FadeTransition(
+                            opacity: _fadeAnim,
+                            child: SlideTransition(
+                                position: _slideAnim, child: _buildCard()),
                           ),
                         ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
             );
           },
         ),
       ),
-    );
+    ));
   }
 
   // ── Header: gambar + tombol kembali + judul ────────────────
@@ -302,39 +355,9 @@ class _UserLoginScreenState extends State<UserLoginScreen>
         children: [
           const Positioned.fill(child: CustomPaint(painter: _ScenePainter())),
 
-          // Tombol kembali
-          Positioned(
-            top: topInset + 10,
-            left: 20,
-            child: SizedBox(
-              width: 42,
-              height: 42,
-              child: Material(
-                color: Colors.white.withValues(alpha: 0.22),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(14),
-                  side: BorderSide(color: Colors.white.withValues(alpha: 0.35)),
-                ),
-                clipBehavior: Clip.antiAlias,
-                child: InkWell(
-                  onTap: _isLoading ? null : () => Navigator.pop(context),
-                  child: const Center(
-                    child: Icon(
-                      Icons.arrow_back_ios_new_rounded,
-                      color: Colors.white,
-                      size: 17,
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          ),
-
           // Chip brand + judul
-          Positioned(
-            left: 26,
-            right: 110,
-            top: topInset + 74,
+          Padding(
+            padding: EdgeInsets.fromLTRB(26, topInset + 20, 40, 24),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -351,16 +374,17 @@ class _UserLoginScreenState extends State<UserLoginScreen>
                       const Icon(Icons.travel_explore_rounded,
                           color: Colors.white, size: 14),
                       const SizedBox(width: 6),
-                      Text(
+                      Flexible(
+                          child: Text(
                         'Wisata Daerahku',
                         style: _font(11.5, FontWeight.w700, Colors.white),
-                      ),
+                      )),
                     ],
                   ),
                 ),
                 const SizedBox(height: 12),
                 Text(
-                  'Selamat datang\nkembali!',
+                  'Selamat datang!',
                   style: _font(
                     30,
                     FontWeight.w800,
@@ -378,10 +402,9 @@ class _UserLoginScreenState extends State<UserLoginScreen>
   }
 
   // ── Kartu putih berisi form ────────────────────────────────
-  Widget _buildCard({required double minHeight}) {
+  Widget _buildCard() {
     return Container(
       width: double.infinity,
-      constraints: BoxConstraints(minHeight: minHeight),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: const BorderRadius.vertical(top: Radius.circular(34)),
@@ -396,13 +419,12 @@ class _UserLoginScreenState extends State<UserLoginScreen>
       child: SafeArea(
         top: false,
         child: Align(
-          alignment: Alignment.topCenter,
+          alignment: Alignment.center,
           child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 480),
+            constraints: const BoxConstraints(maxWidth: 420),
             child: Padding(
-              padding: const EdgeInsets.fromLTRB(26, 16, 26, 20),
+              padding: const EdgeInsets.fromLTRB(24, 16, 24, 20),
               child: Column(
-                mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   // Handle kecil
@@ -417,11 +439,7 @@ class _UserLoginScreenState extends State<UserLoginScreen>
                     ),
                   ),
                   const SizedBox(height: 22),
-                  _buildForm(),
-                  TextButton.icon(
-                      onPressed: _isLoading ? null : _googleLogin,
-                      icon: const Icon(Icons.login_rounded),
-                      label: const Text('Masuk dengan Google')),
+                  Expanded(child: Center(child: _buildForm())),
                   const SizedBox(height: 22),
                   Center(
                     child: Text(
@@ -449,13 +467,7 @@ class _UserLoginScreenState extends State<UserLoginScreen>
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Text(
-            'Masuk ke akunmu',
-            style: _font(22, FontWeight.w800, _C.navy, letterSpacing: -0.5),
-          ),
-          const SizedBox(height: 6),
-          Text(
-            'Masuk sebagai pengunjung untuk menjelajahi '
-            'keindahan Nusantara.',
+            'Masuk untuk melanjutkan ke akun Wisata Daerahku.',
             style: _font(13.5, FontWeight.w500, _C.textMuted, height: 1.45),
           ),
           const SizedBox(height: 24),
@@ -495,8 +507,32 @@ class _UserLoginScreenState extends State<UserLoginScreen>
             ),
           ),
           const SizedBox(height: 16),
-          _fieldLabel('Password'),
-          const SizedBox(height: 8),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Flexible(child: _fieldLabel('Password')),
+              Flexible(
+                  child: TextButton(
+                style: TextButton.styleFrom(
+                  foregroundColor: _C.blue,
+                  padding: const EdgeInsets.only(left: 12),
+                  textStyle: _font(13, FontWeight.w700, _C.blue),
+                ),
+                onPressed: _isLoading
+                    ? null
+                    : () => Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                              builder: (_) => ForgotPasswordScreen(
+                                    session:
+                                        widget.session ?? AuthSession.instance,
+                                    initialEmail: _emailCtrl.text.trim(),
+                                  )),
+                        ),
+                child: const Text('Lupa password?', textAlign: TextAlign.right),
+              )),
+            ],
+          ),
           TextField(
             controller: _passwordCtrl,
             focusNode: _passwordFocus,
@@ -547,6 +583,21 @@ class _UserLoginScreenState extends State<UserLoginScreen>
             ],
           ),
           const SizedBox(height: 16),
+          OutlinedButton.icon(
+            onPressed: _isLoading ? null : _googleLogin,
+            icon: Image.asset('assets/images/google_g.png',
+                width: 20, height: 20),
+            label: const Text('Masuk dengan Google'),
+            style: OutlinedButton.styleFrom(
+              minimumSize: const Size.fromHeight(54),
+              foregroundColor: _C.navy,
+              side: const BorderSide(color: _C.border),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16)),
+              textStyle: _font(14, FontWeight.w700, _C.navy),
+            ),
+          ),
+          const SizedBox(height: 12),
           _buildRegisterButton(),
         ],
       ),
@@ -629,45 +680,16 @@ class _UserLoginScreenState extends State<UserLoginScreen>
 
   // ── Tombol daftar ──────────────────────────────────────────
   Widget _buildRegisterButton() {
-    final radius = BorderRadius.circular(18);
-
-    return Material(
-      color: Colors.transparent,
-      borderRadius: radius,
-      clipBehavior: Clip.antiAlias,
-      child: Ink(
-        height: 54,
-        decoration: BoxDecoration(
-          borderRadius: radius,
-          color: _C.orange.withValues(alpha: 0.08),
-          border: Border.all(
-            color: _C.orange.withValues(alpha: 0.45),
-            width: 1.3,
-          ),
-        ),
-        child: InkWell(
-          onTap: _isLoading ? null : _goToRegister,
-          splashColor: _C.orange.withValues(alpha: 0.15),
-          highlightColor: Colors.transparent,
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              const Icon(
-                Icons.person_add_alt_1_rounded,
-                color: _C.orange,
-                size: 20,
-              ),
-              const SizedBox(width: 10),
-              Text(
-                'Belum punya akun? ',
-                style: _font(13.5, FontWeight.w500, _C.textMuted),
-              ),
-              Text(
-                'Daftar',
-                style: _font(13.5, FontWeight.w800, const Color(0xFFE08600)),
-              ),
-            ],
-          ),
+    return TextButton(
+      onPressed: _isLoading ? null : _goToRegister,
+      child: Text.rich(
+        TextSpan(
+          text: 'Belum punya akun? ',
+          style: _font(13.5, FontWeight.w500, _C.textMuted),
+          children: [
+            TextSpan(
+                text: 'Daftar', style: _font(13.5, FontWeight.w800, _C.blue)),
+          ],
         ),
       ),
     );
@@ -789,9 +811,9 @@ InputDecoration _inputDecoration({
     suffixIcon: suffix,
     filled: true,
     fillColor: _C.background,
-    border: border(Colors.transparent, 1.4),
-    enabledBorder: border(Colors.transparent, 1.4),
-    disabledBorder: border(Colors.transparent, 1.4),
+    border: border(_C.border, 1.2),
+    enabledBorder: border(_C.border, 1.2),
+    disabledBorder: border(_C.border, 1.2),
     focusedBorder: border(_C.blue, 1.6),
     contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 17),
   );

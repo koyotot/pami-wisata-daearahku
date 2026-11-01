@@ -4,9 +4,17 @@ import '../services/auth_session.dart';
 import 'admin_dashboard.dart';
 import 'main_navigation_screen.dart';
 import 'user_login_screen.dart';
+import 'verify_email_otp_screen.dart';
+import '../data/app_data.dart';
 
-Widget sessionDestination() {
-  final session = AuthSession.instance;
+Widget sessionDestination({AuthSession? session}) {
+  session ??= AuthSession.instance;
+  if (session.verificationRequired && currentUser != null) {
+    return VerifyEmailOtpScreen(
+        email: currentUser!.email,
+        resendAfterSeconds: session.resendAfterSeconds,
+        session: session);
+  }
   if (!session.authenticated.value || !session.deviceSessionReady) {
     return const UserLoginScreen();
   }

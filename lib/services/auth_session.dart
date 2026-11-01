@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:http/http.dart' as http;
+import '../core/config/app_config.dart';
 import '../data/app_data.dart';
 
 class ApiException implements Exception {
@@ -15,7 +16,9 @@ class ApiException implements Exception {
 
   /// Optional Laravel `context` object that accompanies a structured conflict.
   final Map<String, dynamic>? context;
-  const ApiException(this.message, [this.status, this.code, this.context]);
+  final Map<String, String> fieldErrors;
+  const ApiException(this.message,
+      [this.status, this.code, this.context, this.fieldErrors = const {}]);
 
   /// True when the request may have reached the server and its effect is unknown, so a
   /// mutation must be reconciled rather than treated as failed or blindly repeated.
@@ -74,9 +77,14 @@ class AuthSession {
   int? _refreshGeneration;
   int _generation = 0;
   int? _logoutGeneration;
+  int? _verifiedOtpGeneration;
+  String? _verifiedOtpEmail;
   int get sessionGeneration => _generation;
   bool isCurrentGeneration(int generation) =>
       generation == _generation && _logoutGeneration != generation;
+  bool verificationRequired = false;
+  int resendAfterSeconds = 0;
+  int? otpExpiresInSeconds;
   int? role;
   String? status;
   bool authenticating = false;
@@ -93,7 +101,7 @@ class AuthSession {
   AuthSession(
       {http.Client? client,
       SessionStore? store,
-      this.baseUrl = const String.fromEnvironment('API_BASE_URL')})
+      this.baseUrl = AppConfig.apiBaseUrl})
       : client = client ?? http.Client(),
         store = store ?? const SecureSessionStore();
 
@@ -155,6 +163,17 @@ class AuthSession {
 
   ApiException _failure(http.Response response, Map<String, dynamic> decoded) {
     final errors = decoded['errors'];
+    final fieldErrors = <String, String>{};
+    if (errors is Map) {
+      for (final entry in errors.entries) {
+        if (entry.key is String && entry.value is List) {
+          final messages = (entry.value as List).whereType<String>();
+          if (messages.isNotEmpty) {
+            fieldErrors[entry.key as String] = messages.first;
+          }
+        }
+      }
+    }
     final validation = errors is Map
         ? errors.values
             .whereType<List>()
@@ -164,8 +183,10 @@ class AuthSession {
         : '';
     final code = decoded['code'] is String ? decoded['code'] as String : null;
     final context = decoded['context'] is Map<String, dynamic>
-        ? decoded['context'] as Map<String, dynamic>
-        : null;
+        ? Map<String, dynamic>.from(decoded['context'] as Map)
+        : <String, dynamic>{};
+    final retry = int.tryParse(response.headers['retry-after'] ?? '');
+    if (retry != null) context['retry_after'] = retry;
     return ApiException(
         response.statusCode == 422 && validation.isNotEmpty
             ? validation
@@ -182,7 +203,8 @@ class AuthSession {
               },
         response.statusCode,
         code,
-        context);
+        context,
+        fieldErrors);
   }
 
   Map<String, dynamic> _envelope(http.Response response) {
@@ -259,6 +281,12 @@ class AuthSession {
       throw const ApiException(
           'Akun tidak aktif atau respons identitas tidak valid.', 403);
     }
+    if (nextRole == 0 && !data.containsKey('email_verified_at')) {
+      throw const ApiException('Status verifikasi email tidak tersedia.');
+    }
+    final verifiedAt = data['email_verified_at'];
+    verificationRequired =
+        nextRole == 0 && (verifiedAt is! String || verifiedAt.trim().isEmpty);
     role = nextRole;
     status = 'active';
     currentUser = User(
@@ -298,14 +326,37 @@ class AuthSession {
       });
 
   /// Google Login hanya untuk role 0; sesi role lain ditolak dan dibersihkan.
-  Future<void> google(String idToken) =>
-      _authenticate('auth/google', {'id_token': idToken},
-          allowedRoles: const {0});
+  Future<void> google(String idToken) async {
+    final generation = _generation;
+    final data =
+        await _send('POST', 'auth/google', body: {'id_token': idToken});
+    try {
+      if (!isCurrentGeneration(generation)) {
+        throw const ApiException('Permintaan masuk sudah dibatalkan.');
+      }
+      await _authenticate('auth/google', const {},
+          allowedRoles: const {0}, prefetched: data);
+    } catch (_) {
+      final token = data['access_token'];
+      if (token is String) {
+        try {
+          await _sendEnvelope('POST', 'auth/logout', token: token);
+        } catch (_) {}
+      }
+      rethrow;
+    }
+  }
+
   Future<void> _authenticate(String path, Map<String, dynamic> body,
-      {Set<int>? allowedRoles}) async {
+      {Set<int>? allowedRoles, Map<String, dynamic>? prefetched}) async {
     var generation = ++_generation;
+    _verifiedOtpGeneration = null;
+    _verifiedOtpEmail = null;
     _logoutGeneration = null;
     authenticating = true;
+    verificationRequired = false;
+    resendAfterSeconds = 0;
+    otpExpiresInSeconds = null;
     role = null;
     status = null;
     currentUser = null;
@@ -331,8 +382,17 @@ class AuthSession {
       if (generation != _generation) {
         throw const ApiException('Permintaan masuk sudah dibatalkan.');
       }
-      final data = await _send('POST', path, body: body);
+      final data = prefetched ?? await _send('POST', path, body: body);
       await _save(data, generation);
+      if (generation != _generation) {
+        throw const ApiException('Permintaan masuk sudah dibatalkan.');
+      }
+      resendAfterSeconds = data['resend_after_seconds'] is int
+          ? data['resend_after_seconds'] as int
+          : 0;
+      otpExpiresInSeconds = data['expires_in_seconds'] is int
+          ? data['expires_in_seconds'] as int
+          : null;
       if (generation != _generation) {
         throw const ApiException('Permintaan masuk sudah dibatalkan.');
       }
@@ -452,7 +512,7 @@ class AuthSession {
     return result;
   }
 
-  Future<void> me({Set<int>? allowedRoles}) async {
+  Future<void> me({Set<int>? allowedRoles, bool activate = true}) async {
     final generation = _generation;
     final data = await request('GET', 'auth/me');
     if (generation != _generation || _logoutGeneration == generation) {
@@ -479,10 +539,72 @@ class AuthSession {
       }
       rethrow;
     }
+    deviceSessionReady = activate && !verificationRequired;
+    authenticated.value = activate && !verificationRequired;
+    sessionChanges.value++;
+    deviceSessionChanged?.call();
+  }
+
+  Future<void> verifyEmailOtp(String email, String otp,
+      {int? expectedGeneration}) async {
+    final generation = expectedGeneration ?? _generation;
+    if (!isCurrentGeneration(generation)) {
+      throw const ApiException('Sesi telah berakhir.', 401);
+    }
+    final issuedUser = _tokens?['user'];
+    final expectedGuid = issuedUser is Map ? issuedUser['guid'] : null;
+    final expectedEmail = issuedUser is Map ? issuedUser['email'] : null;
+    final normalizedEmail = email.trim().toLowerCase();
+    if (_verifiedOtpGeneration != generation ||
+        _verifiedOtpEmail != normalizedEmail) {
+      await _send('POST', 'auth/email-verification/verify-otp',
+          body: {'email': email, 'otp': otp});
+      if (!isCurrentGeneration(generation)) {
+        throw const ApiException('Sesi telah berakhir.', 401);
+      }
+      // OTP is consumed; a transient /me failure must retry only the identity check.
+      _verifiedOtpGeneration = generation;
+      _verifiedOtpEmail = normalizedEmail;
+    }
+    if (!isCurrentGeneration(generation)) {
+      throw const ApiException('Sesi telah berakhir.', 401);
+    }
+    if (_tokens == null ||
+        expectedGuid is! String ||
+        expectedGuid.isEmpty ||
+        expectedEmail is! String ||
+        expectedEmail.toLowerCase() != email.trim().toLowerCase()) {
+      throw const ApiException(
+          'Email terverifikasi. Sesi tidak tersedia, silakan masuk kembali.',
+          401,
+          'verification_login_required');
+    }
+    await me(activate: false);
+    if (!isCurrentGeneration(generation)) {
+      throw const ApiException('Sesi telah berakhir.', 401);
+    }
+    if (currentUser?.id != expectedGuid ||
+        currentUser?.email.toLowerCase() != expectedEmail.toLowerCase() ||
+        role != 0 ||
+        status != 'active') {
+      await clear();
+      throw const ApiException(
+          'Email terverifikasi. Identitas sesi tidak sesuai, silakan masuk kembali.',
+          401,
+          'verification_login_required');
+    }
+    if (verificationRequired) {
+      throw const ApiException('Status verifikasi belum diperbarui.');
+    }
     deviceSessionReady = true;
     authenticated.value = true;
     sessionChanges.value++;
     deviceSessionChanged?.call();
+  }
+
+  Future<void> resendEmailOtp(String email) async {
+    await _send('POST', 'auth/email-verification/resend-otp',
+        body: {'email': email});
   }
 
   Future<void> updateProfile(String name, String phone) async {
@@ -540,6 +662,8 @@ class AuthSession {
 
   Future<void> logout() async {
     final generation = _generation;
+    _verifiedOtpGeneration = null;
+    _verifiedOtpEmail = null;
     _logoutGeneration = generation;
     authenticating = false;
     role = null;
@@ -564,11 +688,16 @@ class AuthSession {
 
   Future<void> clear() async {
     _generation++;
+    _verifiedOtpGeneration = null;
+    _verifiedOtpEmail = null;
     _logoutGeneration = null;
     authenticating = false;
     _tokens = null;
     role = null;
     status = null;
+    verificationRequired = false;
+    resendAfterSeconds = 0;
+    otpExpiresInSeconds = null;
     deviceSessionReady = false;
     currentUser = null;
     authenticated.value = false;

@@ -1,3 +1,4 @@
+import 'auth_presentation.dart';
 // ============================================================
 // lib/screens/user_register_screen.dart
 // Package: google_fonts, firebase_auth
@@ -7,6 +8,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../services/auth_session.dart';
+import 'session_destination.dart';
 
 // ── Palet: sama dengan home dan login ─────────────────────────
 class _C {
@@ -14,7 +16,6 @@ class _C {
   static const blueDeep = Color(0xFF1558B0);
   static const navy = Color(0xFF102D59);
   static const orange = Color(0xFFFF9800);
-  static const background = Color(0xFFF5F8FD);
   static const textMuted = Color(0xFF728099);
   static const border = Color(0xFFDCE4F0);
   static const danger = Color(0xFFE5484D);
@@ -36,7 +37,8 @@ TextStyle _font(
     );
 
 class UserRegisterScreen extends StatefulWidget {
-  const UserRegisterScreen({super.key});
+  const UserRegisterScreen({super.key, this.session});
+  final AuthSession? session;
 
   @override
   State<UserRegisterScreen> createState() => _UserRegisterScreenState();
@@ -48,7 +50,6 @@ class _UserRegisterScreenState extends State<UserRegisterScreen>
 
   final _namaCtrl = TextEditingController();
   final _emailCtrl = TextEditingController();
-  final _teleponCtrl = TextEditingController();
   final _passwordCtrl = TextEditingController();
   final _konfirmasiCtrl = TextEditingController();
 
@@ -56,6 +57,7 @@ class _UserRegisterScreenState extends State<UserRegisterScreen>
   bool _obscureKonfirmasi = true;
   bool _isLoading = false;
   String? _errorMsg;
+  Map<String, String> _fieldErrors = {};
 
   late final AnimationController _animCtrl;
   late final Animation<double> _fadeAnim;
@@ -93,7 +95,6 @@ class _UserRegisterScreenState extends State<UserRegisterScreen>
     _animCtrl.dispose();
     _namaCtrl.dispose();
     _emailCtrl.dispose();
-    _teleponCtrl.dispose();
     _passwordCtrl.dispose();
     _konfirmasiCtrl.dispose();
     super.dispose();
@@ -103,7 +104,10 @@ class _UserRegisterScreenState extends State<UserRegisterScreen>
   Future<void> _register() async {
     if (_isLoading) return;
 
-    setState(() => _errorMsg = null);
+    setState(() {
+      _errorMsg = null;
+      _fieldErrors = {};
+    });
 
     if (!_formKey.currentState!.validate()) return;
 
@@ -113,25 +117,27 @@ class _UserRegisterScreenState extends State<UserRegisterScreen>
 
     try {
       final nama = _namaCtrl.text.trim();
-      await AuthSession.instance.register(nama, _emailCtrl.text.trim(),
-          _passwordCtrl.text, _konfirmasiCtrl.text);
+      await (widget.session ?? AuthSession.instance).register(nama,
+          _emailCtrl.text.trim(), _passwordCtrl.text, _konfirmasiCtrl.text);
       if (!mounted) return;
 
-      // Tetap loading sampai dialog ditutup.
-      await showDialog<void>(
-        context: context,
-        barrierDismissible: false,
-        builder: (_) => _SuccessDialog(namaUser: nama),
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute<void>(
+            builder: (_) => sessionDestination(session: widget.session)),
+        (_) => false,
       );
-
-      if (!mounted) return;
-
-      // Dikembalikan ke halaman login untuk melanjutkan navigasi.
-      Navigator.pop(context, true);
     } on ApiException catch (e) {
       if (!mounted) return;
       setState(() {
-        _errorMsg = e.message;
+        _fieldErrors = Map.of(e.fieldErrors);
+        _errorMsg = _fieldErrors.keys.any((key) => !{
+                  'name',
+                  'email',
+                  'password',
+                  'password_confirmation'
+                }.contains(key))
+            ? e.message
+            : (_fieldErrors.isEmpty ? e.message : null);
         _isLoading = false;
       });
     } catch (_) {
@@ -147,7 +153,8 @@ class _UserRegisterScreenState extends State<UserRegisterScreen>
   // ── Tampilan utama ─────────────────────────────────────────
   @override
   Widget build(BuildContext context) {
-    return AnnotatedRegion<SystemUiOverlayStyle>(
+    return AuthTheme(
+        child: AnnotatedRegion<SystemUiOverlayStyle>(
       value: const SystemUiOverlayStyle(
         statusBarColor: Colors.transparent,
         statusBarIconBrightness: Brightness.dark,
@@ -178,7 +185,7 @@ class _UserRegisterScreenState extends State<UserRegisterScreen>
                       minHeight: constraints.maxHeight,
                     ),
                     child: Align(
-                      alignment: Alignment.topCenter,
+                      alignment: Alignment.center,
                       child: ConstrainedBox(
                         constraints: const BoxConstraints(maxWidth: 520),
                         child: Padding(
@@ -221,7 +228,7 @@ class _UserRegisterScreenState extends State<UserRegisterScreen>
           ),
         ),
       ),
-    );
+    ));
   }
 
   // ── Bar atas: kembali + brand ──────────────────────────────
@@ -322,7 +329,7 @@ class _UserRegisterScreenState extends State<UserRegisterScreen>
             AnimatedSize(
               duration: const Duration(milliseconds: 250),
               curve: Curves.easeOut,
-              alignment: Alignment.topCenter,
+              alignment: Alignment.center,
               child: _errorMsg == null
                   ? const SizedBox(width: double.infinity)
                   : Padding(
@@ -347,6 +354,8 @@ class _UserRegisterScreenState extends State<UserRegisterScreen>
               enabled: !_isLoading,
               textCapitalization: TextCapitalization.words,
               autofillHints: const [AutofillHints.name],
+              errorText: _fieldErrors['name'],
+              onChanged: (_) => setState(() => _fieldErrors.remove('name')),
               validator: (value) {
                 if (value == null || value.trim().isEmpty) {
                   return 'Nama lengkap wajib diisi';
@@ -366,6 +375,8 @@ class _UserRegisterScreenState extends State<UserRegisterScreen>
                 AutofillHints.username,
                 AutofillHints.email,
               ],
+              errorText: _fieldErrors['email'],
+              onChanged: (_) => setState(() => _fieldErrors.remove('email')),
               validator: (value) {
                 final email = value?.trim() ?? '';
 
@@ -380,26 +391,6 @@ class _UserRegisterScreenState extends State<UserRegisterScreen>
                 return null;
               },
             ),
-            const SizedBox(height: 16),
-            _RegField(
-              controller: _teleponCtrl,
-              label: 'Nomor Telepon',
-              hint: 'Contoh: 08123456789',
-              icon: Icons.phone_rounded,
-              enabled: !_isLoading,
-              keyboardType: TextInputType.phone,
-              autofillHints: const [AutofillHints.telephoneNumber],
-              inputFormatters: [
-                FilteringTextInputFormatter.digitsOnly,
-              ],
-              validator: (value) {
-                if (value == null || value.trim().length < 8) {
-                  return 'Nomor telepon tidak valid';
-                }
-                return null;
-              },
-            ),
-
             const SizedBox(height: 28),
 
             // ── Bagian 2 ──
@@ -418,7 +409,8 @@ class _UserRegisterScreenState extends State<UserRegisterScreen>
               enabled: !_isLoading,
               obscure: _obscurePass,
               autofillHints: const [AutofillHints.newPassword],
-              onChanged: (_) => setState(() {}),
+              errorText: _fieldErrors['password'],
+              onChanged: (_) => setState(() => _fieldErrors.remove('password')),
               onToggleObscure: () {
                 setState(() => _obscurePass = !_obscurePass);
               },
@@ -439,6 +431,9 @@ class _UserRegisterScreenState extends State<UserRegisterScreen>
               enabled: !_isLoading,
               obscure: _obscureKonfirmasi,
               textInputAction: TextInputAction.done,
+              errorText: _fieldErrors['password_confirmation'],
+              onChanged: (_) =>
+                  setState(() => _fieldErrors.remove('password_confirmation')),
               onFieldSubmitted: (_) => _register(),
               onToggleObscure: () {
                 setState(
@@ -539,7 +534,7 @@ class _UserRegisterScreenState extends State<UserRegisterScreen>
   // ── Tombol daftar ──────────────────────────────────────────
   Widget _buildRegisterButton() {
     return _GradientButton(
-      label: 'Buat Akun',
+      label: 'Daftar',
       icon: Icons.how_to_reg_rounded,
       isLoading: _isLoading,
       onTap: _isLoading ? null : _register,
@@ -573,14 +568,19 @@ class _UserRegisterScreenState extends State<UserRegisterScreen>
             children: [
               const Icon(Icons.login_rounded, color: _C.orange, size: 20),
               const SizedBox(width: 10),
-              Text(
-                'Sudah punya akun? ',
-                style: _font(13.5, FontWeight.w500, _C.textMuted),
-              ),
-              Text(
-                'Masuk',
-                style: _font(13.5, FontWeight.w800, const Color(0xFFE08600)),
-              ),
+              Flexible(
+                  child: Text.rich(
+                      TextSpan(
+                        text: 'Sudah punya akun? ',
+                        style: _font(13.5, FontWeight.w500, _C.textMuted),
+                        children: [
+                          TextSpan(
+                              text: 'Masuk',
+                              style: _font(13.5, FontWeight.w800,
+                                  const Color(0xFFE08600)))
+                        ],
+                      ),
+                      textAlign: TextAlign.center)),
             ],
           ),
         ),
@@ -602,12 +602,12 @@ class _RegField extends StatelessWidget {
   final TextInputType? keyboardType;
   final TextInputAction textInputAction;
   final TextCapitalization textCapitalization;
-  final List<TextInputFormatter>? inputFormatters;
   final Iterable<String>? autofillHints;
   final String? Function(String?)? validator;
   final ValueChanged<String>? onFieldSubmitted;
   final ValueChanged<String>? onChanged;
   final VoidCallback? onToggleObscure;
+  final String? errorText;
 
   const _RegField({
     required this.controller,
@@ -619,12 +619,12 @@ class _RegField extends StatelessWidget {
     this.keyboardType,
     this.textInputAction = TextInputAction.next,
     this.textCapitalization = TextCapitalization.none,
-    this.inputFormatters,
     this.autofillHints,
     this.validator,
     this.onFieldSubmitted,
     this.onChanged,
     this.onToggleObscure,
+    this.errorText,
   });
 
   OutlineInputBorder _border(Color color, double width) {
@@ -647,7 +647,6 @@ class _RegField extends StatelessWidget {
           keyboardType: keyboardType,
           textInputAction: textInputAction,
           textCapitalization: textCapitalization,
-          inputFormatters: inputFormatters,
           autofillHints: autofillHints,
           validator: validator,
           obscureText: obscure,
@@ -658,6 +657,7 @@ class _RegField extends StatelessWidget {
           onFieldSubmitted: onFieldSubmitted,
           onChanged: onChanged,
           decoration: InputDecoration(
+            errorText: errorText,
             hintText: hint,
             hintStyle: _font(
               14,
@@ -751,7 +751,7 @@ class _PasswordStrength extends StatelessWidget {
     return AnimatedSize(
       duration: const Duration(milliseconds: 200),
       curve: Curves.easeOut,
-      alignment: Alignment.topCenter,
+      alignment: Alignment.center,
       child: level == 0
           ? const SizedBox(width: double.infinity)
           : Padding(
@@ -914,94 +914,6 @@ class _ErrorBanner extends StatelessWidget {
             ),
           ),
         ],
-      ),
-    );
-  }
-}
-
-// ── Dialog sukses: tema terang & biru ─────────────────────────
-class _SuccessDialog extends StatelessWidget {
-  final String namaUser;
-
-  const _SuccessDialog({
-    required this.namaUser,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return PopScope(
-      canPop: false,
-      child: Dialog(
-        backgroundColor: Colors.white,
-        surfaceTintColor: Colors.transparent,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(28),
-        ),
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(28),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                width: 80,
-                height: 80,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  gradient: const LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: [
-                      Color(0xFF42A5F5),
-                      _C.blueDeep,
-                    ],
-                  ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: _C.blue.withValues(alpha: 0.25),
-                      blurRadius: 20,
-                      offset: const Offset(0, 8),
-                    ),
-                  ],
-                ),
-                child: const Icon(
-                  Icons.check_rounded,
-                  color: Colors.white,
-                  size: 42,
-                ),
-              ),
-              const SizedBox(height: 24),
-              Text(
-                'Akun Berhasil Dibuat!',
-                textAlign: TextAlign.center,
-                style: _font(
-                  20,
-                  FontWeight.w800,
-                  _C.navy,
-                  letterSpacing: -0.5,
-                ),
-              ),
-              const SizedBox(height: 10),
-              Text(
-                'Selamat datang, $namaUser!\n'
-                'Akun kamu sudah siap digunakan untuk '
-                'menjelajahi keindahan Nusantara.',
-                textAlign: TextAlign.center,
-                style: _font(
-                  13,
-                  FontWeight.w500,
-                  _C.textMuted,
-                  height: 1.6,
-                ),
-              ),
-              const SizedBox(height: 26),
-              _GradientButton(
-                label: 'Mulai Menjelajah',
-                icon: Icons.explore_rounded,
-                onTap: () => Navigator.pop(context),
-              ),
-            ],
-          ),
-        ),
       ),
     );
   }

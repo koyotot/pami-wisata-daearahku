@@ -55,6 +55,7 @@ void main() {
           'phone': '08123',
           'email': 'u@example.test',
           'role': 0,
+          'email_verified_at': '2026-01-01T00:00:00Z',
           'status': 'active'
         }
       });
@@ -83,6 +84,7 @@ void main() {
         'name': 'Stale',
         'email': 'u@example.test',
         'role': 0,
+        'email_verified_at': '2026-01-01T00:00:00Z',
         'status': 'active'
       }
     }));

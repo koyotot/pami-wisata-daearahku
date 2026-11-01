@@ -29,7 +29,11 @@ Future<AuthSession> signedInSession(
                 'data': {
                   'access_token': 'access',
                   'refresh_token': 'refresh',
-                  'user': {'guid': guid, 'name': 'User', 'email': 'u@example.test'}
+                  'user': {
+                    'guid': guid,
+                    'name': 'User',
+                    'email': 'u@example.test'
+                  }
                 }
               }),
               200);
@@ -43,6 +47,7 @@ Future<AuthSession> signedInSession(
                   'email': 'u@example.test',
                   'phone': '0812345678',
                   'role': 0,
+                  'email_verified_at': '2026-01-01T00:00:00Z',
                   'status': 'active'
                 }
               }),
@@ -57,9 +62,9 @@ Future<AuthSession> signedInSession(
 BusinessRepository repositoryFor(AuthSession session) =>
     BusinessRepository(ApiClient(session));
 
-http.Response jsonResponse(Object body, [int status = 200]) => http.Response(
-    jsonEncode(body), status,
-    headers: {'content-type': 'application/json'});
+http.Response jsonResponse(Object body, [int status = 200]) =>
+    http.Response(jsonEncode(body), status,
+        headers: {'content-type': 'application/json'});
 
 /// A complete Laravel booking resource.
 Map<String, dynamic> bookingJson(

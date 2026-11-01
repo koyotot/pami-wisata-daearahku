@@ -33,6 +33,7 @@ http.Response _me() => http.Response(
         'email': 'a@example.test',
         'phone': null,
         'role': 0,
+        'email_verified_at': '2026-01-01T00:00:00Z',
         'status': 'active'
       }
     }),
