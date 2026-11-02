@@ -1,5 +1,3 @@
-import 'dart:convert';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -10,6 +8,7 @@ import 'package:wisata_daerahku/screens/tambah_wisata_screen.dart';
 import 'package:wisata_daerahku/services/auth_session.dart';
 
 import 'admin_test_support.dart';
+import 'gallery_test_support.dart';
 
 const _facility = {
   'guid': 'f1',
@@ -27,6 +26,8 @@ const _destination = {
   'ticket_price': 25000,
   'opening_hours': '08.00 - 17.00',
   'timezone': 'Asia/Makassar',
+  'images': [galleryImageJson],
+  'gallery_version': 1,
 };
 
 Future<void> _open(WidgetTester tester, AuthSession session,
@@ -84,8 +85,9 @@ void main() {
         _input('Contoh: Pantai Parangtritis'), 'Pantai Diubah');
     await tester.tap(find.text('Simpan Perubahan'));
     await tester.pumpAndSettle();
-    final update = requests.singleWhere((r) => r.method == 'PATCH');
-    expect(jsonDecode(update.body)['name'], 'Pantai Diubah');
+    final update = requests.lastWhere((r) => r.method == 'POST');
+    expect(update.body, contains('Pantai Diubah'));
+    expect(update.body, contains('gallery_manifest'));
     expect(requests.where((r) => r.method == 'PUT'), isEmpty);
     expect(find.text('Buka form'), findsOneWidget);
   });
@@ -130,12 +132,16 @@ void main() {
     await tester.enterText(_input('08.00 – 17.00'), '08.00 - 17.00');
     await tester.tap(find.text('Pantai'));
     await tester.tap(find.byKey(const ValueKey('facility-f1')));
-    await tester.tap(find.text('Tambahkan Wisata'));
+    await pickGalleryPhoto(tester);
+    await tester.tap(find.text('Simpan Perubahan'));
     await tester.pumpAndSettle();
     expect(find.textContaining('Destinasi sudah tersimpan.'), findsOneWidget);
     expect(requests.where((r) => r.method == 'POST'), hasLength(1));
     expect(puts, 1);
-    expect(requests.last.url.path, '/api/v1/admin/destinations/created-1');
+    expect(
+        requests
+            .any((r) => r.url.path == '/api/v1/admin/destinations/created-1'),
+        isTrue);
     expect(
         tester
             .widget<FilterChip>(find.byKey(const ValueKey('facility-f1')))
@@ -144,9 +150,9 @@ void main() {
         reason: 'failed assignment must preserve unsaved input for retry');
     await tester.tap(find.text('Simpan Perubahan'));
     await tester.pumpAndSettle();
-    expect(requests.where((r) => r.method == 'POST'), hasLength(1),
+    expect(requests.where((r) => r.method == 'POST'), hasLength(2),
         reason: 'retry must not create a second destination');
-    final update = requests.singleWhere((r) => r.method == 'PATCH');
+    final update = requests.lastWhere((r) => r.method == 'POST');
     expect(update.url.path, '/api/v1/destinations/created-1');
     final assignments = requests.where((r) => r.method == 'PUT').toList();
     expect(assignments, hasLength(2));

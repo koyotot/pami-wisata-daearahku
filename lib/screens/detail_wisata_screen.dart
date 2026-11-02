@@ -275,7 +275,7 @@ class _DetailWisataScreenState extends State<DetailWisataScreen>
                   Stack(
                     children: [
                       SizedBox(
-                        height: 320,
+                        height: MediaQuery.sizeOf(context).height / 3,
                         width: double.infinity,
                         child: DestinationHeroGallery(
                             key: ValueKey(destination.guid),
@@ -288,7 +288,7 @@ class _DetailWisataScreenState extends State<DetailWisataScreen>
                         left: 0,
                         right: 0,
                         child: Container(
-                          height: 180,
+                          height: MediaQuery.sizeOf(context).height / 9,
                           decoration: BoxDecoration(
                             gradient: LinearGradient(
                               begin: Alignment.bottomCenter,

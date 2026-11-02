@@ -62,11 +62,13 @@ class Destination {
 
   int get galleryVersion => (json['gallery_version'] as num?)?.toInt() ?? 0;
   List<DestinationImage> get images {
-    if (json.containsKey('images')) {
-      return (json['images'] as List? ?? [])
-          .map((e) => DestinationImage(e as Json))
-          .toList()
-        ..sort((a, b) => a.sequence.compareTo(b.sequence));
+    final items = (json['images'] as List? ?? [])
+        .map((e) => DestinationImage(e as Json))
+        .toList()
+      ..sort((a, b) => a.sequence.compareTo(b.sequence));
+    if (items.isNotEmpty ||
+        (json.containsKey('images') && galleryVersion > 0)) {
+      return items;
     }
     final url = imageUrl;
     return url == null

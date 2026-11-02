@@ -23,7 +23,6 @@ class _C {
   static const navy = Color(0xFF102D59);
   static const orange = Color(0xFFFF9800);
   static const bg = Color(0xFFF5F8FD);
-  static const card = Colors.white;
   static const surface = Colors.white;
   static const text = navy;
   static const textMuted = Color(0xFF728099);
@@ -58,6 +57,7 @@ class _TambahWisataScreenState extends State<TambahWisataScreen> {
   bool _failedSave = false;
   bool _galleryLoading = false;
   bool _galleryReady = false;
+  bool _picking = false;
   bool _dirty = false;
   bool _isSaving = false;
 
@@ -113,7 +113,9 @@ class _TambahWisataScreenState extends State<TambahWisataScreen> {
       ..addListener(_onCategories);
     _savedDestinationGuid = w?.id;
     _galleryVersion = w?.galleryVersion ?? 0;
-    _gallery.addAll((w?.images ?? []).map(GalleryDraftItem.existing));
+    _gallery.addAll((w?.images ?? [])
+        .where((e) => !e.guid.startsWith('legacy-'))
+        .map(GalleryDraftItem.existing));
     _galleryReady = w == null;
     if (w != null) _loadGallery();
     if (canAccessAdmin(_session.role)) {
@@ -139,6 +141,22 @@ class _TambahWisataScreenState extends State<TambahWisataScreen> {
   }
 
   // ── Pilih gambar ──────────────────────────────────────────
+  bool get _canSave =>
+      !_isSaving &&
+      !_picking &&
+      !_galleryLoading &&
+      _galleryReady &&
+      _gallery.isNotEmpty &&
+      _gallery.length <= 10 &&
+      _categoryGuid != null &&
+      [namaCtrl, lokasiCtrl, deskCtrl, jamCtrl]
+          .every((c) => c.text.trim().isNotEmpty) &&
+      (int.tryParse(hargaCtrl.text.trim()) ?? -1) >= 0;
+
+  Future<void> _reloadGallery() async {
+    if (await _confirmDiscard() && mounted) await _loadGallery();
+  }
+
   Future<void> _loadGallery() async {
     setState(() => _galleryLoading = true);
     try {
@@ -149,7 +167,9 @@ class _TambahWisataScreenState extends State<TambahWisataScreen> {
         _galleryVersion = value.galleryVersion;
         _gallery
           ..clear()
-          ..addAll(value.images.map(GalleryDraftItem.existing));
+          ..addAll(value.images
+              .where((e) => !e.guid.startsWith('legacy-'))
+              .map(GalleryDraftItem.existing));
         _operationKey = null;
         _operationFingerprint = null;
       });
@@ -161,29 +181,40 @@ class _TambahWisataScreenState extends State<TambahWisataScreen> {
   }
 
   Future<void> _pickImages() async {
-    final picked = await ImagePicker().pickMultiImage();
-    if (!mounted) return;
-    if (_gallery.length + picked.length > 10) {
-      _snack('Maksimal 10 foto. Pilih kembali sesuai slot yang tersisa.');
-      return;
-    }
-    final additions = <GalleryDraftItem>[];
-    for (final file in picked) {
-      final bytes = await file.readAsBytes();
-      final problem = validateDestinationImage(bytes);
-      final extension = file.name.toLowerCase().split('.').last;
-      if (problem != null ||
-          !['jpg', 'jpeg', 'png', 'webp'].contains(extension)) {
-        if (mounted) _snack(problem ?? 'Pilih JPEG, PNG, atau WebP.');
+    if (_picking || _isSaving || _galleryLoading) return;
+    setState(() => _picking = true);
+    try {
+      final picked = await ImagePicker().pickMultiImage();
+      if (!mounted) return;
+      if (_gallery.length + picked.length > 10) {
+        _snack('Maksimal 10 foto. Pilih kembali sesuai slot yang tersisa.');
         return;
       }
-      additions.add(GalleryDraftItem.upload(bytes, file.name));
+      final additions = <GalleryDraftItem>[];
+      for (final file in picked) {
+        final bytes = await file.readAsBytes();
+        final problem = validateDestinationImage(bytes);
+        final extension = file.name.toLowerCase().split('.').last;
+        if (problem != null ||
+            !['jpg', 'jpeg', 'png', 'webp'].contains(extension)) {
+          if (mounted) _snack(problem ?? 'Pilih JPEG, PNG, atau WebP.');
+          return;
+        }
+        additions.add(GalleryDraftItem.upload(bytes, file.name));
+      }
+      if (!mounted) return;
+      setState(() {
+        _gallery.addAll(additions);
+        _dirty = true;
+      });
+    } catch (_) {
+      if (mounted) {
+        _snack(
+            'Foto belum dapat dibaca. Periksa izin foto lalu coba lagi. Draft tetap ada.');
+      }
+    } finally {
+      if (mounted) setState(() => _picking = false);
     }
-    if (!mounted) return;
-    setState(() {
-      _gallery.addAll(additions);
-      _dirty = true;
-    });
   }
 
   Future<bool> _confirmDiscard() async {
@@ -238,8 +269,9 @@ class _TambahWisataScreenState extends State<TambahWisataScreen> {
         'status': 'all'
       });
       for (final remote in result.items) {
-        if (remote.json['last_gallery_operation_key'] == _operationKey)
+        if (remote.json['last_gallery_operation_key'] == _operationKey) {
           return remote;
+        }
       }
       if (result.links?['next'] == null) return null;
       page++;
@@ -345,7 +377,10 @@ class _TambahWisataScreenState extends State<TambahWisataScreen> {
       Navigator.pop(context, true);
     } catch (e) {
       if (!mounted || !_session.isCurrentGeneration(_sessionGeneration)) return;
-      setState(() => _failedSave = true);
+      setState(() {
+        _failedSave = true;
+        _isSaving = false;
+      });
       if (e is ApiException && e.status == 409) {
         final refresh = await showDialog<bool>(
             context: context,
@@ -428,7 +463,11 @@ class _TambahWisataScreenState extends State<TambahWisataScreen> {
               backgroundColor: const Color(0xFF1558B0),
               elevation: 0,
               leading: GestureDetector(
-                onTap: () => Navigator.pop(context),
+                onTap: () async {
+                  if (await _confirmDiscard() && context.mounted) {
+                    Navigator.pop(context);
+                  }
+                },
                 child: Container(
                   margin: const EdgeInsets.all(10),
                   decoration: BoxDecoration(
@@ -566,9 +605,14 @@ class _TambahWisataScreenState extends State<TambahWisataScreen> {
                     _sectionLabel('Foto Destinasi'),
                     const SizedBox(height: 12),
                     if (_galleryLoading) const LinearProgressIndicator(),
+                    if (_galleryReady &&
+                        widget.wisataEdit?.imageUrl != null &&
+                        _gallery.isEmpty)
+                      const Text(
+                          'Foto lama belum dapat diedit di galeri. Tambahkan foto untuk menyimpan.'),
                     AdminDestinationGalleryEditor(
                         items: _gallery,
-                        enabled: !_isSaving && !_galleryLoading,
+                        enabled: !_isSaving && !_galleryLoading && !_picking,
                         destinationGuid: _savedDestinationGuid,
                         repository: _repository,
                         onAdd: _pickImages,
@@ -596,7 +640,7 @@ class _TambahWisataScreenState extends State<TambahWisataScreen> {
                           child: const Text('Coba Lagi')),
                     if (widget.wisataEdit != null)
                       TextButton(
-                          onPressed: _isSaving ? null : _loadGallery,
+                          onPressed: _isSaving ? null : _reloadGallery,
                           child: const Text('Muat ulang galeri')),
                     const SizedBox(height: 24),
 
@@ -705,9 +749,7 @@ class _TambahWisataScreenState extends State<TambahWisataScreen> {
               width: double.infinity,
               height: 54,
               child: ElevatedButton(
-                onPressed: _isSaving || !_galleryReady || _gallery.isEmpty
-                    ? null
-                    : _simpan,
+                onPressed: _canSave ? _simpan : null,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: _C.teal,
                   disabledBackgroundColor: _C.teal.withValues(alpha: 0.5),
@@ -717,19 +759,19 @@ class _TambahWisataScreenState extends State<TambahWisataScreen> {
                       borderRadius: BorderRadius.circular(16)),
                 ),
                 child: _isSaving
-                    ? Row(
+                    ? const Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          const SizedBox(
+                          SizedBox(
                             width: 18,
                             height: 18,
                             child: CircularProgressIndicator(
                                 color: Colors.white, strokeWidth: 2.5),
                           ),
-                          const SizedBox(width: 10),
+                          SizedBox(width: 10),
                           Text(
                             'Menyimpan...',
-                            style: const TextStyle(
+                            style: TextStyle(
                                 fontSize: 14, fontWeight: FontWeight.w700),
                           ),
                         ],
@@ -744,9 +786,9 @@ class _TambahWisataScreenState extends State<TambahWisataScreen> {
                             size: 20,
                           ),
                           const SizedBox(width: 10),
-                          Text(
+                          const Text(
                             'Simpan Perubahan',
-                            style: const TextStyle(
+                            style: TextStyle(
                                 fontSize: 15, fontWeight: FontWeight.w800),
                           ),
                         ],
@@ -780,7 +822,12 @@ class _TambahWisataScreenState extends State<TambahWisataScreen> {
           onChanged: _isSaving
               ? null
               : (value) {
-                  if (value != null) setState(() => _timezone = value);
+                  if (value != null) {
+                    setState(() {
+                      _timezone = value;
+                      _dirty = true;
+                    });
+                  }
                 },
           decoration: InputDecoration(
             prefixIcon: const Padding(
@@ -819,7 +866,7 @@ class _TambahWisataScreenState extends State<TambahWisataScreen> {
         ),
         const SizedBox(width: 8),
         Text(label,
-            style: TextStyle(
+            style: const TextStyle(
                 color: _C.textMuted,
                 fontSize: 10.5,
                 fontWeight: FontWeight.w800,
@@ -845,7 +892,7 @@ class _TambahWisataScreenState extends State<TambahWisataScreen> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(
+              const Text(
                 'Rating Destinasi',
                 style: TextStyle(color: _C.textMuted, fontSize: 13),
               ),
@@ -858,11 +905,11 @@ class _TambahWisataScreenState extends State<TambahWisataScreen> {
                 ),
                 child: Row(
                   children: [
-                    Icon(Icons.star_rounded, color: _C.gold, size: 14),
+                    const Icon(Icons.star_rounded, color: _C.gold, size: 14),
                     const SizedBox(width: 4),
                     Text(
                       _rating == 0 ? '-' : _rating.toStringAsFixed(1),
-                      style: TextStyle(
+                      style: const TextStyle(
                         color: _C.gold,
                         fontWeight: FontWeight.w800,
                         fontSize: 14,
@@ -895,10 +942,10 @@ class _TambahWisataScreenState extends State<TambahWisataScreen> {
           ),
           const SizedBox(height: 8),
           ...[
-            Row(
+            const Row(
               children: [
                 Icon(Icons.lock_outline_rounded, size: 13, color: _C.textDim),
-                const SizedBox(width: 6),
+                SizedBox(width: 6),
                 Expanded(
                   child: Text(
                     'Rating dikunci — dihitung otomatis dari ulasan pengunjung, bukan diatur manual oleh admin.',
@@ -928,7 +975,7 @@ class _TambahWisataScreenState extends State<TambahWisataScreen> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(label,
-            style: TextStyle(
+            style: const TextStyle(
                 color: _C.text, fontSize: 12.5, fontWeight: FontWeight.w700)),
         const SizedBox(height: 7),
         TextFormField(
@@ -937,10 +984,10 @@ class _TambahWisataScreenState extends State<TambahWisataScreen> {
           keyboardType: keyboardType,
           inputFormatters: formatters,
           validator: validator,
-          style: TextStyle(color: _C.text, fontSize: 14),
+          style: const TextStyle(color: _C.text, fontSize: 14),
           decoration: InputDecoration(
             hintText: hint,
-            hintStyle: TextStyle(color: _C.textDim, fontSize: 13),
+            hintStyle: const TextStyle(color: _C.textDim, fontSize: 13),
             prefixIcon: Padding(
               padding: const EdgeInsets.only(left: 14, right: 10),
               child: Icon(icon, color: _C.teal, size: 18),
@@ -951,21 +998,21 @@ class _TambahWisataScreenState extends State<TambahWisataScreen> {
             fillColor: _C.surface,
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(14),
-              borderSide: BorderSide(color: _C.border, width: 1.2),
+              borderSide: const BorderSide(color: _C.border, width: 1.2),
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(14),
-              borderSide: BorderSide(color: _C.teal, width: 1.5),
+              borderSide: const BorderSide(color: _C.teal, width: 1.5),
             ),
             errorBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(14),
-              borderSide: BorderSide(color: _C.danger, width: 1.2),
+              borderSide: const BorderSide(color: _C.danger, width: 1.2),
             ),
             focusedErrorBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(14),
-              borderSide: BorderSide(color: _C.danger, width: 1.5),
+              borderSide: const BorderSide(color: _C.danger, width: 1.5),
             ),
-            errorStyle: TextStyle(color: _C.danger, fontSize: 11),
+            errorStyle: const TextStyle(color: _C.danger, fontSize: 11),
             contentPadding:
                 const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
           ),
@@ -1030,7 +1077,7 @@ class _TambahWisataScreenState extends State<TambahWisataScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('Kategori',
+        const Text('Kategori',
             style: TextStyle(
                 color: _C.text, fontSize: 12.5, fontWeight: FontWeight.w700)),
         const SizedBox(height: 10),
@@ -1048,6 +1095,7 @@ class _TambahWisataScreenState extends State<TambahWisataScreen> {
             return GestureDetector(
               onTap: () => setState(() {
                 _categoryGuid = category.guid;
+                _dirty = true;
               }),
               child: AnimatedContainer(
                 duration: const Duration(milliseconds: 200),

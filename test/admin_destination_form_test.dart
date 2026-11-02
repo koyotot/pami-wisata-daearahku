@@ -7,6 +7,7 @@ import 'package:wisata_daerahku/data/app_data.dart' show Wisata;
 import 'package:wisata_daerahku/data/business_repository.dart' show Destination;
 import 'package:wisata_daerahku/screens/tambah_wisata_screen.dart';
 import 'admin_test_support.dart';
+import 'gallery_test_support.dart';
 
 void main() {
   setUpAll(() => GoogleFonts.config.allowRuntimeFetching = false);
@@ -89,20 +90,24 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text('Asia/Makassar (WITA)').last);
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Tambahkan Wisata'));
+    await pickGalleryPhoto(tester);
+    await tester.tap(find.text('Simpan Perubahan'));
     await tester.pumpAndSettle();
 
     final post = log.singleWhere((r) => r.method == 'POST');
     expect(post.url.path, '/api/v1/destinations');
-    expect(jsonDecode(post.body), {
-      'destination_category_guid': 'cat-1',
-      'name': 'Pantai Baru',
-      'location': 'Makassar',
-      'description': 'Pantai indah',
-      'ticket_price': 25000,
-      'opening_hours': '08.00 - 17.00',
-      'timezone': 'Asia/Makassar',
-    });
+    expect(post.headers['content-type'], startsWith('multipart/form-data'));
+    expect(
+        post.headers['Idempotency-Key'], matches(RegExp(r'^[0-9a-f-]{36}$')));
+    for (final value in [
+      'destination_category_guid',
+      'cat-1',
+      '25000',
+      'Asia/Makassar',
+      'images[]'
+    ]) {
+      expect(latin1.decode(post.bodyBytes), contains(value));
+    }
 
     await tester.pumpWidget(MaterialApp(
       home: TambahWisataScreen(

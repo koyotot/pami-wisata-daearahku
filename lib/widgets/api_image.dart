@@ -139,7 +139,12 @@ class _ApiImageState extends State<ApiImage> {
   Widget build(BuildContext context) {
     final bytes = _bytes;
     if (bytes != null) {
+      final decodeWidth = (MediaQuery.sizeOf(context).width *
+              MediaQuery.devicePixelRatioOf(context))
+          .ceil()
+          .clamp(1, 2048);
       return Image.memory(bytes,
+          cacheWidth: decodeWidth,
           fit: widget.fit,
           width: widget.width,
           height: widget.height,

@@ -24,6 +24,17 @@ class _DestinationHeroGalleryState extends State<DestinationHeroGallery> {
   }
 
   @override
+  void didUpdateWidget(DestinationHeroGallery oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (_index >= widget.images.length) {
+      _index = 0;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && _pages.hasClients) _pages.jumpToPage(0);
+      });
+    }
+  }
+
+  @override
   void dispose() {
     _pages.dispose();
     super.dispose();
@@ -122,6 +133,14 @@ class _FullscreenDestinationGalleryState
   late int _index = widget.initialIndex;
   bool _zoomed = false;
   @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _change(_index);
+    });
+  }
+
+  @override
   void dispose() {
     _pages.dispose();
     _thumbnails.dispose();
@@ -179,6 +198,25 @@ class _FullscreenDestinationGalleryState
                                         '${widget.images[i].guid}-${i == _index}'),
                                     image: widget.images[i],
                                     repository: widget.repository,
+                                    onSwipe: (direction) {
+                                      if (i != _index ||
+                                          _zoomed ||
+                                          !_pages.hasClients) {
+                                        return;
+                                      }
+                                      final next = (i + direction)
+                                          .clamp(0, widget.images.length - 1);
+                                      if (next == i) return;
+                                      if (MediaQuery.disableAnimationsOf(
+                                          context)) {
+                                        _pages.jumpToPage(next);
+                                      } else {
+                                        _pages.animateToPage(next,
+                                            duration: const Duration(
+                                                milliseconds: 220),
+                                            curve: Curves.easeOut);
+                                      }
+                                    },
                                     onZoom: (value) {
                                       if (i == _index && value != _zoomed) {
                                         setState(() => _zoomed = value);
@@ -208,6 +246,7 @@ class _FullscreenDestinationGalleryState
                                       padding: const EdgeInsets.all(4),
                                       child: InkWell(
                                           onTap: () {
+                                            if (i == _index) return;
                                             _pages.jumpToPage(i);
                                             _change(i);
                                           },
@@ -236,11 +275,13 @@ class _ZoomPhoto extends StatefulWidget {
   final DestinationImage image;
   final BusinessRepository repository;
   final ValueChanged<bool> onZoom;
+  final ValueChanged<int> onSwipe;
   const _ZoomPhoto(
       {super.key,
       required this.image,
       required this.repository,
-      required this.onZoom});
+      required this.onZoom,
+      required this.onSwipe});
   @override
   State<_ZoomPhoto> createState() => _ZoomPhotoState();
 }
@@ -248,6 +289,15 @@ class _ZoomPhoto extends StatefulWidget {
 class _ZoomPhotoState extends State<_ZoomPhoto> {
   final _transform = TransformationController();
   Offset _tap = Offset.zero;
+  bool _zoomed = false;
+  Offset _swipeStart = Offset.zero;
+  Offset _swipeDelta = Offset.zero;
+  bool _singlePointerSwipe = false;
+  void _zoom(bool value) {
+    if (_zoomed != value) setState(() => _zoomed = value);
+    widget.onZoom(value);
+  }
+
   @override
   void dispose() {
     _transform.dispose();
@@ -264,14 +314,35 @@ class _ZoomPhotoState extends State<_ZoomPhoto> {
               ..translateByDouble(-_tap.dx * 1.5, -_tap.dy * 1.5, 0, 1)
               ..scaleByDouble(2.5, 2.5, 1, 1))
             : Matrix4.identity();
-        widget.onZoom(zoom);
+        _zoom(zoom);
       },
       child: InteractiveViewer(
           transformationController: _transform,
           minScale: 1,
           maxScale: 5,
-          onInteractionUpdate: (_) =>
-              widget.onZoom(_transform.value.getMaxScaleOnAxis() > 1.01),
+          panEnabled: _zoomed,
+          onInteractionStart: (details) {
+            _swipeStart = details.focalPoint;
+            _swipeDelta = Offset.zero;
+            _singlePointerSwipe = !_zoomed && details.pointerCount == 1;
+          },
+          onInteractionUpdate: (details) {
+            _swipeDelta = details.focalPoint - _swipeStart;
+            if (details.pointerCount != 1 || details.scale > 1.01 || _zoomed) {
+              _singlePointerSwipe = false;
+            }
+            _zoom(_transform.value.getMaxScaleOnAxis() > 1.01);
+          },
+          onInteractionEnd: (_) {
+            // InteractiveViewer can win Android's one-finger gesture before PageView.
+            if (_singlePointerSwipe &&
+                !_zoomed &&
+                _swipeDelta.dx.abs() >= 48 &&
+                _swipeDelta.dx.abs() > _swipeDelta.dy.abs() * 1.5) {
+              widget.onSwipe(_swipeDelta.dx < 0 ? 1 : -1);
+            }
+            _singlePointerSwipe = false;
+          },
           child: SizedBox.expand(
               child: Stack(fit: StackFit.expand, children: [
             ApiImage(
