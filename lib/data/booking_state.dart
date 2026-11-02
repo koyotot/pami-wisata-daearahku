@@ -41,7 +41,10 @@ String? bookingStatusNote(String status) => switch (status) {
 
 /// Indonesian text for an availability status.
 String availabilityStatusLabel(String status) => switch (status) {
-      'open' => 'Tersedia',
+      'open' || 'available' => 'Tersedia',
+      'sold_out' => 'Habis',
+      'unconfigured' => 'Belum dibuka',
+      'insufficient_quantity' => 'Jumlah tiket tidak mencukupi',
       'full' => 'Kuota penuh',
       'closed' => 'Pendaftaran ditutup',
       'not_open_yet' => 'Pendaftaran belum dibuka',

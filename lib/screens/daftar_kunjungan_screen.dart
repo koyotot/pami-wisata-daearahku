@@ -13,6 +13,9 @@ import '../services/api_client.dart';
 import '../services/auth_session.dart';
 import '../data/app_data.dart';
 import '../widgets/api_image.dart';
+import '../widgets/availability_calendar.dart';
+import '../widgets/international_phone_field.dart';
+import 'package:phone_numbers_parser/phone_numbers_parser.dart';
 
 // ── Palet (sama dengan home_screen.dart) ─────────────────────
 class _C {
@@ -73,7 +76,11 @@ class _DaftarKunjunganScreenState extends State<DaftarKunjunganScreen>
       widget.repository ?? BusinessRepository();
   late final BookingIntent _intent =
       widget.intent ?? BookingIntent(repository: _repository);
-  final _availability = RequestState<Availability?>();
+  final _availability = RequestState<MonthlyAvailability>();
+  late DateTime _month;
+  IsoCode _phoneCountry = IsoCode.ID;
+  String? _phoneError;
+  AuthSession get _session => _repository.api.session;
 
   /// Server-confirmed booking shown after success (number and SERVER status).
   Booking? _booking;
@@ -106,7 +113,7 @@ class _DaftarKunjunganScreenState extends State<DaftarKunjunganScreen>
       statusBarIconBrightness: Brightness.dark,
     ));
 
-    AuthSession.instance.sessionChanges.addListener(_sessionChanged);
+    _session.sessionChanges.addListener(_sessionChanged);
     _availability.addListener(_availabilityChanged);
 
     // Auto-fill data dari akun yang sedang login
@@ -116,6 +123,10 @@ class _DaftarKunjunganScreenState extends State<DaftarKunjunganScreen>
       _emailCtrl.text = currentUser!.email;
     }
     _tanggal = widget.initialDate;
+    final initial =
+        widget.initialDate ?? destinationCalendarNow(widget.wisata.timezone);
+    _month = DateTime(initial.year, initial.month);
+    _detectPhoneCountry();
     _loadAvailability();
     _loadPendingIntent();
   }
@@ -136,9 +147,11 @@ class _DaftarKunjunganScreenState extends State<DaftarKunjunganScreen>
   void _sessionChanged() {
     _namaCtrl.clear();
     _teleponCtrl.clear();
+    _phoneCountry = IsoCode.ID;
+    _phoneError = null;
     _emailCtrl.clear();
     _catatanCtrl.clear();
-    final user = AuthSession.instance.deviceSessionReady ? currentUser : null;
+    final user = _session.deviceSessionReady ? currentUser : null;
     if (user != null && user.isLaravel) {
       _namaCtrl.text = user.namaLengkap;
       _teleponCtrl.text = user.noTelepon;
@@ -155,21 +168,30 @@ class _DaftarKunjunganScreenState extends State<DaftarKunjunganScreen>
         _resolution = null;
         _intentMessage = null;
         _intentBusy = false;
+        _isLoading = false;
       });
     }
+    _detectPhoneCountry();
     _loadPendingIntent();
+  }
+
+  void _detectPhoneCountry() {
+    if (_teleponCtrl.text.trim().startsWith('+')) {
+      final phone = parseBookingPhone(_teleponCtrl.text, _phoneCountry);
+      if (phone != null) _phoneCountry = phone.isoCode;
+    }
   }
 
   /// Reads the stored unresolved attempt of the signed-in account (secure storage only).
   Future<void> _loadPendingIntent() async {
     final user = currentUser;
     if (user == null || !user.isLaravel || !widget.wisata.isLaravel) return;
-    final generation = AuthSession.instance.sessionGeneration;
+    final generation = _session.sessionGeneration;
     try {
       final pending = await _intent.pending(user.id);
       if (!mounted ||
           currentUser?.id != user.id ||
-          generation != AuthSession.instance.sessionGeneration) {
+          generation != _session.sessionGeneration) {
         return;
       }
       setState(() {
@@ -181,29 +203,41 @@ class _DaftarKunjunganScreenState extends State<DaftarKunjunganScreen>
     }
   }
 
-  /// Asks the server for the visit date's availability; the newest request wins.
+  /// Reset before every load so a previous month/quantity cannot enable submit.
   void _loadAvailability() {
-    final date = _tanggal;
     _availability.reset();
-    if (date == null || !widget.wisata.isLaravel) return;
+    if (!widget.wisata.isLaravel) return;
     final guid = widget.wisata.id;
-    final visitDate = formatVisitDate(date);
+    final month =
+        '${_month.year.toString().padLeft(4, '0')}-${_month.month.toString().padLeft(2, '0')}';
+    final quantity = _jumlahOrang;
     _availability.load(() async {
-      final rows =
-          await _repository.availability(guid, visitDate: visitDate);
-      return availabilityFor(rows, visitDate);
+      final response =
+          await _repository.monthlyAvailability(guid, month, quantity);
+      if (response.destinationGuid != guid ||
+          response.month != month ||
+          response.requestedQuantity != quantity) {
+        throw const ApiException(
+            'Respons ketersediaan tidak sesuai permintaan.');
+      }
+      return response;
     });
   }
 
-  bool get _availabilityReady =>
-      _tanggal != null &&
-      !_availability.loading &&
-      _availability.error == null &&
-      _availability.data != null;
+  AvailabilityDay? get _selectedAvailability => _tanggal == null
+      ? null
+      : _availability.data?.onDate(formatVisitDate(_tanggal!));
 
   bool get _canSubmit =>
-      _availabilityReady &&
-      canBookAvailability(_availability.data, _jumlahOrang);
+      !_availability.loading &&
+      _availability.error == null &&
+      _availability.data?.requestedQuantity == _jumlahOrang &&
+      _selectedAvailability?.bookable == true;
+
+  void _changeQuantity(int quantity) {
+    setState(() => _jumlahOrang = quantity);
+    _loadAvailability();
+  }
 
   /// Open day with enough remaining capacity, no unresolved earlier attempt, nothing in flight.
   bool get _submitEnabled =>
@@ -215,7 +249,7 @@ class _DaftarKunjunganScreenState extends State<DaftarKunjunganScreen>
 
   @override
   void dispose() {
-    AuthSession.instance.sessionChanges.removeListener(_sessionChanged);
+    _session.sessionChanges.removeListener(_sessionChanged);
     _availability.removeListener(_availabilityChanged);
     _availability.dispose();
     _animCtrl.dispose();
@@ -224,32 +258,6 @@ class _DaftarKunjunganScreenState extends State<DaftarKunjunganScreen>
     _emailCtrl.dispose();
     _catatanCtrl.dispose();
     super.dispose();
-  }
-
-  Future<void> _pickDate() async {
-    final now = DateTime.now();
-    final picked = await showDatePicker(
-      context: context,
-      initialDate: _tanggal ?? now.add(const Duration(days: 1)),
-      firstDate: now,
-      lastDate: now.add(const Duration(days: 365)),
-      builder: (ctx, child) => Theme(
-        data: Theme.of(ctx).copyWith(
-          colorScheme: const ColorScheme.light(
-            primary: Color(0xFF1976D2),
-            onPrimary: Colors.white,
-            surface: Colors.white,
-            onSurface: Color(0xFF102D59),
-          ),
-          dialogBackgroundColor: Colors.white,
-        ),
-        child: child!,
-      ),
-    );
-    if (picked != null) {
-      setState(() => _tanggal = picked);
-      _loadAvailability();
-    }
   }
 
   void _showMessage(String message) {
@@ -268,6 +276,7 @@ class _DaftarKunjunganScreenState extends State<DaftarKunjunganScreen>
       _resolution = null;
       _intentMessage = null;
     });
+    _loadAvailability();
     BookingEvents.notify();
     _showMessage(
         'Pendaftaran ${booking.bookingNumber}: ${bookingStatusLabel(booking.status)}');
@@ -307,51 +316,77 @@ class _DaftarKunjunganScreenState extends State<DaftarKunjunganScreen>
       _showMessage('Kuota untuk tanggal dan jumlah ini belum tersedia.');
       return;
     }
-    final generation = AuthSession.instance.sessionGeneration;
-    setState(() => _isLoading = true);
+    final generation = _session.sessionGeneration;
+    setState(() {
+      _isLoading = true;
+      _phoneError = null;
+    });
     final fields = <String, dynamic>{
       'destination_guid': widget.wisata.id,
       'visit_date': formatVisitDate(_tanggal!),
       'quantity': _jumlahOrang,
       'visitor_name': _namaCtrl.text.trim(),
       'visitor_email': _emailCtrl.text.trim(),
-      'visitor_phone': _teleponCtrl.text.trim(),
+      'visitor_phone':
+          parseBookingPhone(_teleponCtrl.text, _phoneCountry)!.international,
       'notes': _catatanCtrl.text.trim(),
     };
     try {
       final booking = await _intent.submit(user.id, fields);
       if (!mounted ||
           currentUser?.id != user.id ||
-          generation != AuthSession.instance.sessionGeneration) {
+          generation != _session.sessionGeneration) {
         return;
       }
       _onBooked(booking);
     } catch (error) {
       if (!mounted ||
           currentUser?.id != user.id ||
-          generation != AuthSession.instance.sessionGeneration) {
+          generation != _session.sessionGeneration) {
         return;
+      }
+      if (error is ApiException && error.status == 422) {
+        setState(() => _phoneError = error.fieldErrors['visitor_phone']);
       }
       _showMessage(bookingErrorMessage(error, mutation: true));
       // An unknown outcome leaves the intent behind: surface it. A definitive refusal
       // removed it and the capacity shown may be outdated, so ask the server again.
       await _loadPendingIntent();
-      if (_pendingFields == null) _loadAvailability();
+      if (!_sameSession(user, generation)) return;
+      await _resolveConflict(error, user, generation);
+      if (_sameSession(user, generation)) _loadAvailability();
     } finally {
-      if (mounted) setState(() => _isLoading = false);
+      if (_sameSession(user, generation)) setState(() => _isLoading = false);
+    }
+  }
+
+  Future<void> _resolveConflict(Object error, User user, int generation) async {
+    if (error is! ApiException || error.status != 409) return;
+    setState(() => _tanggal = null);
+    if (_pendingFields == null) return;
+    try {
+      final result = await _intent.reconcile(user.id);
+      if (!_sameSession(user, generation)) return;
+      if (result is IntentCompleted) {
+        _onBooked(result.booking);
+      } else {
+        setState(() => _resolution = result);
+      }
+    } catch (_) {
+      // Keep the stored intent available for explicit reconciliation.
     }
   }
 
   bool _sameSession(User user, int generation) =>
       mounted &&
       currentUser?.id == user.id &&
-      generation == AuthSession.instance.sessionGeneration;
+      generation == _session.sessionGeneration;
 
   /// "Periksa hasil": asks the server what happened to the earlier attempt.
   Future<void> _checkIntent() async {
     final user = currentUser;
     if (user == null || _intentBusy || _isLoading) return;
-    final generation = AuthSession.instance.sessionGeneration;
+    final generation = _session.sessionGeneration;
     setState(() {
       _intentBusy = true;
       _intentMessage = null;
@@ -385,7 +420,7 @@ class _DaftarKunjunganScreenState extends State<DaftarKunjunganScreen>
       if (!_sameSession(user, generation)) return;
       setState(() => _intentMessage = bookingErrorMessage(error));
     } finally {
-      if (mounted) setState(() => _intentBusy = false);
+      if (_sameSession(user, generation)) setState(() => _intentBusy = false);
     }
   }
 
@@ -402,7 +437,7 @@ class _DaftarKunjunganScreenState extends State<DaftarKunjunganScreen>
         !resolution.replaySafe) {
       return;
     }
-    final generation = AuthSession.instance.sessionGeneration;
+    final generation = _session.sessionGeneration;
     setState(() {
       _intentBusy = true;
       _intentMessage = null;
@@ -419,8 +454,11 @@ class _DaftarKunjunganScreenState extends State<DaftarKunjunganScreen>
         _intentMessage = bookingErrorMessage(error, mutation: true);
       });
       await _loadPendingIntent();
+      if (!_sameSession(user, generation)) return;
+      await _resolveConflict(error, user, generation);
+      if (_sameSession(user, generation)) _loadAvailability();
     } finally {
-      if (mounted) setState(() => _intentBusy = false);
+      if (_sameSession(user, generation)) setState(() => _intentBusy = false);
     }
   }
 
@@ -444,7 +482,7 @@ class _DaftarKunjunganScreenState extends State<DaftarKunjunganScreen>
               ],
             ));
     if (confirm != true || !mounted) return;
-    final generation = AuthSession.instance.sessionGeneration;
+    final generation = _session.sessionGeneration;
     if (currentUser?.id != user.id) return;
     setState(() {
       _intentBusy = true;
@@ -467,9 +505,10 @@ class _DaftarKunjunganScreenState extends State<DaftarKunjunganScreen>
       }
     } catch (error) {
       if (!_sameSession(user, generation)) return;
-      setState(() => _intentMessage = bookingErrorMessage(error, mutation: true));
+      setState(
+          () => _intentMessage = bookingErrorMessage(error, mutation: true));
     } finally {
-      if (mounted) setState(() => _intentBusy = false);
+      if (_sameSession(user, generation)) setState(() => _intentBusy = false);
     }
   }
 
@@ -536,16 +575,23 @@ class _DaftarKunjunganScreenState extends State<DaftarKunjunganScreen>
                 ),
                 const SizedBox(height: 14),
 
-                _DarkField(
+                InternationalPhoneField(
                   controller: _teleponCtrl,
-                  label: 'Nomor Telepon',
-                  hint: 'Contoh: 08123456789',
-                  icon: Icons.phone_rounded,
-                  keyboardType: TextInputType.phone,
-                  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                  validator: (v) => (v == null || v.trim().length < 8)
-                      ? 'Nomor telepon tidak valid'
-                      : null,
+                  country: _phoneCountry,
+                  error: _phoneError,
+                  onCountryChanged: (country) => setState(() {
+                    _phoneCountry = country;
+                    _phoneError = null;
+                    if (_teleponCtrl.text.trim().startsWith('+')) {
+                      final phone =
+                          parseBookingPhone(_teleponCtrl.text, country);
+                      if (phone != null) _teleponCtrl.text = phone.nsn;
+                    }
+                  }),
+                  onChanged: () => setState(() {
+                    _phoneError = null;
+                    _detectPhoneCountry();
+                  }),
                 ),
                 const SizedBox(height: 14),
 
@@ -556,10 +602,11 @@ class _DaftarKunjunganScreenState extends State<DaftarKunjunganScreen>
                   icon: Icons.email_rounded,
                   keyboardType: TextInputType.emailAddress,
                   // Backend mewajibkan email yang valid (StoreBookingRequest).
-                  validator: (v) =>
-                      (v == null || !RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$').hasMatch(v.trim()))
-                          ? 'Email tidak valid'
-                          : null,
+                  validator: (v) => (v == null ||
+                          !RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$')
+                              .hasMatch(v.trim()))
+                      ? 'Email tidak valid'
+                      : null,
                 ),
                 const SizedBox(height: 28),
 
@@ -567,63 +614,27 @@ class _DaftarKunjunganScreenState extends State<DaftarKunjunganScreen>
                 _sectionLabel('Detail Kunjungan'),
                 const SizedBox(height: 14),
 
-                // Tanggal Kunjungan
-                GestureDetector(
-                  onTap: _pickDate,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 16, vertical: 16),
-                    decoration: BoxDecoration(
-                      color: _C.card,
-                      borderRadius: BorderRadius.circular(14),
-                      border: Border.all(color: _C.border),
-                    ),
-                    child: Row(
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.all(8),
-                          decoration: BoxDecoration(
-                            color: _C.teal.withValues(alpha: 0.12),
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                          child: Icon(Icons.calendar_today_rounded,
-                              color: _C.teal, size: 18),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text('Tanggal Kunjungan',
-                                  style: TextStyle(
-                                      color: _C.textDim,
-                                      fontSize: 11,
-                                      fontWeight: FontWeight.w500)),
-                              const SizedBox(height: 2),
-                              Text(
-                                _tanggal == null
-                                    ? 'Pilih tanggal'
-                                    : '${_tanggal!.day.toString().padLeft(2, '0')}/${_tanggal!.month.toString().padLeft(2, '0')}/${_tanggal!.year}',
-                                style: TextStyle(
-                                  color:
-                                      _tanggal == null ? _C.textDim : _C.text,
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        Icon(Icons.chevron_right_rounded,
-                            color: _C.textDim, size: 20),
-                      ],
-                    ),
-                  ),
+                AvailabilityCalendar(
+                  month: _month,
+                  availability: _availability.data,
+                  selectedDate:
+                      _tanggal == null ? null : formatVisitDate(_tanggal!),
+                  enabled: !_availability.loading &&
+                      _availability.error == null &&
+                      !_isLoading &&
+                      !_intentBusy,
+                  onMonthChanged: (month) {
+                    setState(() {
+                      _month = month;
+                      _tanggal = null;
+                    });
+                    _loadAvailability();
+                  },
+                  onSelected: (day) =>
+                      setState(() => _tanggal = DateTime.parse(day.date)),
                 ),
-                if (_tanggal != null) ...[
-                  const SizedBox(height: 10),
-                  _buildAvailability(),
-                ],
+                const SizedBox(height: 10),
+                _buildAvailability(),
                 const SizedBox(height: 14),
 
                 // Jumlah Orang
@@ -672,7 +683,7 @@ class _DaftarKunjunganScreenState extends State<DaftarKunjunganScreen>
                           _CounterBtn(
                             icon: Icons.remove_rounded,
                             onTap: _jumlahOrang > 1
-                                ? () => setState(() => _jumlahOrang--)
+                                ? () => _changeQuantity(_jumlahOrang - 1)
                                 : null,
                           ),
                           Padding(
@@ -689,7 +700,7 @@ class _DaftarKunjunganScreenState extends State<DaftarKunjunganScreen>
                           _CounterBtn(
                             icon: Icons.add_rounded,
                             onTap: _jumlahOrang < 50
-                                ? () => setState(() => _jumlahOrang++)
+                                ? () => _changeQuantity(_jumlahOrang + 1)
                                 : null,
                           ),
                         ],
@@ -822,7 +833,7 @@ class _DaftarKunjunganScreenState extends State<DaftarKunjunganScreen>
         ]),
       );
     }
-    final availability = _availability.data;
+    final availability = _selectedAvailability;
     if (availability == null) {
       return _infoCard(
         accent: _C.danger,
@@ -831,8 +842,8 @@ class _DaftarKunjunganScreenState extends State<DaftarKunjunganScreen>
             style: TextStyle(color: _C.danger, fontSize: 12.5)),
       );
     }
-    final ok = canBookAvailability(availability, _jumlahOrang);
-    final tooMany = availability.isOpen && _jumlahOrang > availability.remaining;
+    final ok = availability.bookable;
+    final tooMany = availability.status == 'insufficient_quantity';
     return _infoCard(
       accent: ok ? null : _C.danger,
       child: Column(
@@ -845,11 +856,11 @@ class _DaftarKunjunganScreenState extends State<DaftarKunjunganScreen>
                   fontWeight: FontWeight.w700)),
           const SizedBox(height: 2),
           Text(
-              'Kuota total ${availability.capacity} · sisa ${availability.remaining}',
+              'Kuota total ${availability.capacity ?? '—'} · sisa ${availability.remaining ?? '—'}',
               style: const TextStyle(color: _C.textMuted, fontSize: 12.5)),
           if (tooMany)
             Text(
-                'Jumlah pengunjung melebihi sisa kuota (${availability.remaining}).',
+                'Jumlah pengunjung melebihi sisa kuota (${availability.remaining ?? '—'}).',
                 style: const TextStyle(color: _C.danger, fontSize: 12.5)),
         ],
       ),
@@ -889,8 +900,7 @@ class _DaftarKunjunganScreenState extends State<DaftarKunjunganScreen>
   Widget _buildIntentPanel(Map<String, dynamic> pending) {
     final resolution = _resolution;
     final canResend = resolution is IntentNotFound && resolution.replaySafe;
-    final sameDestination =
-        pending['destination_guid'] == widget.wisata.id;
+    final sameDestination = pending['destination_guid'] == widget.wisata.id;
     return _infoCard(
       accent: _C.gold,
       child: Column(
@@ -1090,7 +1100,6 @@ class _DarkField extends StatelessWidget {
   final String hint;
   final IconData icon;
   final TextInputType? keyboardType;
-  final List<TextInputFormatter>? inputFormatters;
   final String? Function(String?)? validator;
   final int maxLines;
 
@@ -1100,7 +1109,6 @@ class _DarkField extends StatelessWidget {
     required this.hint,
     required this.icon,
     this.keyboardType,
-    this.inputFormatters,
     this.validator,
     this.maxLines = 1,
   });
@@ -1110,7 +1118,6 @@ class _DarkField extends StatelessWidget {
     return TextFormField(
       controller: controller,
       keyboardType: keyboardType,
-      inputFormatters: inputFormatters,
       maxLines: maxLines,
       validator: validator,
       style: const TextStyle(color: Color(0xFF102D59), fontSize: 14),

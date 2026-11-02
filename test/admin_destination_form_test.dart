@@ -18,6 +18,21 @@ void main() {
     addTearDown(tester.view.reset);
     final log = <http.Request>[];
     final session = await adminSession((request) async {
+      if (request.method == 'GET' && request.url.path.endsWith('/facilities')) {
+        return jsonResponse(pageEnvelope([]));
+      }
+      if (request.method == 'GET' &&
+          request.url.path.endsWith('/admin/destinations/dest-1')) {
+        return jsonResponse({
+          'data': {
+            'guid': 'dest-1',
+            'name': 'Pantai Server',
+            'rating_average': 4.3,
+            'rating_count': 7,
+            'facilities': [],
+          }
+        });
+      }
       if (request.method == 'GET') {
         return jsonResponse(pageEnvelope([
           {

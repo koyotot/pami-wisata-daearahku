@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -16,26 +18,81 @@ class FormRepository extends BusinessRepository {
   BookingIntentState? intentAnswer;
   int posts = 0;
   int availabilityCalls = 0;
-  String? lastVisitDate;
+  String? lastMonth;
+  int intentCalls = 0;
+  Future<MonthlyAvailability> Function(String month, int quantity)? monthlyHook;
+  Future<Booking> Function(Json fields)? createHook;
+  Json? postedFields;
 
   @override
-  Future<List<Availability>> availability(String destinationGuid,
-      {String? visitDate, String? from, String? to}) async {
+  Future<MonthlyAvailability> monthlyAvailability(
+      String destinationGuid, String month, int quantity) async {
     availabilityCalls++;
-    lastVisitDate = visitDate;
+    lastMonth = month;
+    if (monthlyHook != null) return monthlyHook!(month, quantity);
     final answer = availabilityAnswer;
-    return answer == null ? [] : [answer];
+    return MonthlyAvailability({
+      'destination_guid': destinationGuid,
+      'month': month,
+      'timezone': 'Asia/Jakarta',
+      'requested_quantity': quantity,
+      'dates': answer == null
+          ? []
+          : [
+              {
+                'date': answer.visitDate,
+                'capacity': answer.capacity,
+                'remaining': answer.remaining,
+                'remaining_percent': answer.capacity == 0
+                    ? null
+                    : answer.remaining / answer.capacity * 100,
+                'level': answer.remaining > 0 ? 'low' : 'none',
+                'status': answer.isOpen
+                    ? (quantity <= answer.remaining
+                        ? 'available'
+                        : 'insufficient_quantity')
+                    : 'sold_out',
+                'bookable': answer.isOpen && quantity <= answer.remaining,
+              }
+            ],
+    });
   }
 
   @override
   Future<Booking> createBooking(Json fields, String idempotencyKey) async {
     posts++;
+    postedFields = Map.of(fields);
+    if (createHook != null) return createHook!(fields);
     return Booking(bookingJson());
   }
 
   @override
-  Future<BookingIntentState> bookingIntent(String key) async => intentAnswer!;
+  Future<BookingIntentState> bookingIntent(String key) async {
+    intentCalls++;
+    return intentAnswer!;
+  }
 }
+
+MonthlyAvailability monthAnswer(String month, int quantity,
+        {int remaining = 10}) =>
+    MonthlyAvailability({
+      'destination_guid': 'dest-1',
+      'month': month,
+      'timezone': 'Asia/Jakarta',
+      'requested_quantity': quantity,
+      'dates': [
+        {
+          'date': '$month-10',
+          'capacity': 100,
+          'remaining': remaining,
+          'remaining_percent': remaining.toDouble(),
+          'level': 'low',
+          'status':
+              quantity <= remaining ? 'available' : 'insufficient_quantity',
+          'bookable': quantity <= remaining,
+        }
+      ],
+    });
 
 Availability availability(String status,
         {int capacity = 10, int allocated = 0, String date = '2027-03-10'}) =>
@@ -62,7 +119,7 @@ void main() {
         id: 'user-1',
         namaLengkap: 'User',
         email: 'u@example.test',
-        noTelepon: '0812345678',
+        noTelepon: '+6289655862781',
         password: '',
         createdAt: DateTime(2026),
         isLaravel: true);
@@ -84,9 +141,11 @@ void main() {
     await tester.pumpAndSettle();
   }
 
-  bool submitEnabled(WidgetTester tester) => tester
-      .widget<GestureDetector>(find.byKey(const ValueKey('submitButton')))
-      .onTap != null;
+  bool submitEnabled(WidgetTester tester) =>
+      tester
+          .widget<GestureDetector>(find.byKey(const ValueKey('submitButton')))
+          .onTap !=
+      null;
 
   testWidgets('a full day shows the server numbers and disables submit',
       (tester) async {
@@ -94,8 +153,8 @@ void main() {
         availability('full', capacity: 10, allocated: 10);
     await pumpForm(tester);
 
-    expect(repository.lastVisitDate, '2027-03-10');
-    expect(find.text('Kuota penuh'), findsOneWidget);
+    expect(repository.lastMonth, '2027-03');
+    expect(find.text('Habis'), findsWidgets);
     expect(find.text('Kuota total 10 · sisa 0'), findsOneWidget);
     expect(submitEnabled(tester), isFalse);
 
@@ -104,7 +163,8 @@ void main() {
     expect(repository.posts, 0);
   });
 
-  testWidgets('an open day enables submit only while quantity fits the remaining',
+  testWidgets(
+      'an open day enables submit only while quantity fits the remaining',
       (tester) async {
     repository.availabilityAnswer =
         availability('open', capacity: 10, allocated: 9); // remaining 1
@@ -114,16 +174,149 @@ void main() {
     expect(submitEnabled(tester), isTrue);
 
     await tester.tap(find.byIcon(Icons.add_rounded));
-    await tester.pump();
+    await tester.pumpAndSettle();
     expect(submitEnabled(tester), isFalse);
-    expect(find.textContaining('melebihi sisa kuota'), findsOneWidget);
+    expect(repository.availabilityCalls, 2);
   });
 
-  testWidgets('a day without a published quota is not bookable', (tester) async {
+  testWidgets('a day without a published quota is not bookable',
+      (tester) async {
     repository.availabilityAnswer = null;
     await pumpForm(tester);
     expect(find.textContaining('belum tersedia'), findsWidgets);
     expect(submitEnabled(tester), isFalse);
+  });
+
+  testWidgets('old quantity response cannot overwrite newer calendar',
+      (tester) async {
+    final oldReply = Completer<MonthlyAvailability>();
+    repository.monthlyHook = (month, quantity) => quantity == 2
+        ? oldReply.future
+        : Future.value(monthAnswer(month, quantity));
+    await pumpForm(tester);
+    expect(submitEnabled(tester), isTrue);
+    await tester.tap(find.byIcon(Icons.add_rounded));
+    await tester.pump();
+    expect(submitEnabled(tester), isFalse,
+        reason: 'unverified quantity cannot submit');
+    await tester.tap(find.byIcon(Icons.add_rounded));
+    await tester.pumpAndSettle();
+    expect(submitEnabled(tester), isTrue);
+    oldReply.complete(monthAnswer('2027-03', 2, remaining: 0));
+    await tester.pumpAndSettle();
+    expect(find.text('Kuota total 100 · sisa 10'), findsOneWidget);
+    expect(submitEnabled(tester), isTrue);
+  });
+
+  testWidgets(
+      'nullable quota summary shows missing values without inventing zero',
+      (tester) async {
+    repository.monthlyHook = (month, quantity) async => MonthlyAvailability({
+          ...monthAnswer(month, quantity).json,
+          'dates': [
+            {
+              'date': '$month-10',
+              'capacity': null,
+              'remaining': null,
+              'remaining_percent': null,
+              'level': 'none',
+              'status': 'unconfigured',
+              'bookable': false,
+            }
+          ],
+        });
+    await pumpForm(tester);
+    expect(find.text('Kuota total — · sisa —'), findsOneWidget);
+    expect(submitEnabled(tester), isFalse);
+    expect(find.textContaining('null'), findsNothing);
+  });
+
+  testWidgets('old month response cannot overwrite the visible month',
+      (tester) async {
+    final oldReply = Completer<MonthlyAvailability>();
+    repository.monthlyHook = (month, quantity) => month == '2027-04'
+        ? oldReply.future
+        : Future.value(monthAnswer(month, quantity));
+    await pumpForm(tester);
+    await tester.tap(find.byTooltip('Bulan berikutnya'));
+    await tester.pump();
+    await tester.tap(find.byTooltip('Bulan berikutnya'));
+    await tester.pumpAndSettle();
+    expect(find.text('2027-05'), findsOneWidget);
+    oldReply.complete(monthAnswer('2027-04', 1, remaining: 0));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('availability-2027-05-10')));
+    await tester.pump();
+    expect(find.text('Kuota total 100 · sisa 10'), findsOneWidget);
+    expect(submitEnabled(tester), isTrue);
+  });
+
+  testWidgets('logout drops in-flight calendar and clears phone contact',
+      (tester) async {
+    final oldReply = Completer<MonthlyAvailability>();
+    repository.monthlyHook = (month, quantity) => quantity == 2
+        ? oldReply.future
+        : Future.value(monthAnswer(month, quantity));
+    await pumpForm(tester);
+    await tester.tap(find.byIcon(Icons.add_rounded));
+    await tester.pump();
+    await tester.runAsync(() => repository.api.session.clear());
+    oldReply.complete(monthAnswer('2027-03', 2));
+    await tester.pumpAndSettle();
+    expect(submitEnabled(tester), isFalse);
+    expect(find.text('Kuota total 100 · sisa 10'), findsNothing);
+    expect(
+        tester
+            .widget<TextFormField>(find.byKey(const ValueKey('bookingPhone')))
+            .controller!
+            .text,
+        isEmpty);
+  });
+
+  testWidgets('phone 422 stays inline with form and original input retained',
+      (tester) async {
+    repository.availabilityAnswer = availability('open');
+    repository.createHook = (_) async => throw const ApiException(
+        'Nomor ditolak server',
+        422,
+        null,
+        null,
+        {'visitor_phone': 'Nomor kontak tidak valid.'});
+    await pumpForm(tester);
+    await tester.tap(find.byKey(const ValueKey('submitButton')));
+    await tester.pumpAndSettle();
+    expect(find.text('Nomor kontak tidak valid.'), findsOneWidget);
+    expect(repository.posts, 1);
+    expect(repository.postedFields!['visitor_phone'], '+6289655862781');
+    expect(find.byKey(const ValueKey('bookingPhone')), findsOneWidget);
+    expect(
+        await const FlutterSecureStorage().read(key: 'booking_intent_user-1'),
+        isNull);
+  });
+
+  testWidgets(
+      'ambiguous 409 reconciles intent and refreshes without second POST',
+      (tester) async {
+    repository.availabilityAnswer = availability('open');
+    repository.createHook = (_) async =>
+        throw const ApiException('Kuota berubah', 409, 'quota_changed');
+    repository.intentAnswer = BookingIntentState({
+      'state': 'not_found',
+      'replay_safe': true,
+      'key_expired': false,
+      'booking': null,
+    });
+    await pumpForm(tester);
+    await tester.tap(find.byKey(const ValueKey('submitButton')));
+    await tester.pumpAndSettle();
+    expect(repository.posts, 1);
+    expect(repository.intentCalls, 1);
+    expect(repository.availabilityCalls, 2);
+    expect(find.byKey(const ValueKey('intentPanel')), findsOneWidget);
+    expect(submitEnabled(tester), isFalse);
+    expect(
+        await const FlutterSecureStorage().read(key: 'booking_intent_user-1'),
+        isNotNull);
   });
 
   testWidgets(
@@ -156,7 +349,8 @@ void main() {
     expect(repository.posts, 0, reason: 'checking must never create a booking');
   });
 
-  testWidgets('a completed check shows the booking number and the SERVER status',
+  testWidgets(
+      'a completed check shows the booking number and the SERVER status',
       (tester) async {
     repository.availabilityAnswer = availability('open');
     await const FlutterSecureStorage().write(
@@ -177,7 +371,8 @@ void main() {
     expect(find.text('Nomor: BK-777'), findsOneWidget);
     expect(find.text('Status: Menunggu pembayaran'), findsOneWidget);
     expect(find.byKey(const ValueKey('intentPanel')), findsNothing);
-    expect(await const FlutterSecureStorage().read(key: 'booking_intent_user-1'),
+    expect(
+        await const FlutterSecureStorage().read(key: 'booking_intent_user-1'),
         isNull);
     expect(find.textContaining('QR'), findsNothing);
   });

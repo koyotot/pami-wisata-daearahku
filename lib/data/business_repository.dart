@@ -14,6 +14,19 @@ class Category {
   bool get isActive => json['is_active'] as bool? ?? true;
 }
 
+class Facility {
+  final Json json;
+  Facility(this.json) {
+    guid;
+    name;
+  }
+  String get guid => json['guid'] as String;
+  String get name => json['name'] as String;
+  String get slug => json['slug'] as String? ?? '';
+  String? get iconKey => json['icon_key'] as String?;
+  bool get isActive => json['is_active'] as bool? ?? true;
+}
+
 class Destination {
   final Json json;
   Destination(this.json) {
@@ -34,6 +47,9 @@ class Destination {
   bool get isActive => json['is_active'] as bool? ?? true;
   double? get ratingAverage => (json['rating_average'] as num?)?.toDouble();
   int get ratingCount => (json['rating_count'] as num?)?.toInt() ?? 0;
+  List<Facility> get facilities => (json['facilities'] as List? ?? const [])
+      .map((item) => Facility(item as Json))
+      .toList();
 
   /// Path relative to the API base URL (versioned by Laravel), or null without a picture.
   /// `image_path` is never used: it is an internal storage path, not a URL.
@@ -128,6 +144,38 @@ class Availability {
       DateTime.tryParse(json['booking_closes_at'] as String? ?? '');
 }
 
+/// Calendar-only destination date; nullable quota values remain unknown.
+class AvailabilityDay {
+  final Json json;
+  AvailabilityDay(this.json);
+  String get date => json['date'] as String;
+  int? get capacity => (json['capacity'] as num?)?.toInt();
+  int? get remaining => (json['remaining'] as num?)?.toInt();
+  double? get remainingPercent =>
+      (json['remaining_percent'] as num?)?.toDouble();
+  String get level => json['level'] as String? ?? 'none';
+  String get status => json['status'] as String? ?? 'unavailable';
+  bool get bookable => json['bookable'] == true && status == 'available';
+}
+
+class MonthlyAvailability {
+  final Json json;
+  MonthlyAvailability(this.json);
+  String get destinationGuid => json['destination_guid'] as String;
+  String get month => json['month'] as String;
+  String get timezone => json['timezone'] as String;
+  int get requestedQuantity => (json['requested_quantity'] as num).toInt();
+  List<AvailabilityDay> get dates => (json['dates'] as List)
+      .map((item) => AvailabilityDay(item as Json))
+      .toList();
+  AvailabilityDay? onDate(String date) {
+    for (final day in dates) {
+      if (day.date == date) return day;
+    }
+    return null;
+  }
+}
+
 /// Administrative quota row: total capacity, allocated and remaining are distinct values.
 class QuotaEntry {
   final Json json;
@@ -198,6 +246,48 @@ class BusinessRepository {
   Future<Destination> destination(String guid) async =>
       Destination(await api.object('GET', 'destinations/${_id(guid)}'));
 
+  Future<ApiPage<Facility>> superadminFacilities(
+          {String status = 'all', int page = 1, int perPage = 50}) =>
+      api.collection(
+          _path('superadmin/facilities', {
+            'status': status,
+            'page': '$page',
+            'per_page': '$perPage',
+          }),
+          Facility.new,
+          authenticated: true);
+
+  Future<ApiPage<Facility>> activeFacilities(
+          {int page = 1, int perPage = 50}) =>
+      api.collection(
+          _path('facilities', {
+            'page': '$page',
+            'per_page': '$perPage',
+          }),
+          Facility.new,
+          authenticated: true);
+
+  Future<Facility> createFacility(Json fields) async =>
+      Facility(await api.object('POST', 'superadmin/facilities',
+          authenticated: true, body: {...fields, 'icon_key': null}));
+
+  Future<Facility> updateFacility(String guid, Json fields) async =>
+      Facility(await api.object('PATCH', 'superadmin/facilities/${_id(guid)}',
+          authenticated: true,
+          body: {...fields, 'icon_key': null}..remove('slug')));
+
+  Future<void> deactivateFacility(String guid) async {
+    await api.object('DELETE', 'superadmin/facilities/${_id(guid)}',
+        authenticated: true);
+  }
+
+  Future<Destination> assignDestinationFacilities(
+          String guid, List<String> facilityGuids) async =>
+      Destination(await api.object(
+          'PUT', 'admin/destinations/${_id(guid)}/facilities',
+          authenticated: true,
+          body: {'facility_guids': facilityGuids.toSet().toList()}));
+
   /// Image bytes for a destination's `image_url` (public, active destinations).
   Future<BinaryResponse> imageBytes(String imageUrl) =>
       api.session.publicBytes(imageUrl);
@@ -248,6 +338,16 @@ class BusinessRepository {
         authenticated: true);
     return page.items;
   }
+
+  Future<MonthlyAvailability> monthlyAvailability(
+          String destinationGuid, String month, int quantity) async =>
+      MonthlyAvailability(await api.object(
+          'GET',
+          _path('destinations/${_id(destinationGuid)}/availability', {
+            'month': month,
+            'quantity': '$quantity',
+          }),
+          authenticated: true));
 
   // ── Booking reconciliation ─────────────────────────────────
   Future<BookingIntentState> bookingIntent(String key) async =>

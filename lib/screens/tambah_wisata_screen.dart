@@ -8,6 +8,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../data/admin_state.dart';
+import '../data/facility_state.dart';
 import '../data/app_data.dart';
 import '../data/business_repository.dart';
 import '../services/auth_session.dart';
@@ -58,6 +59,8 @@ class _TambahWisataScreenState extends State<TambahWisataScreen> {
   late final AuthSession _session = widget.session ?? AuthSession.instance;
   late final PagedListController<Category> _categories;
   String? _categoryGuid;
+  String? _savedDestinationGuid;
+  late final DestinationFacilitiesState _facilities;
   late String _timezone;
   late final int _sessionGeneration;
 
@@ -88,11 +91,20 @@ class _TambahWisataScreenState extends State<TambahWisataScreen> {
       keyOf: (category) => category.guid,
       fetchPage: (page, _) => _repository.categories(query: {'page': '$page'}),
     )..addListener(_onCategories);
-    _load();
+    _facilities = DestinationFacilitiesState(_repository, session: _session)
+      ..addListener(_onCategories);
+    _savedDestinationGuid = w?.id;
+    if (canAccessAdmin(_session.role)) {
+      _load();
+      _facilities.load(w?.id);
+    }
   }
 
   @override
   void dispose() {
+    _facilities
+      ..removeListener(_onCategories)
+      ..dispose();
     _categories
       ..removeListener(_onCategories)
       ..dispose();
@@ -246,7 +258,8 @@ class _TambahWisataScreenState extends State<TambahWisataScreen> {
   Future<void> _simpan() async {
     if (_isSaving || !_formKey.currentState!.validate()) return;
     final edit = widget.wisataEdit;
-    if (!_session.isCurrentGeneration(_sessionGeneration)) {
+    if (!_session.isCurrentGeneration(_sessionGeneration) ||
+        !canAccessAdmin(_session.role)) {
       _snack('Sesi telah berakhir. Silakan masuk kembali.');
       return;
     }
@@ -280,10 +293,32 @@ class _TambahWisataScreenState extends State<TambahWisataScreen> {
         bytes == null ? null : UploadFile('image', bytes, _imageName);
     setState(() => _isSaving = true);
     try {
-      if (edit == null) {
-        await _repository.createDestination(fields, image: upload);
+      if (_savedDestinationGuid == null) {
+        final created =
+            await _repository.createDestination(fields, image: upload);
+        if (!mounted || !_session.isCurrentGeneration(_sessionGeneration)) {
+          return;
+        }
+        _savedDestinationGuid = created.guid;
+        _imageBytes = null;
       } else {
-        await _repository.updateDestination(edit.id, fields, image: upload);
+        await _repository.updateDestination(_savedDestinationGuid!, fields,
+            image: upload);
+        if (!mounted || !_session.isCurrentGeneration(_sessionGeneration)) {
+          return;
+        }
+        _imageBytes = null;
+      }
+      if (_facilities.changed) {
+        final failure = await _facilities.save(_savedDestinationGuid!);
+        if (!mounted || !_session.isCurrentGeneration(_sessionGeneration)) {
+          return;
+        }
+        if (failure != null) {
+          _snack(
+              'Destinasi sudah tersimpan. Fasilitas: $failure Tidak perlu menambah destinasi lagi.');
+          return;
+        }
       }
       if (!mounted || !_session.isCurrentGeneration(_sessionGeneration)) return;
       _snack(
@@ -332,8 +367,15 @@ class _TambahWisataScreenState extends State<TambahWisataScreen> {
   }
 
   Widget _buildScaffold(BuildContext context) {
-    final isEdit = widget.wisataEdit != null;
+    final isEdit = widget.wisataEdit != null || _savedDestinationGuid != null;
 
+    if (!canAccessAdmin(_session.role) ||
+        !_session.isCurrentGeneration(_sessionGeneration)) {
+      return Scaffold(
+          appBar: AppBar(title: const Text('Kelola Wisata')),
+          body: const Center(
+              child: Text('Akses ditolak. Silakan masuk kembali.')));
+    }
     return Scaffold(
       backgroundColor: _C.bg,
       body: Form(
@@ -567,6 +609,8 @@ class _TambahWisataScreenState extends State<TambahWisataScreen> {
                     const SizedBox(height: 24),
 
                     // ── Rating ───────────────────────────────────
+                    _fasilitasPicker(),
+                    const SizedBox(height: 24),
                     _sectionLabel(isEdit ? 'Rating Destinasi' : 'Rating Awal'),
                     const SizedBox(height: 14),
                     _ratingPicker(),
@@ -1014,6 +1058,57 @@ class _TambahWisataScreenState extends State<TambahWisataScreen> {
   }
 
   // ── Kategori picker chip ──────────────────────────────────
+  Widget _fasilitasPicker() => Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _sectionLabel('Pilihan Fasilitas'),
+          const SizedBox(height: 10),
+          if (_facilities.changed)
+            const Text('Perubahan fasilitas belum disimpan.',
+                style: TextStyle(color: _C.textMuted, fontSize: 12)),
+          if (widget.wisataEdit != null)
+            const Text(
+                'Fasilitas hanya diganti bila pilihan diubah. Penggantian dapat melepas relasi fasilitas nonaktif yang tersembunyi.',
+                style: TextStyle(color: _C.textMuted, fontSize: 12)),
+          if (_facilities.loading)
+            const Padding(
+                padding: EdgeInsets.all(12),
+                child: CircularProgressIndicator()),
+          if (_facilities.error != null) ...[
+            Text(adminErrorMessage(_facilities.error!),
+                style: const TextStyle(color: _C.danger)),
+            TextButton(
+                onPressed: _isSaving
+                    ? null
+                    : () => _facilities.load(_savedDestinationGuid),
+                child: const Text('Muat ulang fasilitas')),
+          ],
+          if (_facilities.ready && _facilities.items.isEmpty)
+            const Text(
+                'Belum ada fasilitas aktif. Superadmin dapat menambahkannya.',
+                style: TextStyle(color: _C.textMuted)),
+          if (_facilities.ready)
+            Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: _facilities.items
+                    .map((facility) => FilterChip(
+                          key: ValueKey('facility-${facility.guid}'),
+                          label: Text(facility.name),
+                          selected:
+                              _facilities.selected.contains(facility.guid),
+                          onSelected: _isSaving
+                              ? null
+                              : (selected) {
+                                  final error = _facilities.toggle(
+                                      facility.guid, selected);
+                                  if (error != null) _snack(error);
+                                },
+                        ))
+                    .toList()),
+        ],
+      );
+
   Widget _kategoriPicker() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,

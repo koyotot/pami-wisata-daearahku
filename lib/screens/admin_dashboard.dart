@@ -20,6 +20,7 @@ import 'daftar_wisata_screen.dart';
 import 'daftar_pendaftar_screen.dart';
 import 'kelola_admin_screen.dart';
 import 'kelola_kategori_screen.dart';
+import 'kelola_fasilitas_screen.dart';
 
 // ── Palet & font (sama dengan home_screen.dart) ──────────────
 class _C {
@@ -90,7 +91,8 @@ class _AdminDashboardState extends State<AdminDashboard>
   bool get _canManageCategories =>
       canManageCategories(AuthSession.instance.role);
   bool get _canManageQuota => canManageQuota(AuthSession.instance.role);
-  bool get _canAccess => AuthSession.instance.authenticated.value &&
+  bool get _canAccess =>
+      AuthSession.instance.authenticated.value &&
       AuthSession.instance.deviceSessionReady &&
       (AuthSession.instance.role == 1 || AuthSession.instance.role == 2);
   String get _namaAdmin => currentUser?.namaLengkap ?? 'Administrator';
@@ -273,6 +275,14 @@ class _AdminDashboardState extends State<AdminDashboard>
         onTap: () => _buka(const KelolaKategoriScreen()),
       );
 
+  _MenuAdmin get _menuFasilitas => _MenuAdmin(
+        icon: Icons.room_service_rounded,
+        label: 'Kelola Fasilitas',
+        sub: 'Tambah, ubah & atur status fasilitas',
+        color: _C.blue,
+        onTap: () => _buka(const KelolaFasilitasScreen()),
+      );
+
   _MenuAdmin get _menuKelolaAdmin => _MenuAdmin(
         icon: Icons.manage_accounts_rounded,
         label: 'Kelola Admin',
@@ -286,7 +296,8 @@ class _AdminDashboardState extends State<AdminDashboard>
   // ══════════════════════════════════════════════════════════
   @override
   Widget build(BuildContext context) {
-    if (!_canAccess || _sessionGeneration != AuthSession.instance.sessionGeneration) {
+    if (!_canAccess ||
+        _sessionGeneration != AuthSession.instance.sessionGeneration) {
       return sessionDestination();
     }
     final inset = MediaQuery.of(context).padding.top;
@@ -604,6 +615,8 @@ class _AdminDashboardState extends State<AdminDashboard>
           if (_canManageCategories) ...[
             const SizedBox(height: 12),
             _wideCard(_menuKategori),
+            const SizedBox(height: 12),
+            _wideCard(_menuFasilitas),
           ],
           if (_isSuperAdmin) ...[
             const SizedBox(height: 12),
@@ -969,6 +982,16 @@ class _AdminDashboardState extends State<AdminDashboard>
                     onTap: () {
                       _scaffoldKey.currentState?.closeDrawer();
                       _menuKategori.onTap();
+                    },
+                  ),
+                if (_isSuperAdmin)
+                  _drawerItem(
+                    icon: _menuFasilitas.icon,
+                    color: _menuFasilitas.color,
+                    label: _menuFasilitas.label,
+                    onTap: () {
+                      _scaffoldKey.currentState?.closeDrawer();
+                      _menuFasilitas.onTap();
                     },
                   ),
                 if (_isSuperAdmin)

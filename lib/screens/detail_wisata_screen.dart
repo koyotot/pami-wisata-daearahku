@@ -41,7 +41,8 @@ final Set<String> _likedWisataIds = {};
 
 class DetailWisataScreen extends StatefulWidget {
   final Wisata wisata;
-  const DetailWisataScreen({super.key, required this.wisata});
+  final BusinessRepository? repository;
+  const DetailWisataScreen({super.key, required this.wisata, this.repository});
 
   @override
   State<DetailWisataScreen> createState() => _DetailWisataScreenState();
@@ -49,7 +50,7 @@ class DetailWisataScreen extends StatefulWidget {
 
 class _DetailWisataScreenState extends State<DetailWisataScreen>
     with SingleTickerProviderStateMixin {
-  final _repository = BusinessRepository();
+  late final _repository = widget.repository ?? BusinessRepository();
   final _detail = RequestState<Destination>();
   late AnimationController _animCtrl;
   late Animation<double> _fadeAnim;
@@ -579,26 +580,20 @@ class _DetailWisataScreenState extends State<DetailWisataScreen>
                             // ── Fasilitas ────────────────────
                             _sectionTitle('Fasilitas'),
                             const SizedBox(height: 12),
-                            Wrap(
-                              spacing: 10,
-                              runSpacing: 10,
-                              children: const [
-                                _FasilitasBadge(
-                                    icon: Icons.local_parking_rounded,
-                                    label: 'Parkir'),
-                                _FasilitasBadge(
-                                    icon: Icons.wc_rounded, label: 'Toilet'),
-                                _FasilitasBadge(
-                                    icon: Icons.restaurant_rounded,
-                                    label: 'Kuliner'),
-                                _FasilitasBadge(
-                                    icon: Icons.photo_camera_rounded,
-                                    label: 'Spot Foto'),
-                                _FasilitasBadge(
-                                    icon: Icons.security_rounded,
-                                    label: 'Keamanan'),
-                              ],
-                            ),
+                            if (destination.facilities.isEmpty)
+                              const Text('Fasilitas belum dicantumkan',
+                                  style: TextStyle(color: _C.textMuted))
+                            else
+                              Wrap(
+                                spacing: 10,
+                                runSpacing: 10,
+                                children: destination.facilities
+                                    .map((facility) => _FasilitasBadge(
+                                          icon: Icons.room_service_outlined,
+                                          label: facility.name,
+                                        ))
+                                    .toList(),
+                              ),
 
                             const SizedBox(height: 32),
                           ],
