@@ -15,6 +15,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '../data/app_data.dart';
 import '../data/catalog_state.dart';
 import '../widgets/api_image.dart';
+import 'auth_presentation.dart';
 import 'detail_wisata_screen.dart';
 
 // ── Palet (sama dengan home_screen) ──────────────────────────
@@ -71,6 +72,7 @@ void _bukaDetail(BuildContext context, Wisata w) {
 class CariWisataScreen extends StatefulWidget {
   /// true bila halaman ini dipakai sebagai tab di MainNavigationScreen.
   final bool embedded;
+  final bool active;
 
   /// Dipanggil saat tombol menu (☰) ditekan — membuka drawer
   /// yang ada di MainNavigationScreen.
@@ -84,6 +86,7 @@ class CariWisataScreen extends StatefulWidget {
   const CariWisataScreen({
     super.key,
     this.embedded = false,
+    this.active = true,
     this.onBukaMenu,
     this.onKembali,
   });
@@ -320,15 +323,8 @@ class _CariWisataScreenState extends State<CariWisataScreen> {
       ],
       flexibleSpace: FlexibleSpaceBar(
         collapseMode: CollapseMode.parallax,
-        background: Container(
-          decoration: const BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [Color(0xFF2A93F0), _blue, _blueDeep],
-              stops: [0.0, 0.5, 1.0],
-            ),
-          ),
+        background: TimeBasedScenicBackground(
+          active: widget.active,
           child: Stack(
             children: [
               Positioned(

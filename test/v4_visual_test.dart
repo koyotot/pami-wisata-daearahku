@@ -12,6 +12,7 @@ import 'package:wisata_daerahku/widgets/availability_calendar.dart';
 import 'package:wisata_daerahku/widgets/floating_bottom_nav.dart';
 import 'package:wisata_daerahku/widgets/international_phone_field.dart';
 import 'package:wisata_daerahku/screens/main_navigation_screen.dart';
+import 'package:wisata_daerahku/screens/auth_presentation.dart';
 import 'package:wisata_daerahku/screens/cari_wisata_screen.dart';
 import 'package:wisata_daerahku/services/auth_session.dart';
 
@@ -35,14 +36,16 @@ void main() {
     await tester.pump(const Duration(seconds: 1));
     final explore =
         tester.element(find.byType(CariWisataScreen, skipOffstage: false));
-    await tester.tap(find.descendant(
-        of: find.byType(FloatingBottomNav),
-        matching: find.byIcon(Icons.explore_outlined)));
+    await tester.tap(find.byTooltip('Jelajah'));
     await tester.pump();
+    final exploreScenic = find.descendant(
+        of: find.byType(CariWisataScreen, skipOffstage: false),
+        matching: find.byType(TimeBasedScenicBackground));
+    expect(exploreScenic, findsOneWidget);
+    expect(
+        tester.widget<TimeBasedScenicBackground>(exploreScenic).active, isTrue);
     expect(tester.widget<IndexedStack>(find.byType(IndexedStack)).index, 2);
-    await tester.tap(find.descendant(
-        of: find.byType(FloatingBottomNav),
-        matching: find.byIcon(Icons.receipt_long_outlined)));
+    await tester.tap(find.byTooltip('Riwayat'));
     await tester.pump();
     expect(tester.widget<IndexedStack>(find.byType(IndexedStack)).index, 1);
     expect(tester.element(find.byType(CariWisataScreen, skipOffstage: false)),
@@ -170,7 +173,7 @@ void main() {
       final badge =
           tester.getRect(find.byKey(const ValueKey('notification-badge')));
       final bell =
-          tester.getRect(find.byIcon(Icons.notifications_none_rounded));
+          tester.getRect(find.descendant(of: find.byTooltip('Notifikasi'), matching: find.byType(CustomPaint)).first);
       expect(badge.top, lessThan(bell.top));
       expect(badge.left, lessThan(bell.right));
       expect(badge.right, greaterThan(bell.right));

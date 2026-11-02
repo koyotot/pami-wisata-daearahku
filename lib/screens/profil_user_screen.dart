@@ -16,6 +16,7 @@ import '../data/booking_state.dart';
 import '../data/business_repository.dart';
 import '../data/favorite_state.dart';
 import '../widgets/reviews_sheet.dart';
+import 'auth_presentation.dart';
 import 'home_screen.dart';
 import 'user_login_screen.dart';
 
@@ -309,116 +310,125 @@ class _ProfilUserScreenState extends State<ProfilUserScreen>
       child: AnnotatedRegion<SystemUiOverlayStyle>(
         value: const SystemUiOverlayStyle(
           statusBarColor: Colors.transparent,
-          statusBarIconBrightness: Brightness.dark,
-          statusBarBrightness: Brightness.light,
+          statusBarIconBrightness: Brightness.light,
+          statusBarBrightness: Brightness.dark,
         ),
         child: Scaffold(
           backgroundColor: _C.bg,
-          body: Container(
-            decoration: const BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: [Color(0xFFDCEBFF), _C.bg, Colors.white],
-              ),
-            ),
-            child: SafeArea(
-              bottom: false,
-              child: Column(
-                children: [
-                  _buildTopBar(),
-                  Expanded(
-                    child: FadeTransition(
-                      opacity: MediaQuery.disableAnimationsOf(context)
-                          ? const AlwaysStoppedAnimation(1)
-                          : _fadeAnim,
-                      child: SlideTransition(
-                        position: MediaQuery.disableAnimationsOf(context)
-                            ? const AlwaysStoppedAnimation(Offset.zero)
-                            : _slideAnim,
-                        child: SingleChildScrollView(
-                          physics: const BouncingScrollPhysics(),
-                          padding: const EdgeInsets.fromLTRB(20, 10, 20, 32),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              _buildHeaderCard(user, tahunBergabung),
-                              if (_jumlahError != null)
-                                TextButton.icon(
-                                  onPressed: _loadJumlahPendaftaran,
-                                  icon: const Icon(Icons.refresh_rounded),
-                                  label: Text('$_jumlahError Coba lagi'),
-                                ),
-                              const SizedBox(height: 26),
-
-                              // Wisata Tersimpan
-                              _sectionLabel('Wisata Tersimpan'),
-                              const SizedBox(height: 12),
-                              _buildWisataTersimpan(),
-                              const SizedBox(height: 26),
-
-                              // Akun section
-                              _sectionLabel('Akun'),
-                              const SizedBox(height: 12),
-                              _buildMenuGroup([
-                                _MenuItemData(
-                                  icon: Icons.rate_review_rounded,
-                                  iconColor: const Color(0xFF1E88E5),
-                                  title: 'Riwayat Ulasan',
-                                  subtitle: 'Ulasan yang pernah kamu tulis',
-                                  onTap: () => _bukaRiwayatUlasan(context),
-                                ),
-                                _MenuItemData(
-                                  icon: Icons.notifications_rounded,
-                                  iconColor: const Color(0xFFFF8C42),
-                                  title: 'Notifikasi',
-                                  subtitle: widget.onNotifications != null
-                                      ? 'Lihat aktivitas pendaftaran'
-                                      : 'Preferensi belum tersedia',
-                                  onTap: widget.onNotifications ??
-                                      () => _bukaNotifikasi(context),
-                                ),
-                                _MenuItemData(
-                                  icon: Icons.language_rounded,
-                                  iconColor: const Color(0xFF7E57C2),
-                                  title: 'Bahasa',
-                                  subtitle:
-                                      'Indonesia ? bahasa lain belum tersedia',
-                                  onTap: () => _bukaPilihBahasa(context),
-                                ),
-                                _MenuItemData(
-                                  icon: Icons.lock_reset_rounded,
-                                  iconColor: const Color(0xFF26A69A),
-                                  title: 'Ubah Password',
-                                  subtitle: 'Belum tersedia untuk akun API',
-                                  onTap: () => _bukaGantiPassword(context),
-                                ),
-                                _MenuItemData(
-                                  icon: Icons.info_outline_rounded,
-                                  iconColor: _C.blue,
-                                  title: 'Tentang Aplikasi',
-                                  subtitle: 'Wisata Daerahku · versi 1.0.0',
-                                  onTap: () => _tampilkanTentang(context),
-                                ),
-                                _MenuItemData(
-                                  icon: Icons.delete_outline_rounded,
-                                  iconColor: _C.danger,
-                                  title: 'Hapus Akun',
-                                  subtitle: 'Belum tersedia untuk akun API',
-                                  onTap: () => _konfirmasiHapusAkun(context),
-                                  isDanger: true,
-                                ),
-                              ]),
-                              const SizedBox(height: 24),
-                              _buildLogoutButton(context),
-                              const SizedBox(height: 8),
-                            ],
+          body: FadeTransition(
+            opacity: MediaQuery.disableAnimationsOf(context)
+                ? const AlwaysStoppedAnimation(1)
+                : _fadeAnim,
+            child: SlideTransition(
+              position: MediaQuery.disableAnimationsOf(context)
+                  ? const AlwaysStoppedAnimation(Offset.zero)
+                  : _slideAnim,
+              child: SingleChildScrollView(
+                physics: const BouncingScrollPhysics(),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Stack(
+                      clipBehavior: Clip.none,
+                      children: [
+                        SizedBox(
+                          height: 270,
+                          width: double.infinity,
+                          child: TimeBasedScenicBackground(
+                            active: widget.active,
+                            child: const SizedBox.expand(),
                           ),
                         ),
+                        Padding(
+                          padding: EdgeInsets.only(
+                              top: MediaQuery.paddingOf(context).top + 8),
+                          child: _buildTopBar(scenic: true),
+                        ),
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(20, 215, 20, 0),
+                          child: _buildHeaderCard(user, tahunBergabung),
+                        ),
+                      ],
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(20, 26, 20, 32),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          if (_jumlahError != null)
+                            TextButton.icon(
+                              onPressed: _loadJumlahPendaftaran,
+                              icon: const Icon(Icons.refresh_rounded),
+                              label: Text('$_jumlahError Coba lagi'),
+                            ),
+                          const SizedBox(height: 26),
+
+                          // Wisata Tersimpan
+                          _sectionLabel('Wisata Tersimpan'),
+                          const SizedBox(height: 12),
+                          _buildWisataTersimpan(),
+                          const SizedBox(height: 26),
+
+                          // Akun section
+                          _sectionLabel('Akun'),
+                          const SizedBox(height: 12),
+                          _buildMenuGroup([
+                            _MenuItemData(
+                              icon: Icons.rate_review_rounded,
+                              iconColor: const Color(0xFF1E88E5),
+                              title: 'Riwayat Ulasan',
+                              subtitle: 'Ulasan yang pernah kamu tulis',
+                              onTap: () => _bukaRiwayatUlasan(context),
+                            ),
+                            _MenuItemData(
+                              icon: Icons.notifications_rounded,
+                              iconColor: const Color(0xFFFF8C42),
+                              title: 'Notifikasi',
+                              subtitle: widget.onNotifications != null
+                                  ? 'Lihat aktivitas pendaftaran'
+                                  : 'Preferensi belum tersedia',
+                              onTap: widget.onNotifications ??
+                                  () => _bukaNotifikasi(context),
+                            ),
+                            _MenuItemData(
+                              icon: Icons.language_rounded,
+                              iconColor: const Color(0xFF7E57C2),
+                              title: 'Bahasa',
+                              subtitle:
+                                  'Indonesia ? bahasa lain belum tersedia',
+                              onTap: () => _bukaPilihBahasa(context),
+                            ),
+                            _MenuItemData(
+                              icon: Icons.lock_reset_rounded,
+                              iconColor: const Color(0xFF26A69A),
+                              title: 'Ubah Password',
+                              subtitle: 'Belum tersedia untuk akun API',
+                              onTap: () => _bukaGantiPassword(context),
+                            ),
+                            _MenuItemData(
+                              icon: Icons.info_outline_rounded,
+                              iconColor: _C.blue,
+                              title: 'Tentang Aplikasi',
+                              subtitle: 'Wisata Daerahku · versi 1.0.0',
+                              onTap: () => _tampilkanTentang(context),
+                            ),
+                            _MenuItemData(
+                              icon: Icons.delete_outline_rounded,
+                              iconColor: _C.danger,
+                              title: 'Hapus Akun',
+                              subtitle: 'Belum tersedia untuk akun API',
+                              onTap: () => _konfirmasiHapusAkun(context),
+                              isDanger: true,
+                            ),
+                          ]),
+                          const SizedBox(height: 24),
+                          _buildLogoutButton(context),
+                          const SizedBox(height: 8),
+                        ],
                       ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
           ),
@@ -430,7 +440,7 @@ class _ProfilUserScreenState extends State<ProfilUserScreen>
   // ══════════════════════════════════════════════════════════
   //  TOP BAR — tombol kembali, judul, tombol menu (drawer)
   // ══════════════════════════════════════════════════════════
-  Widget _buildTopBar() {
+  Widget _buildTopBar({bool scenic = false}) {
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 10, 20, 4),
       child: Row(
@@ -440,7 +450,8 @@ class _ProfilUserScreenState extends State<ProfilUserScreen>
             child: Text(
               'Profil Saya',
               textAlign: TextAlign.center,
-              style: _font(18, FontWeight.w800, _C.navy, letterSpacing: -0.4),
+              style: _font(18, FontWeight.w800, scenic ? Colors.white : _C.navy,
+                  letterSpacing: -0.4),
             ),
           ),
           // Tombol pembuka drawer (spacer kosong bila tidak ada callback
@@ -524,7 +535,11 @@ class _ProfilUserScreenState extends State<ProfilUserScreen>
       decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(24),
-          border: Border.all(color: _C.border)),
+          border: Border.all(color: _C.border),
+          boxShadow: const [
+            BoxShadow(
+                color: Color(0x140F2D59), blurRadius: 16, offset: Offset(0, 6))
+          ]),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
           CircleAvatar(

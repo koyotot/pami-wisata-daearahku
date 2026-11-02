@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:wisata_daerahku/data/app_data.dart';
+import 'package:wisata_daerahku/screens/auth_presentation.dart';
 import 'package:wisata_daerahku/screens/profil_user_screen.dart';
 import 'package:wisata_daerahku/screens/bukti_pendaftaran_screen.dart';
 
@@ -17,7 +18,7 @@ void main() {
     currentUser = User(
         id: 'u',
         namaLengkap: 'Ayu Putri',
-        email: 'ayu@example.test',
+        email: 'ayu.putri.dengan.alamat.email.yang.panjang@example.test',
         noTelepon: '+6289655862781',
         password: '',
         createdAt: DateTime(2099));
@@ -31,6 +32,15 @@ void main() {
     expect(find.text('AP'), findsOneWidget);
     expect(find.text('2099'), findsNothing);
     expect(find.text('Edit Profil'), findsOneWidget);
+    expect(find.byType(TimeBasedScenicBackground), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('history uses the shared scenic header', (tester) async {
+    await tester.pumpWidget(
+        const MaterialApp(home: BuktiPendaftaranScreen(active: false)));
+    expect(find.byType(TimeBasedScenicBackground), findsOneWidget);
+    expect(find.text('Riwayat Pendaftaran'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 

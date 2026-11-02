@@ -3,14 +3,18 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:wisata_daerahku/data/notification_state.dart';
+import 'package:wisata_daerahku/screens/auth_presentation.dart';
 import 'package:wisata_daerahku/screens/notifikasi_screen.dart';
+import 'package:wisata_daerahku/screens/bukti_pendaftaran_screen.dart';
 import 'package:wisata_daerahku/services/api_client.dart';
 import 'package:wisata_daerahku/widgets/floating_bottom_nav.dart';
 import 'user_support.dart';
 
-Map<String, dynamic> item(String guid, {bool read = false}) => {
+Map<String, dynamic> item(String guid,
+        {bool read = false, String? bookingGuid}) =>
+    {
       'guid': guid,
-      'booking_guid': null,
+      'booking_guid': bookingGuid,
       'title': 'Pendaftaran $guid',
       'body': 'Status diperbarui oleh pengelola.',
       'read_at': read ? '2026-11-01T00:00:00Z' : null,
@@ -34,11 +38,11 @@ void main() {
     expect(find.text('99+'), findsOneWidget);
     final badge =
         tester.getRect(find.byKey(const ValueKey('notification-badge')));
-    final bell = tester.getRect(find.byIcon(Icons.notifications_none_rounded));
+    final bell = tester.getRect(find.descendant(of: find.byTooltip('Notifikasi'), matching: find.byType(CustomPaint)).first);
     expect(badge.top, lessThan(bell.top));
     expect(badge.right, greaterThan(bell.right));
     expect(badge.left, lessThan(bell.right));
-    await tester.tap(find.byIcon(Icons.explore_outlined));
+    await tester.tap(find.byTooltip('Jelajah'));
     expect(selected, 2);
     await render(1);
     expect(find.text('1'), findsOneWidget);
@@ -140,6 +144,7 @@ void main() {
     addTearDown(state.dispose);
     await state.refresh();
     await tester.pumpWidget(MaterialApp(home: NotifikasiScreen(state: state)));
+    expect(find.byType(TimeBasedScenicBackground), findsOneWidget);
     expect(find.text('Pendaftaran a'), findsOneWidget);
     expect(find.text('Pendaftaran b'), findsOneWidget);
     await tester.tap(find.widgetWithText(ChoiceChip, 'Belum dibaca'));
@@ -148,7 +153,80 @@ void main() {
     fail = true;
     await state.refresh();
     await tester.pump();
-    expect(find.text('Aktivitas belum dapat dimuat.'), findsOneWidget);
-    expect(find.text('Pendaftaran a'), findsNothing);
+    expect(find.text('Aktivitas belum berhasil diperbarui.'), findsOneWidget);
+    expect(find.text('Pendaftaran a'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('booking activity opens full-screen and restores unread filter',
+      (tester) async {
+    tester.view.physicalSize = const Size(320, 740);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    var read = false;
+    final requests = <String>[];
+    final session = await signedInSession((request) async {
+      requests.add('${request.method} ${request.url.path}');
+      if (request.url.path.endsWith('unread-count')) {
+        return jsonResponse({
+          'data': {'unread_count': read ? 0 : 1}
+        });
+      }
+      if (request.url.path == '/api/v1/notifications/activity-1/read' &&
+          request.method == 'PATCH') {
+        read = true;
+        return jsonResponse({'data': item('activity-1', read: true)});
+      }
+      if (request.url.path == '/api/v1/notifications') {
+        return jsonResponse({
+          'data': [item('activity-1', read: read, bookingGuid: 'booking-1')],
+          'meta': {'last_page': 1},
+        });
+      }
+      if (request.url.path == '/api/v1/bookings/booking-1') {
+        return jsonResponse({
+          'data': bookingJson(status: 'awaiting_payment'),
+        });
+      }
+      if (request.url.path == '/api/v1/bookings/booking-1/documents') {
+        return jsonResponse({
+          'data': {'invoice': null, 'ticket': null}
+        });
+      }
+      return jsonResponse({'message': 'Unexpected request'}, 404);
+    });
+    final state = NotificationState(ApiClient(session));
+    addTearDown(state.dispose);
+    await state.refresh();
+    await tester.pumpWidget(MaterialApp(
+        home: MediaQuery(
+            data: const MediaQueryData(
+                size: Size(320, 740),
+                textScaler: TextScaler.linear(1.5),
+                disableAnimations: true),
+            child: NotifikasiScreen(state: state))));
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(ChoiceChip, 'Belum dibaca'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Pendaftaran activity-1'));
+    await tester.pumpAndSettle();
+    expect(find.byType(BookingTicketScreen), findsOneWidget);
+    expect(find.text('Detail Pendaftaran'), findsOneWidget);
+    expect(
+        find.descendant(
+            of: find.byKey(const ValueKey('detailStatus')),
+            matching: find.text('Menunggu pembayaran')),
+        findsOneWidget);
+    expect(requests, contains('GET /api/v1/bookings/booking-1'));
+    await tester.pageBack();
+    await tester.pumpAndSettle();
+    expect(find.widgetWithText(ChoiceChip, 'Belum dibaca'), findsOneWidget);
+    expect(
+        tester
+            .widget<ChoiceChip>(find.widgetWithText(ChoiceChip, 'Belum dibaca'))
+            .selected,
+        isTrue);
+    expect(find.text('Semua aktivitas sudah dibaca.'), findsOneWidget);
+    expect(tester.takeException(), isNull);
   });
 }

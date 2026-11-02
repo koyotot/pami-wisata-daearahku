@@ -1,4 +1,65 @@
 # Handoff Flutter UI/UX V4
+### Finalisasi targeted 3 November 2026
+
+- Hero Notifikasi tumbuh mengikuti teks pada 320dp; test navigasi booking pada viewport 320dp/text scale 1.5 PASS.
+- Targeted final: **18 PASS, 0 FAIL** pada `v4_navigation_notifications_test.dart`, `v4_booking_detail_redesign_test.dart`, `v4_booking_success_navigation_test.dart`, dan `v4_visual_test.dart`. Detail Pendaftaran tetap **2/2 PASS**.
+- Finder test navbar disesuaikan dengan CustomPainter existing; posisi badge, semantics, dan selected state tetap diperiksa.
+- Full regression dan analyzer dihentikan sesuai instruksi final pengguna. Hasil sebelumnya bukan gate final. Android native, backend live, batas periode/resume scenic, dan coverage QA lain yang belum tersedia tetap NOT VERIFIED.
+- `git diff --check` dijalankan setelah pembaruan catatan ini; hasil dicantumkan dalam laporan akhir.
+
+## Addendum 3 November 2026 — Dynamic Scenic, Inbox, and Booking Detail
+
+Implementasi Flutter untuk PRD `PRD Wisata Daerahku Flutter UIUX V4 — Dynamic Scenic Headers, Notification Experience & Booking Detail Redesign` telah ditambahkan. Ringkasan 2 November di bawah ini adalah catatan historis dan hasil tesnya bukan hasil validasi perubahan 3 November.
+
+### Perubahan saat ini
+
+- Riwayat, Jelajah, Profil, dan Notifikasi memakai `TimeBasedScenicBackground` yang sama dengan Beranda/auth. Periode lokal, transisi 800 ms, resume/clock reconciliation, dan reduced motion tetap dikelola komponen tersebut. Tab nonaktif menonaktifkan timer latarnya.
+- Profil memakai header full-bleed dan kartu identitas/statistik yang menumpang pada batas bawah hero. Identitas, angka statistik, dan tahun bergabung tetap berasal dari data/pola existing.
+- Inbox memiliki hero ringkas, badge dari unread count server, filter Semua/Belum dibaca, empty state terpisah, dan error refresh yang mempertahankan daftar terakhir. Item booking tetap memakai mark-read server dan membuka `BookingTicketScreen` full-screen dengan booking GUID yang sama. Filter dan posisi scroll tetap di widget tab yang tertahan oleh `IndexedStack`.
+- Detail menampilkan judul “Detail Pendaftaran” sampai respons dokumen berisi `ticket`; status `confirmed` atau invoice saja tidak mengubah judul. Detail mempertahankan kode booking yang bisa disalin, menampilkan tanggal Indonesia dan total IDR, serta menambah konteks “Apa Selanjutnya?” tanpa CTA pembayaran.
+- Dokumen tidak dicampur dengan status booking. Saat dokumen belum diperiksa, sedang dimuat, atau gagal, UI tidak menyebut dokumen belum diterbitkan. Invoice tetap dijelaskan sebagai konfirmasi pendaftaran, bukan bukti pembayaran.
+
+### Status backend yang dipakai
+
+Audit source Laravel di checkout `C:\laragon\www\pami-wisata-daerahku-api` menemukan `BookingRules::STATUSES` pada `app/Support/BookingRules.php:14`; `BookingController` list/detail mengembalikan `BookingResource` (`app/Http/Controllers/Api/V1/BookingController.php:20-42`). `BookingResource` memuat `status` (`app/Http/Resources/BookingResource.php:26`) dan tidak memuat alasan penolakan. Sumber dokumen tetap respons endpoint dokumen booking; invoice tidak dianggap bukti pembayaran.
+
+| Status sumber | Label/konteks UI |
+| --- | --- |
+| `pending_approval` | Menunggu persetujuan; menunggu pengelola. |
+| `awaiting_payment` | Menunggu pembayaran; belum menyatakan pembayaran diterima. |
+| `payment_verification` | Verifikasi pembayaran; belum dipastikan diterima. |
+| `payment_review` | Peninjauan pembayaran; belum dipastikan diterima. |
+| `confirmed` | Disetujui; tiket hanya dinyatakan terbit bila `documents.ticket` tersedia. |
+| `rejected` | Ditolak; alasan tidak ditampilkan karena resource tidak menyediakannya. |
+| `expired` | Kedaluwarsa. |
+| `cancelled` | Dibatalkan. |
+
+Status yang belum dikenal tetap ditampilkan sesuai string sumber, dengan konteks lanjutan generik. Tidak ada status payment/ticket baru atau perubahan backend/API pada pekerjaan ini.
+
+### File perubahan 3 November
+
+Produk: `lib/screens/bukti_pendaftaran_screen.dart`, `lib/screens/cari_wisata_screen.dart`, `lib/screens/main_navigation_screen.dart`, `lib/screens/notifikasi_screen.dart`, dan `lib/screens/profil_user_screen.dart`.
+
+Regression tests: `test/v4_booking_detail_redesign_test.dart`, `test/v4_history_profile_test.dart`, `test/v4_navigation_notifications_test.dart`, dan `test/v4_visual_test.dart`.
+
+PRD yang disediakan tetap tidak diubah. `docs/DESIGN.md` tetap tidak diubah.
+
+### Verifikasi perubahan 3 November
+
+| Pemeriksaan | Hasil |
+| --- | --- |
+| `dart format` pada file Dart tersentuh | **NOT VERIFIED**: percobaan terdahulu keluar setelah `FileSystemException` saat SDK memperbarui timestamp `C:\Users\itsba\AppData\Roaming\.dart-tool\dart-flutter-telemetry-session.json` (Access denied). Percobaan ulang `dart format` pada 3 file tetap berjalan tanpa output lebih dari 45 detik dan dihentikan; perubahan format terakhir perlu diperiksa oleh quality gate. |
+| `test/v4_booking_detail_redesign_test.dart` | **PASS: 2 tests**; seluruh status, judul berbasis dokumen, kegagalan dokumen, dan layout 320/390/430dp/text scale diuji. Perbaikan mencegah overflow status/tombol dan menonaktifkan `AnimatedSize` saat reduced motion. |
+| `test/v4_history_profile_test.dart` | **PASS: 4 tests**. |
+| Notification booking route | **PASS: 1 focused test**; booking membuka detail full-screen, status detail terlihat, dan filter unread tersisa setelah kembali. Hero menyesuaikan tinggi saat teks membesar. |
+| Scenic tab state | **PASS: 1 focused test**; Jelajah aktif saat dipilih dan state tab/back dipertahankan. |
+| Seluruh `test/v4_navigation_notifications_test.dart` | **FAIL: 1 test** pada finder badge lama yang mencari `Icon` notifikasi; `FloatingBottomNav` saat ini menggambar glyph dengan `CustomPainter`. Tes route booking yang berubah lulus terpisah. |
+| Suite penuh `flutter test` (run main thread sebelum perbaikan fokus di atas) | **FAIL: 347 pass, 2 skip, 8 fail**. Hasil tersebut mendahului perbaikan detail, tes route, dan urutan aktivasi scenic; rerun suite penuh dilakukan main thread. Kegagalan lain belum diklasifikasikan sebagai baseline. |
+| `flutter analyze` (run main thread) | **FAIL: 118 issues found**. Belum dibandingkan ulang terhadap baseline setelah perubahan terakhir. |
+| `git diff --check` | Belum dijalankan ulang setelah perbaikan terakhir. |
+| Emulator/perangkat, TalkBack, system bars/keyboard native, backend live/FCM | **NOT VERIFIED**. |
+
+Perubahan Flutter 3 November tidak menyentuh backend. Hasil lokal bila nanti dijalankan main thread harus dilaporkan terpisah dari bukti integrasi live atau rendering perangkat.
 
 Tanggal: 2 November 2026. Scope: pengunjung role 0. Perubahan V4 yang sudah ada di working tree dilanjutkan, bukan direset. Tidak ada commit, push, deployment, atau modifikasi Laravel.
 

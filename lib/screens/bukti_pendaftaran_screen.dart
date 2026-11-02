@@ -14,6 +14,7 @@ import '../data/booking_errors.dart';
 import '../data/booking_state.dart';
 import '../data/business_repository.dart';
 import '../services/auth_session.dart';
+import 'auth_presentation.dart';
 
 // ── Palet (sama dengan home_screen) ──────────────────────────
 const _blue = Color(0xFF1976D2);
@@ -63,9 +64,18 @@ _StatusStyle _styleFor(String status) {
       return const _StatusStyle(
           _red, Color(0xFFC53030), 'Ditolak', Icons.cancel_rounded);
     case 'pending_approval':
+      return _StatusStyle(_blue, _blueDeep, bookingStatusLabel(status),
+          Icons.hourglass_top_rounded);
     case 'menunggu':
       return const _StatusStyle(
-          _amber, Color(0xFFD97706), 'Menunggu', Icons.hourglass_top_rounded);
+          _blue, _blueDeep, 'Menunggu', Icons.hourglass_top_rounded);
+    case 'awaiting_payment':
+      return const _StatusStyle(
+          _blue, _blueDeep, 'Menunggu pembayaran', Icons.hourglass_top_rounded);
+    case 'payment_verification':
+    case 'payment_review':
+      return _StatusStyle(_amber, const Color(0xFFD97706),
+          bookingStatusLabel(status), Icons.hourglass_top_rounded);
     case 'cancelled':
       return const _StatusStyle(
           _textMuted, Color(0xFF5B6B85), 'Dibatalkan', Icons.block_rounded);
@@ -73,11 +83,60 @@ _StatusStyle _styleFor(String status) {
       return const _StatusStyle(_textMuted, Color(0xFF5B6B85), 'Kedaluwarsa',
           Icons.timer_off_rounded);
     default:
-      // awaiting_payment / payment_* dan status lain: label Indonesia dari server.
-      return _StatusStyle(_amber, const Color(0xFFD97706),
-          bookingStatusLabel(status), Icons.hourglass_top_rounded);
+      return _StatusStyle(_textMuted, const Color(0xFF5B6B85),
+          bookingStatusLabel(status), Icons.info_outline_rounded);
   }
 }
+
+String _formatBookingDate(String value) {
+  final date = DateTime.tryParse(value);
+  if (date == null) return value;
+  const months = [
+    'Januari',
+    'Februari',
+    'Maret',
+    'April',
+    'Mei',
+    'Juni',
+    'Juli',
+    'Agustus',
+    'September',
+    'Oktober',
+    'November',
+    'Desember',
+  ];
+  return '${date.day} ${months[date.month - 1]} ${date.year}';
+}
+
+String _formatBookingTotal(Booking booking) {
+  final amount = booking.totalAmount
+      .toString()
+      .replaceAllMapped(RegExp(r'\B(?=(\d{3})+(?!\d))'), (_) => '.');
+  return booking.currency == 'IDR'
+      ? 'Rp$amount'
+      : '${booking.currency} $amount';
+}
+
+String _nextStepFor(Booking booking, {required bool? ticketIssued}) =>
+    switch (booking.status) {
+      'pending_approval' => 'Pendaftaran menunggu persetujuan pengelola.',
+      'awaiting_payment' =>
+        'Selesaikan pembayaran hanya melalui instruksi resmi yang tersedia. Pembayaran belum dikonfirmasi.',
+      'payment_verification' ||
+      'payment_review' =>
+        'Pembayaran sedang diverifikasi dan belum dipastikan diterima.',
+      'confirmed' => switch (ticketIssued) {
+          true => 'Tiket telah diterbitkan dan tersedia pada bagian Dokumen.',
+          false =>
+            'Pendaftaran telah dikonfirmasi. Dokumen tiket belum tersedia.',
+          null =>
+            'Pendaftaran telah dikonfirmasi. Ketersediaan dokumen tiket belum dapat diperiksa.',
+        },
+      'rejected' => 'Pendaftaran tidak disetujui.',
+      'expired' => 'Pendaftaran telah kedaluwarsa.',
+      'cancelled' => 'Pendaftaran telah dibatalkan.',
+      _ => 'Informasi lanjutan belum tersedia untuk status ini.',
+    };
 
 Pendaftar _fromBooking(Booking booking) {
   final json = booking.json;
@@ -331,15 +390,8 @@ class _BuktiPendaftaranScreenState extends State<BuktiPendaftaranScreen> {
       ],
       flexibleSpace: FlexibleSpaceBar(
         collapseMode: CollapseMode.parallax,
-        background: Container(
-          decoration: const BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [Color(0xFF2A93F0), _blue, _blueDeep],
-              stops: [0.0, 0.5, 1.0],
-            ),
-          ),
+        background: TimeBasedScenicBackground(
+          active: widget.active,
           child: Stack(
             children: [
               Positioned(
@@ -695,16 +747,20 @@ class _TicketCard extends StatefulWidget {
   final Booking? booking;
   final bool isLaravel;
   final bool initiallyExpanded;
+  final BusinessRepository? repository;
 
   /// Dipanggil dengan salinan booking terbaru dari server (detail / hasil pembatalan).
   final ValueChanged<Booking>? onChanged;
+  final ValueChanged<bool>? onTicketIssued;
 
   const _TicketCard(
       {required this.pendaftar,
       this.booking,
       this.isLaravel = false,
       this.initiallyExpanded = false,
-      this.onChanged});
+      this.repository,
+      this.onChanged,
+      this.onTicketIssued});
 
   @override
   State<_TicketCard> createState() => _TicketCardState();
@@ -722,7 +778,8 @@ class _TicketCardState extends State<_TicketCard> {
     _statusSebelumnya = widget.pendaftar.status;
     final booking = widget.booking;
     if (widget.isLaravel && booking != null) {
-      _controller = BookingDetailController(BusinessRepository(), booking)
+      _controller = BookingDetailController(
+          widget.repository ?? BusinessRepository(), booking)
         ..addListener(_controllerChanged);
       _emitted = booking;
       if (widget.initiallyExpanded) {
@@ -742,6 +799,10 @@ class _TicketCardState extends State<_TicketCard> {
     if (booking != null && !identical(booking, _emitted)) {
       _emitted = booking;
       widget.onChanged?.call(booking);
+    }
+    final documents = _controller?.documents;
+    if (documents != null) {
+      widget.onTicketIssued?.call(documents.ticket != null);
     }
   }
 
@@ -856,11 +917,11 @@ class _TicketCardState extends State<_TicketCard> {
           color: _border,
           width: 1.2,
         ),
-        boxShadow: [
+        boxShadow: const [
           BoxShadow(
-            color: _blue.withValues(alpha: 0.12),
-            blurRadius: 22,
-            offset: const Offset(0, 10),
+            color: Color(0x140F2D59),
+            blurRadius: 14,
+            offset: Offset(0, 5),
           ),
         ],
       ),
@@ -887,13 +948,26 @@ class _TicketCardState extends State<_TicketCard> {
           Text(p.wisata,
               style: _font(20, FontWeight.w800, _navy, height: 1.25)),
           const SizedBox(height: 4),
-          TextButton.icon(
+          SizedBox(
+            width: double.infinity,
+            child: TextButton(
               onPressed: _copyNomor,
               style: TextButton.styleFrom(
-                  padding: EdgeInsets.zero, alignment: Alignment.centerLeft),
-              icon: const Icon(Icons.copy_outlined, size: 16),
-              label:
-                  Text(p.nomorBukti, style: _font(13, FontWeight.w700, _blue))),
+                  padding: EdgeInsets.zero,
+                  alignment: Alignment.centerLeft,
+                  minimumSize: const Size(48, 44)),
+              child: Row(children: [
+                const Icon(Icons.copy_outlined, size: 16),
+                const SizedBox(width: 8),
+                Expanded(
+                    child: Text(p.nomorBukti,
+                        softWrap: true,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: _font(13, FontWeight.w700, _blue))),
+              ]),
+            ),
+          ),
         ]));
   }
 
@@ -931,38 +1005,49 @@ class _TicketCardState extends State<_TicketCard> {
   Widget _buildTicketBody(Pendaftar p) {
     return Padding(
       padding: const EdgeInsets.fromLTRB(18, 8, 18, 18),
-      child: Column(
-        children: [
-          Row(
-            children: [
-              Expanded(
-                  child: _InfoItem(
-                      icon: Icons.person_rounded,
-                      label: 'Nama',
-                      value: p.namaPengunjung)),
-              Expanded(
-                  child: _InfoItem(
-                      icon: Icons.calendar_today_rounded,
-                      label: 'Tanggal',
-                      value: p.tanggal)),
-            ],
-          ),
-          const SizedBox(height: 14),
-          Row(
-            children: [
-              Expanded(
-                  child: _InfoItem(
-                      icon: Icons.group_rounded,
-                      label: 'Jumlah',
-                      value: '${p.jumlahOrang} orang')),
-              Expanded(
-                  child: _InfoItem(
-                      icon: Icons.phone_rounded,
-                      label: 'Telepon',
-                      value: p.noTelepon)),
-            ],
-          ),
-        ],
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final fields = [
+            _InfoItem(
+                icon: Icons.person_rounded,
+                label: 'Nama',
+                value: p.namaPengunjung),
+            _InfoItem(
+                icon: Icons.calendar_today_rounded,
+                label: 'Tanggal',
+                value: _formatBookingDate(p.tanggal)),
+            _InfoItem(
+                icon: Icons.group_rounded,
+                label: 'Jumlah',
+                value: '${p.jumlahOrang} orang'),
+            _InfoItem(
+                icon: Icons.phone_rounded,
+                label: 'Telepon',
+                value: p.noTelepon),
+          ];
+          if (constraints.maxWidth < 280 ||
+              MediaQuery.textScalerOf(context).scale(1) > 1.3) {
+            return Column(
+              children: [
+                for (var i = 0; i < fields.length; i++) ...[
+                  fields[i],
+                  if (i < fields.length - 1) const SizedBox(height: 14),
+                ],
+              ],
+            );
+          }
+          return Column(children: [
+            Row(children: [
+              Expanded(child: fields[0]),
+              Expanded(child: fields[1])
+            ]),
+            const SizedBox(height: 14),
+            Row(children: [
+              Expanded(child: fields[2]),
+              Expanded(child: fields[3])
+            ]),
+          ]);
+        },
       ),
     );
   }
@@ -1022,6 +1107,48 @@ class _TicketCardState extends State<_TicketCard> {
 
   Widget _buildExpandBtn(Pendaftar p) {
     final c = _controller;
+    final label = (c?.refreshing ?? false)
+        ? 'Memuat...'
+        : (_expanded ? 'Sembunyikan detail' : 'Tampilkan detail');
+    final indicator = AnimatedRotation(
+      turns: _expanded ? 0.5 : 0,
+      duration: MediaQuery.disableAnimationsOf(context)
+          ? Duration.zero
+          : const Duration(milliseconds: 200),
+      child: const Icon(Icons.keyboard_arrow_down_rounded,
+          color: _blue, size: 18),
+    );
+    final expandedContent = _expanded
+        ? Container(
+            width: double.infinity,
+            padding: const EdgeInsets.fromLTRB(18, 0, 18, 18),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (p.email.isNotEmpty) ...[
+                  _InfoItem(
+                      icon: Icons.email_rounded,
+                      label: 'Email',
+                      value: p.email),
+                  const SizedBox(height: 10),
+                ],
+                if (p.catatan.isNotEmpty)
+                  _InfoItem(
+                      icon: Icons.notes_rounded,
+                      label: 'Catatan',
+                      value: p.catatan),
+                if (c != null) ..._buildServerDetail(c),
+              ],
+            ),
+          )
+        : const SizedBox(width: double.infinity);
+    final details = MediaQuery.disableAnimationsOf(context)
+        ? expandedContent
+        : AnimatedSize(
+            duration: const Duration(milliseconds: 250),
+            curve: Curves.easeInOut,
+            child: expandedContent,
+          );
     return Container(
       decoration: const BoxDecoration(
         border: Border(top: BorderSide(color: _border, width: 1)),
@@ -1033,60 +1160,33 @@ class _TicketCardState extends State<_TicketCard> {
             behavior: HitTestBehavior.opaque,
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text(
-                    (c?.refreshing ?? false)
-                        ? 'Memuat...'
-                        : (_expanded ? 'Sembunyikan detail' : 'Lihat detail'),
-                    style: _font(12, FontWeight.w700, _blue),
-                  ),
-                  const SizedBox(width: 4),
-                  AnimatedRotation(
-                    turns: _expanded ? 0.5 : 0,
-                    duration: MediaQuery.disableAnimationsOf(context)
-                        ? Duration.zero
-                        : const Duration(milliseconds: 200),
-                    child: const Icon(Icons.keyboard_arrow_down_rounded,
-                        color: _blue, size: 18),
-                  ),
-                ],
-              ),
-            ),
-          ),
-          AnimatedSize(
-            duration: MediaQuery.disableAnimationsOf(context)
-                ? Duration.zero
-                : const Duration(milliseconds: 250),
-            curve: Curves.easeInOut,
-            child: _expanded
-                ? Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.fromLTRB(18, 0, 18, 18),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+              child: MediaQuery.textScalerOf(context).scale(1) > 1.3
+                  ? Column(
+                      mainAxisSize: MainAxisSize.min,
                       children: [
-                        if (p.email.isNotEmpty) ...[
-                          _InfoItem(
-                            icon: Icons.email_rounded,
-                            label: 'Email',
-                            value: p.email,
-                          ),
-                          const SizedBox(height: 10),
-                        ],
-                        if (p.catatan.isNotEmpty)
-                          _InfoItem(
-                            icon: Icons.notes_rounded,
-                            label: 'Catatan',
-                            value: p.catatan,
-                          ),
-                        if (c != null) ..._buildServerDetail(c),
+                        Text(label,
+                            textAlign: TextAlign.center,
+                            style: _font(12, FontWeight.w700, _blue)),
+                        indicator,
+                      ],
+                    )
+                  : Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Flexible(
+                          child: Text(label,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              textAlign: TextAlign.center,
+                              style: _font(12, FontWeight.w700, _blue)),
+                        ),
+                        const SizedBox(width: 4),
+                        indicator,
                       ],
                     ),
-                  )
-                : const SizedBox(width: double.infinity),
+            ),
           ),
+          details,
         ],
       ),
     );
@@ -1097,22 +1197,62 @@ class _TicketCardState extends State<_TicketCard> {
     final b = c.booking;
     final note = bookingStatusNote(b.status);
     final docs = c.documents;
+    final status = _styleFor(b.status);
     return [
       const SizedBox(height: 10),
       _InfoItem(
         icon: Icons.payments_rounded,
         label: 'Total',
-        value: '${b.currency} ${b.totalAmount}',
+        value: _formatBookingTotal(b),
       ),
       const SizedBox(height: 10),
-      Text('Status: ${bookingStatusLabel(b.status)}',
-          key: const ValueKey('detailStatus'),
-          style: _font(13, FontWeight.w700, _navy)),
-      if (note != null)
-        Padding(
-          padding: const EdgeInsets.only(top: 2),
-          child: Text(note, style: _font(12, FontWeight.w500, _textMuted)),
+      Container(
+        key: const ValueKey('detailStatus'),
+        width: double.infinity,
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: status.color.withValues(alpha: .08),
+          border: Border.all(color: status.color.withValues(alpha: .28)),
+          borderRadius: BorderRadius.circular(18),
         ),
+        child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Icon(status.icon, color: status.deep, size: 20),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(bookingStatusLabel(b.status),
+                    style: _font(14, FontWeight.w800, status.deep)),
+                if (note != null) ...[
+                  const SizedBox(height: 3),
+                  Text(note,
+                      style:
+                          _font(12, FontWeight.w500, _textMuted, height: 1.4)),
+                ],
+              ],
+            ),
+          ),
+        ]),
+      ),
+      const SizedBox(height: 12),
+      Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          border: Border.all(color: _border),
+          borderRadius: BorderRadius.circular(18),
+        ),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text('Apa Selanjutnya?', style: _font(13, FontWeight.w800, _navy)),
+          const SizedBox(height: 5),
+          Text(
+              _nextStepFor(b,
+                  ticketIssued: docs == null ? null : docs.ticket != null),
+              style: _font(12, FontWeight.w500, _textMuted, height: 1.45)),
+        ]),
+      ),
       if (c.message != null)
         Padding(
           padding: const EdgeInsets.only(top: 8),
@@ -1154,10 +1294,15 @@ class _TicketCardState extends State<_TicketCard> {
       Text('Dokumen', style: _font(13, FontWeight.w800, _navy)),
       const SizedBox(height: 6),
       if (c.loadingDocuments)
-        const SizedBox(
-            width: 18,
-            height: 18,
-            child: CircularProgressIndicator(strokeWidth: 2))
+        Row(children: [
+          const SizedBox(
+              width: 18,
+              height: 18,
+              child: CircularProgressIndicator(strokeWidth: 2)),
+          const SizedBox(width: 8),
+          Text('Memeriksa dokumen...',
+              style: _font(12, FontWeight.w500, _textMuted)),
+        ])
       else if (c.documentsError != null)
         Row(children: [
           Expanded(
@@ -1633,7 +1778,12 @@ class _StatusBadge extends StatelessWidget {
         children: [
           Icon(st.icon, size: 12, color: st.deep),
           const SizedBox(width: 5),
-          Text(st.label, style: _font(10.5, FontWeight.w800, st.deep)),
+          Flexible(
+            child: Text(st.label,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: _font(10.5, FontWeight.w800, st.deep)),
+          ),
         ],
       ),
     );
@@ -1645,25 +1795,34 @@ class _StatusBadge extends StatelessWidget {
 // ══════════════════════════════════════════════════════════
 
 class BookingTicketScreen extends StatefulWidget {
-  const BookingTicketScreen({super.key, required this.bookingGuid});
+  const BookingTicketScreen({
+    super.key,
+    required this.bookingGuid,
+    this.repository,
+  });
   final String bookingGuid;
+  final BusinessRepository? repository;
   @override
   State<BookingTicketScreen> createState() => _BookingTicketScreenState();
 }
 
 class _BookingTicketScreenState extends State<BookingTicketScreen> {
+  late final BusinessRepository _repository;
   late final int _generation;
+  bool _ticketIssued = false;
   Future<Booking>? _booking;
   @override
   void initState() {
     super.initState();
-    _generation = AuthSession.instance.sessionGeneration;
-    if (AuthSession.instance.authenticated.value &&
-        AuthSession.instance.deviceSessionReady &&
-        AuthSession.instance.role == 0) {
-      _booking = BusinessRepository().booking(widget.bookingGuid);
+    _repository = widget.repository ?? BusinessRepository();
+    final session = _repository.api.session;
+    _generation = session.sessionGeneration;
+    if (session.authenticated.value &&
+        session.deviceSessionReady &&
+        session.role == 0) {
+      _booking = _repository.booking(widget.bookingGuid);
     }
-    AuthSession.instance.sessionChanges.addListener(_changed);
+    session.sessionChanges.addListener(_changed);
   }
 
   void _changed() {
@@ -1672,13 +1831,13 @@ class _BookingTicketScreenState extends State<BookingTicketScreen> {
 
   @override
   void dispose() {
-    AuthSession.instance.sessionChanges.removeListener(_changed);
+    _repository.api.session.sessionChanges.removeListener(_changed);
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    final session = AuthSession.instance;
+    final session = _repository.api.session;
     final valid = session.isCurrentGeneration(_generation) &&
         session.authenticated.value &&
         session.deviceSessionReady &&
@@ -1686,7 +1845,7 @@ class _BookingTicketScreenState extends State<BookingTicketScreen> {
     return Scaffold(
         backgroundColor: _background,
         appBar: AppBar(
-            title: const Text('Detail Tiket'),
+            title: Text(_ticketIssued ? 'Detail Tiket' : 'Detail Pendaftaran'),
             backgroundColor: _background,
             foregroundColor: _navy),
         body: !valid
@@ -1705,11 +1864,11 @@ class _BookingTicketScreenState extends State<BookingTicketScreen> {
                     return Center(
                         child:
                             Column(mainAxisSize: MainAxisSize.min, children: [
-                      const Text('Tiket belum dapat dimuat.'),
+                      const Text('Pendaftaran belum dapat dimuat.'),
                       TextButton(
                           onPressed: () => setState(() {
-                                _booking = BusinessRepository()
-                                    .booking(widget.bookingGuid);
+                                _booking =
+                                    _repository.booking(widget.bookingGuid);
                               }),
                           child: const Text('Coba lagi')),
                     ]));
@@ -1720,7 +1879,12 @@ class _BookingTicketScreenState extends State<BookingTicketScreen> {
                           pendaftar: _fromBooking(booking),
                           booking: booking,
                           isLaravel: true,
-                          initiallyExpanded: true));
+                          initiallyExpanded: true,
+                          repository: _repository,
+                          onTicketIssued: (issued) {
+                            if (_ticketIssued == issued) return;
+                            setState(() => _ticketIssued = issued);
+                          }));
                 }));
   }
 }

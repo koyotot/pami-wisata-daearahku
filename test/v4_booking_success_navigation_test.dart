@@ -154,7 +154,7 @@ void main() {
               index: index, onSelected: (value) => selected = value),
         ),
       ));
-      expect(find.byType(Icon), findsNWidgets(5));
+      expect(find.descendant(of: find.byType(FloatingBottomNav), matching: find.byType(CustomPaint)), findsNWidgets(5));
       expect(find.byType(Text), findsNothing);
       for (var tab = 0; tab < labels.length; tab++) {
         final node = tester.getSemantics(find.bySemanticsLabel(labels[tab]));
@@ -205,7 +205,7 @@ void main() {
           expect(find.text(count > 99 ? '99+' : '$count'), findsOneWidget);
           final rect = tester.getRect(badge);
           final bell =
-              tester.getRect(find.byIcon(Icons.notifications_none_rounded));
+              tester.getRect(find.descendant(of: find.byTooltip('Notifikasi'), matching: find.byType(CustomPaint)).first);
           expect(rect.top, lessThan(bell.top));
           expect(rect.right, greaterThan(bell.right));
           expect(rect.left, lessThan(bell.right));
@@ -218,7 +218,7 @@ void main() {
         }
         final bellStack = tester.widget<Stack>(find
             .ancestor(
-                of: find.byIcon(Icons.notifications_none_rounded),
+                of: find.descendant(of: find.byTooltip('Notifikasi'), matching: find.byType(CustomPaint)).first,
                 matching: find.byType(Stack))
             .first);
         expect(bellStack.clipBehavior, Clip.none);

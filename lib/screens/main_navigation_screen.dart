@@ -150,8 +150,11 @@ class _MainNavigationScreenState extends State<MainNavigationScreen>
                       onExploreWisata: () => _gotoTab(2),
                       onKembali: () => _gotoTab(0)),
                   CariWisataScreen(
-                      embedded: true, onKembali: () => _gotoTab(0)),
-                  NotifikasiScreen(state: _notifications),
+                      embedded: true,
+                      active: _selectedIndex == 2,
+                      onKembali: () => _gotoTab(0)),
+                  NotifikasiScreen(
+                      state: _notifications, active: _selectedIndex == 3),
                   ProfilUserScreen(
                       active: _selectedIndex == 4,
                       onNotifications: () => _gotoTab(3),
