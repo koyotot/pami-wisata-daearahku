@@ -1,0 +1,20 @@
+{
+  "environment": "Android emulator-5554; isolated Laravel/MySQL wisata_daerahku_e2e; localhost:8099 via adb reverse",
+  "verification": "Observed native UI plus real HTTP reads; these are manual smoke-test observations, not an automated test runner report.",
+  "checks": [
+    {"name": "Authenticated admin editor loads gallery", "result": "PASS", "photos": 3},
+    {"name": "Long press reorder and one logical save", "result": "PASS", "before_version": 4, "after_version": 5, "before_order": ["A", "B", "C"], "after_order": ["B", "C", "A"], "persisted_sequences": [1, 2, 3], "cover": "B"},
+    {"name": "Native Android multi-picker selects two existing test assets and saves", "result": "PASS", "after_version": 6, "photos": 5, "persisted_sequences": [1, 2, 3, 4, 5]},
+    {"name": "Hero horizontal swipe changes counter", "result": "PASS", "from": 1, "to": 2},
+    {"name": "Fullscreen starts at tapped hero index", "result": "PASS", "index": 2},
+    {"name": "Fullscreen horizontal swipe after gesture arbitration fix", "result": "PASS", "from": 1, "to": 2},
+    {"name": "Thumbnail selection and Android Back preserve hero index", "result": "PASS", "index": 3},
+    {"name": "Stale update shows conflict dialog and retains local draft", "result": "PASS", "draft_photos": 5, "retry_button_visible": true},
+    {"name": "Physical-device pinch/pan quality and all viewport/font combinations", "result": "NOT VERIFIED", "note": "Pinch/pan interaction covered by Flutter two-pointer widget tests; native viewport smoke used 1080x2400 at density 420."}
+  ],
+  "limitations": [
+    "Initial adb draganddrop timing did not trigger Flutter long press; separate DOWN, hold, MOVE, UP confirmed reorder.",
+    "Original HTTP fixtures contain small black images; native multi-picker additionally used existing Borobudur/Kuta assets.",
+    "No production database, commit, push or deployment was performed by the agents."
+  ]
+}

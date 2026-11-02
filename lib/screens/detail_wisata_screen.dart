@@ -275,36 +275,31 @@ class _DetailWisataScreenState extends State<DetailWisataScreen>
                   Stack(
                     children: [
                       SizedBox(
-                        height: MediaQuery.sizeOf(context).height / 3,
+                        height: MediaQuery.sizeOf(context).height * 0.49,
                         width: double.infinity,
                         child: DestinationHeroGallery(
                             key: ValueKey(destination.guid),
                             images: destination.images,
                             repository: _repository),
                       ),
-                      // Gradient overlay bawah
+                      // Sudut atas konten menumpuk di tepi bawah gambar.
                       Positioned(
                         bottom: 0,
                         left: 0,
                         right: 0,
                         child: Container(
-                          height: MediaQuery.sizeOf(context).height / 9,
-                          decoration: BoxDecoration(
-                            gradient: LinearGradient(
-                              begin: Alignment.bottomCenter,
-                              end: Alignment.topCenter,
-                              colors: [
-                                _C.bg,
-                                _C.bg.withValues(alpha: 0.7),
-                                Colors.transparent,
-                              ],
+                          height: 24,
+                          decoration: const BoxDecoration(
+                            color: _C.bg,
+                            borderRadius: BorderRadius.vertical(
+                              top: Radius.circular(8),
                             ),
                           ),
                         ),
                       ),
                       // Badge kategori
                       Positioned(
-                        bottom: 20,
+                        bottom: 32,
                         left: 20,
                         child: Container(
                           padding: const EdgeInsets.symmetric(
@@ -331,52 +326,6 @@ class _DetailWisataScreenState extends State<DetailWisataScreen>
                           ),
                         ),
                       ),
-                      // Badge rating
-                      Positioned(
-                        bottom: 20,
-                        right: 20,
-                        child: InkWell(
-                          onTap: () => showModalBottomSheet(
-                            context: context,
-                            backgroundColor: Colors.transparent,
-                            isScrollControlled: true,
-                            builder: (_) => ReviewsSheet(destinationGuid: w.id),
-                          ),
-                          child: Semantics(
-                            button: true,
-                            label: 'Lihat ulasan',
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 10, vertical: 6),
-                              decoration: BoxDecoration(
-                                color: Colors.black.withValues(alpha: 0.55),
-                                borderRadius: BorderRadius.circular(10),
-                                border: Border.all(
-                                    color: _C.gold.withValues(alpha: 0.3),
-                                    width: 1),
-                              ),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Icon(Icons.star_rounded,
-                                      color: _C.gold, size: 14),
-                                  const SizedBox(width: 4),
-                                  Text(
-                                    w.ratingCount == 0
-                                        ? '-'
-                                        : w.rating.toStringAsFixed(1),
-                                    style: TextStyle(
-                                      color: _C.goldLight,
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.w800,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
                     ],
                   ),
 
@@ -390,20 +339,72 @@ class _DetailWisataScreenState extends State<DetailWisataScreen>
                           ? const AlwaysStoppedAnimation(Offset.zero)
                           : _slideAnim,
                       child: Padding(
-                        padding: const EdgeInsets.fromLTRB(20, 4, 20, 20),
+                        padding: const EdgeInsets.fromLTRB(20, 8, 20, 20),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             // Nama wisata
-                            Text(
-                              w.nama,
-                              style: TextStyle(
-                                fontSize: 28,
-                                fontWeight: FontWeight.w900,
-                                color: _C.text,
-                                letterSpacing: -0.5,
-                                height: 1.1,
-                              ),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Expanded(
+                                  child: Text(
+                                    w.nama,
+                                    style: TextStyle(
+                                      fontSize: 28,
+                                      fontWeight: FontWeight.w900,
+                                      color: _C.text,
+                                      letterSpacing: -0.5,
+                                      height: 1.1,
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                InkWell(
+                                  onTap: () => showModalBottomSheet(
+                                    context: context,
+                                    backgroundColor: Colors.transparent,
+                                    isScrollControlled: true,
+                                    builder: (_) =>
+                                        ReviewsSheet(destinationGuid: w.id),
+                                  ),
+                                  child: Semantics(
+                                    button: true,
+                                    label: 'Lihat ulasan',
+                                    child: Container(
+                                      padding: const EdgeInsets.symmetric(
+                                          horizontal: 10, vertical: 6),
+                                      decoration: BoxDecoration(
+                                        color: Colors.black
+                                            .withValues(alpha: 0.55),
+                                        borderRadius: BorderRadius.circular(10),
+                                        border: Border.all(
+                                            color:
+                                                _C.gold.withValues(alpha: 0.3),
+                                            width: 1),
+                                      ),
+                                      child: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Icon(Icons.star_rounded,
+                                              color: _C.gold, size: 14),
+                                          const SizedBox(width: 4),
+                                          Text(
+                                            w.ratingCount == 0
+                                                ? '-'
+                                                : w.rating.toStringAsFixed(1),
+                                            style: TextStyle(
+                                              color: _C.goldLight,
+                                              fontSize: 12,
+                                              fontWeight: FontWeight.w800,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ],
                             ),
                             const SizedBox(height: 10),
 

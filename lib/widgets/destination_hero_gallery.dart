@@ -79,34 +79,52 @@ class _DestinationHeroGalleryState extends State<DestinationHeroGallery> {
                   child: ApiImage(
                       imageUrl: widget.images[i].url('display'),
                       repository: widget.repository)))),
-      if (widget.images.length > 1)
+      if (widget.images.length > 1) ...[
         Positioned(
-            left: 0,
-            right: 0,
-            bottom: 78,
-            child: IgnorePointer(
-                child: Column(children: [
-              Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                  color: Colors.black54,
-                  child: Text('${_index + 1} / ${widget.images.length}',
-                      style: const TextStyle(color: Colors.white))),
-              const SizedBox(height: 8),
-              Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: List.generate(
-                      widget.images.length,
-                      (i) => Container(
-                          width: 6,
-                          height: 6,
-                          margin: const EdgeInsets.symmetric(horizontal: 3),
-                          decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              color: i == _index
-                                  ? Colors.white
-                                  : Colors.white54))))
-            ]))),
+          right: 20,
+          bottom: 32,
+          child: IgnorePointer(
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(
+                color: const Color(0xFF102D59).withValues(alpha: 0.7),
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: Colors.white.withValues(alpha: 0.35)),
+              ),
+              child: Text('${_index + 1} / ${widget.images.length}',
+                  style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w800)),
+            ),
+          ),
+        ),
+        Positioned(
+          left: 0,
+          right: 0,
+          bottom: 12,
+          child: IgnorePointer(
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: List.generate(
+                widget.images.length,
+                (i) => AnimatedContainer(
+                  duration: MediaQuery.disableAnimationsOf(context)
+                      ? Duration.zero
+                      : const Duration(milliseconds: 200),
+                  width: i == _index ? 20 : 6,
+                  height: 6,
+                  margin: const EdgeInsets.symmetric(horizontal: 3),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(3),
+                    color: i == _index ? Colors.white : Colors.white54,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ],
     ]);
   }
 }
@@ -224,48 +242,74 @@ class _FullscreenDestinationGalleryState
                                     }))),
                         SafeArea(
                             child: Column(children: [
-                          Row(children: [
-                            IconButton(
-                                tooltip: 'Tutup galeri',
-                                onPressed: () => Navigator.pop(context, _index),
-                                icon: const Icon(Icons.close,
-                                    color: Colors.white)),
-                            const Spacer(),
-                            Text('${_index + 1} / ${widget.images.length}',
-                                style: const TextStyle(color: Colors.white)),
-                            const SizedBox(width: 20)
-                          ]),
+                          SizedBox(
+                            height: 48,
+                            child: Stack(
+                              alignment: Alignment.center,
+                              children: [
+                                Center(
+                                  child: Text(
+                                    '${_index + 1} dari ${widget.images.length} foto',
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.w800,
+                                    ),
+                                  ),
+                                ),
+                                Align(
+                                  alignment: Alignment.centerLeft,
+                                  child: IconButton(
+                                    tooltip: 'Tutup galeri',
+                                    onPressed: () =>
+                                        Navigator.pop(context, _index),
+                                    icon: const Icon(Icons.close,
+                                        color: Colors.white),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
                           const Spacer(),
                           SizedBox(
                               height: 76,
-                              child: ListView.builder(
-                                  controller: _thumbnails,
-                                  scrollDirection: Axis.horizontal,
-                                  itemCount: widget.images.length,
-                                  itemBuilder: (_, i) => Padding(
-                                      padding: const EdgeInsets.all(4),
-                                      child: InkWell(
-                                          onTap: () {
-                                            if (i == _index) return;
-                                            _pages.jumpToPage(i);
-                                            _change(i);
-                                          },
-                                          child: Container(
-                                              width: 68,
-                                              decoration: BoxDecoration(
-                                                  border: Border.all(
-                                                      width: 3,
-                                                      color: i == _index
-                                                          ? Theme.of(context)
-                                                              .colorScheme
-                                                              .primary
-                                                          : Colors
-                                                              .transparent)),
-                                              child: ApiImage(
-                                                  imageUrl: widget.images[i]
-                                                      .url('thumbnail'),
-                                                  repository:
-                                                      widget.repository)))))),
+                              child: Center(
+                                  child: ListView.builder(
+                                      controller: _thumbnails,
+                                      shrinkWrap: true,
+                                      scrollDirection: Axis.horizontal,
+                                      itemCount: widget.images.length,
+                                      itemBuilder: (_, i) => Padding(
+                                          padding: const EdgeInsets.all(4),
+                                          child: InkWell(
+                                              onTap: () {
+                                                if (i == _index) return;
+                                                _pages.jumpToPage(i);
+                                                _change(i);
+                                              },
+                                              child: Container(
+                                                  width: 68,
+                                                  padding:
+                                                      const EdgeInsets.all(2),
+                                                  decoration: BoxDecoration(
+                                                      borderRadius:
+                                                          BorderRadius.circular(
+                                                              10),
+                                                      border: Border.all(
+                                                          width: 2,
+                                                          color: i == _index
+                                                              ? const Color(
+                                                                  0xFF1976D2)
+                                                              : const Color(0xFF728099)
+                                                                  .withValues(
+                                                                      alpha:
+                                                                          0.65))),
+                                                  child: ClipRRect(
+                                                      borderRadius:
+                                                          BorderRadius.circular(
+                                                              6),
+                                                      child: ApiImage(
+                                                          imageUrl: widget.images[i].url('thumbnail'),
+                                                          repository: widget.repository)))))))),
                           const SizedBox(height: 8),
                         ])),
                       ]))))));
