@@ -162,7 +162,8 @@ class _CariWisataScreenState extends State<CariWisataScreen> {
           child: RefreshIndicator(
             onRefresh: _refresh,
             child: CustomScrollView(
-              physics: const BouncingScrollPhysics(),
+              physics: const BouncingScrollPhysics(
+                  parent: AlwaysScrollableScrollPhysics()),
               slivers: [
                 _buildHeader(),
                 SliverToBoxAdapter(child: _buildCategoryChips()),
@@ -205,12 +206,19 @@ class _CariWisataScreenState extends State<CariWisataScreen> {
                     SliverPadding(
                       padding: const EdgeInsets.fromLTRB(20, 0, 20, 32),
                       sliver: SliverGrid(
-                        gridDelegate:
-                            const SliverGridDelegateWithFixedCrossAxisCount(
-                          crossAxisCount: 2,
+                        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                          crossAxisCount: MediaQuery.sizeOf(context).width <
+                                      370 ||
+                                  MediaQuery.textScalerOf(context).scale(1) >
+                                      1.3
+                              ? 1
+                              : 2,
                           mainAxisSpacing: 14,
                           crossAxisSpacing: 14,
-                          mainAxisExtent: 228,
+                          mainAxisExtent: 248 *
+                              MediaQuery.textScalerOf(context)
+                                  .scale(1)
+                                  .clamp(1, 1.5),
                         ),
                         delegate: SliverChildBuilderDelegate(
                           (_, i) {
@@ -332,7 +340,7 @@ class _CariWisataScreenState extends State<CariWisataScreen> {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Text(
-                      'Cari Wisata',
+                      'Jelajah',
                       style: _font(
                         32,
                         FontWeight.w800,
@@ -343,7 +351,7 @@ class _CariWisataScreenState extends State<CariWisataScreen> {
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      'Ke mana kamu mau pergi hari ini?',
+                      'Temukan tujuan, pilih pengalamanmu.',
                       style: _font(
                         13,
                         FontWeight.w500,
@@ -452,7 +460,8 @@ class _CariWisataScreenState extends State<CariWisataScreen> {
       child: ListView.separated(
         padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
         scrollDirection: Axis.horizontal,
-        physics: const BouncingScrollPhysics(),
+        physics: const BouncingScrollPhysics(
+            parent: AlwaysScrollableScrollPhysics()),
         itemCount: kategori.length + 1,
         separatorBuilder: (_, __) => const SizedBox(width: 8),
         itemBuilder: (_, i) {
@@ -632,7 +641,9 @@ class _FadeSlide extends StatelessWidget {
     final delay = (index.clamp(0, 6)) * 70;
     return TweenAnimationBuilder<double>(
       tween: Tween(begin: 0, end: 1),
-      duration: Duration(milliseconds: 450 + delay),
+      duration: MediaQuery.disableAnimationsOf(context)
+          ? Duration.zero
+          : Duration(milliseconds: 450 + delay),
       curve: Curves.easeOutCubic,
       builder: (_, v, c) => Opacity(
         opacity: v,

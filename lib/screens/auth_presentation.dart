@@ -112,7 +112,7 @@ class AuthScenicShell extends StatelessWidget {
                                   ScrollViewKeyboardDismissBehavior.onDrag,
                               slivers: [
                                 SliverToBoxAdapter(
-                                    child: _AuthDynamicHeader(
+                                    child: TimeBasedScenicBackground(
                                   child: SafeArea(
                                     bottom: false,
                                     child: Padding(
@@ -445,15 +445,23 @@ class _AuthSceneTween extends Tween<_AuthScene> {
   _AuthScene lerp(double t) => _AuthScene.lerp(begin!, end!, t);
 }
 
-class _AuthDynamicHeader extends StatefulWidget {
-  const _AuthDynamicHeader({required this.child});
+class TimeBasedScenicBackground extends StatefulWidget {
+  const TimeBasedScenicBackground({
+    super.key,
+    required this.child,
+    this.active = true,
+    this.topInset,
+  });
   final Widget child;
+  final bool active;
+  final double? topInset;
 
   @override
-  State<_AuthDynamicHeader> createState() => _AuthDynamicHeaderState();
+  State<TimeBasedScenicBackground> createState() =>
+      _TimeBasedScenicBackgroundState();
 }
 
-class _AuthDynamicHeaderState extends State<_AuthDynamicHeader>
+class _TimeBasedScenicBackgroundState extends State<TimeBasedScenicBackground>
     with WidgetsBindingObserver {
   late _AuthHeaderPeriod _period;
   Timer? _boundaryTimer;
@@ -464,8 +472,22 @@ class _AuthDynamicHeaderState extends State<_AuthDynamicHeader>
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _period = _AuthHeaderPeriod.forTime(DateTime.now());
-    _reconcile();
-    _startClockCheck();
+    if (widget.active) {
+      _reconcile();
+      _startClockCheck();
+    }
+  }
+
+  @override
+  void didUpdateWidget(TimeBasedScenicBackground oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.active && !oldWidget.active) {
+      _reconcile();
+      _startClockCheck();
+    } else if (!widget.active) {
+      _boundaryTimer?.cancel();
+      _clockCheck?.cancel();
+    }
   }
 
   void _startClockCheck() {
@@ -493,7 +515,7 @@ class _AuthDynamicHeaderState extends State<_AuthDynamicHeader>
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed) {
+    if (state == AppLifecycleState.resumed && widget.active) {
       _reconcile();
       _startClockCheck();
     } else {
@@ -522,7 +544,7 @@ class _AuthDynamicHeaderState extends State<_AuthDynamicHeader>
           builder: (context, scene, child) => ClipRect(
             child: CustomPaint(
                 painter: AuthMountainPainter._(
-                    scene, MediaQuery.paddingOf(context).top),
+                    scene, widget.topInset ?? MediaQuery.paddingOf(context).top),
                 child: child),
           ),
         ),

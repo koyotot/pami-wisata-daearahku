@@ -15,6 +15,7 @@ import '../data/booking_state.dart';
 import '../data/business_repository.dart';
 import '../services/auth_session.dart';
 import '../widgets/api_image.dart';
+import 'auth_presentation.dart';
 import 'detail_wisata_screen.dart';
 
 // ── Palet & font (sama dengan home_screen.dart) ──────────────
@@ -191,10 +192,12 @@ class _BerandaUserScreenState extends State<BerandaUserScreen>
           child: SafeArea(
             bottom: false,
             child: FadeTransition(
-              opacity: CurvedAnimation(
-                parent: _fadeCtrl,
-                curve: Curves.easeOut,
-              ),
+              opacity: MediaQuery.disableAnimationsOf(context)
+                  ? const AlwaysStoppedAnimation(1)
+                  : CurvedAnimation(
+                      parent: _fadeCtrl,
+                      curve: Curves.easeOut,
+                    ),
               child: RefreshIndicator(
                 onRefresh: _muatData,
                 child: SingleChildScrollView(
@@ -304,12 +307,6 @@ class _BerandaUserScreenState extends State<BerandaUserScreen>
       clipBehavior: Clip.antiAlias,
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(28),
-        gradient: const LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [Color(0xFF2A93F0), _C.blue, _C.blueDeep],
-          stops: [0.0, 0.5, 1.0],
-        ),
         boxShadow: [
           BoxShadow(
             color: _C.blue.withValues(alpha: 0.30),
@@ -318,136 +315,86 @@ class _BerandaUserScreenState extends State<BerandaUserScreen>
           ),
         ],
       ),
-      child: Stack(
-        children: [
-          // Dekorasi lingkaran lembut
-          Positioned(
-            top: -40,
-            right: -30,
-            child: Container(
-              width: 170,
-              height: 170,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: Colors.white.withValues(alpha: 0.09),
-              ),
-            ),
-          ),
-          Positioned(
-            bottom: -50,
-            left: -30,
-            child: Container(
-              width: 140,
-              height: 140,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: Colors.white.withValues(alpha: 0.06),
-              ),
-            ),
-          ),
-          // Matahari kecil (sama dengan motif beranda awal)
-          Positioned(
-            top: 20,
-            right: 22,
-            child: Container(
-              width: 38,
-              height: 38,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                gradient: const LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  colors: [Color(0xFFFFE9B0), _C.orange],
-                ),
-                boxShadow: [
-                  BoxShadow(
-                    color: const Color(0xFFFFC46B).withValues(alpha: 0.6),
-                    blurRadius: 18,
-                    spreadRadius: 2,
+      child: TimeBasedScenicBackground(
+        active: widget.active,
+        topInset: 0,
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  // Avatar
+                  Container(
+                    width: 54,
+                    height: 54,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: Colors.white.withValues(alpha: 0.20),
+                      border: Border.all(
+                        color: Colors.white.withValues(alpha: 0.55),
+                        width: 2,
+                      ),
+                    ),
+                    child: inisial.isEmpty
+                        ? const Icon(Icons.person_rounded,
+                            color: Colors.white, size: 26)
+                        : Text(
+                            inisial,
+                            style: _font(22, FontWeight.w800, Colors.white),
+                          ),
+                  ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Padding(
+                      padding: const EdgeInsets.only(right: 48),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Halo, $namaDepan 👋',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: _font(
+                              20,
+                              FontWeight.w800,
+                              Colors.white,
+                              letterSpacing: -0.4,
+                            ),
+                          ),
+                          const SizedBox(height: 3),
+                          Text(
+                            'Mau jelajah mana hari ini?',
+                            style: _font(
+                              13,
+                              FontWeight.w500,
+                              Colors.white.withValues(alpha: 0.88),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
                   ),
                 ],
               ),
-            ),
+              const SizedBox(height: 20),
+              Row(
+                children: [
+                  _statPill(
+                      Icons.place_rounded, '${_wisata.length}', 'Destinasi'),
+                  const SizedBox(width: 10),
+                  _statPill(Icons.category_rounded,
+                      '${_kategoriList.length - 1}', 'Kategori'),
+                  const SizedBox(width: 10),
+                  _statPill(Icons.people_rounded, '${_bookingCount ?? '–'}',
+                      'Terdaftar'),
+                ],
+              ),
+            ],
           ),
-
-          Padding(
-            padding: const EdgeInsets.all(20),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    // Avatar
-                    Container(
-                      width: 54,
-                      height: 54,
-                      alignment: Alignment.center,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: Colors.white.withValues(alpha: 0.20),
-                        border: Border.all(
-                          color: Colors.white.withValues(alpha: 0.55),
-                          width: 2,
-                        ),
-                      ),
-                      child: inisial.isEmpty
-                          ? const Icon(Icons.person_rounded,
-                              color: Colors.white, size: 26)
-                          : Text(
-                              inisial,
-                              style: _font(22, FontWeight.w800, Colors.white),
-                            ),
-                    ),
-                    const SizedBox(width: 14),
-                    Expanded(
-                      child: Padding(
-                        padding: const EdgeInsets.only(right: 48),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Halo, $namaDepan 👋',
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: _font(
-                                20,
-                                FontWeight.w800,
-                                Colors.white,
-                                letterSpacing: -0.4,
-                              ),
-                            ),
-                            const SizedBox(height: 3),
-                            Text(
-                              'Mau jelajah mana hari ini?',
-                              style: _font(
-                                13,
-                                FontWeight.w500,
-                                Colors.white.withValues(alpha: 0.88),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 20),
-                Row(
-                  children: [
-                    _statPill(
-                        Icons.place_rounded, '${_wisata.length}', 'Destinasi'),
-                    const SizedBox(width: 10),
-                    _statPill(Icons.category_rounded,
-                        '${_kategoriList.length - 1}', 'Kategori'),
-                    const SizedBox(width: 10),
-                    _statPill(Icons.people_rounded, '${_bookingCount ?? '–'}',
-                        'Terdaftar'),
-                  ],
-                ),
-              ],
-            ),
-          ),
-        ],
+        ),
       ),
     );
   }
@@ -617,8 +564,9 @@ class _BerandaUserScreenState extends State<BerandaUserScreen>
   Widget _buildSectionTitle() {
     return Padding(
       padding: const EdgeInsets.fromLTRB(22, 24, 22, 0),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      child: Wrap(
+        spacing: 12,
+        runSpacing: 8,
         children: [
           Row(
             children: [
@@ -632,7 +580,7 @@ class _BerandaUserScreenState extends State<BerandaUserScreen>
               ),
               const SizedBox(width: 10),
               Text(
-                'Destinasi Populer',
+                'Pilihan Destinasi',
                 style: _font(
                   17,
                   FontWeight.w800,
@@ -719,11 +667,15 @@ class _BerandaUserScreenState extends State<BerandaUserScreen>
       child: GridView.builder(
         shrinkWrap: true,
         physics: const NeverScrollableScrollPhysics(),
-        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-          crossAxisCount: 2,
+        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+          crossAxisCount: MediaQuery.sizeOf(context).width < 370 ||
+                  MediaQuery.textScalerOf(context).scale(1) > 1.3
+              ? 1
+              : 2,
           crossAxisSpacing: 14,
           mainAxisSpacing: 14,
-          childAspectRatio: 0.68,
+          mainAxisExtent:
+              310 * MediaQuery.textScalerOf(context).scale(1).clamp(1, 1.5),
         ),
         itemCount: hasil.length,
         itemBuilder: (_, i) => _WisataCard(
@@ -775,7 +727,9 @@ class _WisataCardState extends State<_WisataCard> {
 
     return TweenAnimationBuilder<double>(
       tween: Tween(begin: 0, end: 1),
-      duration: Duration(milliseconds: 380 + delay),
+      duration: MediaQuery.disableAnimationsOf(context)
+          ? Duration.zero
+          : Duration(milliseconds: 380 + delay),
       curve: Curves.easeOutCubic,
       builder: (context, value, child) => Opacity(
         opacity: value,

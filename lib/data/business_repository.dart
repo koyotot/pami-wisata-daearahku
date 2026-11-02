@@ -1,3 +1,4 @@
+import 'dart:convert';
 import '../services/api_client.dart';
 import '../services/auth_session.dart';
 
@@ -27,6 +28,14 @@ class Facility {
   bool get isActive => json['is_active'] as bool? ?? true;
 }
 
+class DestinationImage {
+  final Json json;
+  DestinationImage(this.json);
+  String get guid => json['guid'] as String;
+  int get sequence => (json['sequence'] as num).toInt();
+  String url(String variant) => (json['urls'] as Map)[variant] as String;
+}
+
 class Destination {
   final Json json;
   Destination(this.json) {
@@ -50,6 +59,26 @@ class Destination {
   List<Facility> get facilities => (json['facilities'] as List? ?? const [])
       .map((item) => Facility(item as Json))
       .toList();
+
+  int get galleryVersion => (json['gallery_version'] as num?)?.toInt() ?? 0;
+  List<DestinationImage> get images {
+    if (json.containsKey('images')) {
+      return (json['images'] as List? ?? [])
+          .map((e) => DestinationImage(e as Json))
+          .toList()
+        ..sort((a, b) => a.sequence.compareTo(b.sequence));
+    }
+    final url = imageUrl;
+    return url == null
+        ? []
+        : [
+            DestinationImage({
+              'guid': 'legacy-$guid',
+              'sequence': 1,
+              'urls': {'thumbnail': url, 'display': url, 'fullscreen': url}
+            })
+          ];
+  }
 
   /// Path relative to the API base URL (versioned by Laravel), or null without a picture.
   /// `image_path` is never used: it is an internal storage path, not a URL.
@@ -294,6 +323,12 @@ class BusinessRepository {
 
   /// Image bytes for any destination, including inactive ones (role >= 1).
   Future<BinaryResponse> adminImageBytes(String guid, String imageUrl) {
+    if (imageUrl.contains('/images/')) {
+      final path = imageUrl.replaceFirst(
+          RegExp(r'^/?(?:api/v1/)?(?:admin/)?destinations/'),
+          'admin/destinations/');
+      return api.session.requestBytes(path);
+    }
     final version = Uri.tryParse(imageUrl)?.queryParameters['v'];
     return api.session.requestBytes(
         'admin/destinations/${_id(guid)}/image${version == null ? '' : '?v=$version'}');
@@ -416,6 +451,27 @@ class BusinessRepository {
   Future<Destination> adminDestination(String guid) async =>
       Destination(await api.object('GET', 'admin/destinations/${_id(guid)}',
           authenticated: true));
+
+  Future<Destination> saveDestinationGallery(
+      {String? guid,
+      required Json fields,
+      required int galleryVersion,
+      required List<Json> manifest,
+      required List<UploadFile> files,
+      required String idempotencyKey}) async {
+    return Destination(await api.session
+        .requestMultipart(
+            'POST', guid == null ? 'destinations' : 'destinations/${_id(guid)}',
+            headers: {'Idempotency-Key': idempotencyKey},
+            fields: {
+              ..._formFields(fields),
+              if (guid != null) '_method': 'PATCH',
+              if (guid != null) 'gallery_version': '$galleryVersion',
+              if (guid != null) 'gallery_manifest': jsonEncode(manifest)
+            },
+            files: files)
+        .then(_data));
+  }
 
   /// Creates a destination; with [image] the request is multipart (field `image`).
   Future<Destination> createDestination(Json fields,

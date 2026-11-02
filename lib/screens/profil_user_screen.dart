@@ -73,12 +73,17 @@ class ProfilUserScreen extends StatefulWidget {
   /// Dipanggil saat tombol kembali ditekan. Di dalam MainNavigationScreen
   /// diisi perpindahan ke tab Beranda. Jika null, memakai Navigator.maybePop.
   final VoidCallback? onKembali;
+  final VoidCallback? onNotifications;
 
   /// True saat tab ini tampil; jumlah pendaftaran dimuat ulang ketika tab dibuka kembali.
   final bool active;
 
   const ProfilUserScreen(
-      {super.key, this.onBukaMenu, this.onKembali, this.active = true});
+      {super.key,
+      this.onBukaMenu,
+      this.onKembali,
+      this.onNotifications,
+      this.active = true});
 
   @override
   State<ProfilUserScreen> createState() => _ProfilUserScreenState();
@@ -289,18 +294,11 @@ class _ProfilUserScreenState extends State<ProfilUserScreen>
         content: Text('Fitur ini belum tersedia untuk akun API.')));
   }
 
-  void _kembali() {
-    if (widget.onKembali != null) {
-      widget.onKembali!();
-    } else {
-      Navigator.maybePop(context);
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     final user = currentUser;
-    final tahunBergabung = user != null ? user.createdAt.year.toString() : '-';
+    // AuthSession's legacy currentUser.createdAt is local hydration time.
+    const tahunBergabung = '\u2014';
 
     return Theme(
       // Font Plus Jakarta Sans untuk seluruh halaman, dialog & bottom sheet
@@ -331,9 +329,13 @@ class _ProfilUserScreenState extends State<ProfilUserScreen>
                   _buildTopBar(),
                   Expanded(
                     child: FadeTransition(
-                      opacity: _fadeAnim,
+                      opacity: MediaQuery.disableAnimationsOf(context)
+                          ? const AlwaysStoppedAnimation(1)
+                          : _fadeAnim,
                       child: SlideTransition(
-                        position: _slideAnim,
+                        position: MediaQuery.disableAnimationsOf(context)
+                            ? const AlwaysStoppedAnimation(Offset.zero)
+                            : _slideAnim,
                         child: SingleChildScrollView(
                           physics: const BouncingScrollPhysics(),
                           padding: const EdgeInsets.fromLTRB(20, 10, 20, 32),
@@ -370,22 +372,25 @@ class _ProfilUserScreenState extends State<ProfilUserScreen>
                                   icon: Icons.notifications_rounded,
                                   iconColor: const Color(0xFFFF8C42),
                                   title: 'Notifikasi',
-                                  subtitle: 'Atur preferensi notifikasi',
-                                  badge: 'Baru',
-                                  onTap: () => _bukaNotifikasi(context),
+                                  subtitle: widget.onNotifications != null
+                                      ? 'Lihat aktivitas pendaftaran'
+                                      : 'Preferensi belum tersedia',
+                                  onTap: widget.onNotifications ??
+                                      () => _bukaNotifikasi(context),
                                 ),
                                 _MenuItemData(
                                   icon: Icons.language_rounded,
                                   iconColor: const Color(0xFF7E57C2),
                                   title: 'Bahasa',
-                                  subtitle: 'Indonesia',
+                                  subtitle:
+                                      'Indonesia ? bahasa lain belum tersedia',
                                   onTap: () => _bukaPilihBahasa(context),
                                 ),
                                 _MenuItemData(
                                   icon: Icons.lock_reset_rounded,
                                   iconColor: const Color(0xFF26A69A),
                                   title: 'Ubah Password',
-                                  subtitle: 'Perbarui kata sandi akun kamu',
+                                  subtitle: 'Belum tersedia untuk akun API',
                                   onTap: () => _bukaGantiPassword(context),
                                 ),
                                 _MenuItemData(
@@ -399,7 +404,7 @@ class _ProfilUserScreenState extends State<ProfilUserScreen>
                                   icon: Icons.delete_outline_rounded,
                                   iconColor: _C.danger,
                                   title: 'Hapus Akun',
-                                  subtitle: 'Hapus akun secara permanen',
+                                  subtitle: 'Belum tersedia untuk akun API',
                                   onTap: () => _konfirmasiHapusAkun(context),
                                   isDanger: true,
                                 ),
@@ -430,12 +435,7 @@ class _ProfilUserScreenState extends State<ProfilUserScreen>
       padding: const EdgeInsets.fromLTRB(20, 10, 20, 4),
       child: Row(
         children: [
-          _topButton(
-            icon: Icons.arrow_back_ios_new_rounded,
-            iconSize: 18,
-            tooltip: 'Kembali',
-            onTap: _kembali,
-          ),
+          const SizedBox(width: 44),
           Expanded(
             child: Text(
               'Profil Saya',
@@ -493,283 +493,91 @@ class _ProfilUserScreenState extends State<ProfilUserScreen>
   // ══════════════════════════════════════════════════════════
   Widget _buildHeaderCard(User? user, String tahunBergabung) {
     final nama = user?.namaLengkap.trim() ?? '';
-    final inisial = nama.isEmpty ? '' : nama[0].toUpperCase();
-
+    final initials = nama
+        .split(RegExp(r'\s+'))
+        .where((part) => part.isNotEmpty)
+        .take(2)
+        .map((part) => part.characters.first.toUpperCase())
+        .join();
+    final stats = [
+      (
+        'Pendaftaran',
+        _loadingJumlah || _jumlahPendaftaran == null
+            ? '\u2014'
+            : '$_jumlahPendaftaran'
+      ),
+      (
+        'Dikunjungi',
+        _loadingJumlah || _jumlahDikunjungi == null
+            ? '\u2014'
+            : '$_jumlahDikunjungi'
+      ),
+      (
+        'Ulasan',
+        _loadingJumlah || _jumlahUlasan == null ? '\u2014' : '$_jumlahUlasan'
+      ),
+      ('Tahun bergabung', tahunBergabung),
+    ];
     return Container(
-      width: double.infinity,
-      clipBehavior: Clip.antiAlias,
+      key: const ValueKey('profileIdentityCard'),
+      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(30),
-        gradient: const LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [Color(0xFF2A93F0), _C.blue, _C.blueDeep],
-          stops: [0.0, 0.5, 1.0],
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: _C.blue.withValues(alpha: 0.30),
-            blurRadius: 28,
-            offset: const Offset(0, 12),
-          ),
-        ],
-      ),
-      child: Stack(
-        children: [
-          // Lingkaran dekoratif
-          Positioned(
-            top: -60,
-            right: -50,
-            child: Container(
-              width: 170,
-              height: 170,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: Colors.white.withValues(alpha: 0.09),
-              ),
-            ),
-          ),
-          // Matahari kecil
-          Positioned(
-            top: 20,
-            right: 22,
-            child: Container(
-              width: 30,
-              height: 30,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                gradient: const LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  colors: [Color(0xFFFFE9B0), _C.orange],
-                ),
-                boxShadow: [
-                  BoxShadow(
-                    color: const Color(0xFFFFC46B).withValues(alpha: 0.6),
-                    blurRadius: 14,
-                    spreadRadius: 1,
-                  ),
-                ],
-              ),
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(20, 30, 20, 22),
-            child: Column(
-              children: [
-                // Avatar (inisial nama)
-                Container(
-                  width: 92,
-                  height: 92,
-                  alignment: Alignment.center,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: Colors.white.withValues(alpha: 0.20),
-                    border: Border.all(
-                      color: Colors.white.withValues(alpha: 0.6),
-                      width: 2.5,
-                    ),
-                  ),
-                  child: inisial.isEmpty
-                      ? const Icon(Icons.person_rounded,
-                          color: Colors.white, size: 44)
-                      : Text(
-                          inisial,
-                          style: _font(38, FontWeight.w800, Colors.white),
-                        ),
-                ),
-
-                const SizedBox(height: 16),
-
-                // Nama
-                Text(
-                  nama.isEmpty ? 'Pengunjung' : nama,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  textAlign: TextAlign.center,
-                  style: _font(
-                    22,
-                    FontWeight.w800,
-                    Colors.white,
-                    letterSpacing: -0.5,
-                    height: 1.1,
-                  ),
-                ),
-                const SizedBox(height: 10),
-
-                // Email chip
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.18),
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(Icons.email_rounded,
-                          color: Colors.white.withValues(alpha: 0.9), size: 13),
-                      const SizedBox(width: 6),
-                      Flexible(
-                        child: Text(
-                          (user?.email ?? '').isEmpty ? '-' : user!.email,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: _font(
-                            12,
-                            FontWeight.w600,
-                            Colors.white.withValues(alpha: 0.95),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-
-                if (user != null && user.noTelepon.isNotEmpty) ...[
-                  const SizedBox(height: 8),
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(Icons.phone_rounded,
-                          color: Colors.white.withValues(alpha: 0.8), size: 12),
-                      const SizedBox(width: 5),
-                      Text(
-                        user.noTelepon,
-                        style: _font(
-                          12,
-                          FontWeight.w500,
-                          Colors.white.withValues(alpha: 0.85),
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-
-                const SizedBox(height: 16),
-
-                // Tombol Edit Profil
-                Material(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(20),
-                  clipBehavior: Clip.antiAlias,
-                  child: InkWell(
-                    onTap: () => _bukaEditProfil(context),
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 20, vertical: 9),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const Icon(Icons.edit_rounded,
-                              color: _C.blue, size: 14),
-                          const SizedBox(width: 6),
-                          Text(
-                            'Edit Profil',
-                            style: _font(12.5, FontWeight.w800, _C.blueDeep),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-
-                const SizedBox(height: 22),
-
-                // 4 kartu statistik
-                Row(
-                  children: [
-                    _statCard(
-                      icon: Icons.receipt_long_rounded,
-                      value: _loadingJumlah || _jumlahPendaftaran == null
-                          ? '–'
-                          : '$_jumlahPendaftaran',
-                      label: 'Pendaftaran',
-                      iconColor: _C.orange,
-                    ),
-                    const SizedBox(width: 8),
-                    _statCard(
-                      icon: Icons.location_on_rounded,
-                      value: _loadingJumlah || _jumlahDikunjungi == null
-                          ? '–'
-                          : '$_jumlahDikunjungi',
-                      label: 'Dikunjungi',
-                      iconColor: _C.blue,
-                    ),
-                    const SizedBox(width: 8),
-                    _statCard(
-                      icon: Icons.star_rounded,
-                      value: _loadingJumlah || _jumlahUlasan == null
-                          ? '–'
-                          : '$_jumlahUlasan',
-                      label: 'Ulasan',
-                      iconColor: const Color(0xFF26A69A),
-                    ),
-                    const SizedBox(width: 8),
-                    _statCard(
-                      icon: Icons.calendar_today_rounded,
-                      value: tahunBergabung,
-                      label: 'Bergabung',
-                      iconColor: const Color(0xFFFF8C42),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _statCard({
-    required IconData icon,
-    required String value,
-    required String label,
-    required Color iconColor,
-  }) {
-    return Expanded(
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 12),
-        decoration: BoxDecoration(
           color: Colors.white,
-          borderRadius: BorderRadius.circular(16),
-        ),
-        child: Column(
-          children: [
-            Container(
-              width: 30,
-              height: 30,
-              alignment: Alignment.center,
-              decoration: BoxDecoration(
-                color: iconColor.withValues(alpha: 0.12),
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: Icon(icon, color: iconColor, size: 17),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              value,
-              style: _font(15.5, FontWeight.w800, _C.navy, letterSpacing: -0.4),
-            ),
-            const SizedBox(height: 2),
-            Text(
-              label,
-              style: _font(9.5, FontWeight.w600, _C.textMuted),
-              textAlign: TextAlign.center,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
-          ],
-        ),
-      ),
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(color: _C.border)),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          CircleAvatar(
+              radius: 28,
+              backgroundColor: _C.blue,
+              child: initials.isEmpty
+                  ? const Icon(Icons.person_outline, color: Colors.white)
+                  : Text(initials,
+                      style: _font(20, FontWeight.w800, Colors.white))),
+          const SizedBox(width: 14),
+          Expanded(
+              child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                Text(nama.isEmpty ? 'Pengunjung' : nama,
+                    style: _font(20, FontWeight.w800, _C.navy)),
+                const SizedBox(height: 4),
+                Text(user?.email ?? '\u2014',
+                    style: _font(13, FontWeight.w500, _C.textMuted)),
+                if (user?.noTelepon.isNotEmpty ?? false) ...[
+                  const SizedBox(height: 4),
+                  Text(user!.noTelepon,
+                      style: _font(13, FontWeight.w500, _C.textMuted)),
+                ],
+              ])),
+        ]),
+        const SizedBox(height: 16),
+        OutlinedButton.icon(
+            onPressed: () => _bukaEditProfil(context),
+            icon: const Icon(Icons.edit_outlined, size: 18),
+            label: const Text('Edit Profil')),
+        const SizedBox(height: 16),
+        LayoutBuilder(
+            builder: (context, constraints) => Wrap(
+                spacing: 12,
+                runSpacing: 16,
+                children: stats
+                    .map((stat) => SizedBox(
+                        width: (constraints.maxWidth - 12) / 2,
+                        child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(stat.$2,
+                                  style: _font(24, FontWeight.w800, _C.navy)),
+                              Text(stat.$1,
+                                  style:
+                                      _font(12, FontWeight.w500, _C.textMuted)),
+                            ])))
+                    .toList())),
+      ]),
     );
   }
 
-  // ══════════════════════════════════════════════════════════
-  //  SECTION LABEL
-  // ══════════════════════════════════════════════════════════
   Widget _sectionLabel(String text) {
     return Row(
       children: [
@@ -782,10 +590,11 @@ class _ProfilUserScreenState extends State<ProfilUserScreen>
           ),
         ),
         const SizedBox(width: 8),
-        Text(
+        Expanded(
+            child: Text(
           text,
           style: _font(15.5, FontWeight.w800, _C.navy, letterSpacing: -0.3),
-        ),
+        )),
       ],
     );
   }
@@ -960,24 +769,6 @@ class _ProfilUserScreenState extends State<ProfilUserScreen>
                             ],
                           ),
                         ),
-                        if (item.badge != null)
-                          Container(
-                            margin: const EdgeInsets.only(right: 8),
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 8, vertical: 3),
-                            decoration: BoxDecoration(
-                              color: _C.gold,
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                            child: Text(
-                              item.badge!,
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 10,
-                                fontWeight: FontWeight.w800,
-                              ),
-                            ),
-                          ),
                         Icon(Icons.arrow_forward_ios_rounded,
                             color: _C.textDim, size: 13),
                       ],
@@ -1073,7 +864,6 @@ class _MenuItemData {
   final Color iconColor;
   final String title;
   final String subtitle;
-  final String? badge;
   final VoidCallback onTap;
   final bool isDanger;
 
@@ -1083,7 +873,6 @@ class _MenuItemData {
     required this.title,
     required this.subtitle,
     required this.onTap,
-    this.badge,
     this.isDanger = false,
   });
 }
@@ -1275,224 +1064,55 @@ class _EditProfilSheetState extends State<_EditProfilSheet> {
 // ════════════════════════════════════════════════════════════
 //  BOTTOM SHEET — Riwayat Ulasan
 // ════════════════════════════════════════════════════════════
-class _NotifikasiSheet extends StatefulWidget {
+class _NotifikasiSheet extends StatelessWidget {
   const _NotifikasiSheet();
-
   @override
-  State<_NotifikasiSheet> createState() => _NotifikasiSheetState();
+  Widget build(BuildContext context) => const _UnavailableSettingSheet(
+        title: 'Preferensi Notifikasi',
+        message:
+            'Pengaturan jenis notifikasi belum tersedia. Notifikasi perangkat tetap mengikuti izin sistem perangkat.',
+      );
 }
 
-class _NotifikasiSheetState extends State<_NotifikasiSheet> {
-  bool _infoWisata = true;
-  bool _promoEvent = true;
-  bool _statusPendaftaran = true;
-  bool _pengumumanApp = false;
-
-  Widget _switchTile(
-      String title, String subtitle, bool value, ValueChanged<bool> onChanged) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 10),
-      child: Row(
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(title,
-                    style: TextStyle(
-                        color: _C.text,
-                        fontWeight: FontWeight.w600,
-                        fontSize: 13.5)),
-                const SizedBox(height: 2),
-                Text(subtitle,
-                    style: TextStyle(color: _C.textMuted, fontSize: 12)),
-              ],
-            ),
-          ),
-          Switch(
-            value: value,
-            onChanged: onChanged,
-            activeColor: _C.teal,
-          ),
-        ],
-      ),
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
-      decoration: BoxDecoration(
-        color: _C.card,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Center(
-            child: Container(
-              width: 40,
-              height: 4,
-              decoration: BoxDecoration(
-                  color: _C.border, borderRadius: BorderRadius.circular(2)),
-            ),
-          ),
-          const SizedBox(height: 16),
-          Text('Notifikasi',
-              style: TextStyle(
-                  color: _C.text, fontSize: 18, fontWeight: FontWeight.w800)),
-          const SizedBox(height: 4),
-          Text('Atur notifikasi yang ingin kamu terima',
-              style: TextStyle(color: _C.textMuted, fontSize: 12.5)),
-          const SizedBox(height: 16),
-          _switchTile('Info Wisata Baru', 'Pemberitahuan destinasi terbaru',
-              _infoWisata, (v) => setState(() => _infoWisata = v)),
-          Divider(color: _C.border.withValues(alpha: 0.4)),
-          _switchTile('Promo & Event', 'Diskon dan acara spesial', _promoEvent,
-              (v) => setState(() => _promoEvent = v)),
-          Divider(color: _C.border.withValues(alpha: 0.4)),
-          _switchTile(
-              'Status Pendaftaran',
-              'Update status kunjunganmu',
-              _statusPendaftaran,
-              (v) => setState(() => _statusPendaftaran = v)),
-          Divider(color: _C.border.withValues(alpha: 0.4)),
-          _switchTile('Pengumuman Aplikasi', 'Update dan info versi baru',
-              _pengumumanApp, (v) => setState(() => _pengumumanApp = v)),
-          const SizedBox(height: 8),
-          GestureDetector(
-            onTap: () => Navigator.pop(context),
-            child: Container(
-              width: double.infinity,
-              height: 48,
-              decoration: BoxDecoration(
-                gradient: LinearGradient(colors: [_C.teal, _C.tealDark]),
-                borderRadius: BorderRadius.circular(14),
-              ),
-              child: const Center(
-                child: Text('Simpan Preferensi',
-                    style: TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.w700,
-                        fontSize: 14)),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-// ════════════════════════════════════════════════════════════
-//  BOTTOM SHEET — Pilih Bahasa
-// ════════════════════════════════════════════════════════════
-class _PilihBahasaSheet extends StatefulWidget {
+class _PilihBahasaSheet extends StatelessWidget {
   const _PilihBahasaSheet();
-
   @override
-  State<_PilihBahasaSheet> createState() => _PilihBahasaSheetState();
+  Widget build(BuildContext context) => const _UnavailableSettingSheet(
+        title: 'Bahasa',
+        message:
+            'Aplikasi menggunakan Bahasa Indonesia. Pilihan bahasa lain belum tersedia.',
+      );
 }
 
-class _PilihBahasaSheetState extends State<_PilihBahasaSheet> {
-  String _selected = 'Indonesia';
-
-  final _bahasa = [
-    ('Indonesia', '🇮🇩'),
-    ('English', '🇬🇧'),
-  ];
-
+class _UnavailableSettingSheet extends StatelessWidget {
+  const _UnavailableSettingSheet({required this.title, required this.message});
+  final String title;
+  final String message;
   @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
-      decoration: BoxDecoration(
-        color: _C.card,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Center(
-            child: Container(
-              width: 40,
-              height: 4,
-              decoration: BoxDecoration(
-                  color: _C.border, borderRadius: BorderRadius.circular(2)),
-            ),
-          ),
-          const SizedBox(height: 16),
-          Text('Pilih Bahasa',
-              style: TextStyle(
-                  color: _C.text, fontSize: 18, fontWeight: FontWeight.w800)),
-          const SizedBox(height: 16),
-          ..._bahasa.map((b) {
-            final isSelected = _selected == b.$1;
-            return GestureDetector(
-              onTap: () => setState(() => _selected = b.$1),
-              child: Container(
-                margin: const EdgeInsets.only(bottom: 10),
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                decoration: BoxDecoration(
-                  color: isSelected ? _C.teal.withValues(alpha: 0.12) : _C.bg,
-                  borderRadius: BorderRadius.circular(14),
-                  border: Border.all(
-                    color:
-                        isSelected ? _C.teal.withValues(alpha: 0.5) : _C.border,
-                    width: 1.2,
-                  ),
-                ),
-                child: Row(
-                  children: [
-                    Text(b.$2, style: const TextStyle(fontSize: 22)),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Text(b.$1,
-                          style: TextStyle(
-                              color: _C.text,
-                              fontWeight: FontWeight.w600,
-                              fontSize: 14)),
-                    ),
-                    if (isSelected)
-                      Icon(Icons.check_circle_rounded,
-                          color: _C.teal, size: 18),
-                  ],
-                ),
-              ),
-            );
-          }),
-          const SizedBox(height: 8),
-          GestureDetector(
-            onTap: () => Navigator.pop(context),
-            child: Container(
-              width: double.infinity,
-              height: 48,
-              decoration: BoxDecoration(
-                gradient: LinearGradient(colors: [_C.teal, _C.tealDark]),
-                borderRadius: BorderRadius.circular(14),
-              ),
-              child: const Center(
-                child: Text('Terapkan',
-                    style: TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.w700,
-                        fontSize: 14)),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
+  Widget build(BuildContext context) => SafeArea(
+        top: false,
+        child: Container(
+            padding: const EdgeInsets.all(24),
+            decoration: const BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.vertical(top: Radius.circular(28))),
+            child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(title, style: _font(20, FontWeight.w800, _C.navy)),
+                  const SizedBox(height: 12),
+                  Text(message,
+                      style: _font(14, FontWeight.w500, _C.textMuted,
+                          height: 1.5)),
+                  const SizedBox(height: 16),
+                  TextButton(
+                      onPressed: () => Navigator.pop(context),
+                      child: const Text('Tutup')),
+                ])),
+      );
 }
 
-// ════════════════════════════════════════════════════════════
-//  BOTTOM SHEET — Semua Wisata Tersimpan
-// ════════════════════════════════════════════════════════════
 class _SemuaWisataTersimpanSheet extends StatelessWidget {
   const _SemuaWisataTersimpanSheet();
 

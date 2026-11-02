@@ -6,7 +6,6 @@
 // - Kartu tiket modern dengan strip status berwarna
 // Butuh package: google_fonts
 // ============================================================
-import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -98,60 +97,6 @@ Pendaftar _fromBooking(Booking booking) {
 }
 
 // ── Cari data wisata (untuk foto) berdasarkan nama ────────────
-Wisata? _cariWisata(String nama) {
-  final n = nama.trim().toLowerCase();
-  for (final w in daftarWisata) {
-    if (w.nama.trim().toLowerCase() == n) return w;
-  }
-  return null;
-}
-
-// ── Foto destinasi (http / asset / file / placeholder) ────────
-class _FotoWisata extends StatelessWidget {
-  final Wisata? wisata;
-  final _StatusStyle style;
-  const _FotoWisata({required this.wisata, required this.style});
-
-  @override
-  Widget build(BuildContext context) {
-    Widget placeholder() => Container(
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [style.color, style.deep],
-            ),
-          ),
-          child: Center(
-            child: Icon(Icons.landscape_rounded,
-                color: Colors.white.withValues(alpha: 0.35), size: 64),
-          ),
-        );
-
-    final path = wisata?.imagePath;
-    if (path == null || path.isEmpty) return placeholder();
-
-    if (path.startsWith('http://') || path.startsWith('https://')) {
-      return Image.network(
-        path,
-        fit: BoxFit.cover,
-        loadingBuilder: (_, child, progress) =>
-            progress == null ? child : placeholder(),
-        errorBuilder: (_, __, ___) => placeholder(),
-      );
-    }
-    if (path.startsWith('assets/')) {
-      return Image.asset(path,
-          fit: BoxFit.cover, errorBuilder: (_, __, ___) => placeholder());
-    }
-    return Image.file(File(path),
-        fit: BoxFit.cover, errorBuilder: (_, __, ___) => placeholder());
-  }
-}
-
-// ══════════════════════════════════════════════════════════
-//  LAYAR UTAMA
-// ══════════════════════════════════════════════════════════
 class BuktiPendaftaranScreen extends StatefulWidget {
   // Saat true, layar ini ditampilkan sebagai salah satu tab di
   // MainNavigationScreen.
@@ -353,9 +298,7 @@ class _BuktiPendaftaranScreenState extends State<BuktiPendaftaranScreen> {
       scrolledUnderElevation: 0,
       backgroundColor: _blue,
       automaticallyImplyLeading: false,
-      leadingWidth: 62,
       centerTitle: true,
-      // Pill jumlah pendaftaran, di antara tombol kembali & menu
       title: Container(
         height: 34,
         padding: const EdgeInsets.symmetric(horizontal: 12),
@@ -376,21 +319,6 @@ class _BuktiPendaftaranScreenState extends State<BuktiPendaftaranScreen> {
           ],
         ),
       ),
-      // Tombol kembali
-      leading: (widget.embedded && widget.onKembali == null)
-          ? null
-          : _headerButton(
-              icon: Icons.arrow_back_ios_new_rounded,
-              iconSize: 17,
-              margin: const EdgeInsets.fromLTRB(20, 8, 0, 8),
-              onTap: () {
-                if (widget.onKembali != null) {
-                  widget.onKembali!();
-                } else {
-                  Navigator.maybePop(context);
-                }
-              },
-            ),
       // Tombol pembuka drawer
       actions: [
         if (widget.onBukaMenu != null)
@@ -742,6 +670,7 @@ class _FadeSlide extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (MediaQuery.disableAnimationsOf(context)) return child;
     final delay = (index.clamp(0, 6)) * 70;
     return TweenAnimationBuilder<double>(
       tween: Tween(begin: 0, end: 1),
@@ -765,6 +694,7 @@ class _TicketCard extends StatefulWidget {
   /// Booking Laravel asal [pendaftar]; null untuk data historis.
   final Booking? booking;
   final bool isLaravel;
+  final bool initiallyExpanded;
 
   /// Dipanggil dengan salinan booking terbaru dari server (detail / hasil pembatalan).
   final ValueChanged<Booking>? onChanged;
@@ -773,6 +703,7 @@ class _TicketCard extends StatefulWidget {
       {required this.pendaftar,
       this.booking,
       this.isLaravel = false,
+      this.initiallyExpanded = false,
       this.onChanged});
 
   @override
@@ -794,6 +725,11 @@ class _TicketCardState extends State<_TicketCard> {
       _controller = BookingDetailController(BusinessRepository(), booking)
         ..addListener(_controllerChanged);
       _emitted = booking;
+      if (widget.initiallyExpanded) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) _toggleExpand();
+        });
+      }
     }
   }
 
@@ -943,103 +879,22 @@ class _TicketCardState extends State<_TicketCard> {
   }
 
   Widget _buildTicketHeader(Pendaftar p, _StatusStyle st) {
-    final wisata = widget.isLaravel ? null : _cariWisata(p.wisata);
-
-    return Material(
-      color: Colors.transparent,
-      borderRadius: const BorderRadius.vertical(top: Radius.circular(25)),
-      clipBehavior: Clip.antiAlias,
-      child: SizedBox(
-        height: 156,
-        width: double.infinity,
-        child: Stack(
-          fit: StackFit.expand,
-          children: [
-            _FotoWisata(wisata: wisata, style: st),
-            // gradasi gelap agar teks terbaca
-            const DecoratedBox(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  colors: [Color(0x33102D59), Color(0xE6102D59)],
-                  stops: [0.25, 1.0],
-                ),
-              ),
-            ),
-            // status (kiri atas)
-            Positioned(
-              top: 12,
-              left: 12,
-              child: _StatusBadge(status: p.status, onPhoto: true),
-            ),
-            // nama wisata + nomor bukti (kiri bawah)
-            Positioned(
-              left: 16,
-              right: 16,
-              bottom: 14,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    p.wisata,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: _font(20, FontWeight.w800, Colors.white,
-                        height: 1.15, letterSpacing: -0.5),
-                  ),
-                  const SizedBox(height: 7),
-                  GestureDetector(
-                    onTap: _copyNomor,
-                    behavior: HitTestBehavior.opaque,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 10, vertical: 5),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.2),
-                        borderRadius: BorderRadius.circular(20),
-                        border: Border.all(
-                            color: Colors.white.withValues(alpha: 0.35)),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const Icon(Icons.confirmation_number_rounded,
-                              color: Colors.white, size: 13),
-                          const SizedBox(width: 6),
-                          Flexible(
-                            child: Text(
-                              p.nomorBukti,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: _font(11.5, FontWeight.w800, Colors.white,
-                                  letterSpacing: 0.5),
-                            ),
-                          ),
-                          const SizedBox(width: 6),
-                          Icon(Icons.copy_rounded,
-                              color: Colors.white.withValues(alpha: 0.85),
-                              size: 12),
-                        ],
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            // strip warna status di tepi bawah foto
-            Positioned(
-              left: 0,
-              right: 0,
-              bottom: 0,
-              height: 4,
-              child: ColoredBox(color: st.color),
-            ),
-          ],
-        ),
-      ),
-    );
+    return Padding(
+        padding: const EdgeInsets.fromLTRB(18, 18, 18, 4),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          _StatusBadge(status: p.status, onPhoto: false),
+          const SizedBox(height: 12),
+          Text(p.wisata,
+              style: _font(20, FontWeight.w800, _navy, height: 1.25)),
+          const SizedBox(height: 4),
+          TextButton.icon(
+              onPressed: _copyNomor,
+              style: TextButton.styleFrom(
+                  padding: EdgeInsets.zero, alignment: Alignment.centerLeft),
+              icon: const Icon(Icons.copy_outlined, size: 16),
+              label:
+                  Text(p.nomorBukti, style: _font(13, FontWeight.w700, _blue))),
+        ]));
   }
 
   Widget _buildDashedDivider() {
@@ -1055,7 +910,7 @@ class _TicketCardState extends State<_TicketCard> {
               borderRadius: BorderRadius.horizontal(right: Radius.circular(9)),
             ),
           ),
-          Expanded(
+          const Expanded(
             child: CustomPaint(
               painter: _DashedLinePainter(color: _border),
             ),
@@ -1190,7 +1045,9 @@ class _TicketCardState extends State<_TicketCard> {
                   const SizedBox(width: 4),
                   AnimatedRotation(
                     turns: _expanded ? 0.5 : 0,
-                    duration: const Duration(milliseconds: 200),
+                    duration: MediaQuery.disableAnimationsOf(context)
+                        ? Duration.zero
+                        : const Duration(milliseconds: 200),
                     child: const Icon(Icons.keyboard_arrow_down_rounded,
                         color: _blue, size: 18),
                   ),
@@ -1199,7 +1056,9 @@ class _TicketCardState extends State<_TicketCard> {
             ),
           ),
           AnimatedSize(
-            duration: const Duration(milliseconds: 250),
+            duration: MediaQuery.disableAnimationsOf(context)
+                ? Duration.zero
+                : const Duration(milliseconds: 250),
             curve: Curves.easeInOut,
             child: _expanded
                 ? Container(
@@ -1784,3 +1643,84 @@ class _StatusBadge extends StatelessWidget {
 // ══════════════════════════════════════════════════════════
 //  TIKET BOTTOM SHEET — muncul saat kartu disetujui diklik
 // ══════════════════════════════════════════════════════════
+
+class BookingTicketScreen extends StatefulWidget {
+  const BookingTicketScreen({super.key, required this.bookingGuid});
+  final String bookingGuid;
+  @override
+  State<BookingTicketScreen> createState() => _BookingTicketScreenState();
+}
+
+class _BookingTicketScreenState extends State<BookingTicketScreen> {
+  late final int _generation;
+  Future<Booking>? _booking;
+  @override
+  void initState() {
+    super.initState();
+    _generation = AuthSession.instance.sessionGeneration;
+    if (AuthSession.instance.authenticated.value &&
+        AuthSession.instance.deviceSessionReady &&
+        AuthSession.instance.role == 0) {
+      _booking = BusinessRepository().booking(widget.bookingGuid);
+    }
+    AuthSession.instance.sessionChanges.addListener(_changed);
+  }
+
+  void _changed() {
+    if (mounted) setState(() {});
+  }
+
+  @override
+  void dispose() {
+    AuthSession.instance.sessionChanges.removeListener(_changed);
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final session = AuthSession.instance;
+    final valid = session.isCurrentGeneration(_generation) &&
+        session.authenticated.value &&
+        session.deviceSessionReady &&
+        session.role == 0;
+    return Scaffold(
+        backgroundColor: _background,
+        appBar: AppBar(
+            title: const Text('Detail Tiket'),
+            backgroundColor: _background,
+            foregroundColor: _navy),
+        body: !valid
+            ? const Center(
+                child: Text('Sesi berubah. Silakan buka kembali tiket.'))
+            : FutureBuilder<Booking>(
+                future: _booking,
+                builder: (context, snapshot) {
+                  if (snapshot.connectionState != ConnectionState.done) {
+                    return const Center(child: CircularProgressIndicator());
+                  }
+                  final booking = snapshot.data;
+                  if (snapshot.hasError ||
+                      booking == null ||
+                      booking.guid != widget.bookingGuid) {
+                    return Center(
+                        child:
+                            Column(mainAxisSize: MainAxisSize.min, children: [
+                      const Text('Tiket belum dapat dimuat.'),
+                      TextButton(
+                          onPressed: () => setState(() {
+                                _booking = BusinessRepository()
+                                    .booking(widget.bookingGuid);
+                              }),
+                          child: const Text('Coba lagi')),
+                    ]));
+                  }
+                  return SingleChildScrollView(
+                      padding: const EdgeInsets.all(20),
+                      child: _TicketCard(
+                          pendaftar: _fromBooking(booking),
+                          booking: booking,
+                          isLaravel: true,
+                          initiallyExpanded: true));
+                }));
+  }
+}

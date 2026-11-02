@@ -7,6 +7,7 @@ import 'package:flutter/services.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'firebase_options.dart';
 import 'screens/user_login_screen.dart';
+import 'theme/app_colors.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -90,6 +91,19 @@ class _WisataDaerahkuAppState extends State<WisataDaerahkuApp> {
       scaffoldMessengerKey: _messenger,
       title: 'Wisata Daerahku',
       debugShowCheckedModeBanner: false,
+      builder: (context, child) => ListenableBuilder(
+        listenable: AuthSession.instance.sessionChanges,
+        builder: (context, _) {
+          final session = AuthSession.instance;
+          if (session.authenticated.value &&
+              session.deviceSessionReady &&
+              session.role == 0) {
+            // The Navigator overlay also needs the visitor theme during route flights.
+            return Theme(data: AppColors.visitorTheme, child: child!);
+          }
+          return child!;
+        },
+      ),
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(
           seedColor: const Color(0xFF0A6E5E),

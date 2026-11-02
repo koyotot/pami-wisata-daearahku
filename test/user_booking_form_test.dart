@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
@@ -7,13 +8,14 @@ import 'package:wisata_daerahku/data/app_data.dart';
 import 'package:wisata_daerahku/data/booking_intent.dart';
 import 'package:wisata_daerahku/data/business_repository.dart';
 import 'package:wisata_daerahku/screens/daftar_kunjungan_screen.dart';
+import 'package:wisata_daerahku/screens/permintaan_terkirim_screen.dart';
 import 'package:wisata_daerahku/services/api_client.dart';
 import 'package:wisata_daerahku/services/auth_session.dart';
 
 import 'user_support.dart';
 
 class FormRepository extends BusinessRepository {
-  FormRepository() : super(ApiClient(AuthSession.instance));
+  FormRepository(AuthSession session) : super(ApiClient(session));
   Availability? availabilityAnswer;
   BookingIntentState? intentAnswer;
   int posts = 0;
@@ -23,6 +25,17 @@ class FormRepository extends BusinessRepository {
   Future<MonthlyAvailability> Function(String month, int quantity)? monthlyHook;
   Future<Booking> Function(Json fields)? createHook;
   Json? postedFields;
+  String? postedKey;
+  Booking? completedAbandon;
+
+  @override
+  Future<BookingIntentState> abandonBookingIntent(String key) async {
+    throw ApiException('Sudah tercatat', 409, 'intent_already_completed',
+        {'booking_guid': completedAbandon!.guid});
+  }
+
+  @override
+  Future<Booking> booking(String guid) async => completedAbandon!;
 
   @override
   Future<MonthlyAvailability> monthlyAvailability(
@@ -62,6 +75,7 @@ class FormRepository extends BusinessRepository {
   Future<Booking> createBooking(Json fields, String idempotencyKey) async {
     posts++;
     postedFields = Map.of(fields);
+    postedKey = idempotencyKey;
     if (createHook != null) return createHook!(fields);
     return Booking(bookingJson());
   }
@@ -70,6 +84,15 @@ class FormRepository extends BusinessRepository {
   Future<BookingIntentState> bookingIntent(String key) async {
     intentCalls++;
     return intentAnswer!;
+  }
+}
+
+class BookingRouteObserver extends NavigatorObserver {
+  int replacements = 0;
+
+  @override
+  void didReplace({Route<dynamic>? newRoute, Route<dynamic>? oldRoute}) {
+    replacements++;
   }
 }
 
@@ -112,9 +135,11 @@ final wisata = Wisata(
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
   late FormRepository repository;
+  late BookingRouteObserver observer;
 
-  setUp(() {
+  setUp(() async {
     FlutterSecureStorage.setMockInitialValues({});
+    final session = await signedInSession((_) async => jsonResponse({}));
     currentUser = User(
         id: 'user-1',
         namaLengkap: 'User',
@@ -123,7 +148,8 @@ void main() {
         password: '',
         createdAt: DateTime(2026),
         isLaravel: true);
-    repository = FormRepository();
+    repository = FormRepository(session);
+    observer = BookingRouteObserver();
   });
   tearDown(() => currentUser = null);
 
@@ -132,12 +158,13 @@ void main() {
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.reset);
     await tester.pumpWidget(MaterialApp(
+        navigatorObservers: [observer],
         home: DaftarKunjunganScreen(
-      wisata: wisata,
-      repository: repository,
-      intent: BookingIntent(repository: repository),
-      initialDate: DateTime(2027, 3, 10),
-    )));
+          wisata: wisata,
+          repository: repository,
+          intent: BookingIntent(repository: repository),
+          initialDate: DateTime(2027, 3, 10),
+        )));
     await tester.pumpAndSettle();
   }
 
@@ -161,6 +188,7 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('submitButton')));
     await tester.pump();
     expect(repository.posts, 0);
+    expect(observer.replacements, 0);
   });
 
   testWidgets(
@@ -289,6 +317,7 @@ void main() {
     expect(repository.posts, 1);
     expect(repository.postedFields!['visitor_phone'], '+6289655862781');
     expect(find.byKey(const ValueKey('bookingPhone')), findsOneWidget);
+    expect(find.byType(PermintaanTerkirimScreen), findsNothing);
     expect(
         await const FlutterSecureStorage().read(key: 'booking_intent_user-1'),
         isNull);
@@ -311,6 +340,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(repository.posts, 1);
     expect(repository.intentCalls, 1);
+    expect(find.byType(PermintaanTerkirimScreen), findsNothing);
     expect(repository.availabilityCalls, 2);
     expect(find.byKey(const ValueKey('intentPanel')), findsOneWidget);
     expect(submitEnabled(tester), isFalse);
@@ -370,10 +400,126 @@ void main() {
 
     expect(find.text('Nomor: BK-777'), findsOneWidget);
     expect(find.text('Status: Menunggu pembayaran'), findsOneWidget);
+    expect(find.byType(PermintaanTerkirimScreen), findsOneWidget);
+    expect(find.byType(DaftarKunjunganScreen), findsNothing);
+    expect(repository.posts, 0);
+    expect(observer.replacements, 1);
     expect(find.byKey(const ValueKey('intentPanel')), findsNothing);
     expect(
         await const FlutterSecureStorage().read(key: 'booking_intent_user-1'),
         isNull);
     expect(find.textContaining('QR'), findsNothing);
+  });
+
+  testWidgets('confirmed submit replaces form once with actual server summary',
+      (tester) async {
+    repository.availabilityAnswer = availability('open');
+    final response = Completer<Booking>();
+    repository.createHook = (_) => response.future;
+    await pumpForm(tester);
+    await tester.tap(find.byKey(const ValueKey('submitButton')));
+    await tester.pump();
+    await tester.tap(find.byKey(const ValueKey('submitButton')));
+    expect(repository.posts, 1);
+    response.complete(Booking({
+      ...bookingJson(number: 'BK-SERVER'),
+      'destination_name': 'Nama dari server',
+      'quantity': 5,
+    }));
+    await tester.pumpAndSettle();
+    expect(find.byType(PermintaanTerkirimScreen), findsOneWidget);
+    expect(find.byType(DaftarKunjunganScreen), findsNothing);
+    expect(find.text('Nama dari server'), findsOneWidget);
+    expect(find.text('5 orang'), findsOneWidget);
+    expect(find.text('Nomor: BK-SERVER'), findsOneWidget);
+    expect(find.text('Pendaftaran diterima server'), findsNothing);
+    expect(find.text('Pendaftaran Terkonfirmasi Server'), findsNothing);
+    expect(observer.replacements, 1);
+    expect(repository.posts, 1);
+  });
+
+  testWidgets('409 completed reconciliation opens success without second POST',
+      (tester) async {
+    repository.availabilityAnswer = availability('open');
+    repository.createHook = (_) async =>
+        throw const ApiException('Outcome belum diketahui', 409, 'unknown');
+    repository.intentAnswer = BookingIntentState({
+      'state': 'completed',
+      'booking': bookingJson(status: 'rejected', number: 'BK-409'),
+    });
+    await pumpForm(tester);
+    await tester.tap(find.byKey(const ValueKey('submitButton')));
+    await tester.pumpAndSettle();
+    expect(find.byType(PermintaanTerkirimScreen), findsOneWidget);
+    expect(find.text('Status: Ditolak'), findsOneWidget);
+    expect(observer.replacements, 1);
+    expect(repository.posts, 1);
+    expect(repository.intentCalls, 1);
+  });
+
+  testWidgets(
+      'unknown outcome stays unresolved and replay keeps payload and key',
+      (tester) async {
+    repository.availabilityAnswer = availability('open');
+    repository.createHook = (_) async => throw const ApiException('Timeout');
+    await pumpForm(tester);
+    await tester.tap(find.byKey(const ValueKey('submitButton')));
+    await tester.pumpAndSettle();
+    expect(find.byType(PermintaanTerkirimScreen), findsNothing);
+    expect(find.byKey(const ValueKey('intentPanel')), findsOneWidget);
+    final original = jsonDecode((await const FlutterSecureStorage()
+        .read(key: 'booking_intent_user-1'))!) as Json;
+    repository.intentAnswer = BookingIntentState({
+      'state': 'not_found',
+      'replay_safe': true,
+    });
+    await tester.tap(find.byKey(const ValueKey('intentCheck')));
+    await tester.pumpAndSettle();
+    repository.createHook = (_) async =>
+        Booking(bookingJson(status: 'cancelled', number: 'BK-REPLAY'));
+    await tester.tap(find.byKey(const ValueKey('intentResend')));
+    await tester.pumpAndSettle();
+    expect(find.byType(PermintaanTerkirimScreen), findsOneWidget);
+    expect(find.text('Status: Dibatalkan'), findsOneWidget);
+    expect(observer.replacements, 1);
+    expect(repository.posts, 2);
+    expect(repository.postedKey, original['key']);
+    expect(repository.postedFields, jsonDecode(original['fields'] as String));
+  });
+
+  testWidgets('logout during submit cannot display old account success',
+      (tester) async {
+    repository.availabilityAnswer = availability('open');
+    final response = Completer<Booking>();
+    repository.createHook = (_) => response.future;
+    await pumpForm(tester);
+    await tester.tap(find.byKey(const ValueKey('submitButton')));
+    await tester.pump();
+    await tester.runAsync(() => repository.api.session.clear());
+    response.complete(Booking(bookingJson()));
+    await tester.pumpAndSettle();
+    expect(find.byType(PermintaanTerkirimScreen), findsNothing);
+    expect(repository.posts, 1);
+  });
+
+  testWidgets('abandon already-completed intent shows success without POST',
+      (tester) async {
+    repository.availabilityAnswer = availability('open');
+    repository.completedAbandon = Booking(bookingJson(number: 'BK-ABANDON'));
+    await const FlutterSecureStorage().write(
+        key: 'booking_intent_user-1',
+        value: jsonEncode({
+          'fields': jsonEncode({'quantity': 2}),
+          'key': 'key'
+        }));
+    await pumpForm(tester);
+    await tester.tap(find.byKey(const ValueKey('intentAbandon')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(TextButton, 'Batalkan percobaan'));
+    await tester.pumpAndSettle();
+    expect(find.byType(PermintaanTerkirimScreen), findsOneWidget);
+    expect(find.text('Nomor: BK-ABANDON'), findsOneWidget);
+    expect(observer.replacements, 1);
+    expect(repository.posts, 0);
   });
 }

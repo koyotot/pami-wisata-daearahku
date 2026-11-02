@@ -48,6 +48,11 @@ void main() {
     ));
     expect(find.bySemanticsLabel(RegExp('2027-03-10, Tersedia, Hampir penuh')),
         findsOneWidget);
+    final selected = tester.widget<TextButton>(
+        find.byKey(const ValueKey('availability-2027-03-10')));
+    expect(
+        selected.style!.foregroundColor!.resolve({}), const Color(0xFFC7353C));
+    expect(selected.style!.side!.resolve({})!.color, const Color(0xFF1976D2));
     expect(tester.takeException(), isNull);
     semantics.dispose();
   });
@@ -84,8 +89,74 @@ void main() {
       onCountryChanged: (_) {},
       onChanged: () {},
     ))));
-    expect(find.text('ID +62'), findsOneWidget);
+    expect(find.text('+62'), findsOneWidget);
+    expect(find.text(countryFlag(IsoCode.ID)), findsOneWidget);
     expect(find.text('+1 202-555-0119'), findsOneWidget);
+    await tester.tap(find.byKey(const ValueKey('phoneCountryPicker')));
+    await tester.pumpAndSettle();
+    await tester.enterText(
+        find.byKey(const ValueKey('countrySearch')), 'United States');
+    await tester.pumpAndSettle();
+    expect(find.widgetWithText(ListTile, 'United States'), findsOneWidget);
+    expect(find.text(countryFlag(IsoCode.US)), findsOneWidget);
+    expect(find.text('US +1'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('national input formats using selected country metadata',
+      (tester) async {
+    final controller = TextEditingController();
+    addTearDown(controller.dispose);
+    await tester.pumpWidget(MaterialApp(
+        home: Scaffold(
+            body: InternationalPhoneField(
+      controller: controller,
+      country: IsoCode.US,
+      onCountryChanged: (_) {},
+      onChanged: () {},
+    ))));
+    await tester.enterText(find.byKey(const ValueKey('bookingPhone')), '20255');
+    await tester.pump();
+    expect(controller.text, '202-55');
+    await tester.enterText(
+        find.byKey(const ValueKey('bookingPhone')), '2025550119');
+    await tester.pump();
+    expect(controller.text, '202-555-0119');
+    expect(parseBookingPhone(controller.text, IsoCode.US)?.international,
+        '+12025550119');
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets(
+      'country search remains usable above keyboard at large text scale',
+      (tester) async {
+    tester.view.physicalSize = const Size(320, 640);
+    tester.view.devicePixelRatio = 1;
+    tester.view.viewInsets = const FakeViewPadding(bottom: 300);
+    addTearDown(tester.view.reset);
+    final controller = TextEditingController();
+    addTearDown(controller.dispose);
+    await tester.pumpWidget(MaterialApp(
+      builder: (context, child) => MediaQuery(
+          data: MediaQuery.of(context)
+              .copyWith(textScaler: const TextScaler.linear(1.8)),
+          child: child!),
+      home: Scaffold(
+        body: InternationalPhoneField(
+          controller: controller,
+          country: IsoCode.JP,
+          onCountryChanged: (_) {},
+          onChanged: () {},
+        ),
+      ),
+    ));
+    expect(find.text(countryFlag(IsoCode.JP)), findsOneWidget);
+    await tester.tap(find.byKey(const ValueKey('phoneCountryPicker')));
+    await tester.pumpAndSettle();
+    await tester.enterText(
+        find.byKey(const ValueKey('countrySearch')), 'Japan');
+    await tester.pumpAndSettle();
+    expect(find.widgetWithText(ListTile, 'Japan'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 

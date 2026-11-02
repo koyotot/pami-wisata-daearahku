@@ -2,7 +2,6 @@
 // lib/screens/detail_wisata_screen.dart
 // Tema: biru terang — sama dengan home, login, beranda, dan profil
 // ============================================================
-import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../data/app_data.dart';
@@ -10,7 +9,7 @@ import '../data/business_repository.dart';
 import '../data/favorite_state.dart';
 import '../services/api_client.dart';
 import '../services/auth_session.dart';
-import '../widgets/api_image.dart';
+import '../widgets/destination_hero_gallery.dart';
 import '../widgets/reviews_sheet.dart';
 import 'daftar_kunjungan_screen.dart';
 
@@ -37,7 +36,6 @@ class _C {
 }
 
 // ── Liked masih in-memory (opsional: bisa dipersist juga nanti) ──
-final Set<String> _likedWisataIds = {};
 
 class DetailWisataScreen extends StatefulWidget {
   final Wisata wisata;
@@ -56,7 +54,7 @@ class _DetailWisataScreenState extends State<DetailWisataScreen>
   late Animation<double> _fadeAnim;
   late Animation<Offset> _slideAnim;
 
-  bool get _isLiked => _likedWisataIds.contains(widget.wisata.id);
+  bool get _isLiked => _isSaved;
 
   final _favorites = FavoriteState.instance;
   bool get _isSaved => _favorites.isFavorite(widget.wisata.id);
@@ -118,18 +116,7 @@ class _DetailWisataScreenState extends State<DetailWisataScreen>
   }
 
   void _toggleLike() {
-    setState(() {
-      if (_isLiked) {
-        _likedWisataIds.remove(widget.wisata.id);
-      } else {
-        _likedWisataIds.add(widget.wisata.id);
-      }
-    });
-    _showSnack(
-      _isLiked
-          ? '❤️  ${widget.wisata.nama} disukai!'
-          : '🤍  Dihapus dari disukai',
-    );
+    _toggleSave();
   }
 
   Future<void> _toggleSave() async {
@@ -207,7 +194,12 @@ class _DetailWisataScreenState extends State<DetailWisataScreen>
           ? 'Wisata tidak ditemukan.'
           : error?.toString() ?? 'Memuat wisata...';
       return Scaffold(
-        appBar: AppBar(),
+        backgroundColor: _C.bg,
+        appBar: AppBar(
+            backgroundColor: _C.bg,
+            foregroundColor: _C.navy,
+            systemOverlayStyle: SystemUiOverlayStyle.dark
+                .copyWith(statusBarColor: Colors.transparent)),
         body: Center(
           child: error == null
               ? const CircularProgressIndicator()
@@ -220,6 +212,7 @@ class _DetailWisataScreenState extends State<DetailWisataScreen>
       );
     }
     final w = Wisata.fromDestination(destination);
+    final reduceMotion = MediaQuery.disableAnimationsOf(context);
 
     return Scaffold(
       backgroundColor: _C.bg,
@@ -227,6 +220,9 @@ class _DetailWisataScreenState extends State<DetailWisataScreen>
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
+        surfaceTintColor: Colors.transparent,
+        systemOverlayStyle: SystemUiOverlayStyle.light
+            .copyWith(statusBarColor: Colors.transparent),
         leading: GestureDetector(
           onTap: () => Navigator.pop(context),
           child: Container(
@@ -281,7 +277,10 @@ class _DetailWisataScreenState extends State<DetailWisataScreen>
                       SizedBox(
                         height: 320,
                         width: double.infinity,
-                        child: _buildImage(w),
+                        child: DestinationHeroGallery(
+                            key: ValueKey(destination.guid),
+                            images: destination.images,
+                            repository: _repository),
                       ),
                       // Gradient overlay bawah
                       Positioned(
@@ -383,9 +382,13 @@ class _DetailWisataScreenState extends State<DetailWisataScreen>
 
                   // ── Konten ─────────────────────────────────
                   FadeTransition(
-                    opacity: _fadeAnim,
+                    opacity: reduceMotion
+                        ? const AlwaysStoppedAnimation(1)
+                        : _fadeAnim,
                     child: SlideTransition(
-                      position: _slideAnim,
+                      position: reduceMotion
+                          ? const AlwaysStoppedAnimation(Offset.zero)
+                          : _slideAnim,
                       child: Padding(
                         padding: const EdgeInsets.fromLTRB(20, 4, 20, 20),
                         child: Column(
@@ -427,10 +430,12 @@ class _DetailWisataScreenState extends State<DetailWisataScreen>
                                 Icon(Icons.access_time_rounded,
                                     size: 15, color: _C.teal),
                                 const SizedBox(width: 5),
-                                Text(
-                                  w.jamBuka,
-                                  style: TextStyle(
-                                      color: _C.textMuted, fontSize: 13),
+                                Expanded(
+                                  child: Text(
+                                    w.jamBuka,
+                                    style: TextStyle(
+                                        color: _C.textMuted, fontSize: 13),
+                                  ),
                                 ),
                               ],
                             ),
@@ -533,11 +538,12 @@ class _DetailWisataScreenState extends State<DetailWisataScreen>
                             const SizedBox(height: 24),
 
                             // ── Info Pills ───────────────────
-                            Row(
+                            Wrap(
+                              spacing: 10,
+                              runSpacing: 10,
                               children: [
                                 _infoPill(
                                     Icons.place_rounded, w.kategori, _C.teal),
-                                const SizedBox(width: 10),
                                 _infoPill(
                                   Icons.schedule_rounded,
                                   w.jamBuka == '24 Jam'
@@ -608,7 +614,8 @@ class _DetailWisataScreenState extends State<DetailWisataScreen>
 
           // ── Tombol CTA Bawah ─────────────────────────────────
           Container(
-            padding: const EdgeInsets.fromLTRB(20, 14, 20, 28),
+            padding: EdgeInsets.fromLTRB(
+                20, 14, 20, 14 + MediaQuery.paddingOf(context).bottom),
             decoration: BoxDecoration(
               color: _C.surface,
               border: Border(
@@ -669,7 +676,9 @@ class _DetailWisataScreenState extends State<DetailWisataScreen>
                       ),
                     ),
                     child: Container(
-                      height: 52,
+                      constraints: const BoxConstraints(minHeight: 52),
+                      padding: const EdgeInsets.symmetric(
+                          vertical: 14, horizontal: 8),
                       decoration: BoxDecoration(
                         gradient: LinearGradient(
                           colors: [_C.teal, _C.tealDark],
@@ -691,15 +700,16 @@ class _DetailWisataScreenState extends State<DetailWisataScreen>
                           Icon(Icons.how_to_reg_rounded,
                               color: Colors.white, size: 20),
                           SizedBox(width: 10),
-                          Text(
-                            'DAFTAR KUNJUNGAN',
+                          Flexible(
+                              child: Text(
+                            'Daftar Kunjungan',
                             style: TextStyle(
                               color: Colors.white,
                               fontSize: 14,
                               fontWeight: FontWeight.w800,
-                              letterSpacing: 0.8,
+                              letterSpacing: 0,
                             ),
-                          ),
+                          )),
                         ],
                       ),
                     ),
@@ -728,13 +738,15 @@ class _DetailWisataScreenState extends State<DetailWisataScreen>
             ),
           ),
           const SizedBox(width: 10),
-          Text(
-            title,
-            style: TextStyle(
-              color: _C.text,
-              fontWeight: FontWeight.w800,
-              fontSize: 16,
-              letterSpacing: -0.2,
+          Expanded(
+            child: Text(
+              title,
+              style: TextStyle(
+                color: _C.text,
+                fontWeight: FontWeight.w800,
+                fontSize: 16,
+                letterSpacing: -0.2,
+              ),
             ),
           ),
         ],
@@ -753,54 +765,20 @@ class _DetailWisataScreenState extends State<DetailWisataScreen>
         children: [
           Icon(icon, color: color, size: 14),
           const SizedBox(width: 6),
-          Text(
-            label,
-            style: TextStyle(
-              color: color,
-              fontSize: 12,
-              fontWeight: FontWeight.w700,
+          Flexible(
+            child: Text(
+              label,
+              style: TextStyle(
+                color: color,
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+              ),
             ),
           ),
         ],
       ),
     );
   }
-
-  Widget _buildImage(Wisata w) {
-    // Destinasi Laravel: gambar dimuat lewat API (imagePath selalu null).
-    if (w.isLaravel) {
-      return ApiImage(
-          imageUrl: w.imageUrl,
-          fit: BoxFit.cover,
-          placeholder: (_) => _placeholder());
-    }
-    final path = w.imagePath;
-    if (path == null || path.isEmpty) return _placeholder();
-    if (path.startsWith('http')) {
-      return Image.network(path,
-          fit: BoxFit.cover, errorBuilder: (_, __, ___) => _placeholder());
-    }
-    if (path.startsWith('assets/')) {
-      return Image.asset(path,
-          fit: BoxFit.cover, errorBuilder: (_, __, ___) => _placeholder());
-    }
-    return Image.file(File(path),
-        fit: BoxFit.cover, errorBuilder: (_, __, ___) => _placeholder());
-  }
-
-  Widget _placeholder() => Container(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            colors: [const Color(0xFFDCEBFF), _C.bg],
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-          ),
-        ),
-        child: Center(
-          child: Icon(Icons.landscape_rounded,
-              size: 80, color: _C.teal.withValues(alpha: 0.35)),
-        ),
-      );
 }
 
 // ── Fasilitas Badge ───────────────────────────────────────

@@ -35,6 +35,26 @@ class ApiImage extends StatefulWidget {
 
   /// Clears cached bytes (call on logout/account switch).
   static void clearCache() => _ApiImageState._cache.clear();
+
+  static Future<void> prefetch(String url, BusinessRepository repository,
+      {String? adminGuid}) async {
+    final generation = repository.api.session.sessionGeneration;
+    final key = '${adminGuid ?? 'public'}|$url';
+    if (_ApiImageState._cache.containsKey(key)) return;
+    try {
+      final result = adminGuid == null
+          ? await repository.imageBytes(url)
+          : await repository.adminImageBytes(adminGuid, url);
+      if (generation != repository.api.session.sessionGeneration ||
+          !result.contentType.startsWith('image/')) {
+        return;
+      }
+      if (_ApiImageState._cache.length >= _ApiImageState._maxEntries) {
+        _ApiImageState._cache.remove(_ApiImageState._cache.keys.first);
+      }
+      _ApiImageState._cache[key] = result.bytes;
+    } catch (_) {/* A visible image provides retry when prefetch fails. */}
+  }
 }
 
 class _ApiImageState extends State<ApiImage> {
@@ -72,6 +92,7 @@ class _ApiImageState extends State<ApiImage> {
   Future<void> _load() async {
     final url = widget.imageUrl;
     final request = ++_request;
+    final cacheKey = _cacheKey;
     if (url == null || url.isEmpty) {
       setState(() {
         _bytes = null;
@@ -79,7 +100,7 @@ class _ApiImageState extends State<ApiImage> {
       });
       return;
     }
-    final cached = _cache[_cacheKey];
+    final cached = _cache[cacheKey];
     if (cached != null) {
       setState(() {
         _bytes = cached;
@@ -93,15 +114,18 @@ class _ApiImageState extends State<ApiImage> {
     });
     try {
       final repository = widget.repository ?? BusinessRepository();
+      final generation = repository.api.session.sessionGeneration;
       final admin = widget.adminGuid;
       final response = admin == null
           ? await repository.imageBytes(url)
           : await repository.adminImageBytes(admin, url);
+      if (generation != repository.api.session.sessionGeneration) return;
       if (!response.contentType.startsWith('image/')) {
         throw const ApiException('Respons gambar tidak valid.');
       }
       if (_cache.length >= _maxEntries) _cache.remove(_cache.keys.first);
-      _cache[_cacheKey] = response.bytes;
+      if (!mounted || request != _request) return;
+      _cache[cacheKey] = response.bytes;
       // Ignore results for a different URL or a disposed widget.
       if (!mounted || request != _request) return;
       setState(() => _bytes = response.bytes);
@@ -135,10 +159,12 @@ class _ApiImageState extends State<ApiImage> {
                 child: CircularProgressIndicator(strokeWidth: 2))));
   }
 
-  Widget _fallback(BuildContext context) =>
-      widget.placeholder?.call(context) ??
-      SizedBox(
-          width: widget.width,
-          height: widget.height,
-          child: const Center(child: Icon(Icons.image_not_supported_outlined)));
+  Widget _fallback(BuildContext context) => GestureDetector(
+      onTap: _failed ? _load : null,
+      child: widget.placeholder?.call(context) ??
+          SizedBox(
+              width: widget.width,
+              height: widget.height,
+              child: const Center(
+                  child: Icon(Icons.image_not_supported_outlined))));
 }

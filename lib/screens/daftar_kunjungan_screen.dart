@@ -15,12 +15,12 @@ import '../data/app_data.dart';
 import '../widgets/api_image.dart';
 import '../widgets/availability_calendar.dart';
 import '../widgets/international_phone_field.dart';
+import 'permintaan_terkirim_screen.dart';
 import 'package:phone_numbers_parser/phone_numbers_parser.dart';
 
 // ── Palet (sama dengan home_screen.dart) ─────────────────────
 class _C {
   static const blue = Color(0xFF1976D2);
-  static const blueDeep = Color(0xFF1558B0);
   static const navy = Color(0xFF102D59);
   static const orange = Color(0xFFFF9800);
   static const bg = Color(0xFFF5F8FD);
@@ -34,7 +34,6 @@ class _C {
 
   // Alias supaya kode lama tetap jalan dengan warna baru
   static const teal = blue;
-  static const tealDark = blueDeep;
   static const gold = orange;
 }
 
@@ -82,9 +81,6 @@ class _DaftarKunjunganScreenState extends State<DaftarKunjunganScreen>
   String? _phoneError;
   AuthSession get _session => _repository.api.session;
 
-  /// Server-confirmed booking shown after success (number and SERVER status).
-  Booking? _booking;
-
   /// Payload of an unresolved earlier attempt, and what the server said about it.
   Map<String, dynamic>? _pendingFields;
   IntentResolution? _resolution;
@@ -100,7 +96,7 @@ class _DaftarKunjunganScreenState extends State<DaftarKunjunganScreen>
     super.initState();
     _animCtrl = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 500),
+      duration: const Duration(milliseconds: 200),
     )..forward();
     _fadeAnim = CurvedAnimation(parent: _animCtrl, curve: Curves.easeOut);
     _slideAnim = Tween<Offset>(
@@ -129,6 +125,12 @@ class _DaftarKunjunganScreenState extends State<DaftarKunjunganScreen>
     _detectPhoneCountry();
     _loadAvailability();
     _loadPendingIntent();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (MediaQuery.disableAnimationsOf(context)) _animCtrl.value = 1;
   }
 
   @override
@@ -163,7 +165,6 @@ class _DaftarKunjunganScreenState extends State<DaftarKunjunganScreen>
         _tanggal = null;
         _jumlahOrang = 1;
         _completed = false;
-        _booking = null;
         _pendingFields = null;
         _resolution = null;
         _intentMessage = null;
@@ -266,20 +267,23 @@ class _DaftarKunjunganScreenState extends State<DaftarKunjunganScreen>
         .showSnackBar(SnackBar(content: Text(message)));
   }
 
-  /// A booking now exists on the server: show its number and SERVER status. No QR or proof
-  /// is generated locally.
+  /// All server-confirmed paths converge here; replacement removes the completed form.
   void _onBooked(Booking booking) {
+    if (!mounted || _completed) return;
     setState(() {
-      _booking = booking;
       _completed = true;
       _pendingFields = null;
       _resolution = null;
       _intentMessage = null;
     });
-    _loadAvailability();
+    FocusManager.instance.primaryFocus?.unfocus();
+    final session = _session;
+    final generation = session.sessionGeneration;
     BookingEvents.notify();
-    _showMessage(
-        'Pendaftaran ${booking.bookingNumber}: ${bookingStatusLabel(booking.status)}');
+    Navigator.of(context).pushReplacement(MaterialPageRoute<void>(
+      builder: (_) => PermintaanTerkirimScreen(
+          booking: booking, session: session, sessionGeneration: generation),
+    ));
   }
 
   Future<void> _submit() async {
@@ -519,18 +523,17 @@ class _DaftarKunjunganScreenState extends State<DaftarKunjunganScreen>
       appBar: AppBar(
         backgroundColor: _C.surface,
         elevation: 0,
-        leading: GestureDetector(
-          onTap: () => Navigator.pop(context),
-          child: Container(
-            margin: const EdgeInsets.only(left: 16, top: 8, bottom: 8),
-            decoration: BoxDecoration(
-              color: _C.card,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: _C.border),
-            ),
-            child: const Icon(Icons.arrow_back_ios_new_rounded,
-                color: Color(0xFF102D59), size: 18),
-          ),
+        systemOverlayStyle: const SystemUiOverlayStyle(
+          statusBarColor: Colors.transparent,
+          statusBarIconBrightness: Brightness.dark,
+          systemNavigationBarColor: Colors.transparent,
+          systemNavigationBarIconBrightness: Brightness.dark,
+        ),
+        leading: IconButton(
+          tooltip: 'Kembali',
+          onPressed: () => Navigator.pop(context),
+          icon: const Icon(Icons.arrow_back_ios_new_rounded,
+              color: Color(0xFF102D59), size: 18),
         ),
         title: const Text(
           'Daftar Kunjungan',
@@ -545,6 +548,65 @@ class _DaftarKunjunganScreenState extends State<DaftarKunjunganScreen>
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(1),
           child: Container(height: 1, color: _C.teal.withValues(alpha: 0.12)),
+        ),
+      ),
+      bottomNavigationBar: SafeArea(
+        top: false,
+        child: Container(
+          padding: const EdgeInsets.fromLTRB(20, 12, 20, 12),
+          color: Colors.white,
+          child: Column(mainAxisSize: MainAxisSize.min, children: [
+            if (!_completed) ...[
+              Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+                const Flexible(
+                    child: Text('Estimasi total',
+                        style: TextStyle(color: _C.textMuted))),
+                Flexible(
+                    child: Text(
+                  widget.wisata.isLaravel
+                      ? '${widget.wisata.hargaTiket.split(' ').first} ${widget.wisata.ticketPrice * _jumlahOrang}'
+                      : '${widget.wisata.hargaTiket} x $_jumlahOrang',
+                  textAlign: TextAlign.end,
+                  style: const TextStyle(
+                      color: _C.navy, fontWeight: FontWeight.w800),
+                )),
+              ]),
+              const SizedBox(height: 10),
+            ],
+            Semantics(
+              button: true,
+              enabled: _submitEnabled,
+              label: 'Konfirmasi Pendaftaran',
+              child: GestureDetector(
+                key: const ValueKey('submitButton'),
+                onTap: _submitEnabled ? _submit : null,
+                child: Container(
+                  constraints: const BoxConstraints(minHeight: 56),
+                  width: double.infinity,
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                  decoration: BoxDecoration(
+                    color: _submitEnabled ? _C.blue : const Color(0xFFB5C7DD),
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: Center(
+                    child: _isLoading
+                        ? const SizedBox(
+                            width: 24,
+                            height: 24,
+                            child: CircularProgressIndicator(
+                                color: Colors.white, strokeWidth: 2.5))
+                        : const Text('Konfirmasi Pendaftaran',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 15,
+                                fontWeight: FontWeight.w800)),
+                  ),
+                ),
+              ),
+            ),
+          ]),
         ),
       ),
       body: FadeTransition(
@@ -586,6 +648,11 @@ class _DaftarKunjunganScreenState extends State<DaftarKunjunganScreen>
                       final phone =
                           parseBookingPhone(_teleponCtrl.text, country);
                       if (phone != null) _teleponCtrl.text = phone.nsn;
+                    }
+                    final phone = parseBookingPhone(_teleponCtrl.text, country);
+                    if (phone != null) {
+                      _teleponCtrl.text =
+                          phone.formatNsn(format: NsnFormat.international);
                     }
                   }),
                   onChanged: () => setState(() {
@@ -720,72 +787,12 @@ class _DaftarKunjunganScreenState extends State<DaftarKunjunganScreen>
                 ),
                 const SizedBox(height: 36),
 
-                if (_booking != null) ...[
-                  _buildSuccess(_booking!),
-                  const SizedBox(height: 20),
-                ],
                 if (_pendingFields != null && !_completed) ...[
                   _buildIntentPanel(_pendingFields!),
                   const SizedBox(height: 20),
                 ],
 
                 // ── Tombol Daftar ───────────────────────────
-                GestureDetector(
-                  key: const ValueKey('submitButton'),
-                  onTap: _submitEnabled ? _submit : null,
-                  child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 200),
-                    height: 56,
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: _isLoading || !_submitEnabled
-                            ? [
-                                _C.teal.withValues(alpha: 0.5),
-                                _C.tealDark.withValues(alpha: 0.5)
-                              ]
-                            : [_C.teal, _C.tealDark],
-                        begin: Alignment.centerLeft,
-                        end: Alignment.centerRight,
-                      ),
-                      borderRadius: BorderRadius.circular(16),
-                      boxShadow: _isLoading || !_submitEnabled
-                          ? []
-                          : [
-                              BoxShadow(
-                                color: _C.teal.withValues(alpha: 0.45),
-                                blurRadius: 18,
-                                offset: const Offset(0, 6),
-                              ),
-                            ],
-                    ),
-                    child: Center(
-                      child: _isLoading
-                          ? const SizedBox(
-                              width: 24,
-                              height: 24,
-                              child: CircularProgressIndicator(
-                                  color: Colors.white, strokeWidth: 2.5),
-                            )
-                          : const Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Icon(Icons.how_to_reg_rounded,
-                                    color: Colors.white, size: 20),
-                                SizedBox(width: 10),
-                                Text(
-                                  'Konfirmasi Pendaftaran',
-                                  style: TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 15,
-                                    fontWeight: FontWeight.w800,
-                                    letterSpacing: 0.3,
-                                  ),
-                                ),
-                              ],
-                            ),
-                    ),
-                  ),
-                ),
               ],
             ),
           ),
@@ -867,36 +874,7 @@ class _DaftarKunjunganScreenState extends State<DaftarKunjunganScreen>
     );
   }
 
-  // ── Hasil pendaftaran (status dari server) ──────────────────
-  Widget _buildSuccess(Booking booking) {
-    final note = bookingStatusNote(booking.status);
-    return _infoCard(
-      accent: _C.teal,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text('Pendaftaran diterima server',
-              style: TextStyle(
-                  color: _C.text, fontSize: 14, fontWeight: FontWeight.w800)),
-          const SizedBox(height: 6),
-          Text('Nomor: ${booking.bookingNumber}',
-              key: const ValueKey('bookingNumber'),
-              style: const TextStyle(color: _C.text, fontSize: 13)),
-          Text('Status: ${bookingStatusLabel(booking.status)}',
-              key: const ValueKey('bookingStatus'),
-              style: const TextStyle(color: _C.text, fontSize: 13)),
-          if (note != null)
-            Text(note,
-                style: const TextStyle(color: _C.textMuted, fontSize: 12.5)),
-          const SizedBox(height: 4),
-          const Text('Pantau status dan dokumen di menu Riwayat.',
-              style: TextStyle(color: _C.textMuted, fontSize: 12.5)),
-        ],
-      ),
-    );
-  }
-
-  // ── Percobaan sebelumnya belum dipastikan ───────────────────
+  // Unresolved earlier attempt; actions always use the original stored intent.
   Widget _buildIntentPanel(Map<String, dynamic> pending) {
     final resolution = _resolution;
     final canResend = resolution is IntentNotFound && resolution.replaySafe;
@@ -1166,26 +1144,33 @@ class _CounterBtn extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final active = onTap != null;
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        width: 32,
-        height: 32,
-        decoration: BoxDecoration(
-          color: active
-              ? const Color(0xFF1976D2).withValues(alpha: 0.15)
-              : const Color(0xFFFFFFFF),
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(
+    return Semantics(
+      button: true,
+      enabled: active,
+      label: icon == Icons.add_rounded
+          ? 'Tambah pengunjung'
+          : 'Kurangi pengunjung',
+      child: GestureDetector(
+        onTap: onTap,
+        child: Container(
+          width: 44,
+          height: 44,
+          decoration: BoxDecoration(
             color: active
-                ? const Color(0xFF1976D2).withValues(alpha: 0.4)
-                : const Color(0xFFDCE4F0),
+                ? const Color(0xFF1976D2).withValues(alpha: 0.15)
+                : const Color(0xFFFFFFFF),
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(
+              color: active
+                  ? const Color(0xFF1976D2).withValues(alpha: 0.4)
+                  : const Color(0xFFDCE4F0),
+            ),
           ),
-        ),
-        child: Icon(
-          icon,
-          size: 16,
-          color: active ? const Color(0xFF1976D2) : const Color(0xFF9AA7BC),
+          child: Icon(
+            icon,
+            size: 16,
+            color: active ? const Color(0xFF1976D2) : const Color(0xFF9AA7BC),
+          ),
         ),
       ),
     );

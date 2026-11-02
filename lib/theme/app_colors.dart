@@ -1,44 +1,46 @@
-// ============================================================
-// lib/theme/app_colors.dart
-// ============================================================
-// Satu sumber kebenaran untuk semua warna tema aplikasi.
-// Cara pakai: import 'package:nama_app/theme/app_colors.dart';
-// Ganti _C.teal → AppColors.teal, dst.
-// ============================================================
-
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 
+/// Visitor V4 tokens; other roles keep their local presentation.
 class AppColors {
-  AppColors._(); // Tidak bisa di-instantiate
+  AppColors._();
+  static const blue = Color(0xFF1976D2);
+  static const blueDeep = Color(0xFF1558B0);
+  static const navy = Color(0xFF102D59);
+  static const bg = Color(0xFFF5F8FD);
+  static const surface = Colors.white;
+  static const border = Color(0xFFDCE4F0);
+  static const textMuted = Color(0xFF728099);
+  static const orange = Color(0xFFFF9800);
 
-  // ── Background & Surface ──────────────────────────────────
-  static const bg = Color(0xFF0D1B1E); // Latar utama (paling gelap)
-  static const surface = Color(0xFF142226); // Latar section
-  static const card = Color(0xFF1A2D32); // Latar kartu
-  static const border = Color(0xFF254A44); // Garis batas default
-  static const borderAlt = Color(0xFF1F3A40); // Garis batas alternatif
-
-  // ── Teal (warna utama) ────────────────────────────────────
-  static const teal = Color(0xFF0BC5A0);
-  static const tealDark = Color(0xFF07897A);
-  static const tealDeep = Color(0xFF054D44);
-
-  // ── Gold (aksen premium) ──────────────────────────────────
-  static const gold = Color(0xFFE8B86D);
-  static const goldLight = Color(0xFFF5D49A);
-
-  // ── Teks ─────────────────────────────────────────────────
-  static const text = Color(0xFFEEF2F0); // Teks utama
-  static const textMuted = Color(0xFF7FA89C); // Teks sekunder
-  static const textDim = Color(0xFF4A706A); // Teks tersier / placeholder
-
-  // ── Status & Semantik ─────────────────────────────────────
-  static const danger = Color(0xFFFF6B6B); // Error / hapus / keluar
-  static const success = Color(0xFF4ADE80); // Sukses / konfirmasi
-  static const info = Color(0xFF38BDF8); // Informasi
-  static const warning = Color(0xFFFB923C); // Peringatan
-
-  // ── Warna tambahan (admin dashboard) ─────────────────────
-  static const purple = Color(0xFFA78BFA);
-  static const slate = Color(0xFF94A3B8);
+  static ThemeData get visitorTheme => ThemeData(
+        useMaterial3: true,
+        colorScheme: ColorScheme.fromSeed(seedColor: blue)
+            .copyWith(primary: blue, secondary: blueDeep, surface: surface),
+        scaffoldBackgroundColor: bg,
+        canvasColor: bg,
+        textTheme: GoogleFonts.plusJakartaSansTextTheme(),
+        appBarTheme: const AppBarTheme(
+            backgroundColor: bg,
+            foregroundColor: navy,
+            elevation: 0,
+            surfaceTintColor: Colors.transparent),
+        elevatedButtonTheme: ElevatedButtonThemeData(
+            style: ElevatedButton.styleFrom(
+                backgroundColor: blue,
+                foregroundColor: Colors.white,
+                minimumSize: const Size(48, 48),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16)))),
+        inputDecorationTheme: InputDecorationTheme(
+            filled: true,
+            fillColor: surface,
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
+            enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(14),
+                borderSide: const BorderSide(color: border)),
+            focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(14),
+                borderSide: const BorderSide(color: blue, width: 2))),
+      );
 }

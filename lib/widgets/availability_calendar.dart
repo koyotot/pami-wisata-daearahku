@@ -72,16 +72,25 @@ class AvailabilityCalendar extends StatelessWidget {
                 onMonthChanged(DateTime(month.year, month.month + 1)),
             icon: const Icon(Icons.chevron_right)),
       ]),
-      Row(
-          children: ['Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab', 'Min']
-              .map((day) =>
-                  Expanded(child: Text(day, textAlign: TextAlign.center)))
-              .toList()),
+      Row(children: [
+        for (final day in [
+          'Sen',
+          'Sel',
+          'Rab',
+          'Kam',
+          'Jum',
+          'Sab',
+          'Min'
+        ]) ...[
+          if (day != 'Sen') const SizedBox(width: 4),
+          Expanded(child: Text(day, textAlign: TextAlign.center)),
+        ],
+      ]),
       GridView.builder(
         shrinkWrap: true,
         physics: const NeverScrollableScrollPhysics(),
         gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: 7, mainAxisExtent: 50),
+            crossAxisCount: 7, crossAxisSpacing: 4, mainAxisSpacing: 4),
         itemCount: offset + count,
         itemBuilder: (context, index) {
           if (index < offset) return const SizedBox.shrink();
@@ -105,20 +114,33 @@ class AvailabilityCalendar extends StatelessWidget {
                   style: TextButton.styleFrom(
                       foregroundColor: color,
                       disabledForegroundColor: color,
-                      backgroundColor:
-                          selectedDate == date ? const Color(0xFFE3EFFD) : null,
-                      minimumSize: const Size(44, 48),
+                      backgroundColor: color.withValues(alpha: .09),
+                      side: selectedDate == date
+                          ? const BorderSide(color: Color(0xFF1976D2), width: 2)
+                          : BorderSide.none,
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8)),
+                      minimumSize: Size.zero,
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                       padding: EdgeInsets.zero),
                   onPressed: selectable ? () => onSelected(day!) : null,
-                  child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
+                  child: Stack(
+                      fit: StackFit.expand,
+                      alignment: Alignment.center,
                       children: [
-                        Text('${index - offset + 1}'),
-                        Container(
-                            width: 6,
-                            height: 6,
-                            decoration: BoxDecoration(
-                                color: color, shape: BoxShape.circle)),
+                        Center(
+                            child: Text('${index - offset + 1}',
+                                style: TextStyle(
+                                    color: color,
+                                    fontWeight: FontWeight.w700))),
+                        Positioned(
+                          bottom: 4,
+                          child: Container(
+                              width: 6,
+                              height: 6,
+                              decoration: BoxDecoration(
+                                  color: color, shape: BoxShape.circle)),
+                        ),
                       ]),
                 )),
           );

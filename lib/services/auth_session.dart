@@ -232,9 +232,10 @@ class AuthSession {
   Future<Map<String, dynamic>> _sendMultipart(String method, String path,
       {required Map<String, String> fields,
       required List<UploadFile> files,
+      Map<String, String>? headers,
       String? token}) async {
     final request = http.MultipartRequest(method, _uri(path));
-    request.headers.addAll(_headers(token: token, json: false));
+    request.headers.addAll(_headers(token: token, json: false, extra: headers));
     request.fields.addAll(fields);
     for (final file in files) {
       // Laravel validates the real file content, not the client-declared type.
@@ -470,9 +471,10 @@ class AuthSession {
   /// field to spoof PATCH, because PHP does not parse multipart bodies for PATCH.
   Future<Map<String, dynamic>> requestMultipart(String method, String path,
           {Map<String, String> fields = const {},
-          List<UploadFile> files = const []}) =>
+          List<UploadFile> files = const [],
+          Map<String, String>? headers}) =>
       _authorized((token) => _sendMultipart(method, path,
-          fields: fields, files: files, token: token));
+          fields: fields, files: files, headers: headers, token: token));
 
   /// Authenticated binary download (documents, protected images).
   Future<BinaryResponse> requestBytes(String path) =>

@@ -12,7 +12,9 @@ import '../data/facility_state.dart';
 import '../data/app_data.dart';
 import '../data/business_repository.dart';
 import '../services/auth_session.dart';
-import '../widgets/api_image.dart';
+import '../data/gallery_draft.dart';
+import '../widgets/admin_destination_gallery_editor.dart';
+import '../data/favorite_state.dart';
 
 // ── Palet (sama dengan home_screen.dart) ─────────────────────
 class _C {
@@ -50,8 +52,13 @@ class _TambahWisataScreenState extends State<TambahWisataScreen> {
   final _formKey = GlobalKey<FormState>();
   late TextEditingController namaCtrl, lokasiCtrl, deskCtrl, hargaCtrl, jamCtrl;
   double _rating = 0;
-  Uint8List? _imageBytes; // Gambar baru yang dipilih (belum diunggah)
-  String _imageName = 'destination.jpg';
+  final List<GalleryDraftItem> _gallery = [];
+  int _galleryVersion = 0;
+  String? _operationKey, _operationFingerprint;
+  bool _failedSave = false;
+  bool _galleryLoading = false;
+  bool _galleryReady = false;
+  bool _dirty = false;
   bool _isSaving = false;
 
   late final BusinessRepository _repository =
@@ -80,6 +87,17 @@ class _TambahWisataScreenState extends State<TambahWisataScreen> {
     hargaCtrl =
         TextEditingController(text: w == null ? '' : '${w.ticketPrice}');
     jamCtrl = TextEditingController(text: w?.jamBuka ?? '');
+    for (final controller in [
+      namaCtrl,
+      lokasiCtrl,
+      deskCtrl,
+      hargaCtrl,
+      jamCtrl
+    ]) {
+      controller.addListener(() {
+        if (mounted) setState(() => _dirty = true);
+      });
+    }
     _rating = (w?.ratingCount ?? 0) > 0 ? w!.rating : 0;
     _categoryGuid =
         (w?.categoryGuid.isNotEmpty ?? false) ? w!.categoryGuid : null;
@@ -94,6 +112,10 @@ class _TambahWisataScreenState extends State<TambahWisataScreen> {
     _facilities = DestinationFacilitiesState(_repository, session: _session)
       ..addListener(_onCategories);
     _savedDestinationGuid = w?.id;
+    _galleryVersion = w?.galleryVersion ?? 0;
+    _gallery.addAll((w?.images ?? []).map(GalleryDraftItem.existing));
+    _galleryReady = w == null;
+    if (w != null) _loadGallery();
     if (canAccessAdmin(_session.role)) {
       _load();
       _facilities.load(w?.id);
@@ -117,127 +139,72 @@ class _TambahWisataScreenState extends State<TambahWisataScreen> {
   }
 
   // ── Pilih gambar ──────────────────────────────────────────
-  Future<void> _pickImage(ImageSource source) async {
-    Navigator.pop(context); // tutup bottom sheet
-    final picker = ImagePicker();
-    final picked = await picker.pickImage(
-      source: source,
-      maxWidth: 1200,
-      maxHeight: 900,
-      imageQuality: 85,
-    );
-    if (picked == null) return;
-    final bytes = await picked.readAsBytes();
+  Future<void> _loadGallery() async {
+    setState(() => _galleryLoading = true);
+    try {
+      final value = await _repository.adminDestination(_savedDestinationGuid!);
+      if (!mounted || !_session.isCurrentGeneration(_sessionGeneration)) return;
+      setState(() {
+        _galleryReady = true;
+        _galleryVersion = value.galleryVersion;
+        _gallery
+          ..clear()
+          ..addAll(value.images.map(GalleryDraftItem.existing));
+        _operationKey = null;
+        _operationFingerprint = null;
+      });
+    } catch (e) {
+      if (mounted) _snack('Galeri belum dimuat: ${adminErrorMessage(e)}');
+    } finally {
+      if (mounted) setState(() => _galleryLoading = false);
+    }
+  }
+
+  Future<void> _pickImages() async {
+    final picked = await ImagePicker().pickMultiImage();
     if (!mounted) return;
-    final problem = validateDestinationImage(bytes);
-    if (problem != null) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text(problem),
-        backgroundColor: _C.danger,
-        behavior: SnackBarBehavior.floating,
-      ));
+    if (_gallery.length + picked.length > 10) {
+      _snack('Maksimal 10 foto. Pilih kembali sesuai slot yang tersisa.');
       return;
     }
+    final additions = <GalleryDraftItem>[];
+    for (final file in picked) {
+      final bytes = await file.readAsBytes();
+      final problem = validateDestinationImage(bytes);
+      final extension = file.name.toLowerCase().split('.').last;
+      if (problem != null ||
+          !['jpg', 'jpeg', 'png', 'webp'].contains(extension)) {
+        if (mounted) _snack(problem ?? 'Pilih JPEG, PNG, atau WebP.');
+        return;
+      }
+      additions.add(GalleryDraftItem.upload(bytes, file.name));
+    }
+    if (!mounted) return;
     setState(() {
-      _imageBytes = bytes;
-      _imageName = picked.name.isEmpty ? 'destination.jpg' : picked.name;
+      _gallery.addAll(additions);
+      _dirty = true;
     });
   }
 
-  void _showImagePicker() {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: _C.surface,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      builder: (_) => SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(20),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                width: 40,
-                height: 4,
-                decoration: BoxDecoration(
-                    color: _C.border, borderRadius: BorderRadius.circular(2)),
-              ),
-              const SizedBox(height: 20),
-              Text('Pilih Sumber Foto',
-                  style: TextStyle(
-                      color: _C.text,
-                      fontSize: 16,
-                      fontWeight: FontWeight.w800)),
-              const SizedBox(height: 20),
-              Row(
-                children: [
-                  Expanded(
-                      child: _sheetBtn(
-                    icon: Icons.camera_alt_rounded,
-                    label: 'Kamera',
-                    color: _C.teal,
-                    onTap: () => _pickImage(ImageSource.camera),
-                  )),
-                  const SizedBox(width: 12),
-                  Expanded(
-                      child: _sheetBtn(
-                    icon: Icons.photo_library_rounded,
-                    label: 'Galeri',
-                    color: _C.gold,
-                    onTap: () => _pickImage(ImageSource.gallery),
-                  )),
-                ],
-              ),
-              if (_imageBytes != null) ...[
-                const SizedBox(height: 12),
-                _sheetBtn(
-                  icon: Icons.undo_rounded,
-                  label: 'Batalkan Foto Baru',
-                  color: _C.danger,
-                  onTap: () {
-                    setState(() => _imageBytes = null);
-                    Navigator.pop(context);
-                  },
-                ),
-              ],
-              const SizedBox(height: 8),
-            ],
-          ),
-        ),
-      ),
-    );
+  Future<bool> _confirmDiscard() async {
+    if (_isSaving) return false;
+    if (!_dirty) return true;
+    return await showDialog<bool>(
+            context: context,
+            builder: (context) => AlertDialog(
+                    title: const Text('Buang perubahan?'),
+                    content: const Text('Draft foto dan form belum disimpan.'),
+                    actions: [
+                      TextButton(
+                          onPressed: () => Navigator.pop(context, false),
+                          child: const Text('Lanjut edit')),
+                      TextButton(
+                          onPressed: () => Navigator.pop(context, true),
+                          child: const Text('Buang'))
+                    ])) ??
+        false;
   }
 
-  Widget _sheetBtn({
-    required IconData icon,
-    required String label,
-    required Color color,
-    required VoidCallback onTap,
-  }) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 16),
-        decoration: BoxDecoration(
-          color: color.withValues(alpha: 0.1),
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: color.withValues(alpha: 0.25)),
-        ),
-        child: Column(
-          children: [
-            Icon(icon, color: color, size: 26),
-            const SizedBox(height: 6),
-            Text(label,
-                style: TextStyle(
-                    color: color, fontSize: 12, fontWeight: FontWeight.w700)),
-          ],
-        ),
-      ),
-    );
-  }
-
-  // ── Simpan ke Laravel (multipart bila ada foto baru) ────────
   void _snack(String message, {bool error = true}) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -253,6 +220,30 @@ class _TambahWisataScreenState extends State<TambahWisataScreen> {
         margin: const EdgeInsets.all(16),
       ),
     );
+  }
+
+  Future<Destination?> _reconcileGallery() async {
+    if (_savedDestinationGuid != null) {
+      final remote = await _repository.adminDestination(_savedDestinationGuid!);
+      return remote.json['last_gallery_operation_key'] == _operationKey
+          ? remote
+          : null;
+    }
+    var page = 1;
+    while (true) {
+      final result = await _repository.adminDestinations(query: {
+        'search': namaCtrl.text.trim(),
+        'page': '$page',
+        'per_page': '100',
+        'status': 'all'
+      });
+      for (final remote in result.items) {
+        if (remote.json['last_gallery_operation_key'] == _operationKey)
+          return remote;
+      }
+      if (result.links?['next'] == null) return null;
+      page++;
+    }
   }
 
   Future<void> _simpan() async {
@@ -272,13 +263,12 @@ class _TambahWisataScreenState extends State<TambahWisataScreen> {
       _snack('Harga harus berupa bilangan bulat nonnegatif.');
       return;
     }
-    final bytes = _imageBytes;
-    if (bytes != null) {
-      final problem = validateDestinationImage(bytes);
-      if (problem != null) {
-        _snack(problem);
-        return;
-      }
+    if (!_galleryReady ||
+        _galleryLoading ||
+        _gallery.isEmpty ||
+        _gallery.length > 10) {
+      _snack('Galeri wajib berisi 1-10 foto dan selesai dimuat.');
+      return;
     }
     final fields = <String, dynamic>{
       'destination_category_guid': _categoryGuid,
@@ -289,26 +279,52 @@ class _TambahWisataScreenState extends State<TambahWisataScreen> {
       'opening_hours': jamCtrl.text.trim(),
       'timezone': _timezone,
     };
-    final upload =
-        bytes == null ? null : UploadFile('image', bytes, _imageName);
-    setState(() => _isSaving = true);
+    final manifest = _gallery.map((e) => e.manifest).toList();
+    final fingerprint = '$fields|$manifest|$_galleryVersion';
+    if (_operationFingerprint != fingerprint) {
+      _operationKey = galleryUuid();
+      _operationFingerprint = fingerprint;
+    }
+    final creating = _savedDestinationGuid == null;
+    final uploads = <UploadFile>[
+      for (final item in _gallery)
+        if (item.bytes != null)
+          UploadFile(creating ? 'images[]' : 'new_images[${item.key}]',
+              item.bytes!, item.filename),
+    ];
+    setState(() {
+      _isSaving = true;
+      _failedSave = false;
+    });
     try {
-      if (_savedDestinationGuid == null) {
-        final created =
-            await _repository.createDestination(fields, image: upload);
-        if (!mounted || !_session.isCurrentGeneration(_sessionGeneration)) {
-          return;
-        }
-        _savedDestinationGuid = created.guid;
-        _imageBytes = null;
-      } else {
-        await _repository.updateDestination(_savedDestinationGuid!, fields,
-            image: upload);
-        if (!mounted || !_session.isCurrentGeneration(_sessionGeneration)) {
-          return;
-        }
-        _imageBytes = null;
+      Destination saved;
+      try {
+        saved = await _repository.saveDestinationGallery(
+            guid: _savedDestinationGuid,
+            fields: fields,
+            galleryVersion: _galleryVersion,
+            manifest: manifest,
+            files: uploads,
+            idempotencyKey: _operationKey!);
+      } on ApiException catch (error) {
+        if (!error.outcomeUnknown) rethrow;
+        Destination? remote;
+        try {
+          remote = await _reconcileGallery();
+        } catch (_) {/* Retry keeps the same operation key. */}
+        if (remote == null) rethrow;
+        saved = remote;
       }
+      if (!mounted || !_session.isCurrentGeneration(_sessionGeneration)) return;
+      _savedDestinationGuid = saved.guid;
+      _galleryVersion = saved.galleryVersion;
+      _gallery
+        ..clear()
+        ..addAll(saved.images.map(GalleryDraftItem.existing));
+      _operationKey = null;
+      _operationFingerprint = null;
+      _dirty = false;
+      FavoriteState.instance.load();
       if (_facilities.changed) {
         final failure = await _facilities.save(_savedDestinationGuid!);
         if (!mounted || !_session.isCurrentGeneration(_sessionGeneration)) {
@@ -329,15 +345,27 @@ class _TambahWisataScreenState extends State<TambahWisataScreen> {
       Navigator.pop(context, true);
     } catch (e) {
       if (!mounted || !_session.isCurrentGeneration(_sessionGeneration)) return;
-      if (e is ApiException && e.outcomeUnknown) {
-        // Tidak diulang otomatis: simpan tidak idempoten.
-        _snack(edit == null
-            ? 'Hasil penyimpanan belum pasti (${e.message}). Periksa Daftar '
-                'Wisata sebelum menyimpan ulang agar tidak terjadi duplikat.'
-            : 'Hasil penyimpanan belum pasti (${e.message}). Periksa data '
-                'wisata sebelum menyimpan ulang.');
+      setState(() => _failedSave = true);
+      if (e is ApiException && e.status == 409) {
+        final refresh = await showDialog<bool>(
+            context: context,
+            builder: (context) => AlertDialog(
+                    title: const Text('Galeri telah berubah'),
+                    content: const Text(
+                        'Admin lain telah menyimpan perubahan. Draft lokal tetap ada. Muat ulang untuk mengganti draft foto dengan galeri terbaru, lalu susun kembali perubahan Anda.'),
+                    actions: [
+                      TextButton(
+                          onPressed: () => Navigator.pop(context, false),
+                          child: const Text('Pertahankan draft')),
+                      TextButton(
+                          onPressed: () => Navigator.pop(context, true),
+                          child: const Text('Muat ulang'))
+                    ]));
+        if (refresh == true && mounted) await _loadGallery();
       } else {
-        _snack('Gagal menyimpan: ${adminErrorMessage(e)}');
+        _snack(e is ApiException && e.outcomeUnknown
+            ? 'Hasil simpan belum pasti. Draft tetap ada; Coba Lagi memakai operasi yang sama. ${e.message}'
+            : 'Gagal menyimpan: ${adminErrorMessage(e)}. Draft tetap ada.');
       }
     } finally {
       if (mounted) setState(() => _isSaving = false);
@@ -361,7 +389,15 @@ class _TambahWisataScreenState extends State<TambahWisataScreen> {
           systemNavigationBarColor: Colors.white,
           systemNavigationBarIconBrightness: Brightness.dark,
         ),
-        child: _buildScaffold(context),
+        child: PopScope(
+            canPop: !_dirty && !_isSaving,
+            onPopInvokedWithResult: (didPop, _) async {
+              if (!didPop && await _confirmDiscard() && mounted) {
+                setState(() => _dirty = false);
+                if (context.mounted) Navigator.pop(context);
+              }
+            },
+            child: _buildScaffold(context)),
       ),
     );
   }
@@ -529,7 +565,39 @@ class _TambahWisataScreenState extends State<TambahWisataScreen> {
                     // ── Upload Foto ──────────────────────────────
                     _sectionLabel('Foto Destinasi'),
                     const SizedBox(height: 12),
-                    _photoUploader(),
+                    if (_galleryLoading) const LinearProgressIndicator(),
+                    AdminDestinationGalleryEditor(
+                        items: _gallery,
+                        enabled: !_isSaving && !_galleryLoading,
+                        destinationGuid: _savedDestinationGuid,
+                        repository: _repository,
+                        onAdd: _pickImages,
+                        onRemove: (index) {
+                          if (_gallery.length == 1) {
+                            _snack('Minimal satu foto harus dipertahankan.');
+                            return;
+                          }
+                          setState(() {
+                            _gallery.removeAt(index);
+                            _dirty = true;
+                          });
+                        },
+                        onReorder: (from, to) => setState(() {
+                              final item = _gallery.removeAt(from);
+                              _gallery.insert(to, item);
+                              _dirty = true;
+                            })),
+                    if (_failedSave)
+                      TextButton(
+                          onPressed:
+                              _isSaving || !_galleryReady || _gallery.isEmpty
+                                  ? null
+                                  : _simpan,
+                          child: const Text('Coba Lagi')),
+                    if (widget.wisataEdit != null)
+                      TextButton(
+                          onPressed: _isSaving ? null : _loadGallery,
+                          child: const Text('Muat ulang galeri')),
                     const SizedBox(height: 24),
 
                     // ── Info Dasar ───────────────────────────────
@@ -637,7 +705,9 @@ class _TambahWisataScreenState extends State<TambahWisataScreen> {
               width: double.infinity,
               height: 54,
               child: ElevatedButton(
-                onPressed: _isSaving ? null : _simpan,
+                onPressed: _isSaving || !_galleryReady || _gallery.isEmpty
+                    ? null
+                    : _simpan,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: _C.teal,
                   disabledBackgroundColor: _C.teal.withValues(alpha: 0.5),
@@ -658,9 +728,7 @@ class _TambahWisataScreenState extends State<TambahWisataScreen> {
                           ),
                           const SizedBox(width: 10),
                           Text(
-                            _imageBytes != null
-                                ? 'Mengupload foto...'
-                                : 'Menyimpan...',
+                            'Menyimpan...',
                             style: const TextStyle(
                                 fontSize: 14, fontWeight: FontWeight.w700),
                           ),
@@ -677,7 +745,7 @@ class _TambahWisataScreenState extends State<TambahWisataScreen> {
                           ),
                           const SizedBox(width: 10),
                           Text(
-                            isEdit ? 'Simpan Perubahan' : 'Tambahkan Wisata',
+                            'Simpan Perubahan',
                             style: const TextStyle(
                                 fontSize: 15, fontWeight: FontWeight.w800),
                           ),
@@ -692,151 +760,6 @@ class _TambahWisataScreenState extends State<TambahWisataScreen> {
   }
 
   // ── Photo Uploader ────────────────────────────────────────
-  Widget _photoUploader() {
-    // Punya gambar jika: foto baru dipilih ATAU destinasi sudah punya gambar di server
-    final hasImage = _imageBytes != null ||
-        (widget.wisataEdit?.imageUrl?.isNotEmpty ?? false);
-
-    return GestureDetector(
-      onTap: _showImagePicker,
-      child: Container(
-        width: double.infinity,
-        height: 190,
-        decoration: BoxDecoration(
-          color: _C.surface,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(
-            color: hasImage ? _C.teal.withValues(alpha: 0.4) : _C.border,
-            width: hasImage ? 1.5 : 1,
-          ),
-        ),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(19),
-          child: hasImage
-              ? Stack(
-                  fit: StackFit.expand,
-                  children: [
-                    _buildPreviewImage(),
-                    // overlay gelap
-                    Container(
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          colors: [
-                            Colors.transparent,
-                            Colors.black.withValues(alpha: 0.55),
-                          ],
-                          begin: Alignment.topCenter,
-                          end: Alignment.bottomCenter,
-                        ),
-                      ),
-                    ),
-                    // badge edit
-                    Positioned(
-                      bottom: 12,
-                      right: 12,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 12, vertical: 7),
-                        decoration: BoxDecoration(
-                          color: _C.teal,
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: const [
-                            Icon(Icons.edit_rounded,
-                                color: Colors.white, size: 13),
-                            SizedBox(width: 5),
-                            Text('Ganti Foto',
-                                style: TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.w700)),
-                          ],
-                        ),
-                      ),
-                    ),
-                    // badge kiri: berhasil
-                    Positioned(
-                      top: 12,
-                      left: 12,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 10, vertical: 5),
-                        decoration: BoxDecoration(
-                          color: _C.teal.withValues(alpha: 0.85),
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: const [
-                            Icon(Icons.check_circle_rounded,
-                                color: Colors.white, size: 12),
-                            SizedBox(width: 4),
-                            Text('Foto dipilih',
-                                style: TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.w700)),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ],
-                )
-              : Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Container(
-                      width: 64,
-                      height: 64,
-                      decoration: BoxDecoration(
-                        color: _C.teal.withValues(alpha: 0.1),
-                        shape: BoxShape.circle,
-                        border: Border.all(
-                            color: _C.teal.withValues(alpha: 0.25), width: 1.5),
-                      ),
-                      child: Icon(Icons.add_photo_alternate_rounded,
-                          color: _C.teal, size: 30),
-                    ),
-                    const SizedBox(height: 14),
-                    Text('Tap untuk upload foto',
-                        style: TextStyle(
-                            color: _C.text,
-                            fontSize: 14,
-                            fontWeight: FontWeight.w700)),
-                    const SizedBox(height: 4),
-                    Text('Kamera atau galeri · JPEG, PNG, WebP · maks 5 MB',
-                        style: TextStyle(color: _C.textMuted, fontSize: 11.5)),
-                  ],
-                ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildPreviewImage() {
-    // Prioritas 1: foto baru yang baru dipilih (belum diunggah)
-    final bytes = _imageBytes;
-    if (bytes != null) {
-      return Image.memory(bytes,
-          fit: BoxFit.cover, errorBuilder: (_, __, ___) => _placeholder());
-    }
-    // Prioritas 2: gambar yang tersimpan di Laravel (endpoint admin)
-    final edit = widget.wisataEdit;
-    if (edit != null && (edit.imageUrl?.isNotEmpty ?? false)) {
-      return ApiImage(
-        imageUrl: edit.imageUrl,
-        adminGuid: edit.id,
-        fit: BoxFit.cover,
-        repository: widget.repository,
-        placeholder: (_) => _placeholder(),
-      );
-    }
-    return _placeholder();
-  }
-
-  // ── Zona waktu destinasi (IANA) ───────────────────────────
   Widget _timezonePicker() {
     final zones = <String>{...kAdminTimezones, _timezone}.toList();
     return Column(
@@ -883,12 +806,6 @@ class _TambahWisataScreenState extends State<TambahWisataScreen> {
       ],
     );
   }
-
-  Widget _placeholder() => Container(
-      color: _C.card,
-      child: Center(
-          child:
-              Icon(Icons.broken_image_rounded, color: _C.textMuted, size: 32)));
 
   // ── Section label ─────────────────────────────────────────
   Widget _sectionLabel(String label) {
