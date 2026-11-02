@@ -110,13 +110,16 @@ class _VerifyResetOtpScreenState extends State<VerifyResetOtpScreen> {
       _message = null;
     });
     try {
-      await widget.session.publicEnvelope(
+      final response = await widget.session.publicEnvelope(
           'POST', 'auth/password-reset/resend-otp',
           body: {'email': widget.email});
       if (!mounted || !_current(generation)) return;
       _code.clear();
       setState(() {
-        _countdown(60);
+        _countdown(response['data'] is Map &&
+                response['data']['resend_after_seconds'] is int
+            ? response['data']['resend_after_seconds'] as int
+            : 60);
         _error = false;
         _message =
             'Jika alamat email memenuhi syarat, kode verifikasi akan dikirim.';
@@ -124,7 +127,11 @@ class _VerifyResetOtpScreenState extends State<VerifyResetOtpScreen> {
     } on ApiException catch (e) {
       if (_current(generation)) {
         setState(() {
-          if (e.status == 429) _countdown(60);
+          if (e.status == 429) {
+            _countdown(e.context?['retry_after'] is int
+                ? e.context!['retry_after'] as int
+                : 60);
+          }
           _error = true;
           _message = recoveryError(e);
         });
@@ -140,93 +147,55 @@ class _VerifyResetOtpScreenState extends State<VerifyResetOtpScreen> {
     final masked = parts.length == 2 && parts[0].isNotEmpty
         ? '${parts[0][0]}***@${parts[1]}'
         : 'email Anda';
-    return AuthTheme(
-        child: Scaffold(
-            backgroundColor: const Color(0xFF1976D2),
-            appBar: AppBar(title: const Text('Verifikasi reset password')),
-            body: SafeArea(
-                child: Center(
-                    child: SingleChildScrollView(
-                        padding: const EdgeInsets.all(24),
-                        child: ConstrainedBox(
-                            constraints: const BoxConstraints(maxWidth: 460),
-                            child: Card(
-                                shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(20)),
-                                child: Padding(
-                                    padding: const EdgeInsets.all(24),
-                                    child: Column(
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.stretch,
-                                        mainAxisSize: MainAxisSize.min,
-                                        children: [
-                                          const Icon(
-                                              Icons.mark_email_unread_outlined,
-                                              size: 48,
-                                              color: Color(0xFF1976D2)),
-                                          const SizedBox(height: 20),
-                                          const Text('Kode reset password',
-                                              style: TextStyle(
-                                                  fontSize: 26,
-                                                  fontWeight: FontWeight.bold)),
-                                          const SizedBox(height: 8),
-                                          Text(
-                                              'Jika alamat email memenuhi syarat, kode verifikasi akan dikirim ke $masked. Masukkan 6 digit kode.'),
-                                          const SizedBox(height: 24),
-                                          AuthOtpInput(
-                                            controller: _code,
-                                            enabled: !_busy,
-                                            hasError:
-                                                _error && _message != null,
-                                            onChanged: (_) => setState(() {
-                                              _message = null;
-                                              _error = false;
-                                            }),
-                                          ),
-                                          if (_message != null)
-                                            Padding(
-                                                padding: const EdgeInsets.only(
-                                                    top: 12),
-                                                child: Text(_message!,
-                                                    style: TextStyle(
-                                                        color: _error
-                                                            ? Colors
-                                                                .red.shade800
-                                                            : Colors.blue
-                                                                .shade800))),
-                                          const SizedBox(height: 20),
-                                          FilledButton(
-                                              onPressed: !_busy &&
-                                                      _code.text.length == 6
-                                                  ? _verify
-                                                  : null,
-                                              style: FilledButton.styleFrom(
-                                                  minimumSize:
-                                                      const Size.fromHeight(
-                                                          50)),
-                                              child: _busy
-                                                  ? const SizedBox(
-                                                      height: 20,
-                                                      width: 20,
-                                                      child:
-                                                          CircularProgressIndicator(
-                                                              strokeWidth: 2))
-                                                  : const Text('Verifikasi')),
-                                          const SizedBox(height: 12),
-                                          TextButton(
-                                              onPressed:
-                                                  !_busy && _remaining == 0
-                                                      ? _resend
-                                                      : null,
-                                              child: Text(_remaining > 0
-                                                  ? 'Kirim ulang kode ($_remaining dtk)'
-                                                  : 'Kirim ulang kode')),
-                                          TextButton(
-                                              onPressed: _busy
-                                                  ? null
-                                                  : () => Navigator.of(context)
-                                                      .pop(),
-                                              child: const Text('Ubah email')),
-                                        ])))))))));
+    return AuthScenicShell(
+        title: 'Pulihkan akun',
+        child:
+            Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          AuthBackLink(
+              label: 'Kembali ke Lupa Password',
+              onPressed: _busy ? null : () => Navigator.of(context).pop()),
+          const SizedBox(height: 12),
+          AuthHeading(
+              title: 'Verifikasi kode OTP',
+              description:
+                  'Masukkan 6 digit kode verifikasi yang dikirimkan ke $masked untuk mengatur ulang password.'),
+          const Text('Kode verifikasi',
+              style: TextStyle(fontWeight: FontWeight.w700)),
+          const SizedBox(height: 10),
+          AuthOtpInput(
+              controller: _code,
+              enabled: !_busy,
+              hasError: _error && _message != null,
+              onChanged: (_) => setState(() {
+                    _message = null;
+                    _error = false;
+                  })),
+          if (_message != null)
+            Padding(
+                padding: const EdgeInsets.only(top: 12),
+                child: Text(_message!,
+                    style: TextStyle(
+                        color: _error
+                            ? Colors.red.shade800
+                            : Colors.blue.shade800))),
+          const SizedBox(height: 24),
+          AuthPrimaryButton(
+              label: 'Verifikasi kode',
+              loading: _busy,
+              onPressed: _code.text.length == 6 ? _verify : null),
+          const SizedBox(height: 12),
+          TextButton(
+              onPressed: !_busy && _remaining == 0 ? _resend : null,
+              child: Text(_remaining > 0
+                  ? 'Kirim ulang kode ($_remaining dtk)'
+                  : 'Kirim ulang kode')),
+          TextButton(
+              onPressed: _busy ? null : () => Navigator.of(context).pop(),
+              child: const Text('Ubah email')),
+          const SizedBox(height: 12),
+          const Text('Periksa kotak masuk atau folder spam emailmu.',
+              textAlign: TextAlign.center,
+              style: TextStyle(color: Color(0xFF536780), height: 1.5)),
+        ]));
   }
 }

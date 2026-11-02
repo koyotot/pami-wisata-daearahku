@@ -12,8 +12,7 @@ import 'auth_session_test.dart' show ok;
 
 void main() {
   setUpAll(() => GoogleFonts.config.allowRuntimeFetching = false);
-  testWidgets(
-      'all six auth screens support small viewport keyboard and enlarged text',
+  testWidgets('auth screens support small viewport keyboard and enlarged text',
       (tester) async {
     tester.view.physicalSize = const Size(320, 640);
     tester.view.devicePixelRatio = 1;
@@ -31,6 +30,7 @@ void main() {
           email: 'visual@example.test',
           ticket: 'test',
           expiresInSeconds: 300),
+      ResetPasswordSuccessScreen(session: session),
     ];
     for (final screen in screens) {
       await tester.pumpWidget(MaterialApp(
@@ -43,6 +43,14 @@ void main() {
       expect(tester.takeException(), isNull,
           reason: screen.runtimeType.toString());
       final fields = find.byType(EditableText);
+      if (screen is ResetPasswordSuccessScreen) {
+        await tester.ensureVisible(find.text('Kembali ke Login'));
+        await tester.pumpAndSettle();
+        expect(tester.getRect(find.text('Kembali ke Login')).bottom,
+            lessThanOrEqualTo(380));
+        await tester.pumpWidget(const SizedBox());
+        continue;
+      }
       expect(fields, findsWidgets);
       await tester.ensureVisible(fields.last);
       await tester.pumpAndSettle();

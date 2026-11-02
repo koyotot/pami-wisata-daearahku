@@ -38,6 +38,7 @@ void main() {
             of: find.byType(OutlinedButton), matching: find.byType(Image)),
         findsOneWidget);
     await tester.ensureVisible(find.text('Masuk'));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('Masuk'));
     await tester.pumpAndSettle();
     expect(find.text('Email dan password tidak boleh kosong.'), findsOneWidget);
@@ -91,11 +92,15 @@ void main() {
     expect(tester.widget<TextField>(find.byType(TextField)).controller!.text,
         'user@example.test');
     await tester.enterText(find.byType(TextField), 'invalid');
+    await tester.ensureVisible(find.text('Kirim kode OTP'));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('Kirim kode OTP'));
     await tester.pumpAndSettle();
     expect(find.text('Masukkan email yang valid.'), findsOneWidget);
     expect(requests, 0);
     await tester.enterText(find.byType(TextField), 'user@example.test');
+    await tester.ensureVisible(find.text('Kirim kode OTP'));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('Kirim kode OTP'));
     await tester.pumpAndSettle();
     expect(requests, 1);
@@ -118,10 +123,14 @@ void main() {
       home: ForgotPasswordScreen(
           session: auth, initialEmail: 'user@example.test'),
     ));
+    await tester.ensureVisible(find.text('Kirim kode OTP'));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('Kirim kode OTP'));
     await tester.pumpAndSettle();
     expect(find.text('Tidak dapat terhubung. Periksa koneksi internet Anda.'),
         findsOneWidget);
+    await tester.ensureVisible(find.text('Kirim kode OTP'));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('Kirim kode OTP'));
     await tester.pumpAndSettle();
     expect(requests, 2);

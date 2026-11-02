@@ -5,7 +5,6 @@ import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:wisata_daerahku/screens/user_login_screen.dart';
 import 'package:wisata_daerahku/screens/user_register_screen.dart';
-import 'package:wisata_daerahku/screens/verify_email_otp_screen.dart';
 import 'package:wisata_daerahku/screens/forgot_password_screen.dart';
 import 'package:wisata_daerahku/screens/verify_reset_otp_screen.dart';
 import 'package:wisata_daerahku/screens/reset_password_screen.dart';
@@ -29,7 +28,6 @@ class _PreviewState extends State<Preview> {
     final screens = <Widget>[
       UserLoginScreen(session: session),
       UserRegisterScreen(session: session),
-      VerifyEmailOtpScreen(email: 'visual@example.test', session: session),
       ForgotPasswordScreen(session: session),
       VerifyResetOtpScreen(email: 'visual@example.test', session: session),
       ResetPasswordScreen(
@@ -37,6 +35,7 @@ class _PreviewState extends State<Preview> {
           email: 'visual@example.test',
           ticket: 'rendering-only',
           expiresInSeconds: 3600),
+      ResetPasswordSuccessScreen(session: session),
     ];
     return MaterialApp(
         debugShowCheckedModeBanner: false,

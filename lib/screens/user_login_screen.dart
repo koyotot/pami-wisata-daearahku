@@ -5,7 +5,6 @@ import 'auth_presentation.dart';
 // ============================================================
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:firebase_auth/firebase_auth.dart' as fb_auth;
 import 'package:flutter/foundation.dart';
@@ -66,9 +65,7 @@ Future<String?> googleFirebaseToken(bool Function() isCurrent,
 // ── Warna & font: sama dengan home_screen.dart ────────────────
 class _C {
   static const blue = Color(0xFF1976D2);
-  static const blueDeep = Color(0xFF1558B0);
   static const navy = Color(0xFF102D59);
-  static const background = Color(0xFFF5F8FD);
   static const textMuted = Color(0xFF728099);
   static const border = Color(0xFFDCE4F0);
   static const danger = Color(0xFFE5484D);
@@ -278,7 +275,7 @@ class _UserLoginScreenState extends State<UserLoginScreen>
     final berhasil = await Navigator.push<bool>(
       context,
       MaterialPageRoute(
-        builder: (_) => const UserRegisterScreen(),
+        builder: (_) => UserRegisterScreen(session: widget.session),
       ),
     );
 
@@ -292,175 +289,13 @@ class _UserLoginScreenState extends State<UserLoginScreen>
   // ── Tampilan utama ─────────────────────────────────────────
 
   @override
-  Widget build(BuildContext context) {
-    return AuthTheme(
-        child: AnnotatedRegion<SystemUiOverlayStyle>(
-      value: const SystemUiOverlayStyle(
-        statusBarColor: Colors.transparent,
-        statusBarIconBrightness: Brightness.light, // ikon putih di header biru
-        statusBarBrightness: Brightness.dark,
-        systemNavigationBarColor: Colors.white,
-        systemNavigationBarIconBrightness: Brightness.dark,
-      ),
-      child: Scaffold(
-        backgroundColor: Colors.white,
-        body: LayoutBuilder(
-          builder: (context, constraints) {
-            return SingleChildScrollView(
-              physics: const BouncingScrollPhysics(),
-              keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
-              child: ConstrainedBox(
-                constraints: BoxConstraints(minHeight: constraints.maxHeight),
-                child: IntrinsicHeight(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      FadeTransition(
-                          opacity: _fadeAnim, child: _buildHeader(context)),
-                      Expanded(
-                        child: Container(
-                          color: const Color(0xFF102D59),
-                          child: FadeTransition(
-                            opacity: _fadeAnim,
-                            child: SlideTransition(
-                                position: _slideAnim, child: _buildCard()),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            );
-          },
-        ),
-      ),
-    ));
-  }
+  Widget build(BuildContext context) => AuthScenicShell(
+        title: 'Selamat datang!',
+        child: FadeTransition(
+            opacity: _fadeAnim,
+            child: SlideTransition(position: _slideAnim, child: _buildForm())),
+      );
 
-  // ── Header: gambar + tombol kembali + judul ────────────────
-  Widget _buildHeader(BuildContext context) {
-    final topInset = MediaQuery.of(context).padding.top;
-
-    return Container(
-      decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: [Color(0xFF1E88E5), Color(0xFF42A5F5), Color(0xFF90CAF9)],
-          stops: [0.0, 0.55, 1.0],
-        ),
-      ),
-      child: Stack(
-        children: [
-          const Positioned.fill(child: CustomPaint(painter: _ScenePainter())),
-
-          // Chip brand + judul
-          Padding(
-            padding: EdgeInsets.fromLTRB(26, topInset + 20, 40, 24),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.2),
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Icon(Icons.travel_explore_rounded,
-                          color: Colors.white, size: 14),
-                      const SizedBox(width: 6),
-                      Flexible(
-                          child: Text(
-                        'Wisata Daerahku',
-                        style: _font(11.5, FontWeight.w700, Colors.white),
-                      )),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 12),
-                Text(
-                  'Selamat datang!',
-                  style: _font(
-                    30,
-                    FontWeight.w800,
-                    Colors.white,
-                    height: 1.15,
-                    letterSpacing: -0.8,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // ── Kartu putih berisi form ────────────────────────────────
-  Widget _buildCard() {
-    return Container(
-      width: double.infinity,
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(34)),
-        boxShadow: [
-          BoxShadow(
-            color: _C.navy.withValues(alpha: 0.10),
-            blurRadius: 30,
-            offset: const Offset(0, -8),
-          ),
-        ],
-      ),
-      child: SafeArea(
-        top: false,
-        child: Align(
-          alignment: Alignment.center,
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 420),
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(24, 16, 24, 20),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  // Handle kecil
-                  Center(
-                    child: Container(
-                      width: 44,
-                      height: 4.5,
-                      decoration: BoxDecoration(
-                        color: _C.border,
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 22),
-                  Expanded(child: Center(child: _buildForm())),
-                  const SizedBox(height: 22),
-                  Center(
-                    child: Text(
-                      '© ${DateTime.now().year} Wisata Daerahku',
-                      style: _font(
-                        11,
-                        FontWeight.w500,
-                        _C.textMuted.withValues(alpha: 0.7),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  // ── Form login ─────────────────────────────────────────────
   Widget _buildForm() {
     return AutofillGroup(
       child: Column(
@@ -612,73 +447,9 @@ class _UserLoginScreenState extends State<UserLoginScreen>
   }
 
   // ── Tombol masuk ───────────────────────────────────────────
-  Widget _buildLoginButton() {
-    final radius = BorderRadius.circular(18);
+  Widget _buildLoginButton() =>
+      AuthPrimaryButton(label: 'Masuk', loading: _isLoading, onPressed: _login);
 
-    return Container(
-      decoration: BoxDecoration(
-        borderRadius: radius,
-        boxShadow: _isLoading
-            ? null
-            : [
-                BoxShadow(
-                  color: _C.blue.withValues(alpha: 0.35),
-                  blurRadius: 18,
-                  offset: const Offset(0, 8),
-                ),
-              ],
-      ),
-      child: Material(
-        color: Colors.transparent,
-        borderRadius: radius,
-        clipBehavior: Clip.antiAlias,
-        child: Ink(
-          height: 56,
-          decoration: BoxDecoration(
-            borderRadius: radius,
-            gradient: LinearGradient(
-              colors: _isLoading
-                  ? const [_C.blueDeep, _C.blueDeep]
-                  : const [Color(0xFF2386E8), _C.blueDeep],
-            ),
-          ),
-          child: InkWell(
-            onTap: _isLoading ? null : _login,
-            splashColor: Colors.white.withValues(alpha: 0.12),
-            highlightColor: Colors.transparent,
-            child: Center(
-              child: _isLoading
-                  ? const SizedBox(
-                      width: 22,
-                      height: 22,
-                      child: CircularProgressIndicator(
-                        color: Colors.white,
-                        strokeWidth: 2.5,
-                      ),
-                    )
-                  : Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(
-                          'Masuk',
-                          style: _font(15.5, FontWeight.w700, Colors.white),
-                        ),
-                        const SizedBox(width: 10),
-                        const Icon(
-                          Icons.arrow_forward_rounded,
-                          color: Colors.white,
-                          size: 20,
-                        ),
-                      ],
-                    ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  // ── Tombol daftar ──────────────────────────────────────────
   Widget _buildRegisterButton() {
     return TextButton(
       onPressed: _isLoading ? null : _goToRegister,
@@ -697,93 +468,6 @@ class _UserLoginScreenState extends State<UserLoginScreen>
 }
 
 // ── Ilustrasi matahari, awan & pegunungan ────────────────────
-class _ScenePainter extends CustomPainter {
-  const _ScenePainter();
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final w = size.width;
-    final h = size.height;
-
-    // Matahari + cahaya
-    final sun = Offset(w * 0.82, h * 0.30);
-    final r = w * 0.085;
-    canvas.drawCircle(
-      sun,
-      r * 3,
-      Paint()
-        ..shader = const RadialGradient(
-          colors: [Color(0x80FFC46B), Color(0x00FFC46B)],
-        ).createShader(Rect.fromCircle(center: sun, radius: r * 3)),
-    );
-    canvas.drawCircle(
-      sun,
-      r,
-      Paint()
-        ..shader = const LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: [Color(0xFFFFE9B0), Color(0xFFFF9800)],
-        ).createShader(Rect.fromCircle(center: sun, radius: r)),
-    );
-
-    // Awan sederhana
-    final cloud = Paint()..color = Colors.white.withValues(alpha: 0.22);
-    void drawCloud(Offset c, double s) {
-      canvas.drawCircle(c, 9 * s, cloud);
-      canvas.drawCircle(c.translate(11 * s, -5 * s), 12 * s, cloud);
-      canvas.drawCircle(c.translate(25 * s, 0), 9 * s, cloud);
-      canvas.drawRRect(
-        RRect.fromRectAndRadius(
-          Rect.fromLTWH(c.dx - 9 * s, c.dy, 43 * s, 9 * s),
-          Radius.circular(9 * s),
-        ),
-        cloud,
-      );
-    }
-
-    drawCloud(Offset(w * 0.62, h * 0.20), 1.0);
-    drawCloud(Offset(w * 0.42, h * 0.52), 0.75);
-
-    // Gunung belakang
-    final back = Path()
-      ..moveTo(0, h * 0.74)
-      ..lineTo(w * 0.18, h * 0.58)
-      ..lineTo(w * 0.36, h * 0.70)
-      ..lineTo(w * 0.58, h * 0.52)
-      ..lineTo(w * 0.80, h * 0.72)
-      ..lineTo(w, h * 0.62)
-      ..lineTo(w, h)
-      ..lineTo(0, h)
-      ..close();
-    canvas.drawPath(back, Paint()..color = const Color(0x661558B0));
-
-    // Gunung depan
-    final front = Path()
-      ..moveTo(0, h * 0.84)
-      ..lineTo(w * 0.24, h * 0.68)
-      ..lineTo(w * 0.48, h * 0.82)
-      ..lineTo(w * 0.72, h * 0.67)
-      ..lineTo(w, h * 0.82)
-      ..lineTo(w, h)
-      ..lineTo(0, h)
-      ..close();
-    canvas.drawPath(
-      front,
-      Paint()
-        ..shader = const LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: [Color(0xCC1558B0), Color(0xF2102D59)],
-        ).createShader(Rect.fromLTWH(0, h * 0.6, w, h * 0.4)),
-    );
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
-}
-
-// ── Dekorasi input ───────────────────────────────────────────
 InputDecoration _inputDecoration({
   required String hint,
   required IconData icon,
@@ -810,7 +494,7 @@ InputDecoration _inputDecoration({
     prefixIconConstraints: const BoxConstraints(minWidth: 0, minHeight: 0),
     suffixIcon: suffix,
     filled: true,
-    fillColor: _C.background,
+    fillColor: Colors.white,
     border: border(_C.border, 1.2),
     enabledBorder: border(_C.border, 1.2),
     disabledBorder: border(_C.border, 1.2),

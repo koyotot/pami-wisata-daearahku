@@ -5,7 +5,6 @@ import 'auth_presentation.dart';
 // ============================================================
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../services/auth_session.dart';
 import 'session_destination.dart';
@@ -13,9 +12,7 @@ import 'session_destination.dart';
 // ── Palet: sama dengan home dan login ─────────────────────────
 class _C {
   static const blue = Color(0xFF1976D2);
-  static const blueDeep = Color(0xFF1558B0);
   static const navy = Color(0xFF102D59);
-  static const orange = Color(0xFFFF9800);
   static const textMuted = Color(0xFF728099);
   static const border = Color(0xFFDCE4F0);
   static const danger = Color(0xFFE5484D);
@@ -152,175 +149,26 @@ class _UserRegisterScreenState extends State<UserRegisterScreen>
 
   // ── Tampilan utama ─────────────────────────────────────────
   @override
-  Widget build(BuildContext context) {
-    return AuthTheme(
-        child: AnnotatedRegion<SystemUiOverlayStyle>(
-      value: const SystemUiOverlayStyle(
-        statusBarColor: Colors.transparent,
-        statusBarIconBrightness: Brightness.dark,
-        statusBarBrightness: Brightness.light,
-        systemNavigationBarColor: Colors.white,
-        systemNavigationBarIconBrightness: Brightness.dark,
-      ),
-      child: Scaffold(
-        backgroundColor: Colors.white,
-        body: Container(
-          decoration: const BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
-              colors: [Color(0xFFDCEBFF), Color(0xFFF5F8FD), Colors.white],
-              stops: [0.0, 0.35, 0.8],
-            ),
-          ),
-          child: SafeArea(
-            child: LayoutBuilder(
-              builder: (context, constraints) {
-                return SingleChildScrollView(
-                  physics: const BouncingScrollPhysics(),
-                  keyboardDismissBehavior:
-                      ScrollViewKeyboardDismissBehavior.onDrag,
-                  child: ConstrainedBox(
-                    constraints: BoxConstraints(
-                      minHeight: constraints.maxHeight,
-                    ),
-                    child: Align(
-                      alignment: Alignment.center,
-                      child: ConstrainedBox(
-                        constraints: const BoxConstraints(maxWidth: 520),
-                        child: Padding(
-                          padding: const EdgeInsets.fromLTRB(24, 14, 24, 16),
-                          child: FadeTransition(
-                            opacity: _fadeAnim,
-                            child: SlideTransition(
-                              position: _slideAnim,
-                              child: Column(
-                                mainAxisSize: MainAxisSize.min,
-                                crossAxisAlignment: CrossAxisAlignment.stretch,
-                                children: [
-                                  _buildTopBar(),
-                                  const SizedBox(height: 28),
-                                  _buildTitle(),
-                                  const SizedBox(height: 26),
-                                  _buildForm(),
-                                  const SizedBox(height: 22),
-                                  Center(
-                                    child: Text(
-                                      '© ${DateTime.now().year} Wisata Daerahku',
-                                      style: _font(
-                                        11,
-                                        FontWeight.w500,
-                                        _C.textMuted.withValues(alpha: 0.7),
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                );
-              },
-            ),
-          ),
-        ),
-      ),
-    ));
-  }
+  Widget build(BuildContext context) => AuthScenicShell(
+      title: 'Mulai petualangan!',
+      child: FadeTransition(
+          opacity: _fadeAnim,
+          child: SlideTransition(
+              position: _slideAnim,
+              child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    const AuthHeading(
+                        title: 'Buat akun baru',
+                        description:
+                            'Mulai petualanganmu dan jelajahi Nusantara.'),
+                    _buildForm(),
+                  ]))));
 
-  // ── Bar atas: kembali + brand ──────────────────────────────
-  Widget _buildTopBar() {
-    return Row(
-      children: [
-        SizedBox(
-          width: 42,
-          height: 42,
-          child: Material(
-            color: Colors.white,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(14),
-              side: const BorderSide(color: _C.border),
-            ),
-            clipBehavior: Clip.antiAlias,
-            child: InkWell(
-              onTap: _isLoading ? null : () => Navigator.pop(context),
-              child: const Center(
-                child: Icon(
-                  Icons.arrow_back_ios_new_rounded,
-                  color: _C.navy,
-                  size: 17,
-                ),
-              ),
-            ),
-          ),
-        ),
-        const SizedBox(width: 12),
-        Container(
-          width: 40,
-          height: 40,
-          decoration: BoxDecoration(
-            gradient: const LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [Color(0xFF42A5F5), _C.blue],
-            ),
-            borderRadius: BorderRadius.circular(13),
-            boxShadow: [
-              BoxShadow(
-                color: _C.blue.withValues(alpha: 0.25),
-                blurRadius: 12,
-                offset: const Offset(0, 5),
-              ),
-            ],
-          ),
-          child: const Icon(
-            Icons.travel_explore_rounded,
-            color: Colors.white,
-            size: 23,
-          ),
-        ),
-        const SizedBox(width: 10),
-        Expanded(
-          child: Text(
-            'Wisata Daerahku',
-            style: _font(18, FontWeight.w800, _C.navy, letterSpacing: -0.4),
-          ),
-        ),
-      ],
-    );
-  }
-
-  // ── Judul halaman ──────────────────────────────────────────
-  Widget _buildTitle() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          'Mulai Petualangan\nBarumu!',
-          style: _font(
-            32,
-            FontWeight.w800,
-            _C.navy,
-            height: 1.15,
-            letterSpacing: -1,
-          ),
-        ),
-        const SizedBox(height: 10),
-        Text(
-          'Buat akun pengunjung dan temukan keindahan Nusantara.',
-          style: _font(14, FontWeight.w500, _C.textMuted, height: 1.5),
-        ),
-      ],
-    );
-  }
-
-  // ── Form pendaftaran ───────────────────────────────────────
   Widget _buildForm() {
     return Form(
       key: _formKey,
+      autovalidateMode: AutovalidateMode.onUserInteraction,
       child: AutofillGroup(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -339,16 +187,11 @@ class _UserRegisterScreenState extends State<UserRegisterScreen>
             ),
 
             // ── Bagian 1 ──
-            _sectionLabel(
-              1,
-              'Informasi Pribadi',
-              'Data dirimu untuk profil pengunjung',
-              Icons.person_outline_rounded,
-            ),
+            _sectionLabel('Informasi pribadi'),
             const SizedBox(height: 16),
             _RegField(
               controller: _namaCtrl,
-              label: 'Nama Lengkap',
+              label: 'Nama lengkap',
               hint: 'Masukkan nama lengkap',
               icon: Icons.person_rounded,
               enabled: !_isLoading,
@@ -384,7 +227,7 @@ class _UserRegisterScreenState extends State<UserRegisterScreen>
                   return 'Email wajib diisi';
                 }
 
-                if (!email.contains('@') || !email.contains('.')) {
+                if (!RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$').hasMatch(email)) {
                   return 'Format email tidak valid';
                 }
 
@@ -394,12 +237,7 @@ class _UserRegisterScreenState extends State<UserRegisterScreen>
             const SizedBox(height: 28),
 
             // ── Bagian 2 ──
-            _sectionLabel(
-              2,
-              'Keamanan Akun',
-              'Lindungi akunmu dengan password kuat',
-              Icons.shield_outlined,
-            ),
+            _sectionLabel('Keamanan akun'),
             const SizedBox(height: 16),
             _RegField(
               controller: _passwordCtrl,
@@ -421,11 +259,10 @@ class _UserRegisterScreenState extends State<UserRegisterScreen>
                 return null;
               },
             ),
-            _PasswordStrength(password: _passwordCtrl.text),
             const SizedBox(height: 16),
             _RegField(
               controller: _konfirmasiCtrl,
-              label: 'Konfirmasi Password',
+              label: 'Konfirmasi password',
               hint: 'Ulangi password',
               icon: Icons.lock_outline_rounded,
               enabled: !_isLoading,
@@ -456,21 +293,6 @@ class _UserRegisterScreenState extends State<UserRegisterScreen>
             _buildRegisterButton(),
             const SizedBox(height: 20),
 
-            // Pemisah
-            Row(
-              children: [
-                const Expanded(child: Divider(color: _C.border)),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 12),
-                  child: Text(
-                    'atau',
-                    style: _font(12, FontWeight.w600, _C.textMuted),
-                  ),
-                ),
-                const Expanded(child: Divider(color: _C.border)),
-              ],
-            ),
-            const SizedBox(height: 16),
             _buildLoginLinkButton(),
           ],
         ),
@@ -478,115 +300,24 @@ class _UserRegisterScreenState extends State<UserRegisterScreen>
     );
   }
 
-  // Label bagian bernomor
-  Widget _sectionLabel(
-    int number,
-    String title,
-    String subtitle,
-    IconData icon,
-  ) {
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: _C.border),
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 36,
-            height: 36,
-            alignment: Alignment.center,
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(12),
-              gradient: const LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [Color(0xFF42A5F5), _C.blue],
-              ),
-            ),
-            child: Text(
-              '$number',
-              style: _font(15, FontWeight.w800, Colors.white),
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(title, style: _font(14, FontWeight.w800, _C.navy)),
-                const SizedBox(height: 2),
-                Text(
-                  subtitle,
-                  style: _font(11.5, FontWeight.w500, _C.textMuted),
-                ),
-              ],
-            ),
-          ),
-          Icon(icon, color: _C.blue.withValues(alpha: 0.7), size: 22),
-        ],
-      ),
-    );
-  }
+  Widget _sectionLabel(String title) =>
+      Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        const Divider(color: _C.border, height: 24),
+        Text(title, style: _font(14, FontWeight.w800, _C.navy)),
+      ]);
 
-  // ── Tombol daftar ──────────────────────────────────────────
-  Widget _buildRegisterButton() {
-    return _GradientButton(
-      label: 'Daftar',
-      icon: Icons.how_to_reg_rounded,
-      isLoading: _isLoading,
-      onTap: _isLoading ? null : _register,
-    );
-  }
+  Widget _buildRegisterButton() => AuthPrimaryButton(
+      label: 'Daftar', loading: _isLoading, onPressed: _register);
 
-  // ── Tombol ke halaman masuk ────────────────────────────────
-  Widget _buildLoginLinkButton() {
-    final radius = BorderRadius.circular(18);
-
-    return Material(
-      color: Colors.transparent,
-      borderRadius: radius,
-      clipBehavior: Clip.antiAlias,
-      child: Ink(
-        height: 54,
-        decoration: BoxDecoration(
-          borderRadius: radius,
-          color: _C.orange.withValues(alpha: 0.08),
-          border: Border.all(
-            color: _C.orange.withValues(alpha: 0.45),
-            width: 1.3,
-          ),
-        ),
-        child: InkWell(
-          onTap: _isLoading ? null : () => Navigator.pop(context),
-          splashColor: _C.orange.withValues(alpha: 0.15),
-          highlightColor: Colors.transparent,
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              const Icon(Icons.login_rounded, color: _C.orange, size: 20),
-              const SizedBox(width: 10),
-              Flexible(
-                  child: Text.rich(
-                      TextSpan(
-                        text: 'Sudah punya akun? ',
-                        style: _font(13.5, FontWeight.w500, _C.textMuted),
-                        children: [
-                          TextSpan(
-                              text: 'Masuk',
-                              style: _font(13.5, FontWeight.w800,
-                                  const Color(0xFFE08600)))
-                        ],
-                      ),
-                      textAlign: TextAlign.center)),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
+  Widget _buildLoginLinkButton() => TextButton(
+      onPressed: _isLoading ? null : () => Navigator.pop(context),
+      child: Text.rich(TextSpan(
+          text: 'Sudah punya akun? ',
+          style: _font(13.5, FontWeight.w500, _C.textMuted),
+          children: [
+            TextSpan(
+                text: 'Masuk', style: _font(13.5, FontWeight.w800, _C.blue))
+          ])));
 }
 
 // ── Field pendaftaran ────────────────────────────────────────
@@ -708,171 +439,6 @@ class _RegField extends StatelessWidget {
 }
 
 // ── Indikator kekuatan password ──────────────────────────────
-class _PasswordStrength extends StatelessWidget {
-  final String password;
-
-  const _PasswordStrength({required this.password});
-
-  // 0 = kosong, 1 = lemah, 2 = cukup, 3 = kuat
-  int get _level {
-    if (password.isEmpty) return 0;
-    if (password.length < 8) return 1;
-
-    var score = 0;
-    if (password.length >= 8) score++;
-    if (RegExp(r'[A-Z]').hasMatch(password) &&
-        RegExp(r'[a-z]').hasMatch(password)) {
-      score++;
-    }
-    if (RegExp(r'\d').hasMatch(password)) score++;
-    if (RegExp(r'[^A-Za-z0-9]').hasMatch(password)) score++;
-
-    return score >= 3 ? 3 : 2;
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final level = _level;
-
-    final color = switch (level) {
-      1 => _C.danger,
-      2 => _C.orange,
-      3 => const Color(0xFF2EAD6B),
-      _ => _C.border,
-    };
-
-    final text = switch (level) {
-      1 => 'Lemah',
-      2 => 'Cukup',
-      3 => 'Kuat',
-      _ => '',
-    };
-
-    return AnimatedSize(
-      duration: const Duration(milliseconds: 200),
-      curve: Curves.easeOut,
-      alignment: Alignment.center,
-      child: level == 0
-          ? const SizedBox(width: double.infinity)
-          : Padding(
-              padding: const EdgeInsets.only(top: 10, left: 2, right: 2),
-              child: Row(
-                children: [
-                  for (var i = 1; i <= 3; i++) ...[
-                    Expanded(
-                      child: AnimatedContainer(
-                        duration: const Duration(milliseconds: 200),
-                        height: 5,
-                        decoration: BoxDecoration(
-                          color: i <= level ? color : _C.border,
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                      ),
-                    ),
-                    if (i < 3) const SizedBox(width: 6),
-                  ],
-                  const SizedBox(width: 12),
-                  Text(
-                    text,
-                    style: _font(11.5, FontWeight.w700, color),
-                  ),
-                ],
-              ),
-            ),
-    );
-  }
-}
-
-// ── Tombol gradasi ───────────────────────────────────────────
-class _GradientButton extends StatelessWidget {
-  final String label;
-  final IconData? icon;
-  final bool isLoading;
-  final VoidCallback? onTap;
-
-  const _GradientButton({
-    required this.label,
-    required this.onTap,
-    this.icon,
-    this.isLoading = false,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final radius = BorderRadius.circular(18);
-
-    return Container(
-      width: double.infinity,
-      decoration: BoxDecoration(
-        borderRadius: radius,
-        boxShadow: isLoading
-            ? null
-            : [
-                BoxShadow(
-                  color: _C.blue.withValues(alpha: 0.35),
-                  blurRadius: 18,
-                  offset: const Offset(0, 8),
-                ),
-              ],
-      ),
-      child: Material(
-        color: Colors.transparent,
-        borderRadius: radius,
-        clipBehavior: Clip.antiAlias,
-        child: Ink(
-          height: 56,
-          decoration: BoxDecoration(
-            borderRadius: radius,
-            gradient: LinearGradient(
-              colors: isLoading
-                  ? const [_C.blueDeep, _C.blueDeep]
-                  : const [Color(0xFF2386E8), _C.blueDeep],
-            ),
-          ),
-          child: InkWell(
-            onTap: isLoading ? null : onTap,
-            splashColor: Colors.white.withValues(alpha: 0.12),
-            highlightColor: Colors.transparent,
-            child: Center(
-              child: isLoading
-                  ? const SizedBox(
-                      width: 22,
-                      height: 22,
-                      child: CircularProgressIndicator(
-                        color: Colors.white,
-                        strokeWidth: 2.5,
-                      ),
-                    )
-                  : Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        if (icon != null) ...[
-                          Icon(
-                            icon,
-                            color: Colors.white,
-                            size: 22,
-                          ),
-                          const SizedBox(width: 10),
-                        ],
-                        Text(
-                          label,
-                          style: _font(
-                            15,
-                            FontWeight.w700,
-                            Colors.white,
-                          ),
-                        ),
-                      ],
-                    ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-// ── Pesan error ──────────────────────────────────────────────
 class _ErrorBanner extends StatelessWidget {
   final String message;
 

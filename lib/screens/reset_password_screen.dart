@@ -59,7 +59,7 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
       widget.session.isCurrentGeneration(generation) &&
       ModalRoute.of(context)?.isCurrent == true;
   Future<void> _submit() async {
-    if (_busy) return;
+    if (_busy || _remaining == 0) return;
     setState(() {
       _passwordError =
           _password.text.length < 8 ? 'Password minimal 8 karakter.' : null;
@@ -83,17 +83,15 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
       _confirmation.clear();
       Navigator.of(context).pushAndRemoveUntil(
           MaterialPageRoute(
-              builder: (_) => UserLoginScreen(session: widget.session)),
+              builder: (_) =>
+                  ResetPasswordSuccessScreen(session: widget.session)),
           (_) => false);
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text('Password berhasil diubah. Silakan masuk.',
-              style: AuthTheme.snackBarTextStyle)));
     } on ApiException catch (e) {
       if (!mounted || !_current(generation)) return;
       if (e.status == 422 && e.fieldErrors.containsKey('reset_ticket')) {
         _password.clear();
         _confirmation.clear();
-        Navigator.of(context).pop();
+        _requestNewCode();
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
             content: Text(
                 'Kode reset tidak berlaku atau kedaluwarsa. Minta kode OTP baru.',
@@ -114,115 +112,131 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
     }
   }
 
+  void _requestNewCode() {
+    _password.clear();
+    _confirmation.clear();
+    if (Navigator.of(context).canPop()) {
+      Navigator.of(context).pop();
+    } else {
+      Navigator.of(context).pushReplacement(MaterialPageRoute(
+          builder: (_) => ForgotPasswordScreen(
+              session: widget.session, initialEmail: widget.email)));
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final minutes = (_remaining ~/ 60).toString().padLeft(2, '0');
     final seconds = (_remaining % 60).toString().padLeft(2, '0');
-    return AuthTheme(
-        child: Scaffold(
-            backgroundColor: const Color(0xFF1976D2),
-            appBar: AppBar(title: const Text('Password baru')),
-            body: SafeArea(
-                child: Center(
-                    child: SingleChildScrollView(
-                        padding: const EdgeInsets.all(24),
-                        child: ConstrainedBox(
-                            constraints: const BoxConstraints(maxWidth: 460),
-                            child: Card(
-                                shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(20)),
-                                child: Padding(
-                                    padding: const EdgeInsets.all(24),
-                                    child: Column(
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.stretch,
-                                        mainAxisSize: MainAxisSize.min,
-                                        children: [
-                                          const Icon(Icons.lock_reset,
-                                              size: 48,
-                                              color: Color(0xFF1976D2)),
-                                          const SizedBox(height: 20),
-                                          const Text('Buat password baru',
-                                              style: TextStyle(
-                                                  fontSize: 26,
-                                                  fontWeight: FontWeight.bold)),
-                                          const SizedBox(height: 8),
-                                          const Text(
-                                              'Gunakan minimal 8 karakter.'),
-                                          const SizedBox(height: 8),
-                                          Text(
-                                              'Sisa waktu kode reset: $minutes:$seconds'),
-                                          const SizedBox(height: 24),
-                                          TextField(
-                                              controller: _password,
-                                              enabled: !_busy,
-                                              obscureText: !_showPassword,
-                                              autofillHints: const [
-                                                AutofillHints.newPassword
-                                              ],
-                                              decoration: InputDecoration(
-                                                  labelText: 'Password baru',
-                                                  errorText: _passwordError,
-                                                  suffixIcon: IconButton(
-                                                      tooltip: _showPassword
-                                                          ? 'Sembunyikan password'
-                                                          : 'Tampilkan password',
-                                                      onPressed: () => setState(
-                                                          () => _showPassword =
-                                                              !_showPassword),
-                                                      icon: Icon(_showPassword
-                                                          ? Icons.visibility_off
-                                                          : Icons
-                                                              .visibility)))),
-                                          const SizedBox(height: 16),
-                                          TextField(
-                                              controller: _confirmation,
-                                              enabled: !_busy,
-                                              obscureText: !_showConfirmation,
-                                              autofillHints: const [
-                                                AutofillHints.newPassword
-                                              ],
-                                              onSubmitted: (_) => _submit(),
-                                              decoration: InputDecoration(
-                                                  labelText:
-                                                      'Konfirmasi password',
-                                                  errorText: _confirmationError,
-                                                  suffixIcon: IconButton(
-                                                      tooltip: _showConfirmation
-                                                          ? 'Sembunyikan konfirmasi password'
-                                                          : 'Tampilkan konfirmasi password',
-                                                      onPressed: () => setState(
-                                                          () => _showConfirmation =
-                                                              !_showConfirmation),
-                                                      icon: Icon(_showConfirmation
-                                                          ? Icons.visibility_off
-                                                          : Icons
-                                                              .visibility)))),
-                                          if (_message != null)
-                                            Padding(
-                                                padding: const EdgeInsets.only(
-                                                    top: 12),
-                                                child: Text(_message!,
-                                                    style: TextStyle(
-                                                        color: Theme.of(context)
-                                                            .colorScheme
-                                                            .error))),
-                                          const SizedBox(height: 20),
-                                          FilledButton(
-                                              onPressed: _busy ? null : _submit,
-                                              style: FilledButton.styleFrom(
-                                                  minimumSize:
-                                                      const Size.fromHeight(
-                                                          50)),
-                                              child: _busy
-                                                  ? const SizedBox(
-                                                      height: 20,
-                                                      width: 20,
-                                                      child:
-                                                          CircularProgressIndicator(
-                                                              strokeWidth: 2))
-                                                  : const Text(
-                                                      'Simpan password')),
-                                        ])))))))));
+    return AuthScenicShell(
+        title: 'Pulihkan akun',
+        child:
+            Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          AuthBackLink(
+              label: 'Minta kode baru',
+              onPressed: _busy ? null : _requestNewCode),
+          const SizedBox(height: 12),
+          const AuthHeading(
+              title: 'Buat password baru',
+              description:
+                  'Kode OTP berhasil diverifikasi. Gunakan minimal 8 karakter untuk password baru.'),
+          Text(
+              _remaining > 0
+                  ? 'Sisa waktu kode reset: $minutes:$seconds'
+                  : 'Kode reset kedaluwarsa. Minta kode OTP baru.',
+              style: TextStyle(
+                  color: _remaining > 0
+                      ? const Color(0xFF536780)
+                      : const Color(0xFFE5484D))),
+          const SizedBox(height: 24),
+          TextField(
+              controller: _password,
+              enabled: !_busy && _remaining > 0,
+              obscureText: !_showPassword,
+              textInputAction: TextInputAction.next,
+              autofillHints: const [AutofillHints.newPassword],
+              onChanged: (_) => setState(() => _passwordError = null),
+              decoration: InputDecoration(
+                  labelText: 'Password baru',
+                  hintText: 'Minimal 8 karakter',
+                  prefixIcon: const Icon(Icons.lock_outline_rounded),
+                  errorText: _passwordError,
+                  suffixIcon: IconButton(
+                      tooltip: _showPassword
+                          ? 'Sembunyikan password'
+                          : 'Tampilkan password',
+                      onPressed: _busy
+                          ? null
+                          : () =>
+                              setState(() => _showPassword = !_showPassword),
+                      icon: Icon(_showPassword
+                          ? Icons.visibility_off_outlined
+                          : Icons.visibility_outlined)))),
+          const SizedBox(height: 20),
+          TextField(
+              controller: _confirmation,
+              enabled: !_busy && _remaining > 0,
+              obscureText: !_showConfirmation,
+              textInputAction: TextInputAction.done,
+              autofillHints: const [AutofillHints.newPassword],
+              onChanged: (_) => setState(() => _confirmationError = null),
+              onSubmitted: (_) => _submit(),
+              decoration: InputDecoration(
+                  labelText: 'Konfirmasi password',
+                  hintText: 'Ulangi password',
+                  prefixIcon: const Icon(Icons.lock_outline_rounded),
+                  errorText: _confirmationError,
+                  suffixIcon: IconButton(
+                      tooltip: _showConfirmation
+                          ? 'Sembunyikan konfirmasi password'
+                          : 'Tampilkan konfirmasi password',
+                      onPressed: _busy
+                          ? null
+                          : () => setState(
+                              () => _showConfirmation = !_showConfirmation),
+                      icon: Icon(_showConfirmation
+                          ? Icons.visibility_off_outlined
+                          : Icons.visibility_outlined)))),
+          if (_message != null)
+            Padding(
+                padding: const EdgeInsets.only(top: 12),
+                child: Text(_message!,
+                    style: const TextStyle(color: Color(0xFFE5484D)))),
+          const SizedBox(height: 24),
+          AuthPrimaryButton(
+              label: 'Simpan password',
+              loading: _busy,
+              onPressed: _remaining > 0 ? _submit : null),
+        ]));
   }
+}
+
+class ResetPasswordSuccessScreen extends StatelessWidget {
+  const ResetPasswordSuccessScreen({super.key, required this.session});
+  final AuthSession session;
+  @override
+  Widget build(BuildContext context) => AuthScenicShell(
+      title: 'Pulihkan akun',
+      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        const SizedBox(height: 20),
+        const Center(
+            child: DecoratedBox(
+                decoration: BoxDecoration(
+                    color: Color(0xFFE8F3FF), shape: BoxShape.circle),
+                child: Padding(
+                    padding: EdgeInsets.all(24),
+                    child: Icon(Icons.check_rounded,
+                        size: 48, color: AuthTheme.blue)))),
+        const SizedBox(height: 28),
+        const AuthHeading(
+            title: 'Password berhasil diubah!',
+            description:
+                'Password akunmu telah diperbarui. Silakan masuk kembali menggunakan password baru.'),
+        AuthPrimaryButton(
+            label: 'Kembali ke Login',
+            onPressed: () => Navigator.of(context).pushAndRemoveUntil(
+                MaterialPageRoute(
+                    builder: (_) => UserLoginScreen(session: session)),
+                (_) => false)),
+      ]));
 }

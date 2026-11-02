@@ -46,7 +46,8 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
       _error = null;
     });
     try {
-      await widget.session.publicEnvelope('POST', 'auth/forgot-password',
+      final response = await widget.session.publicEnvelope(
+          'POST', 'auth/forgot-password',
           body: {'email': email});
       if (!mounted ||
           !widget.session.isCurrentGeneration(generation) ||
@@ -54,8 +55,13 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
         return;
       }
       Navigator.of(context).push(MaterialPageRoute(
-          builder: (_) =>
-              VerifyResetOtpScreen(session: widget.session, email: email)));
+          builder: (_) => VerifyResetOtpScreen(
+              session: widget.session,
+              email: email,
+              resendAfterSeconds: response['data'] is Map &&
+                      response['data']['resend_after_seconds'] is int
+                  ? response['data']['resend_after_seconds'] as int
+                  : 60)));
     } on ApiException catch (e) {
       if (mounted && widget.session.isCurrentGeneration(generation)) {
         setState(() => _error =
@@ -67,67 +73,34 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
   }
 
   @override
-  Widget build(BuildContext context) => AuthTheme(
-      child: Scaffold(
-          backgroundColor: const Color(0xFF1976D2),
-          appBar: AppBar(title: const Text('Lupa password?')),
-          body: SafeArea(
-              child: Center(
-                  child: SingleChildScrollView(
-                      padding: const EdgeInsets.all(24),
-                      child: ConstrainedBox(
-                          constraints: const BoxConstraints(maxWidth: 460),
-                          child: Card(
-                              shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(20)),
-                              child: Padding(
-                                  padding: const EdgeInsets.all(24),
-                                  child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.stretch,
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        const Icon(
-                                            Icons.mark_email_unread_outlined,
-                                            size: 48,
-                                            color: Color(0xFF1976D2)),
-                                        const SizedBox(height: 20),
-                                        const Text('Lupa password?',
-                                            style: TextStyle(
-                                                fontSize: 26,
-                                                fontWeight: FontWeight.bold)),
-                                        const SizedBox(height: 8),
-                                        const Text(
-                                            'Masukkan email untuk meminta kode OTP 6 digit. Jika alamat email memenuhi syarat, kode verifikasi akan dikirim.'),
-                                        const SizedBox(height: 24),
-                                        TextField(
-                                            controller: _email,
-                                            enabled: !_loading,
-                                            keyboardType:
-                                                TextInputType.emailAddress,
-                                            textInputAction:
-                                                TextInputAction.done,
-                                            autofillHints: const [
-                                              AutofillHints.email
-                                            ],
-                                            onSubmitted: (_) => _submit(),
-                                            decoration: InputDecoration(
-                                                labelText: 'Email',
-                                                errorText: _error)),
-                                        const SizedBox(height: 20),
-                                        FilledButton(
-                                            onPressed:
-                                                _loading ? null : _submit,
-                                            style: FilledButton.styleFrom(
-                                                minimumSize:
-                                                    const Size.fromHeight(50)),
-                                            child: _loading
-                                                ? const SizedBox(
-                                                    width: 20,
-                                                    height: 20,
-                                                    child:
-                                                        CircularProgressIndicator(
-                                                            strokeWidth: 2))
-                                                : const Text('Kirim kode OTP')),
-                                      ])))))))));
+  Widget build(BuildContext context) => AuthScenicShell(
+      title: 'Pulihkan akun',
+      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        AuthBackLink(
+            label: 'Kembali ke Login',
+            onPressed: _loading ? null : () => Navigator.of(context).pop()),
+        const SizedBox(height: 12),
+        const AuthHeading(
+            title: 'Lupa password?',
+            description:
+                'Masukkan email yang terdaftar untuk melanjutkan proses pemulihan akun.'),
+        TextField(
+            controller: _email,
+            enabled: !_loading,
+            keyboardType: TextInputType.emailAddress,
+            textInputAction: TextInputAction.done,
+            autofillHints: const [AutofillHints.email],
+            onChanged: (_) {
+              if (_error != null) setState(() => _error = null);
+            },
+            onSubmitted: (_) => _submit(),
+            decoration: InputDecoration(
+                labelText: 'Email',
+                hintText: 'nama@email.com',
+                prefixIcon: const Icon(Icons.mail_outline_rounded),
+                errorText: _error)),
+        const SizedBox(height: 24),
+        AuthPrimaryButton(
+            label: 'Kirim kode OTP', loading: _loading, onPressed: _submit),
+      ]));
 }

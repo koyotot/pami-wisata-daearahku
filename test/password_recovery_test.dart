@@ -8,6 +8,7 @@ import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:wisata_daerahku/screens/verify_reset_otp_screen.dart';
 import 'package:wisata_daerahku/screens/reset_password_screen.dart';
+import 'package:wisata_daerahku/screens/user_login_screen.dart';
 import 'package:wisata_daerahku/services/auth_session.dart';
 
 import 'auth_session_test.dart' show MemoryStore;
@@ -45,7 +46,9 @@ void main() {
         contains(AutofillHints.oneTimeCode));
     await tester.enterText(input, '012345');
     await tester.pump();
-    await tester.tap(find.text('Verifikasi'));
+    await tester.ensureVisible(find.text('Verifikasi kode'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Verifikasi kode'));
     await tester.pump();
     expect(calls, 1);
     expect(tester.widget<FilledButton>(find.byType(FilledButton)).onPressed,
@@ -101,7 +104,9 @@ void main() {
         home: VerifyResetOtpScreen(email: 'user@example.test', session: auth)));
     await tester.enterText(find.byType(TextField), '012345');
     await tester.pump();
-    await tester.tap(find.text('Verifikasi'));
+    await tester.ensureVisible(find.text('Verifikasi kode'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Verifikasi kode'));
     await tester.pumpAndSettle();
     expect(find.byType(ResetPasswordScreen), findsOneWidget);
     expect(store.value, isNull);
@@ -109,6 +114,7 @@ void main() {
     await tester.enterText(fields.at(0), 'Password123');
     await tester.enterText(fields.at(1), 'different');
     await tester.ensureVisible(find.text('Simpan password'));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('Simpan password'));
     await tester.pump();
     expect(calls, hasLength(1));
@@ -118,6 +124,17 @@ void main() {
     expect(calls, hasLength(2));
     expect(store.value, isNull);
     expect(auth.authenticated.value, isFalse);
+    expect(find.byType(ResetPasswordSuccessScreen), findsOneWidget);
+    expect(find.byType(ResetPasswordScreen), findsNothing);
+    expect(find.byType(VerifyResetOtpScreen), findsNothing);
+    await tester.ensureVisible(find.text('Kembali ke Login'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Kembali ke Login'));
+    await tester.pumpAndSettle();
+    expect(find.byType(UserLoginScreen), findsOneWidget);
+    expect(find.byType(ResetPasswordSuccessScreen), findsNothing);
+    expect(
+        tester.state<NavigatorState>(find.byType(Navigator)).canPop(), isFalse);
     await tester.pumpWidget(const SizedBox());
   });
 
@@ -134,6 +151,8 @@ void main() {
             email: 'user@example.test', session: auth, resendAfterSeconds: 0)));
     await tester.enterText(find.byType(TextField), '123');
     await tester.pump();
+    await tester.ensureVisible(find.text('Kirim ulang kode'));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('Kirim ulang kode'));
     await tester.pumpAndSettle();
     expect(calls, 1);
@@ -151,7 +170,9 @@ void main() {
         home: VerifyResetOtpScreen(email: 'user@example.test', session: auth)));
     await tester.enterText(find.byType(TextField), '012345');
     await tester.pump();
-    await tester.tap(find.text('Verifikasi'));
+    await tester.ensureVisible(find.text('Verifikasi kode'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Verifikasi kode'));
     await tester.pump();
     await tester.pumpWidget(const MaterialApp(home: Text('abandoned')));
     gate.complete(http.Response(
@@ -184,10 +205,14 @@ void main() {
             email: 'user@example.test', session: auth, resendAfterSeconds: 0)));
     await tester.enterText(find.byType(TextField), '012345');
     await tester.pump();
-    await tester.tap(find.text('Verifikasi'));
+    await tester.ensureVisible(find.text('Verifikasi kode'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Verifikasi kode'));
     await tester.pumpAndSettle();
     expect(find.textContaining('Kode tidak valid'), findsOneWidget);
     await tester.ensureVisible(find.text('Kirim ulang kode'));
+    await tester.ensureVisible(find.text('Kirim ulang kode'));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('Kirim ulang kode'));
     await tester.pumpAndSettle();
     expect(find.textContaining('Terlalu banyak'), findsOneWidget);
@@ -235,6 +260,7 @@ void main() {
     await tester.enterText(find.byType(TextField).at(0), 'Password123');
     await tester.enterText(find.byType(TextField).at(1), 'Password123');
     await tester.ensureVisible(find.text('Simpan password'));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('Simpan password'));
     await tester.pumpAndSettle();
     expect(find.text('Password ditolak server.'), findsOneWidget);
@@ -255,7 +281,9 @@ void main() {
         home: VerifyResetOtpScreen(email: 'user@example.test', session: auth)));
     await tester.enterText(find.byType(TextField), '012345');
     await tester.pump();
-    await tester.tap(find.text('Verifikasi'));
+    await tester.ensureVisible(find.text('Verifikasi kode'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Verifikasi kode'));
     await tester.pump();
     await auth.clear();
     gate.complete(http.Response(
