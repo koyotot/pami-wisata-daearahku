@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -94,12 +96,14 @@ class AuthScenicShell extends StatelessWidget {
                     statusBarColor: Colors.transparent,
                     statusBarIconBrightness: Brightness.light,
                     statusBarBrightness: Brightness.dark,
+                    systemStatusBarContrastEnforced: false,
                     systemNavigationBarColor: Colors.white,
                     systemNavigationBarIconBrightness: Brightness.dark,
                   ),
                   child: Scaffold(
-                    backgroundColor: const Color(0xFF1E88E5),
+                    backgroundColor: AuthTheme.navy,
                     body: SafeArea(
+                        top: false,
                         bottom: false,
                         child: ColoredBox(
                             color: AuthTheme.navy,
@@ -108,24 +112,10 @@ class AuthScenicShell extends StatelessWidget {
                                   ScrollViewKeyboardDismissBehavior.onDrag,
                               slivers: [
                                 SliverToBoxAdapter(
-                                    child: Container(
-                                  decoration: const BoxDecoration(
-                                      gradient: LinearGradient(
-                                    begin: Alignment.topCenter,
-                                    end: Alignment.bottomCenter,
-                                    colors: [
-                                      Color(0xFF1E88E5),
-                                      Color(0xFF42A5F5),
-                                      Color(0xFF90CAF9)
-                                    ],
-                                  )),
-                                  child: Stack(children: [
-                                    const Positioned.fill(
-                                        child: ClipRect(
-                                            child: CustomPaint(
-                                                painter:
-                                                    AuthMountainPainter()))),
-                                    Padding(
+                                    child: _AuthDynamicHeader(
+                                  child: SafeArea(
+                                    bottom: false,
+                                    child: Padding(
                                       padding: const EdgeInsets.fromLTRB(
                                           24, 20, 24, 44),
                                       child: Column(
@@ -182,7 +172,7 @@ class AuthScenicShell extends StatelessWidget {
                                                         letterSpacing: -.8)),
                                           ]),
                                     ),
-                                  ]),
+                                  ),
                                 )),
                                 SliverFillRemaining(
                                     hasScrollBody: false,
@@ -368,38 +358,259 @@ class _AuthOtpInputState extends State<AuthOtpInput> {
       ]);
 }
 
+enum _AuthHeaderPeriod {
+  morning,
+  day,
+  evening,
+  night;
+
+  static _AuthHeaderPeriod forTime(DateTime now) {
+    if (now.hour < 5 || now.hour >= 19) return night;
+    if (now.hour < 11) return morning;
+    if (now.hour < 15) return day;
+    return evening;
+  }
+}
+
+class _AuthScene {
+  const _AuthScene(this.sky, this.back, this.front, this.sun, this.sunY,
+      this.sunOpacity, this.cloudOpacity, this.nightOpacity);
+
+  final List<Color> sky;
+  final Color back;
+  final List<Color> front;
+  final List<Color> sun;
+  final double sunY, sunOpacity, cloudOpacity, nightOpacity;
+
+  static const scenes = {
+    _AuthHeaderPeriod.morning: _AuthScene(
+        [Color(0xFF397EBC), Color(0xFF80BFE5), Color(0xFFF4CDB1)],
+        Color(0x661558B0),
+        [Color(0xCC286AA4), Color(0xF2102D59)],
+        [Color(0xFFFFE9C4), Color(0xFFFFBC78)],
+        .42,
+        1,
+        .18,
+        0),
+    _AuthHeaderPeriod.day: _AuthScene(
+        [Color(0xFF1E88E5), Color(0xFF42A5F5), Color(0xFF90CAF9)],
+        Color(0x661558B0),
+        [Color(0xCC1558B0), Color(0xF2102D59)],
+        [Color(0xFFFFE9B0), Color(0xFFFF9800)],
+        .30,
+        1,
+        .22,
+        0),
+    _AuthHeaderPeriod.evening: _AuthScene(
+        [Color(0xFF555783), Color(0xFFC18DAD), Color(0xFFF4AC7F)],
+        Color(0x9960527E),
+        [Color(0xDD4A4676), Color(0xF2102D59)],
+        [Color(0xFFFFD9AD), Color(0xFFF78E60)],
+        .54,
+        1,
+        .15,
+        0),
+    _AuthHeaderPeriod.night: _AuthScene(
+        [Color(0xFF09172F), Color(0xFF142E55), Color(0xFF365479)],
+        Color(0xCC1C365A),
+        [Color(0xFF172D4E), Color(0xFF102039)],
+        [Color(0xFFFFE9B0), Color(0xFFFF9800)],
+        .40,
+        0,
+        .04,
+        1),
+  };
+
+  static _AuthScene lerp(_AuthScene a, _AuthScene b, double t) {
+    List<Color> colors(List<Color> x, List<Color> y) =>
+        [for (var i = 0; i < x.length; i++) Color.lerp(x[i], y[i], t)!];
+    double value(double x, double y) => x + (y - x) * t;
+    return _AuthScene(
+        colors(a.sky, b.sky),
+        Color.lerp(a.back, b.back, t)!,
+        colors(a.front, b.front),
+        colors(a.sun, b.sun),
+        value(a.sunY, b.sunY),
+        value(a.sunOpacity, b.sunOpacity),
+        value(a.cloudOpacity, b.cloudOpacity),
+        value(a.nightOpacity, b.nightOpacity));
+  }
+}
+
+class _AuthSceneTween extends Tween<_AuthScene> {
+  _AuthSceneTween({required _AuthScene scene})
+      : super(begin: scene, end: scene);
+
+  @override
+  _AuthScene lerp(double t) => _AuthScene.lerp(begin!, end!, t);
+}
+
+class _AuthDynamicHeader extends StatefulWidget {
+  const _AuthDynamicHeader({required this.child});
+  final Widget child;
+
+  @override
+  State<_AuthDynamicHeader> createState() => _AuthDynamicHeaderState();
+}
+
+class _AuthDynamicHeaderState extends State<_AuthDynamicHeader>
+    with WidgetsBindingObserver {
+  late _AuthHeaderPeriod _period;
+  Timer? _boundaryTimer;
+  Timer? _clockCheck;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _period = _AuthHeaderPeriod.forTime(DateTime.now());
+    _reconcile();
+    _startClockCheck();
+  }
+
+  void _startClockCheck() {
+    _clockCheck?.cancel();
+    // Manual clock/timezone edits may not emit a lifecycle event.
+    _clockCheck =
+        Timer.periodic(const Duration(minutes: 1), (_) => _reconcile());
+  }
+
+  void _reconcile() {
+    final now = DateTime.now();
+    final period = _AuthHeaderPeriod.forTime(now);
+    if (period != _period) setState(() => _period = period);
+    final boundary = [
+      for (final hour in [5, 11, 15, 19])
+        DateTime(now.year, now.month, now.day, hour),
+      DateTime(now.year, now.month, now.day + 1, 5),
+    ].firstWhere((time) => time.isAfter(now));
+    final delay = boundary.difference(now);
+    _boundaryTimer?.cancel();
+    _boundaryTimer = Timer(
+        delay > Duration.zero ? delay : const Duration(milliseconds: 1),
+        _reconcile);
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _reconcile();
+      _startClockCheck();
+    } else {
+      _boundaryTimer?.cancel();
+      _clockCheck?.cancel();
+    }
+  }
+
+  @override
+  void dispose() {
+    _boundaryTimer?.cancel();
+    _clockCheck?.cancel();
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => RepaintBoundary(
+        child: TweenAnimationBuilder<_AuthScene>(
+          tween: _AuthSceneTween(scene: _AuthScene.scenes[_period]!),
+          duration: MediaQuery.disableAnimationsOf(context)
+              ? Duration.zero
+              : const Duration(milliseconds: 800),
+          curve: Curves.easeInOut,
+          child: widget.child,
+          builder: (context, scene, child) => ClipRect(
+            child: CustomPaint(
+                painter: AuthMountainPainter._(
+                    scene, MediaQuery.paddingOf(context).top),
+                child: child),
+          ),
+        ),
+      );
+}
+
 class AuthMountainPainter extends CustomPainter {
-  const AuthMountainPainter();
+  const AuthMountainPainter._(this.scene, this.topInset);
+  final _AuthScene scene;
+  final double topInset;
 
   @override
   void paint(Canvas canvas, Size size) {
     final w = size.width;
-    final h = size.height;
+    final h = size.height - topInset;
+    final bounds = Offset.zero & size;
+    canvas.drawRect(
+        bounds,
+        Paint()
+          ..shader = LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: scene.sky,
+          ).createShader(bounds));
+
+    // Extend the sky above the original scene without moving its illustration.
+    canvas.save();
+    canvas.translate(0, topInset);
 
     // Matahari + cahaya
-    final sun = Offset(w * 0.82, h * 0.30);
+    final sun = Offset(w * 0.82, h * scene.sunY);
     final r = w * 0.085;
     canvas.drawCircle(
       sun,
       r * 3,
       Paint()
-        ..shader = const RadialGradient(
-          colors: [Color(0x80FFC46B), Color(0x00FFC46B)],
+        ..shader = RadialGradient(
+          colors: [
+            scene.sun.last.withValues(alpha: .5 * scene.sunOpacity),
+            scene.sun.last.withValues(alpha: 0)
+          ],
         ).createShader(Rect.fromCircle(center: sun, radius: r * 3)),
     );
     canvas.drawCircle(
       sun,
       r,
       Paint()
-        ..shader = const LinearGradient(
+        ..shader = LinearGradient(
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
-          colors: [Color(0xFFFFE9B0), Color(0xFFFF9800)],
+          colors: [
+            for (final color in scene.sun)
+              color.withValues(alpha: scene.sunOpacity)
+          ],
         ).createShader(Rect.fromCircle(center: sun, radius: r)),
     );
 
+    final moon = Offset(w * .83, h * .30);
+    final crescent = Path.combine(
+        PathOperation.difference,
+        Path()..addOval(Rect.fromCircle(center: moon, radius: r * .78)),
+        Path()
+          ..addOval(Rect.fromCircle(
+              center: moon.translate(r * .40, -r * .20), radius: r * .72)));
+    canvas.drawPath(
+        crescent,
+        Paint()
+          ..color =
+              const Color(0xFFF4EBCF).withValues(alpha: scene.nightOpacity));
+    const stars = [
+      Offset(.60, .13),
+      Offset(.73, .43),
+      Offset(.93, .14),
+      Offset(.95, .51),
+      Offset(.52, .34),
+      Offset(.69, .08)
+    ];
+    for (var i = 0; i < stars.length; i++) {
+      canvas.drawCircle(
+          Offset(w * stars[i].dx, h * stars[i].dy),
+          i.isEven ? 1.4 : 1,
+          Paint()
+            ..color = Colors.white.withValues(alpha: .75 * scene.nightOpacity));
+    }
+
     // Awan sederhana
-    final cloud = Paint()..color = Colors.white.withValues(alpha: 0.22);
+    final cloud = Paint()
+      ..color = Colors.white.withValues(alpha: scene.cloudOpacity);
     void drawCloud(Offset c, double s) {
       canvas.drawCircle(c, 9 * s, cloud);
       canvas.drawCircle(c.translate(11 * s, -5 * s), 12 * s, cloud);
@@ -427,7 +638,7 @@ class AuthMountainPainter extends CustomPainter {
       ..lineTo(w, h)
       ..lineTo(0, h)
       ..close();
-    canvas.drawPath(back, Paint()..color = const Color(0x661558B0));
+    canvas.drawPath(back, Paint()..color = scene.back);
 
     // Gunung depan
     final front = Path()
@@ -442,14 +653,33 @@ class AuthMountainPainter extends CustomPainter {
     canvas.drawPath(
       front,
       Paint()
-        ..shader = const LinearGradient(
+        ..shader = LinearGradient(
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
-          colors: [Color(0xCC1558B0), Color(0xF2102D59)],
+          colors: scene.front,
         ).createShader(Rect.fromLTWH(0, h * 0.6, w, h * 0.4)),
     );
+    canvas.restore();
+    // Keep white headings readable while leaving the right-hand sky visible.
+    canvas.drawRect(
+        bounds,
+        Paint()
+          ..shader = const LinearGradient(
+            colors: [Color(0x99102D59), Color(0x00102D59)],
+            stops: [0, .8],
+          ).createShader(bounds));
+    canvas.drawRect(
+        bounds,
+        Paint()
+          ..shader = const LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [Color(0x33102D59), Color(0x00102D59)],
+            stops: [0, .45],
+          ).createShader(bounds));
   }
 
   @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+  bool shouldRepaint(covariant AuthMountainPainter oldDelegate) =>
+      oldDelegate.scene != scene || oldDelegate.topInset != topInset;
 }
