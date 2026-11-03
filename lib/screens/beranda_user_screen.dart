@@ -1,1013 +1,831 @@
-// ============================================================
-// lib/screens/beranda_user_screen.dart
-// Package: google_fonts
-// Tema: biru terang — sama dengan home, login, dan register
-// ============================================================
-import 'dart:io';
+import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
-import 'package:google_fonts/google_fonts.dart';
-
 import '../data/app_data.dart';
-import '../data/catalog_state.dart';
 import '../data/booking_state.dart';
 import '../data/business_repository.dart';
-import '../services/auth_session.dart';
+import '../data/favorite_state.dart';
+import '../services/api_client.dart';
+import '../theme/app_colors.dart';
 import '../widgets/api_image.dart';
 import 'auth_presentation.dart';
+import 'bukti_pendaftaran_screen.dart';
 import 'detail_wisata_screen.dart';
+import 'profil_user_screen.dart';
 
-// ── Palet & font (sama dengan home_screen.dart) ──────────────
-class _C {
-  static const blue = Color(0xFF1976D2);
-  static const blueDeep = Color(0xFF1558B0);
-  static const navy = Color(0xFF102D59);
-  static const orange = Color(0xFFFF9800);
-  static const background = Color(0xFFF5F8FD);
-  static const textMuted = Color(0xFF728099);
-  static const border = Color(0xFFDCE4F0);
+/// Attention first, then the nearest confirmed visit; terminal bookings stay in history.
+Booking? selectHomeBooking(List<Booking> bookings, DateTime now) {
+  final today = formatVisitDate(now);
+  int priority(Booking b) => switch (b.status) {
+        'awaiting_payment' => 0,
+        'pending_approval' || 'payment_verification' || 'payment_review' => 1,
+        'confirmed' => 2,
+        _ => 3,
+      };
+  final relevant = bookings
+      .where((b) =>
+          priority(b) < 3 &&
+          (b.status != 'confirmed' ||
+              (b.checkedInAt == null &&
+                  DateTime.tryParse(b.visitDate) != null &&
+                  b.visitDate.compareTo(today) >= 0)))
+      .toList()
+    ..sort((a, b) {
+      final order = priority(a).compareTo(priority(b));
+      return order != 0 ? order : a.visitDate.compareTo(b.visitDate);
+    });
+  return relevant.isEmpty ? null : relevant.first;
 }
 
-TextStyle _font(
-  double size,
-  FontWeight weight,
-  Color color, {
-  double? height,
-  double? letterSpacing,
-}) =>
-    GoogleFonts.plusJakartaSans(
-      fontSize: size,
-      fontWeight: weight,
-      color: color,
-      height: height,
-      letterSpacing: letterSpacing,
-    );
-
 class BerandaUserScreen extends StatefulWidget {
-  /// Dipanggil saat tombol menu (☰) ditekan — membuka drawer
-  /// yang ada di MainNavigationScreen.
+  const BerandaUserScreen(
+      {super.key,
+      this.onBukaMenu,
+      this.active = true,
+      this.onExplore,
+      this.onHistory,
+      this.repository,
+      this.favorites});
   final VoidCallback? onBukaMenu;
-
-  /// True saat tab ini tampil; jumlah pendaftaran dimuat ulang ketika tab dibuka kembali.
   final bool active;
-
-  const BerandaUserScreen({super.key, this.onBukaMenu, this.active = true});
+  final VoidCallback? onExplore;
+  final VoidCallback? onHistory;
+  final BusinessRepository? repository;
+  final FavoriteState? favorites;
 
   @override
   State<BerandaUserScreen> createState() => _BerandaUserScreenState();
 }
 
 class _BerandaUserScreenState extends State<BerandaUserScreen>
-    with TickerProviderStateMixin {
-  String _kategoriTerpilih = 'Semua';
-  final TextEditingController _searchCtrl = TextEditingController();
-  late AnimationController _fadeCtrl;
-  final _catalog = CatalogState();
-  int? _bookingCount;
-  bool get _isLoadingData =>
-      _catalog.destinations.loading || _catalog.categories.loading;
-  List<Map<String, dynamic>> get _kategoriList => [
-        {'label': 'Semua', 'icon': '\u{1F5FA}', 'guid': 'Semua'},
-        ...?_catalog.categories.data?.map((c) => {
-              'label': c.name,
-              'icon': const {
-                    'Alam': '\u{1F3D4}',
-                    'Budaya': '\u{1F3DB}',
-                    'Pantai': '\u{1F3D6}',
-                    'Bahari': '\u{1F41A}',
-                    'Kuliner': '\u{1F35C}'
-                  }[c.name] ??
-                  '\u{1F4CD}',
-              'guid': c.guid
-            }),
-      ];
-  List<Wisata> get _wisata =>
-      (_catalog.destinations.data ?? []).map(Wisata.fromDestination).toList();
+    with WidgetsBindingObserver {
+  late final BusinessRepository _repository;
+  late final UserBookingsState _bookings;
+  late final FavoriteState _favorites;
+  final _inspiration = RequestState<List<Destination>>();
+  Future<Destination>? _journeyDestination;
+  String? _journeyDestinationGuid;
+  Timer? _clock;
+  DateTime _now = DateTime.now();
+
+  @override
+  void initState() {
+    super.initState();
+    _repository = widget.repository ?? BusinessRepository();
+    _bookings = UserBookingsState(_repository)..addListener(_changed);
+    _favorites = widget.favorites ?? FavoriteState.instance;
+    _favorites.favorites.addListener(_changed);
+    _inspiration.addListener(_changed);
+    _repository.api.session.sessionChanges.addListener(_sessionChanged);
+    BookingEvents.changed.addListener(_bookingChanged);
+    WidgetsBinding.instance.addObserver(this);
+    _clock = Timer.periodic(const Duration(minutes: 1), (_) {
+      if (mounted && widget.active) setState(() => _now = DateTime.now());
+    });
+    if (widget.active) _refresh(initial: true);
+  }
 
   void _changed() {
     if (mounted) setState(() {});
   }
 
-  void _loadCatalog() => _catalog.loadDestinations(
-        category: _kategoriTerpilih == 'Semua' ? null : _kategoriTerpilih,
-        search: _searchCtrl.text,
-      );
+  void _sessionChanged() {
+    _journeyDestination = null;
+    _journeyDestinationGuid = null;
+    if (widget.active) _refresh();
+  }
 
-  @override
-  void initState() {
-    super.initState();
-    _fadeCtrl = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 800),
-    )..forward();
-    _catalog.categories.addListener(_changed);
-    _catalog.destinations.addListener(_changed);
-    AuthSession.instance.sessionChanges.addListener(_sessionChanged);
-    BookingEvents.changed.addListener(_loadBookingCount);
-    _muatData();
+  void _bookingChanged() {
+    if (widget.active) _loadBookings();
+  }
+
+  Future<void> _loadBookings() async {
+    final session = _repository.api.session;
+    if (!_bookings.loading &&
+        session.authenticated.value &&
+        session.deviceSessionReady) {
+      final generation = session.sessionGeneration;
+      await _bookings.load();
+      if (!mounted || generation != session.sessionGeneration) return;
+      final booking = selectHomeBooking(_bookings.items, _now);
+      final guid = booking?.destinationGuid;
+      if (guid != _journeyDestinationGuid) {
+        setState(() {
+          _journeyDestinationGuid = guid;
+          _journeyDestination = guid == null || guid.isEmpty
+              ? null
+              : _repository.destination(guid).catchError((Object error) {
+                  if (mounted &&
+                      generation == session.sessionGeneration &&
+                      _journeyDestinationGuid == guid) {
+                    _journeyDestinationGuid = null;
+                  }
+                  throw error;
+                });
+        });
+      }
+    }
+  }
+
+  Future<void> _loadInspiration() async {
+    if (_inspiration.loading) return;
+    await _inspiration.load(() async => (await _repository.destinations(query: {
+          'per_page': '4',
+          'sort': '-created_at',
+        }))
+            .items
+            .where((d) => d.isActive)
+            .take(4)
+            .toList());
+  }
+
+  Future<void> _refresh({bool initial = false}) async {
+    _now = DateTime.now();
+    await Future.wait([
+      _loadBookings(),
+      _loadInspiration(),
+      if (!_favorites.favorites.loading &&
+          (!initial || _favorites.favorites.data == null))
+        _favorites.load()
+    ]);
   }
 
   @override
   void didUpdateWidget(BerandaUserScreen oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (widget.active && !oldWidget.active) _loadBookingCount();
-  }
-
-  void _sessionChanged() {
-    if (!mounted) return;
-    setState(() => _bookingCount = null);
-    _loadBookingCount();
-  }
-
-  int _bookingCountRequest = 0;
-
-  Future<void> _loadBookingCount() async {
-    final session = AuthSession.instance;
-    if (!session.authenticated.value || !session.deviceSessionReady) return;
-    final generation = session.sessionGeneration;
-    final request = ++_bookingCountRequest;
-    try {
-      final total = await loadBookingTotal(BusinessRepository());
-      if (!mounted ||
-          generation != session.sessionGeneration ||
-          request != _bookingCountRequest) {
-        return;
-      }
-      setState(() => _bookingCount = total);
-    } catch (_) {
-      if (mounted &&
-          generation == session.sessionGeneration &&
-          request == _bookingCountRequest) {
-        setState(() => _bookingCount = null);
-      }
+    if (widget.active && !oldWidget.active) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && widget.active) _refresh();
+      });
     }
   }
 
-  // ── Logika data (tidak diubah) ─────────────────────────────
-  Future<void> _muatData() async {
-    await Future.wait([
-      _catalog.loadCategories(),
-      _catalog.loadDestinations(
-        category: _kategoriTerpilih == 'Semua' ? null : _kategoriTerpilih,
-        search: _searchCtrl.text,
-      )
-    ]);
-    await _loadBookingCount();
-    if (mounted) setState(() {});
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed && widget.active) _refresh();
   }
 
   @override
   void dispose() {
-    AuthSession.instance.sessionChanges.removeListener(_sessionChanged);
-    BookingEvents.changed.removeListener(_loadBookingCount);
-    _catalog.dispose();
-    _searchCtrl.dispose();
-    _fadeCtrl.dispose();
+    _clock?.cancel();
+    WidgetsBinding.instance.removeObserver(this);
+    BookingEvents.changed.removeListener(_bookingChanged);
+    _repository.api.session.sessionChanges.removeListener(_sessionChanged);
+    _favorites.favorites.removeListener(_changed);
+    _bookings.dispose();
+    _inspiration.dispose();
     super.dispose();
   }
 
-  List<Wisata> get _filtered => _wisata;
-
-  // ── Tampilan ───────────────────────────────────────────────
-  @override
-  Widget build(BuildContext context) {
-    return AnnotatedRegion<SystemUiOverlayStyle>(
-      value: const SystemUiOverlayStyle(
-        statusBarColor: Colors.transparent,
-        statusBarIconBrightness: Brightness.dark,
-        statusBarBrightness: Brightness.light,
-      ),
-      child: Scaffold(
-        backgroundColor: Colors.white,
-        body: Container(
-          decoration: const BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
-              colors: [Color(0xFFDCEBFF), _C.background, Colors.white],
-              stops: [0.0, 0.3, 0.7],
-            ),
-          ),
-          child: SafeArea(
-            bottom: false,
-            child: FadeTransition(
-              opacity: MediaQuery.disableAnimationsOf(context)
-                  ? const AlwaysStoppedAnimation(1)
-                  : CurvedAnimation(
-                      parent: _fadeCtrl,
-                      curve: Curves.easeOut,
-                    ),
-              child: RefreshIndicator(
-                onRefresh: _muatData,
-                child: SingleChildScrollView(
-                  physics: const BouncingScrollPhysics(
-                      parent: AlwaysScrollableScrollPhysics()),
-                  keyboardDismissBehavior:
-                      ScrollViewKeyboardDismissBehavior.onDrag,
-                  child: Center(
-                    child: ConstrainedBox(
-                      constraints: const BoxConstraints(maxWidth: 560),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          _buildTopBar(),
-                          _buildHero(),
-                          _buildSearchBar(),
-                          const SizedBox(height: 16),
-                          _buildKategori(),
-                          _buildSectionTitle(),
-                          _buildWisataSection(),
-                          const SizedBox(height: 40),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
+  Future<void> _openDestination(Destination destination) async {
+    await Navigator.of(context).push(MaterialPageRoute<void>(
+        builder: (_) =>
+            DetailWisataScreen(wisata: Wisata.fromDestination(destination))));
+    if (mounted && widget.active) await _refresh();
   }
 
-  // ── Bar atas: logo + nama aplikasi ─────────────────────────
-  Widget _buildTopBar() {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(22, 14, 22, 16),
-      child: Row(
-        children: [
-          Container(
-            width: 40,
-            height: 40,
-            decoration: BoxDecoration(
-              gradient: const LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [Color(0xFF42A5F5), _C.blue],
-              ),
-              borderRadius: BorderRadius.circular(13),
-              boxShadow: [
-                BoxShadow(
-                  color: _C.blue.withValues(alpha: 0.25),
-                  blurRadius: 12,
-                  offset: const Offset(0, 5),
-                ),
-              ],
-            ),
-            child: const Icon(
-              Icons.travel_explore_rounded,
-              color: Colors.white,
-              size: 23,
-            ),
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Text(
-              'Wisata Daerahku',
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: _font(18, FontWeight.w800, _C.navy, letterSpacing: -0.4),
-            ),
-          ),
-          // Tombol pembuka drawer
-          if (widget.onBukaMenu != null)
-            SizedBox(
-              width: 44,
-              height: 44,
-              child: Material(
-                color: Colors.white,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(14),
-                  side: const BorderSide(color: _C.border),
-                ),
-                clipBehavior: Clip.antiAlias,
-                child: InkWell(
-                  onTap: widget.onBukaMenu,
-                  child: const Center(
-                    child: Icon(Icons.menu_rounded, color: _C.navy, size: 22),
-                  ),
-                ),
-              ),
-            ),
-        ],
-      ),
-    );
+  Future<void> _openBooking(Booking booking) async {
+    await Navigator.of(context).push(MaterialPageRoute<void>(
+        builder: (_) => BookingTicketScreen(
+            bookingGuid: booking.guid, repository: _repository)));
+    if (mounted && widget.active) await _refresh();
   }
 
-  // ── Hero: sapaan + statistik ───────────────────────────────
-  Widget _buildHero() {
-    final nama = currentUser?.namaLengkap.trim() ?? '';
-    final namaDepan = nama.isEmpty ? 'Pengunjung' : nama.split(' ').first;
-    final inisial = nama.isEmpty ? '' : nama[0].toUpperCase();
-
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 22),
-      clipBehavior: Clip.antiAlias,
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(28),
-        boxShadow: [
-          BoxShadow(
-            color: _C.blue.withValues(alpha: 0.30),
-            blurRadius: 28,
-            offset: const Offset(0, 12),
-          ),
-        ],
-      ),
-      child: TimeBasedScenicBackground(
-        active: widget.active,
-        topInset: 0,
-        child: Padding(
-          padding: const EdgeInsets.all(20),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  // Avatar
-                  Container(
-                    width: 54,
-                    height: 54,
-                    alignment: Alignment.center,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: Colors.white.withValues(alpha: 0.20),
-                      border: Border.all(
-                        color: Colors.white.withValues(alpha: 0.55),
-                        width: 2,
-                      ),
-                    ),
-                    child: inisial.isEmpty
-                        ? const Icon(Icons.person_rounded,
-                            color: Colors.white, size: 26)
-                        : Text(
-                            inisial,
-                            style: _font(22, FontWeight.w800, Colors.white),
-                          ),
-                  ),
-                  const SizedBox(width: 14),
-                  Expanded(
-                    child: Padding(
-                      padding: const EdgeInsets.only(right: 48),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Halo, $namaDepan 👋',
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: _font(
-                              20,
-                              FontWeight.w800,
-                              Colors.white,
-                              letterSpacing: -0.4,
-                            ),
-                          ),
-                          const SizedBox(height: 3),
-                          Text(
-                            'Mau jelajah mana hari ini?',
-                            style: _font(
-                              13,
-                              FontWeight.w500,
-                              Colors.white.withValues(alpha: 0.88),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 20),
-              Row(
-                children: [
-                  _statPill(
-                      Icons.place_rounded, '${_wisata.length}', 'Destinasi'),
-                  const SizedBox(width: 10),
-                  _statPill(Icons.category_rounded,
-                      '${_kategoriList.length - 1}', 'Kategori'),
-                  const SizedBox(width: 10),
-                  _statPill(Icons.people_rounded, '${_bookingCount ?? '–'}',
-                      'Terdaftar'),
-                ],
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _statPill(IconData icon, String value, String label) {
-    return Expanded(
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
-        decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: 0.16),
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: Colors.white.withValues(alpha: 0.24)),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Icon(icon, color: Colors.white, size: 15),
-                const SizedBox(width: 6),
-                Text(
-                  value,
-                  style: _font(16, FontWeight.w800, Colors.white),
-                ),
-              ],
-            ),
-            const SizedBox(height: 3),
-            Text(
-              label,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: _font(
-                10.5,
-                FontWeight.w600,
-                Colors.white.withValues(alpha: 0.85),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  // ── Kolom pencarian ────────────────────────────────────────
-  Widget _buildSearchBar() {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(22, 18, 22, 0),
-      child: Container(
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(18),
-          border: Border.all(color: _C.border, width: 1.2),
-          boxShadow: [
-            BoxShadow(
-              color: _C.navy.withValues(alpha: 0.06),
-              blurRadius: 16,
-              offset: const Offset(0, 6),
-            ),
-          ],
-        ),
-        child: TextField(
-          controller: _searchCtrl,
-          onChanged: (_) => _loadCatalog(),
-          style: _font(14.5, FontWeight.w500, _C.navy),
-          cursorColor: _C.blue,
-          decoration: InputDecoration(
-            hintText: 'Cari nama wisata...',
-            hintStyle: _font(
-              14,
-              FontWeight.w400,
-              _C.textMuted.withValues(alpha: 0.75),
-            ),
-            prefixIcon:
-                const Icon(Icons.search_rounded, color: _C.blue, size: 22),
-            suffixIcon: _searchCtrl.text.isNotEmpty
-                ? IconButton(
-                    icon: const Icon(Icons.close_rounded,
-                        color: _C.textMuted, size: 20),
-                    onPressed: () {
-                      _searchCtrl.clear();
-                      _loadCatalog();
-                    },
-                  )
-                : null,
-            filled: false,
-            contentPadding:
-                const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-            border: InputBorder.none,
-            enabledBorder: InputBorder.none,
-            focusedBorder: InputBorder.none,
-          ),
-        ),
-      ),
-    );
-  }
-
-  // ── Filter kategori (chip bisa digeser) ────────────────────
-  Widget _buildKategori() {
-    return SizedBox(
-      height: 46,
-      child: ListView.separated(
-        scrollDirection: Axis.horizontal,
-        physics: const BouncingScrollPhysics(),
-        padding: const EdgeInsets.symmetric(horizontal: 22),
-        itemCount: _kategoriList.length,
-        separatorBuilder: (_, __) => const SizedBox(width: 8),
-        itemBuilder: (_, i) {
-          final item = _kategoriList[i];
-          final label = item['label'] as String;
-          final icon = item['icon'] as String;
-          final selected = item['guid'] == _kategoriTerpilih;
-
-          return GestureDetector(
-            onTap: () {
-              setState(() => _kategoriTerpilih = item['guid'] as String);
-              _loadCatalog();
-            },
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 220),
-              curve: Curves.easeInOut,
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              decoration: BoxDecoration(
-                gradient: selected
-                    ? const LinearGradient(
-                        colors: [Color(0xFF2386E8), _C.blueDeep],
-                      )
-                    : null,
-                color: selected ? null : Colors.white,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(
-                  color: selected ? Colors.transparent : _C.border,
-                  width: 1.2,
-                ),
-                boxShadow: selected
-                    ? [
-                        BoxShadow(
-                          color: _C.blue.withValues(alpha: 0.32),
-                          blurRadius: 12,
-                          offset: const Offset(0, 5),
-                        ),
-                      ]
-                    : null,
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(icon, style: const TextStyle(fontSize: 15)),
-                  const SizedBox(width: 7),
-                  Text(
-                    label,
-                    style: _font(
-                      13,
-                      selected ? FontWeight.w700 : FontWeight.w600,
-                      selected ? Colors.white : _C.navy,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          );
-        },
-      ),
-    );
-  }
-
-  // ── Judul bagian ───────────────────────────────────────────
-  Widget _buildSectionTitle() {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(22, 24, 22, 0),
-      child: Wrap(
-        spacing: 12,
-        runSpacing: 8,
-        children: [
-          Row(
-            children: [
-              Container(
-                width: 4,
-                height: 20,
-                decoration: BoxDecoration(
-                  color: _C.orange,
-                  borderRadius: BorderRadius.circular(3),
-                ),
-              ),
-              const SizedBox(width: 10),
-              Text(
-                'Pilihan Destinasi',
-                style: _font(
-                  17,
-                  FontWeight.w800,
-                  _C.navy,
-                  letterSpacing: -0.4,
-                ),
-              ),
-            ],
-          ),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 6),
-            decoration: BoxDecoration(
-              color: _C.orange.withValues(alpha: 0.12),
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: _C.orange.withValues(alpha: 0.35)),
-            ),
-            child: Text(
-              '${_filtered.length} tempat',
-              style: _font(11.5, FontWeight.w800, const Color(0xFFE08600)),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // ── Daftar wisata ──────────────────────────────────────────
-  Widget _buildWisataSection() {
-    if (_isLoadingData) {
-      return const Padding(
-        padding: EdgeInsets.symmetric(vertical: 56),
-        child: Center(
-          child: CircularProgressIndicator(color: _C.blue, strokeWidth: 3),
-        ),
-      );
-    }
-
-    if (_catalog.categories.error != null ||
-        _catalog.destinations.error != null) {
-      return Center(
-          child: Column(children: [
-        const Text('Gagal memuat data wisata.'),
-        TextButton(onPressed: _muatData, child: const Text('Coba lagi')),
-      ]));
-    }
-    final hasil = _filtered;
-
-    if (hasil.isEmpty) {
-      return Padding(
-        padding: const EdgeInsets.symmetric(vertical: 48, horizontal: 32),
-        child: Center(
-          child: Column(
-            children: [
-              Container(
-                width: 80,
-                height: 80,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: _C.blue.withValues(alpha: 0.08),
-                ),
-                child: const Icon(Icons.search_off_rounded,
-                    color: _C.blue, size: 38),
-              ),
-              const SizedBox(height: 16),
-              Text(
-                'Tidak ada destinasi ditemukan',
-                style: _font(14.5, FontWeight.w800, _C.navy),
-              ),
-              const SizedBox(height: 6),
-              Text(
-                'Coba kata kunci lain atau ganti kategori',
-                textAlign: TextAlign.center,
-                style: _font(12.5, FontWeight.w500, _C.textMuted),
-              ),
-            ],
-          ),
-        ),
-      );
-    }
-
-    // Grid 2 kolom — semua kartu langsung terlihat.
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(22, 16, 22, 8),
-      child: GridView.builder(
-        shrinkWrap: true,
-        physics: const NeverScrollableScrollPhysics(),
-        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-          crossAxisCount: MediaQuery.sizeOf(context).width < 370 ||
-                  MediaQuery.textScalerOf(context).scale(1) > 1.3
-              ? 1
-              : 2,
-          crossAxisSpacing: 14,
-          mainAxisSpacing: 14,
-          mainAxisExtent:
-              310 * MediaQuery.textScalerOf(context).scale(1).clamp(1, 1.5),
-        ),
-        itemCount: hasil.length,
-        itemBuilder: (_, i) => _WisataCard(
-          wisata: hasil[i],
-          index: i,
-          onTap: () async {
-            await Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (_) => DetailWisataScreen(wisata: hasil[i]),
-              ),
-            );
-            if (!mounted) return;
-            setState(() {});
-          },
-        ),
-      ),
-    );
-  }
-}
-
-// ══════════════════════════════════════════════════════════
-//  KARTU WISATA
-// ══════════════════════════════════════════════════════════
-class _WisataCard extends StatefulWidget {
-  final Wisata wisata;
-  final int index;
-  final VoidCallback onTap;
-
-  const _WisataCard({
-    required this.wisata,
-    required this.index,
-    required this.onTap,
-  });
-
-  @override
-  State<_WisataCard> createState() => _WisataCardState();
-}
-
-class _WisataCardState extends State<_WisataCard> {
-  bool _pressed = false;
+  TextStyle _text(double size,
+          {FontWeight weight = FontWeight.w500,
+          Color color = AppColors.navy}) =>
+      TextStyle(fontSize: size, fontWeight: weight, color: color, height: 1.35);
 
   @override
   Widget build(BuildContext context) {
-    final w = widget.wisata;
-
-    // Muncul bergantian (stagger) saat kartu pertama kali tampil.
-    final delay = (widget.index.clamp(0, 6)) * 70;
-
-    return TweenAnimationBuilder<double>(
-      tween: Tween(begin: 0, end: 1),
-      duration: MediaQuery.disableAnimationsOf(context)
-          ? Duration.zero
-          : Duration(milliseconds: 380 + delay),
-      curve: Curves.easeOutCubic,
-      builder: (context, value, child) => Opacity(
-        opacity: value,
-        child: Transform.translate(
-          offset: Offset(0, 18 * (1 - value)),
-          child: child,
-        ),
-      ),
-      child: GestureDetector(
-        onTapDown: (_) => setState(() => _pressed = true),
-        onTapUp: (_) {
-          setState(() => _pressed = false);
-          widget.onTap();
-        },
-        onTapCancel: () => setState(() => _pressed = false),
-        child: AnimatedScale(
-          scale: _pressed ? 0.96 : 1.0,
-          duration: const Duration(milliseconds: 120),
-          child: Container(
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(24),
-              border: Border.all(color: _C.border.withValues(alpha: 0.8)),
-              boxShadow: [
-                BoxShadow(
-                  color: _C.navy.withValues(alpha: 0.09),
-                  blurRadius: 20,
-                  offset: const Offset(0, 10),
-                ),
-              ],
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // ── Gambar ──
-                Expanded(
-                  flex: 5,
-                  child: Stack(
-                    fit: StackFit.expand,
+    final favorites = _favorites.favorites;
+    final saved = favorites.data ?? [];
+    return Scaffold(
+      backgroundColor: AppColors.bg,
+      body: RefreshIndicator(
+        onRefresh: _refresh,
+        child: SingleChildScrollView(
+          physics: const AlwaysScrollableScrollPhysics(
+              parent: BouncingScrollPhysics()),
+          child:
+              Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+            _hero(),
+            Center(
+                child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 640),
+              child: Padding(
+                padding: EdgeInsets.fromLTRB(
+                    20, 20, 20, 16 + MediaQuery.paddingOf(context).bottom),
+                child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      ClipRRect(
-                        borderRadius: const BorderRadius.vertical(
-                          top: Radius.circular(23),
-                        ),
-                        child: _wisataImage(w),
-                      ),
-                      // Gradasi gelap tipis di bawah gambar
-                      ClipRRect(
-                        borderRadius: const BorderRadius.vertical(
-                          top: Radius.circular(23),
-                        ),
-                        child: DecoratedBox(
-                          decoration: BoxDecoration(
-                            gradient: LinearGradient(
-                              begin: Alignment.bottomCenter,
-                              end: Alignment.topCenter,
-                              colors: [
-                                _C.navy.withValues(alpha: 0.35),
-                                Colors.transparent,
-                              ],
-                              stops: const [0.0, 0.5],
-                            ),
-                          ),
-                        ),
-                      ),
-                      // Badge kategori
-                      Positioned(
-                        top: 10,
-                        left: 10,
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 10, vertical: 5),
-                          decoration: BoxDecoration(
-                            gradient: const LinearGradient(
-                              colors: [Color(0xFF2386E8), _C.blueDeep],
-                            ),
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                          child: Text(
-                            w.kategori,
-                            style: _font(10, FontWeight.w800, Colors.white),
-                          ),
-                        ),
-                      ),
-                      // Badge rating
-                      Positioned(
-                        top: 10,
-                        right: 10,
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 8, vertical: 5),
-                          decoration: BoxDecoration(
-                            color: Colors.white.withValues(alpha: 0.95),
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              const Icon(Icons.star_rounded,
-                                  color: _C.orange, size: 13),
-                              const SizedBox(width: 3),
-                              Text(
-                                w.ratingCount == 0
-                                    ? '-'
-                                    : w.rating.toStringAsFixed(1),
-                                style: _font(10.5, FontWeight.w800, _C.navy),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
+                      _heading('Perjalanan Kamu', 'Riwayat', widget.onHistory),
+                      const SizedBox(height: 12),
+                      _journey(),
+                      if (favorites.loading && saved.isEmpty) ...[
+                        const SizedBox(height: 24),
+                        _heading('Favorit Kamu'),
+                        const SizedBox(height: 12),
+                        _loading('Memuat favorit…'),
+                      ] else if (favorites.error != null) ...[
+                        const SizedBox(height: 24),
+                        _heading('Favorit Kamu'),
+                        _error(
+                            'Favorit belum dapat diperbarui.', _favorites.load),
+                      ] else if (saved.isNotEmpty) ...[
+                        const SizedBox(height: 24),
+                        _heading(
+                            'Favorit Kamu',
+                            'Lihat Semua',
+                            () => showModalBottomSheet<void>(
+                                context: context,
+                                backgroundColor: Colors.transparent,
+                                isScrollControlled: true,
+                                builder: (_) =>
+                                    const SavedDestinationsSheet())),
+                        const SizedBox(height: 12),
+                        _favoritesRow(saved.map((f) => f.destination).toList()),
+                      ],
+                      const SizedBox(height: 24),
+                      _heading(
+                          'Inspirasi Wisata', 'Lihat Semua', widget.onExplore),
+                      const SizedBox(height: 6),
+                      Text('Sedikit inspirasi untuk perjalanan berikutnya.',
+                          style: _text(13, color: AppColors.textMuted)),
+                      const SizedBox(height: 14),
+                      if (_inspiration.error != null)
+                        _error('Inspirasi belum dapat diperbarui.',
+                            _loadInspiration)
+                      else if (_inspiration.loading &&
+                          _inspiration.data == null)
+                        _loading('Memuat inspirasi…', minHeight: 210)
+                      else if ((_inspiration.data ?? []).isEmpty)
+                        Text('Destinasi baru akan hadir di sini.',
+                            style: _text(14, color: AppColors.textMuted))
+                      else
+                        _editorial(_inspiration.data!),
+                      const SizedBox(height: 24),
+                      _exploreBanner(),
+                    ]),
+              ),
+            )),
+          ]),
+        ),
+      ),
+    );
+  }
 
-                // ── Info ──
+  Widget _hero() {
+    final name =
+        currentUser?.namaLengkap.trim().split(' ').first ?? 'Pengunjung';
+    final greeting = _now.hour < 5 || _now.hour >= 19
+        ? 'Selamat malam'
+        : _now.hour < 11
+            ? 'Selamat pagi'
+            : _now.hour < 15
+                ? 'Selamat siang'
+                : 'Selamat sore';
+    return TimeBasedScenicBackground(
+      active: widget.active,
+      topInset: MediaQuery.paddingOf(context).top,
+      child: SafeArea(
+          bottom: false,
+          child: Center(
+              child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 640),
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(24, 22, 24, 48),
+              child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(children: [
+                      Expanded(
+                          child: Text('Wisata Daerahku',
+                              style: _text(15,
+                                  weight: FontWeight.w700,
+                                  color: Colors.white))),
+                      if (widget.onBukaMenu != null)
+                        IconButton(
+                            onPressed: widget.onBukaMenu,
+                            tooltip: 'Buka menu',
+                            icon: const Icon(Icons.menu_rounded,
+                                color: Colors.white)),
+                    ]),
+                    const SizedBox(height: 30),
+                    Text('$greeting, ${name.isEmpty ? 'Pengunjung' : name}',
+                        style: _text(14, color: Colors.white)),
+                    const SizedBox(height: 10),
+                    Text('Siap untuk\npetualangan baru?',
+                        style: _text(30,
+                            weight: FontWeight.w800, color: Colors.white)),
+                    const SizedBox(height: 12),
+                    Text(
+                        'Rencana perjalanan dan tempat favoritmu, dalam satu tempat.',
+                        style: _text(14, color: Colors.white)),
+                  ]),
+            ),
+          ))),
+    );
+  }
+
+  Widget _heading(String title, [String? action, VoidCallback? onTap]) =>
+      Row(children: [
+        Expanded(child: Text(title, style: _text(20, weight: FontWeight.w800))),
+        if (action != null && onTap != null)
+          TextButton(onPressed: onTap, child: Text(action)),
+      ]);
+  Widget _panel(Widget child) => Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+          color: AppColors.surface,
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: const [
+            BoxShadow(
+                color: Color(0x09102D59), blurRadius: 12, offset: Offset(0, 4))
+          ]),
+      child: child);
+  Widget _loading(String label, {double minHeight = 114}) =>
+      _panel(ConstrainedBox(
+          constraints: BoxConstraints(minHeight: minHeight - 32),
+          child: Row(children: [
+            const SizedBox(
+                width: 20,
+                height: 20,
+                child: CircularProgressIndicator(strokeWidth: 2)),
+            const SizedBox(width: 14),
+            Expanded(child: Text(label, style: _text(14))),
+          ])));
+  Widget _error(String message, VoidCallback retry) =>
+      _panel(Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Text(message, style: _text(14, color: AppColors.textMuted)),
+        TextButton(onPressed: retry, child: const Text('Coba lagi')),
+      ]));
+
+  Widget _journey() {
+    if (_bookings.error != null) {
+      return _error('Perjalanan belum dapat diperbarui.', _loadBookings);
+    }
+    if (_bookings.loading && _bookings.items.isEmpty) {
+      return _loading('Memuat perjalanan…', minHeight: 190);
+    }
+    final booking = selectHomeBooking(_bookings.items, _now);
+    if (booking == null) {
+      return _journeyPanel(
+          Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+            const Icon(Icons.explore_outlined,
+                color: AppColors.orange, size: 32),
+            const SizedBox(height: 12),
+            Text('Petualangan pertamamu menanti',
+                textAlign: TextAlign.center,
+                style: _text(16, weight: FontWeight.w800)),
+            const SizedBox(height: 8),
+            Text('Belum ada perjalanan aktif. Mulai dari destinasi pilihanmu.',
+                textAlign: TextAlign.center,
+                style: _text(12, color: AppColors.textMuted)),
+            const SizedBox(height: 16),
+            _journeyAction('Mulai Jelajah', widget.onExplore),
+          ]),
+          empty: true);
+    }
+    final note = switch (booking.status) {
+      'pending_approval' => 'Pendaftaranmu sedang ditinjau pengelola.',
+      'awaiting_payment' => 'Selesaikan pembayaran sesuai tenggat dari sistem.',
+      'confirmed' => 'Tiketmu sudah terkonfirmasi. Siap berkunjung!',
+      _ => bookingStatusNote(booking.status),
+    };
+    final action = switch (booking.status) {
+      'awaiting_payment' => 'Lihat Detail Pembayaran',
+      'confirmed' => 'Lihat Detail Tiket',
+      _ => 'Lihat Status Pendaftaran',
+    };
+    final visitDate = DateTime.tryParse(booking.visitDate);
+    const months = [
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'Mei',
+      'Jun',
+      'Jul',
+      'Agu',
+      'Sep',
+      'Okt',
+      'Nov',
+      'Des'
+    ];
+    final dateLabel = visitDate == null
+        ? booking.visitDate
+        : '${visitDate.day} ${months[visitDate.month - 1]} ${visitDate.year}';
+    final statusColor = booking.status == 'confirmed'
+        ? const Color(0xFF247B50)
+        : booking.status == 'awaiting_payment'
+            ? const Color(0xFF92400E)
+            : AppColors.blueDeep;
+    return _journeyPanel(
+        Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+      Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        ClipRRect(
+            borderRadius: BorderRadius.circular(14),
+            child: SizedBox(
+                width: 80,
+                height: 100,
+                child: FutureBuilder<Destination>(
+                    future: _journeyDestination,
+                    builder: (_, snapshot) {
+                      Destination? destination =
+                          snapshot.data?.guid == booking.destinationGuid
+                              ? snapshot.data
+                              : null;
+                      for (final item in [
+                        ...?_inspiration.data,
+                        ...?_favorites.favorites.data
+                            ?.map((f) => f.destination),
+                      ]) {
+                        if (item.guid == booking.destinationGuid) {
+                          destination ??= item;
+                          break;
+                        }
+                      }
+                      if (destination == null &&
+                          snapshot.connectionState != ConnectionState.done &&
+                          _journeyDestination != null) {
+                        return const Center(
+                            child: CircularProgressIndicator(strokeWidth: 2));
+                      }
+                      return _cover(destination);
+                    }))),
+        const SizedBox(width: 14),
+        Expanded(
+            child:
+                Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Container(
+              padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
+              decoration: BoxDecoration(
+                  color: statusColor.withValues(alpha: .09),
+                  borderRadius: BorderRadius.circular(8)),
+              child: Text(
+                  booking.status == 'confirmed'
+                      ? 'Tiket dikonfirmasi'
+                      : bookingStatusLabel(booking.status),
+                  style:
+                      _text(12, weight: FontWeight.w700, color: statusColor))),
+          const SizedBox(height: 8),
+          Text(booking.destinationName,
+              style: _text(18, weight: FontWeight.w800)),
+          const SizedBox(height: 10),
+          _meta(Icons.calendar_today_outlined, dateLabel),
+          const SizedBox(height: 6),
+          _meta(
+              Icons.confirmation_number_outlined, '${booking.quantity} tiket'),
+        ])),
+      ]),
+      const SizedBox(height: 16),
+      const SizedBox(
+          height: 1, child: CustomPaint(painter: _BoardingPassRule())),
+      if (note != null) ...[
+        const SizedBox(height: 12),
+        Text(note, style: _text(12, color: AppColors.textMuted)),
+      ],
+      const SizedBox(height: 12),
+      _journeyAction(action, () => _openBooking(booking),
+          icon: Icons.confirmation_number_outlined),
+    ]));
+  }
+
+  Widget _journeyPanel(Widget child, {bool empty = false}) => CustomPaint(
+      foregroundPainter: empty ? const _JourneyEmptyBorder() : null,
+      child: Container(
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+              color: AppColors.surface,
+              borderRadius: BorderRadius.circular(20),
+              border: empty ? null : Border.all(color: AppColors.border)),
+          child: child));
+
+  Widget _journeyAction(String label, VoidCallback? onPressed,
+          {IconData? icon}) =>
+      ElevatedButton(
+          onPressed: onPressed,
+          style: ElevatedButton.styleFrom(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12))),
+          child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+            if (icon != null) ...[
+              Icon(icon, size: 16),
+              const SizedBox(width: 6),
+            ],
+            Flexible(
+                child: Text(label,
+                    textAlign: TextAlign.center,
+                    style: _text(12,
+                        weight: FontWeight.w800, color: Colors.white))),
+            const SizedBox(width: 8),
+            const Icon(Icons.arrow_forward_rounded, size: 16),
+          ]));
+
+  Widget _meta(IconData icon, String label) =>
+      Row(mainAxisSize: MainAxisSize.min, children: [
+        Icon(icon, size: 15, color: AppColors.textMuted),
+        const SizedBox(width: 5),
+        Flexible(
+            child: Text(label, style: _text(12, color: AppColors.textMuted))),
+      ]);
+
+  Widget _cover(Destination? destination, {bool featured = false}) {
+    final images = destination?.images ?? [];
+    return ApiImage(
+        repository: _repository,
+        imageUrl: images.isNotEmpty
+            ? images.first.url(featured ? 'display' : 'thumbnail')
+            : destination?.imageUrl,
+        fit: BoxFit.cover,
+        placeholder: (_) => const ColoredBox(
+            color: AppColors.border,
+            child: Center(
+                child: Icon(Icons.landscape_outlined,
+                    color: AppColors.textMuted, size: 30))));
+  }
+
+  Widget _favoritesRow(List<Destination> items) {
+    if (items.length == 1) return _favoriteCard(items.first);
+    return LayoutBuilder(builder: (context, constraints) {
+      final scale = MediaQuery.textScalerOf(context).scale(14) / 14;
+      return SizedBox(
+          height: 126 + 90 * (scale - 1).clamp(0, 3),
+          child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              itemCount: items.length,
+              separatorBuilder: (_, __) => const SizedBox(width: 12),
+              itemBuilder: (_, i) => SizedBox(
+                  width: constraints.maxWidth * .9,
+                  child: _favoriteCard(items[i]))));
+    });
+  }
+
+  Widget _favoriteCard(Destination d) => Material(
+      color: AppColors.surface,
+      shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+          side: const BorderSide(color: AppColors.border)),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+          onTap: () => _openDestination(d),
+          child: Padding(
+              padding: const EdgeInsets.all(10),
+              child:
+                  Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                ClipRRect(
+                    borderRadius: BorderRadius.circular(12),
+                    child: SizedBox(width: 84, height: 72, child: _cover(d))),
+                const SizedBox(width: 10),
                 Expanded(
-                  flex: 4,
-                  child: Padding(
-                    padding: const EdgeInsets.fromLTRB(13, 11, 11, 11),
                     child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          w.nama,
-                          maxLines: 1,
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                      Text(d.name,
+                          maxLines: 2,
                           overflow: TextOverflow.ellipsis,
-                          style: _font(
-                            14,
-                            FontWeight.w800,
-                            _C.navy,
-                            letterSpacing: -0.3,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Row(
-                          children: [
-                            const Icon(Icons.location_on_rounded,
-                                size: 13, color: _C.blue),
-                            const SizedBox(width: 3),
-                            Expanded(
-                              child: Text(
-                                w.lokasi,
+                          style: _text(14, weight: FontWeight.w800)),
+                      const SizedBox(height: 4),
+                      Row(children: [
+                        const Icon(Icons.place_rounded,
+                            size: 12, color: Color(0xFFF45B83)),
+                        const SizedBox(width: 4),
+                        Expanded(
+                            child: Text(d.location,
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
-                                style:
-                                    _font(11.5, FontWeight.w500, _C.textMuted),
-                              ),
-                            ),
-                          ],
-                        ),
-                        const Spacer(),
-                        Row(
-                          children: [
-                            Expanded(
-                              child: Column(
+                                style: _text(11, color: AppColors.textMuted))),
+                      ]),
+                      const SizedBox(height: 8),
+                      Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 10, vertical: 7),
+                          decoration: BoxDecoration(
+                              color: AppColors.blue.withValues(alpha: .07),
+                              borderRadius: BorderRadius.circular(8)),
+                          child: Text('Lihat Destinasi \u2192',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: _text(11,
+                                  weight: FontWeight.w700,
+                                  color: AppColors.blue))),
+                    ])),
+                const SizedBox(width: 6),
+                Semantics(
+                    label: 'Destinasi favorit',
+                    child: const CircleAvatar(
+                        radius: 14,
+                        backgroundColor: Color(0xFFFFF0F4),
+                        child: Icon(Icons.favorite_rounded,
+                            size: 14, color: Color(0xFFF45B83)))),
+              ]))));
+
+  Widget _editorial(List<Destination> destinations) {
+    final seen = <String>{};
+    final items = destinations.where((d) => seen.add(d.guid)).take(3).toList();
+    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+      _featuredCard(items.first),
+      if (items.length > 1) ...[
+        const SizedBox(height: 12),
+        Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          for (var i = 1; i < items.length; i++) ...[
+            if (i > 1) const SizedBox(width: 8),
+            Expanded(child: _miniCard(items[i])),
+          ],
+        ]),
+      ],
+    ]);
+  }
+
+  Widget _featuredCard(Destination d) => Material(
+      borderRadius: BorderRadius.circular(16),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+          onTap: () => _openDestination(d),
+          child: LayoutBuilder(
+              builder: (context, constraints) => Stack(children: [
+                    Positioned.fill(child: _cover(d, featured: true)),
+                    Positioned.fill(
+                        child: DecoratedBox(
+                            decoration: BoxDecoration(
+                                gradient: LinearGradient(
+                                    begin: Alignment.topCenter,
+                                    end: Alignment.bottomCenter,
+                                    colors: [
+                          Colors.transparent,
+                          Colors.black.withValues(alpha: .75)
+                        ])))),
+                    ConstrainedBox(
+                        constraints: BoxConstraints(
+                            minHeight: constraints.maxWidth * .54),
+                        child: Padding(
+                            padding: const EdgeInsets.all(14),
+                            child: Column(
+                                mainAxisAlignment: MainAxisAlignment.end,
                                 crossAxisAlignment: CrossAxisAlignment.start,
-                                mainAxisSize: MainAxisSize.min,
                                 children: [
-                                  Text(
-                                    'Tiket',
-                                    style: _font(
-                                      9.5,
-                                      FontWeight.w600,
-                                      _C.textMuted.withValues(alpha: 0.85),
-                                    ),
-                                  ),
-                                  Text(
-                                    w.hargaTiket,
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: _font(
-                                      12.5,
-                                      FontWeight.w800,
-                                      const Color(0xFFE08600),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            const SizedBox(width: 6),
-                            Container(
-                              width: 34,
-                              height: 34,
-                              decoration: BoxDecoration(
-                                gradient: const LinearGradient(
-                                  colors: [Color(0xFF2386E8), _C.blueDeep],
-                                ),
-                                borderRadius: BorderRadius.circular(12),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: _C.blue.withValues(alpha: 0.35),
-                                    blurRadius: 8,
-                                    offset: const Offset(0, 4),
-                                  ),
-                                ],
-                              ),
-                              child: const Icon(
-                                Icons.arrow_forward_rounded,
-                                color: Colors.white,
-                                size: 17,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
+                                  Container(
+                                      padding: const EdgeInsets.symmetric(
+                                          horizontal: 8, vertical: 5),
+                                      decoration: BoxDecoration(
+                                          color: Colors.white
+                                              .withValues(alpha: .22),
+                                          border: Border.all(
+                                              color: Colors.white
+                                                  .withValues(alpha: .3)),
+                                          borderRadius:
+                                              BorderRadius.circular(20)),
+                                      child: Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            const Icon(Icons.auto_awesome,
+                                                size: 12, color: Colors.white),
+                                            const SizedBox(width: 4),
+                                            Flexible(
+                                                child: Text('Destinasi pilihan',
+                                                    style: _text(11,
+                                                        weight: FontWeight.w700,
+                                                        color: Colors.white))),
+                                          ])),
+                                  const SizedBox(height: 6),
+                                  Text(d.name,
+                                      maxLines: 2,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: _text(22,
+                                          weight: FontWeight.w800,
+                                          color: Colors.white)),
+                                  const SizedBox(height: 4),
+                                  Row(children: [
+                                    const Icon(Icons.place_rounded,
+                                        color: Color(0xFFF45B83), size: 14),
+                                    const SizedBox(width: 4),
+                                    Expanded(
+                                        child: Text(
+                                            [d.location, d.category?.name]
+                                                .whereType<String>()
+                                                .where(
+                                                    (value) => value.isNotEmpty)
+                                                .join(' \u00b7 '),
+                                            maxLines: 2,
+                                            overflow: TextOverflow.ellipsis,
+                                            style: _text(11,
+                                                color: Colors.white))),
+                                    const SizedBox(width: 8),
+                                    const CircleAvatar(
+                                        radius: 16,
+                                        backgroundColor: Colors.white,
+                                        child: Icon(Icons.north_east_rounded,
+                                            size: 16, color: AppColors.blue)),
+                                  ]),
+                                ]))),
+                  ]))));
+
+  Widget _miniCard(Destination d) => Material(
+      color: AppColors.surface,
+      shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+          side: const BorderSide(color: AppColors.border)),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+          onTap: () => _openDestination(d),
+          child: Padding(
+              padding: const EdgeInsets.all(6),
+              child: Row(children: [
+                ClipRRect(
+                    borderRadius: BorderRadius.circular(8),
+                    child: SizedBox(width: 40, height: 40, child: _cover(d))),
+                const SizedBox(width: 8),
+                Expanded(
+                    child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                      Text(d.name,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: _text(11, weight: FontWeight.w800)),
+                      const SizedBox(height: 3),
+                      Text(
+                          [d.category?.name, d.location]
+                              .whereType<String>()
+                              .where((value) => value.isNotEmpty)
+                              .join(' \u00b7 '),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: _text(11, color: AppColors.textMuted)),
+                    ])),
+              ]))));
+
+  Widget _exploreBanner() => Material(
+      borderRadius: BorderRadius.circular(20),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+          onTap: widget.onExplore,
+          child: Ink(
+              padding: const EdgeInsets.all(18),
+              decoration: const BoxDecoration(
+                  gradient: LinearGradient(
+                      colors: [AppColors.blue, AppColors.blueDeep])),
+              child: Row(children: [
+                Expanded(
+                    child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                      Text('Masih ingin eksplorasi?',
+                          style: _text(16,
+                              weight: FontWeight.w800, color: Colors.white)),
+                      const SizedBox(height: 5),
+                      Text('Temukan tujuan perjalanan berikutnya.',
+                          style: _text(13, color: Colors.white)),
+                    ])),
+                const SizedBox(width: 12),
+                const CircleAvatar(
+                    radius: 22,
+                    backgroundColor: Colors.white,
+                    child: Icon(Icons.arrow_forward_rounded,
+                        color: AppColors.blue)),
+              ]))));
+}
+
+class _BoardingPassRule extends CustomPainter {
+  const _BoardingPassRule();
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = AppColors.border
+      ..strokeWidth = 1;
+    for (double x = 0; x < size.width; x += 9) {
+      canvas.drawLine(
+          Offset(x, 0), Offset((x + 5).clamp(0, size.width), 0), paint);
+    }
   }
 
-  // ── Gambar wisata (logika sama seperti sebelumnya) ─────────
-  Widget _placeholder() {
-    return Container(
-      color: const Color(0xFFE6F0FC),
-      child: Center(
-        child: Icon(
-          Icons.landscape_rounded,
-          size: 46,
-          color: _C.blue.withValues(alpha: 0.4),
-        ),
-      ),
-    );
+  @override
+  bool shouldRepaint(_BoardingPassRule oldDelegate) => false;
+}
+
+class _JourneyEmptyBorder extends CustomPainter {
+  const _JourneyEmptyBorder();
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = AppColors.blue.withValues(alpha: .3)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1;
+    final path = Path()
+      ..addRRect(RRect.fromRectAndRadius(
+          (Offset.zero & size).deflate(.5), const Radius.circular(20)));
+    for (final metric in path.computeMetrics()) {
+      for (double distance = 0; distance < metric.length; distance += 8) {
+        canvas.drawPath(metric.extractPath(distance, distance + 4), paint);
+      }
+    }
   }
 
-  Widget _wisataImage(Wisata w) {
-    // Destinasi Laravel: gambar dimuat lewat API (imagePath selalu null).
-    if (w.isLaravel) {
-      return ApiImage(
-          imageUrl: w.imageUrl,
-          fit: BoxFit.cover,
-          placeholder: (_) => _placeholder());
-    }
-    final path = w.imagePath;
-
-    if (path == null || path.isEmpty) return _placeholder();
-
-    if (path.startsWith('http')) {
-      return Image.network(
-        path,
-        fit: BoxFit.cover,
-        headers: const {
-          'User-Agent': 'Mozilla/5.0 (compatible; FlutterApp/1.0)',
-        },
-        loadingBuilder: (_, child, progress) {
-          if (progress == null) return child;
-          return Container(
-            color: const Color(0xFFE6F0FC),
-            child: Center(
-              child: CircularProgressIndicator(
-                value: progress.expectedTotalBytes != null
-                    ? progress.cumulativeBytesLoaded /
-                        progress.expectedTotalBytes!
-                    : null,
-                color: _C.blue,
-                strokeWidth: 2.2,
-              ),
-            ),
-          );
-        },
-        errorBuilder: (_, __, ___) => _placeholder(),
-      );
-    }
-
-    if (path.startsWith('assets/')) {
-      return Image.asset(path, fit: BoxFit.cover);
-    }
-
-    return Image.file(
-      File(path),
-      fit: BoxFit.cover,
-      errorBuilder: (_, __, ___) => _placeholder(),
-    );
-  }
+  @override
+  bool shouldRepaint(_JourneyEmptyBorder oldDelegate) => false;
 }

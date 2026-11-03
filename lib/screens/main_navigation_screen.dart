@@ -144,7 +144,10 @@ class _MainNavigationScreenState extends State<MainNavigationScreen>
               child: SlideTransition(
                 position: _tabOffset,
                 child: IndexedStack(index: _selectedIndex, children: [
-                  BerandaUserScreen(active: _selectedIndex == 0),
+                  BerandaUserScreen(
+                      active: _selectedIndex == 0,
+                      onExplore: () => _gotoTab(2),
+                      onHistory: () => _gotoTab(1)),
                   BuktiPendaftaranScreen(
                       embedded: true,
                       active: _selectedIndex == 1,

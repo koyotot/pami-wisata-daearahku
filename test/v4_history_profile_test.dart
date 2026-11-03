@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:wisata_daerahku/data/app_data.dart';
+import 'package:wisata_daerahku/data/business_repository.dart';
+import 'package:wisata_daerahku/data/favorite_state.dart';
 import 'package:wisata_daerahku/widgets/floating_bottom_nav.dart';
 import 'package:wisata_daerahku/screens/auth_presentation.dart';
 import 'package:wisata_daerahku/screens/profil_user_screen.dart';
@@ -10,6 +12,82 @@ import 'package:wisata_daerahku/screens/bukti_pendaftaran_screen.dart';
 void main() {
   setUpAll(() => GoogleFonts.config.allowRuntimeFetching = false);
   tearDown(() => currentUser = null);
+
+  testWidgets('saved preview caps five long names at compact width',
+      (tester) async {
+    tester.view.physicalSize = const Size(320, 740);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    final state = FavoriteState.instance;
+    state.session.authenticated.value = true;
+    addTearDown(() {
+      state.session.authenticated.value = false;
+      state.favorites.reset();
+    });
+    final names = List.generate(6,
+        (i) => 'Destinasi $i dengan nama yang sangat panjang di daerah wisata');
+    await state.favorites.load(() async => [
+          for (var i = 0; i < names.length; i++)
+            Favorite({
+              'guid': 'favorite-$i',
+              'destination': {'guid': 'destination-$i', 'name': names[i]},
+            }),
+        ]);
+    await tester.pumpWidget(const MaterialApp(
+      home: MediaQuery(
+        data: MediaQueryData(
+            textScaler: TextScaler.linear(1.5), disableAnimations: true),
+        child: ProfilUserScreen(active: false),
+      ),
+    ));
+    await tester.pumpAndSettle();
+    for (final name in names.take(5)) {
+      expect(find.text(name), findsOneWidget);
+    }
+    expect(find.text(names.last), findsNothing);
+    expect(find.text('+ Lihat semua'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets(
+      'profile groups menus in order and removes duplicate notifications',
+      (tester) async {
+    tester.view.physicalSize = const Size(320, 740);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    await tester.pumpWidget(const MaterialApp(
+      home: MediaQuery(
+        data: MediaQueryData(
+            textScaler: TextScaler.linear(1.5), disableAnimations: true),
+        child: ProfilUserScreen(active: false),
+      ),
+    ));
+    await tester.pumpAndSettle();
+    final headings = [
+      'Aktivitas Saya',
+      'Pengaturan & Keamanan',
+      'Informasi Aplikasi',
+      'Pengelolaan Akun',
+    ];
+    final tops = headings
+        .map((label) => tester.getTopLeft(find.text(label)).dy)
+        .toList();
+    expect(tops, orderedEquals([...tops]..sort()));
+    expect(find.text('Akun'), findsNothing);
+    expect(find.text('Notifikasi'), findsNothing);
+    expect(find.text('Wisata Tersimpan'), findsOneWidget);
+    expect(find.text('Riwayat Ulasan'), findsOneWidget);
+    expect(find.text('Login untuk melihat wisata tersimpan'), findsOneWidget);
+    final scrollable =
+        tester.state<ScrollableState>(find.byType(Scrollable).first);
+    scrollable.position.jumpTo(scrollable.position.maxScrollExtent);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Hapus Akun'));
+    await tester.pumpAndSettle();
+    expect(
+        find.text('Fitur ini belum tersedia untuk akun API.'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
 
   testWidgets('profile shows real identity and never uses hydration year',
       (tester) async {
@@ -60,7 +138,7 @@ void main() {
     final titleBefore = tester.getRect(title);
     final sceneryBefore = tester.getRect(scenery);
     final cardBefore = tester.getRect(card);
-    final menuBefore = tester.getTopLeft(find.text('Akun')).dy;
+    final menuBefore = tester.getTopLeft(find.text('Aktivitas Saya')).dy;
     final scrollable =
         tester.state<ScrollableState>(find.byType(Scrollable).first);
     scrollable.position.jumpTo(60);
@@ -84,7 +162,7 @@ void main() {
     final clippedTop = tester.getTopLeft(menuClip).dy +
         clipper.getClip(tester.getSize(menuClip)).top;
     expect(clippedTop, 270);
-    expect(tester.getTopLeft(find.text('Akun')).dy, menuBefore - 260);
+    expect(tester.getTopLeft(find.text('Aktivitas Saya')).dy, menuBefore - 260);
     expect(tester.getRect(find.byType(CustomScrollView)).top,
         greaterThanOrEqualTo(titleBefore.bottom));
     expect(tester.takeException(), isNull);
@@ -176,7 +254,9 @@ void main() {
     await tester.pumpAndSettle();
     final scrollable =
         tester.state<ScrollableState>(find.byType(Scrollable).first);
-    scrollable.position.jumpTo(scrollable.position.maxScrollExtent - 160);
+    scrollable.position.jumpTo(0);
+    await tester.scrollUntilVisible(find.text('Bahasa'), 150,
+        scrollable: find.byType(Scrollable).first);
     await tester.pumpAndSettle();
     await tester.tap(find.text('Bahasa'));
     await tester.pumpAndSettle();

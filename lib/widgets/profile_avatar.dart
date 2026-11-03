@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import '../data/app_data.dart';
 import '../services/auth_session.dart';
+import '../theme/app_colors.dart';
 
 class ProfileAvatar extends StatelessWidget {
   final double size;
@@ -251,25 +252,21 @@ Future<void> changeProfilePhoto(BuildContext context) async {
     final user = currentUser!;
     final action = await showModalBottomSheet<String>(
       context: context,
+      useRootNavigator: true,
       useSafeArea: true,
-      builder: (context) => Padding(
-          padding: const EdgeInsets.symmetric(vertical: 16),
-          child: Column(mainAxisSize: MainAxisSize.min, children: [
-            const ListTile(
-                title: Text('Foto Profil',
-                    style: TextStyle(fontWeight: FontWeight.w800))),
-            for (final item in [
-              ('gallery', Icons.photo_library_outlined, 'Pilih dari Galeri'),
-              ('camera', Icons.camera_alt_outlined, 'Ambil dengan Kamera'),
-              if (user.googleAvatarAvailable && user.avatarSource != 'google')
-                ('google', Icons.restore, 'Kembalikan Foto Google'),
-              ('default', Icons.person_outline, 'Gunakan Avatar Default'),
-            ])
-              ListTile(
-                  leading: Icon(item.$2),
-                  title: Text(item.$3),
-                  onTap: () => Navigator.pop(context, item.$1)),
-          ])),
+      isScrollControlled: true,
+      backgroundColor: AppColors.surface,
+      shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+      clipBehavior: Clip.antiAlias,
+      sheetAnimationStyle: MediaQuery.disableAnimationsOf(context)
+          ? AnimationStyle.noAnimation
+          : null,
+      builder: (_) => _AvatarPhotoPickerSheet(
+        hasCustomAvatar: user.avatarSource != 'default',
+        canRestoreGoogle:
+            user.googleAvatarAvailable && user.avatarSource != 'google',
+      ),
     );
     if (action == null || !context.mounted || !valid()) return;
     if (action == 'gallery' || action == 'camera') {
@@ -305,6 +302,185 @@ Future<void> changeProfilePhoto(BuildContext context) async {
     }
   } finally {
     _photoFlowActive = false;
+  }
+}
+
+class _AvatarPhotoPickerSheet extends StatefulWidget {
+  final bool hasCustomAvatar;
+  final bool canRestoreGoogle;
+  const _AvatarPhotoPickerSheet({
+    required this.hasCustomAvatar,
+    required this.canRestoreGoogle,
+  });
+
+  @override
+  State<_AvatarPhotoPickerSheet> createState() => _AvatarPhotoPickerSheetState();
+}
+
+class _AvatarPhotoPickerSheetState extends State<_AvatarPhotoPickerSheet> {
+  bool _selected = false;
+
+  void _select([String? action]) {
+    if (_selected) return;
+    _selected = true;
+    Navigator.pop(context, action);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final text = Theme.of(context).textTheme;
+    final secondaryStyle = TextButton.styleFrom(
+      foregroundColor: AppColors.textMuted,
+      minimumSize: const Size(double.infinity, 48),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+      textStyle: text.labelLarge?.copyWith(fontWeight: FontWeight.w600),
+    );
+    return SafeArea(
+      top: false,
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.fromLTRB(20, 12, 20, 16),
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          Container(
+            width: 40,
+            height: 4,
+            decoration: BoxDecoration(
+              color: AppColors.border,
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+          const SizedBox(height: 12),
+          Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.only(top: 8),
+                child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('Ubah Foto Profil',
+                          style: text.titleLarge?.copyWith(
+                              color: AppColors.navy,
+                              fontSize: 20,
+                              fontWeight: FontWeight.w800)),
+                      const SizedBox(height: 6),
+                      Text('Pilih cara untuk memperbarui foto profilmu.',
+                          style: text.bodyMedium?.copyWith(
+                              color: AppColors.textMuted, height: 1.5)),
+                    ]),
+              ),
+            ),
+            const SizedBox(width: 8),
+            IconButton(
+              tooltip: 'Tutup',
+              onPressed: () => _select(),
+              style: IconButton.styleFrom(
+                  backgroundColor: AppColors.bg,
+                  foregroundColor: AppColors.textMuted,
+                  minimumSize: const Size(48, 48),
+                  shape: const CircleBorder()),
+              icon: const Icon(Icons.close, size: 20),
+            ),
+          ]),
+          const SizedBox(height: 24),
+          IntrinsicHeight(
+            child: Row(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+              Expanded(
+                child: _AvatarPhotoActionCard(
+                  icon: Icons.photo_library_outlined,
+                  label: 'Galeri',
+                  subtitle: 'Pilih dari perangkat',
+                  onTap: () => _select('gallery'),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: _AvatarPhotoActionCard(
+                  icon: Icons.camera_alt_outlined,
+                  label: 'Kamera',
+                  subtitle: 'Ambil foto baru',
+                  onTap: () => _select('camera'),
+                ),
+              ),
+            ]),
+          ),
+          if (widget.hasCustomAvatar || widget.canRestoreGoogle) ...[
+            const SizedBox(height: 20),
+            const Divider(height: 1, color: AppColors.border),
+            const SizedBox(height: 8),
+            if (widget.canRestoreGoogle)
+              TextButton.icon(
+                style: secondaryStyle,
+                onPressed: () => _select('google'),
+                icon: const Icon(Icons.restore, size: 20),
+                label: const Text('Kembalikan Foto Google',
+                    textAlign: TextAlign.center),
+              ),
+            if (widget.hasCustomAvatar)
+              TextButton.icon(
+                style: secondaryStyle,
+                onPressed: () => _select('default'),
+                icon: const Icon(Icons.restart_alt, size: 20),
+                label: const Text('Gunakan Avatar Default',
+                    textAlign: TextAlign.center),
+              ),
+          ],
+        ]),
+      ),
+    );
+  }
+}
+
+class _AvatarPhotoActionCard extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final String subtitle;
+  final VoidCallback onTap;
+  const _AvatarPhotoActionCard({
+    required this.icon,
+    required this.label,
+    required this.subtitle,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final text = Theme.of(context).textTheme;
+    final radius = BorderRadius.circular(20);
+    return Material(
+      color: AppColors.surface,
+      shape: RoundedRectangleBorder(
+          borderRadius: radius,
+          side: const BorderSide(color: AppColors.border)),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: radius,
+        splashColor: AppColors.blue.withValues(alpha: .08),
+        highlightColor: AppColors.blue.withValues(alpha: .04),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 20),
+          child: Column(mainAxisSize: MainAxisSize.min, children: [
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: AppColors.blue.withValues(alpha: .08),
+                borderRadius: BorderRadius.circular(14),
+              ),
+              child: Icon(icon, color: AppColors.blue, size: 28),
+            ),
+            const SizedBox(height: 12),
+            Text(label,
+                textAlign: TextAlign.center,
+                style: text.titleMedium?.copyWith(
+                    color: AppColors.navy, fontWeight: FontWeight.w700)),
+            const SizedBox(height: 4),
+            Text(subtitle,
+                textAlign: TextAlign.center,
+                style: text.bodySmall
+                    ?.copyWith(color: AppColors.textMuted, height: 1.5)),
+          ]),
+        ),
+      ),
+    );
   }
 }
 

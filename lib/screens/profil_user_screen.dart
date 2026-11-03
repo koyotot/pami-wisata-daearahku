@@ -260,6 +260,8 @@ class _ProfilUserScreenState extends State<ProfilUserScreen>
     );
   }
 
+  // Retain the notification fallback while its duplicate profile entry is hidden.
+  // ignore: unused_element
   void _bukaNotifikasi(BuildContext context) {
     showModalBottomSheet(
       context: context,
@@ -282,7 +284,7 @@ class _ProfilUserScreenState extends State<ProfilUserScreen>
       context: context,
       backgroundColor: Colors.transparent,
       isScrollControlled: true,
-      builder: (_) => const _SemuaWisataTersimpanSheet(),
+      builder: (_) => const SavedDestinationsSheet(),
     );
   }
 
@@ -389,15 +391,7 @@ class _ProfilUserScreenState extends State<ProfilUserScreen>
                                                     '$_jumlahError Coba lagi'),
                                               ),
                                             const SizedBox(height: 26),
-
-                                            // Wisata Tersimpan
-                                            _sectionLabel('Wisata Tersimpan'),
-                                            const SizedBox(height: 12),
-                                            _buildWisataTersimpan(),
-                                            const SizedBox(height: 26),
-
-                                            // Akun section
-                                            _sectionLabel('Akun'),
+                                            _sectionLabel('Aktivitas Saya'),
                                             const SizedBox(height: 12),
                                             _buildMenuGroup([
                                               _MenuItemData(
@@ -410,28 +404,21 @@ class _ProfilUserScreenState extends State<ProfilUserScreen>
                                                 onTap: () =>
                                                     _bukaRiwayatUlasan(context),
                                               ),
-                                              _MenuItemData(
-                                                icon:
-                                                    Icons.notifications_rounded,
-                                                iconColor:
-                                                    const Color(0xFFFF8C42),
-                                                title: 'Notifikasi',
-                                                subtitle: widget
-                                                            .onNotifications !=
-                                                        null
-                                                    ? 'Lihat aktivitas pendaftaran'
-                                                    : 'Preferensi belum tersedia',
-                                                onTap: widget.onNotifications ??
-                                                    () => _bukaNotifikasi(
-                                                        context),
-                                              ),
+                                            ],
+                                                leading:
+                                                    _buildWisataTersimpan()),
+                                            const SizedBox(height: 26),
+                                            _sectionLabel(
+                                                'Pengaturan & Keamanan'),
+                                            const SizedBox(height: 12),
+                                            _buildMenuGroup([
                                               _MenuItemData(
                                                 icon: Icons.language_rounded,
                                                 iconColor:
                                                     const Color(0xFF7E57C2),
                                                 title: 'Bahasa',
                                                 subtitle:
-                                                    'Indonesia ? bahasa lain belum tersedia',
+                                                    'Indonesia · bahasa lain belum tersedia',
                                                 onTap: () =>
                                                     _bukaPilihBahasa(context),
                                               ),
@@ -445,6 +432,11 @@ class _ProfilUserScreenState extends State<ProfilUserScreen>
                                                 onTap: () =>
                                                     _bukaGantiPassword(context),
                                               ),
+                                            ]),
+                                            const SizedBox(height: 26),
+                                            _sectionLabel('Informasi Aplikasi'),
+                                            const SizedBox(height: 12),
+                                            _buildMenuGroup([
                                               _MenuItemData(
                                                 icon:
                                                     Icons.info_outline_rounded,
@@ -455,6 +447,11 @@ class _ProfilUserScreenState extends State<ProfilUserScreen>
                                                 onTap: () =>
                                                     _tampilkanTentang(context),
                                               ),
+                                            ]),
+                                            const SizedBox(height: 26),
+                                            _sectionLabel('Pengelolaan Akun'),
+                                            const SizedBox(height: 12),
+                                            _buildMenuGroup([
                                               _MenuItemData(
                                                 icon: Icons
                                                     .delete_outline_rounded,
@@ -684,102 +681,126 @@ class _ProfilUserScreenState extends State<ProfilUserScreen>
       builder: (context, _) {
         final docs = state.favorites.data ?? [];
         final isLoading = state.favorites.loading;
-        return Container(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-          decoration: BoxDecoration(
-            color: _C.card,
-            borderRadius: BorderRadius.circular(18),
-            border: Border.all(color: _C.teal.withValues(alpha: 0.12)),
-          ),
-          child: isLoading
-              ? const Center(
-                  child: Padding(
-                    padding: EdgeInsets.symmetric(vertical: 8),
-                    child: SizedBox(
-                        width: 20,
-                        height: 20,
-                        child: CircularProgressIndicator(strokeWidth: 2)),
+        return Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(children: [
+                Container(
+                  padding: const EdgeInsets.all(9),
+                  decoration: BoxDecoration(
+                    color: _C.blue.withValues(alpha: 0.13),
+                    borderRadius: BorderRadius.circular(11),
                   ),
-                )
-              : state.favorites.error != null
-                  ? TextButton(
-                      onPressed: state.load,
-                      child: Text(state.favorites.error.toString()))
-                  : !state.session.authenticated.value
-                      ? Center(
-                          child: Text('Login untuk melihat wisata tersimpan',
-                              style:
-                                  TextStyle(color: _C.textMuted, fontSize: 13)))
-                      : docs.isEmpty
+                  child: const Icon(Icons.bookmark_rounded,
+                      color: _C.blue, size: 18),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Text('Wisata Tersimpan',
+                      style: _font(13.5, FontWeight.w700, _C.text)),
+                ),
+              ]),
+              const SizedBox(height: 12),
+              isLoading
+                  ? const Center(
+                      child: Padding(
+                        padding: EdgeInsets.symmetric(vertical: 8),
+                        child: SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(strokeWidth: 2)),
+                      ),
+                    )
+                  : state.favorites.error != null
+                      ? TextButton(
+                          onPressed: state.load,
+                          child: Text(state.favorites.error.toString()))
+                      : !state.session.authenticated.value
                           ? Center(
-                              child: Padding(
-                                padding:
-                                    const EdgeInsets.symmetric(vertical: 8),
-                                child: Text('Belum ada wisata tersimpan',
-                                    style: TextStyle(
-                                        color: _C.textMuted, fontSize: 13)),
-                              ),
-                            )
-                          : Wrap(
-                              spacing: 8,
-                              runSpacing: 8,
-                              children: [
-                                ...docs.take(5).map((doc) {
-                                  final nama = doc.destination.name;
-                                  return Container(
-                                    padding: const EdgeInsets.symmetric(
-                                        horizontal: 12, vertical: 6),
-                                    decoration: BoxDecoration(
-                                      color: _C.teal.withValues(alpha: 0.12),
-                                      borderRadius: BorderRadius.circular(20),
-                                      border: Border.all(
+                              child: Text(
+                                  'Login untuk melihat wisata tersimpan',
+                                  style: TextStyle(
+                                      color: _C.textMuted, fontSize: 13)))
+                          : docs.isEmpty
+                              ? Center(
+                                  child: Padding(
+                                    padding:
+                                        const EdgeInsets.symmetric(vertical: 8),
+                                    child: Text('Belum ada wisata tersimpan',
+                                        style: TextStyle(
+                                            color: _C.textMuted, fontSize: 13)),
+                                  ),
+                                )
+                              : Wrap(
+                                  spacing: 8,
+                                  runSpacing: 8,
+                                  children: [
+                                    ...docs.take(5).map((doc) {
+                                      final nama = doc.destination.name;
+                                      return Container(
+                                        padding: const EdgeInsets.symmetric(
+                                            horizontal: 12, vertical: 6),
+                                        decoration: BoxDecoration(
                                           color:
-                                              _C.teal.withValues(alpha: 0.25)),
-                                    ),
-                                    child: Row(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        Container(
-                                          width: 6,
-                                          height: 6,
-                                          decoration: BoxDecoration(
-                                            shape: BoxShape.circle,
-                                            color: _C.teal,
-                                          ),
+                                              _C.teal.withValues(alpha: 0.12),
+                                          borderRadius:
+                                              BorderRadius.circular(20),
+                                          border: Border.all(
+                                              color: _C.teal
+                                                  .withValues(alpha: 0.25)),
                                         ),
-                                        const SizedBox(width: 6),
-                                        Text(nama,
-                                            style: TextStyle(
+                                        child: Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            Container(
+                                              width: 6,
+                                              height: 6,
+                                              decoration: BoxDecoration(
+                                                shape: BoxShape.circle,
                                                 color: _C.teal,
+                                              ),
+                                            ),
+                                            const SizedBox(width: 6),
+                                            Flexible(
+                                                child: Text(nama,
+                                                    style: TextStyle(
+                                                        color: _C.teal,
+                                                        fontSize: 12.5,
+                                                        fontWeight:
+                                                            FontWeight.w600))),
+                                          ],
+                                        ),
+                                      );
+                                    }),
+                                    // Lihat semua chip
+                                    GestureDetector(
+                                      onTap: () =>
+                                          _bukaSemuaWisataTersimpan(context),
+                                      child: Container(
+                                        padding: const EdgeInsets.symmetric(
+                                            horizontal: 12, vertical: 6),
+                                        decoration: BoxDecoration(
+                                          color:
+                                              _C.gold.withValues(alpha: 0.10),
+                                          borderRadius:
+                                              BorderRadius.circular(20),
+                                          border: Border.all(
+                                              color: _C.gold
+                                                  .withValues(alpha: 0.30)),
+                                        ),
+                                        child: Text('+ Lihat semua',
+                                            style: TextStyle(
+                                                color: _C.warning,
                                                 fontSize: 12.5,
                                                 fontWeight: FontWeight.w600)),
-                                      ],
+                                      ),
                                     ),
-                                  );
-                                }),
-                                // Lihat semua chip
-                                GestureDetector(
-                                  onTap: () =>
-                                      _bukaSemuaWisataTersimpan(context),
-                                  child: Container(
-                                    padding: const EdgeInsets.symmetric(
-                                        horizontal: 12, vertical: 6),
-                                    decoration: BoxDecoration(
-                                      color: _C.gold.withValues(alpha: 0.10),
-                                      borderRadius: BorderRadius.circular(20),
-                                      border: Border.all(
-                                          color:
-                                              _C.gold.withValues(alpha: 0.30)),
-                                    ),
-                                    child: Text('+ Lihat semua',
-                                        style: TextStyle(
-                                            color: _C.warning,
-                                            fontSize: 12.5,
-                                            fontWeight: FontWeight.w600)),
-                                  ),
+                                  ],
                                 ),
-                              ],
-                            ),
+            ],
+          ),
         );
       },
     );
@@ -788,7 +809,7 @@ class _ProfilUserScreenState extends State<ProfilUserScreen>
   // ══════════════════════════════════════════════════════════
   //  GROUPED MENU CARD
   // ══════════════════════════════════════════════════════════
-  Widget _buildMenuGroup(List<_MenuItemData> items) {
+  Widget _buildMenuGroup(List<_MenuItemData> items, {Widget? leading}) {
     return Container(
       decoration: BoxDecoration(
         color: _C.card,
@@ -797,70 +818,77 @@ class _ProfilUserScreenState extends State<ProfilUserScreen>
       ),
       clipBehavior: Clip.hardEdge,
       child: Column(
-        children: List.generate(items.length, (i) {
-          final item = items[i];
-          final isLast = i == items.length - 1;
-          return Column(
-            children: [
-              Material(
-                color: Colors.transparent,
-                child: InkWell(
-                  onTap: item.onTap,
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 16, vertical: 14),
-                    child: Row(
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.all(9),
-                          decoration: BoxDecoration(
-                            color: item.isDanger
-                                ? _C.danger.withValues(alpha: 0.12)
-                                : item.iconColor.withValues(alpha: 0.13),
-                            borderRadius: BorderRadius.circular(11),
+        children: [
+          if (leading != null) ...[
+            leading,
+            const Divider(
+                height: 1, thickness: 1, indent: 66, color: _C.border),
+          ],
+          ...List.generate(items.length, (i) {
+            final item = items[i];
+            final isLast = i == items.length - 1;
+            return Column(
+              children: [
+                Material(
+                  color: Colors.transparent,
+                  child: InkWell(
+                    onTap: item.onTap,
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 16, vertical: 14),
+                      child: Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(9),
+                            decoration: BoxDecoration(
+                              color: item.isDanger
+                                  ? _C.danger.withValues(alpha: 0.12)
+                                  : item.iconColor.withValues(alpha: 0.13),
+                              borderRadius: BorderRadius.circular(11),
+                            ),
+                            child: Icon(item.icon,
+                                color: item.iconColor, size: 18),
                           ),
-                          child:
-                              Icon(item.icon, color: item.iconColor, size: 18),
-                        ),
-                        const SizedBox(width: 14),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                item.title,
-                                style: TextStyle(
-                                  color: item.isDanger ? _C.danger : _C.text,
-                                  fontWeight: FontWeight.w700,
-                                  fontSize: 13.5,
+                          const SizedBox(width: 14),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  item.title,
+                                  style: TextStyle(
+                                    color: item.isDanger ? _C.danger : _C.text,
+                                    fontWeight: FontWeight.w700,
+                                    fontSize: 13.5,
+                                  ),
                                 ),
-                              ),
-                              const SizedBox(height: 2),
-                              Text(
-                                item.subtitle,
-                                style: TextStyle(
-                                    color: _C.textMuted, fontSize: 11.5),
-                              ),
-                            ],
+                                const SizedBox(height: 2),
+                                Text(
+                                  item.subtitle,
+                                  style: TextStyle(
+                                      color: _C.textMuted, fontSize: 11.5),
+                                ),
+                              ],
+                            ),
                           ),
-                        ),
-                        Icon(Icons.arrow_forward_ios_rounded,
-                            color: _C.textDim, size: 13),
-                      ],
+                          Icon(Icons.arrow_forward_ios_rounded,
+                              color: _C.textDim, size: 13),
+                        ],
+                      ),
                     ),
                   ),
                 ),
-              ),
-              if (!isLast)
-                Divider(
-                  height: 1,
-                  thickness: 1,
-                  indent: 52,
-                  color: _C.border,
-                ),
-            ],
-          );
-        }),
+                if (!isLast)
+                  Divider(
+                    height: 1,
+                    thickness: 1,
+                    indent: 66,
+                    color: _C.border,
+                  ),
+              ],
+            );
+          }),
+        ],
       ),
     );
   }
@@ -1380,8 +1408,8 @@ class _UnavailableSettingSheet extends StatelessWidget {
       );
 }
 
-class _SemuaWisataTersimpanSheet extends StatelessWidget {
-  const _SemuaWisataTersimpanSheet();
+class SavedDestinationsSheet extends StatelessWidget {
+  const SavedDestinationsSheet({super.key});
 
   @override
   Widget build(BuildContext context) {
