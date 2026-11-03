@@ -52,6 +52,8 @@ class InternationalPhoneField extends StatelessWidget {
   final ValueChanged<IsoCode> onCountryChanged;
   final VoidCallback onChanged;
   final String? error;
+  final bool split;
+  final bool enabled;
   const InternationalPhoneField({
     super.key,
     required this.controller,
@@ -59,6 +61,8 @@ class InternationalPhoneField extends StatelessWidget {
     required this.onCountryChanged,
     required this.onChanged,
     this.error,
+    this.split = false,
+    this.enabled = true,
   });
 
   Future<void> _pickCountry(BuildContext context) async {
@@ -82,9 +86,28 @@ class InternationalPhoneField extends StatelessWidget {
     final border = OutlineInputBorder(
         borderRadius: BorderRadius.circular(14),
         borderSide: const BorderSide(color: Color(0xFFDCE4F0)));
-    return TextFormField(
+    final countrySelector = TextButton(
+      key: const ValueKey('phoneCountryPicker'),
+      onPressed: enabled ? () => _pickCountry(context) : null,
+      style:
+          split ? TextButton.styleFrom(minimumSize: const Size(0, 56)) : null,
+      child: Semantics(
+        label: '${_countryNames[country.name]}, +${_dialCode(country)}',
+        child: Row(mainAxisSize: MainAxisSize.min, children: [
+          Text(countryFlag(country), style: const TextStyle(fontSize: 20)),
+          const SizedBox(width: 5),
+          if (split)
+            Flexible(child: Text('+${_dialCode(country)}'))
+          else
+            Text('+${_dialCode(country)}'),
+          const Icon(Icons.arrow_drop_down, size: 18),
+        ]),
+      ),
+    );
+    final field = TextFormField(
       key: const ValueKey('bookingPhone'),
       controller: controller,
+      enabled: enabled,
       keyboardType: TextInputType.phone,
       autofillHints: const [AutofillHints.telephoneNumber],
       inputFormatters: [_NationalPhoneFormatter(country)],
@@ -105,33 +128,39 @@ class InternationalPhoneField extends StatelessWidget {
             : '+${phone.countryCode} ${phone.formatNsn(format: NsnFormat.international)}',
         helperMaxLines: 2,
         prefixIconConstraints: const BoxConstraints(minHeight: 48),
-        prefixIcon: Padding(
-          padding: const EdgeInsets.only(right: 10),
-          child: DecoratedBox(
-            decoration: const BoxDecoration(
-                border: Border(right: BorderSide(color: Color(0xFFDCE4F0)))),
-            child: TextButton(
-              key: const ValueKey('phoneCountryPicker'),
-              onPressed: () => _pickCountry(context),
-              child: Semantics(
-                label: '${_countryNames[country.name]}, +${_dialCode(country)}',
-                child: Row(mainAxisSize: MainAxisSize.min, children: [
-                  Text(countryFlag(country),
-                      style: const TextStyle(fontSize: 20)),
-                  const SizedBox(width: 5),
-                  Text('+${_dialCode(country)}'),
-                  const Icon(Icons.arrow_drop_down, size: 18),
-                ]),
+        prefixIcon: split
+            ? null
+            : Padding(
+                padding: const EdgeInsets.only(right: 10),
+                child: DecoratedBox(
+                  decoration: const BoxDecoration(
+                      border:
+                          Border(right: BorderSide(color: Color(0xFFDCE4F0)))),
+                  child: countrySelector,
+                ),
               ),
-            ),
-          ),
-        ),
       ),
       onChanged: (_) => onChanged(),
       validator: (value) => parseBookingPhone(value ?? '', country) == null
           ? 'Nomor telepon tidak valid untuk negara ini'
           : null,
     );
+    if (!split) return field;
+    return Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 122),
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            border: Border.all(color: const Color(0xFFDCE4F0)),
+            borderRadius: BorderRadius.circular(14),
+          ),
+          child: countrySelector,
+        ),
+      ),
+      const SizedBox(width: 10),
+      Expanded(child: field),
+    ]);
   }
 }
 

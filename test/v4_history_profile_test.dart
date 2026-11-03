@@ -44,6 +44,52 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('profile card scrolls then stops below the fixed title',
+      (tester) async {
+    await tester.pumpWidget(const MaterialApp(
+      home: MediaQuery(
+        data: MediaQueryData(
+            padding: EdgeInsets.only(top: 24), disableAnimations: true),
+        child: ProfilUserScreen(active: false),
+      ),
+    ));
+    await tester.pumpAndSettle();
+    final title = find.text('Profil Saya');
+    final scenery = find.byType(TimeBasedScenicBackground);
+    final card = find.byKey(const ValueKey('profileIdentityCard'));
+    final titleBefore = tester.getRect(title);
+    final sceneryBefore = tester.getRect(scenery);
+    final cardBefore = tester.getRect(card);
+    final menuBefore = tester.getTopLeft(find.text('Akun')).dy;
+    final scrollable =
+        tester.state<ScrollableState>(find.byType(Scrollable).first);
+    scrollable.position.jumpTo(60);
+    await tester.pumpAndSettle();
+    expect(tester.getRect(card).top, cardBefore.top - 60);
+    scrollable.position.jumpTo(180);
+    await tester.pumpAndSettle();
+    expect(tester.getRect(title), titleBefore);
+    expect(tester.getRect(scenery), sceneryBefore);
+    final boundary = tester.getRect(find.byType(CustomScrollView)).top;
+    expect(tester.getRect(card).top, boundary);
+    scrollable.position.jumpTo(260);
+    await tester.pumpAndSettle();
+    expect(tester.getRect(card).top, boundary);
+    final menuClip = find
+        .descendant(
+            of: find.byType(SliverLayoutBuilder),
+            matching: find.byType(ClipRect))
+        .first;
+    final clipper = tester.widget<ClipRect>(menuClip).clipper!;
+    final clippedTop = tester.getTopLeft(menuClip).dy +
+        clipper.getClip(tester.getSize(menuClip)).top;
+    expect(clippedTop, 270);
+    expect(tester.getTopLeft(find.text('Akun')).dy, menuBefore - 260);
+    expect(tester.getRect(find.byType(CustomScrollView)).top,
+        greaterThanOrEqualTo(titleBefore.bottom));
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('join year uses email verification date', (tester) async {
     currentUser = User(
         id: 'u',
@@ -75,7 +121,7 @@ void main() {
     await tester.pumpAndSettle();
     final scrollable = tester.state<ScrollableState>(find
         .descendant(
-            of: find.byType(SingleChildScrollView),
+            of: find.byType(CustomScrollView),
             matching: find.byType(Scrollable))
         .first);
     scrollable.position.jumpTo(scrollable.position.maxScrollExtent);
@@ -128,7 +174,10 @@ void main() {
       (tester) async {
     await tester.pumpWidget(const MaterialApp(home: ProfilUserScreen()));
     await tester.pumpAndSettle();
-    await tester.scrollUntilVisible(find.text('Bahasa'), 250);
+    final scrollable =
+        tester.state<ScrollableState>(find.byType(Scrollable).first);
+    scrollable.position.jumpTo(scrollable.position.maxScrollExtent - 160);
+    await tester.pumpAndSettle();
     await tester.tap(find.text('Bahasa'));
     await tester.pumpAndSettle();
     expect(

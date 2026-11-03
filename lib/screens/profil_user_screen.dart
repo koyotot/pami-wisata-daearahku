@@ -11,11 +11,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:firebase_auth/firebase_auth.dart' as fb_auth;
 import 'package:google_fonts/google_fonts.dart';
+import 'package:phone_numbers_parser/phone_numbers_parser.dart';
 import '../data/app_data.dart';
 import '../data/booking_state.dart';
 import '../data/business_repository.dart';
 import '../data/favorite_state.dart';
 import '../widgets/reviews_sheet.dart';
+import '../widgets/profile_avatar.dart';
+import '../widgets/international_phone_field.dart';
 import 'auth_presentation.dart';
 import 'home_screen.dart';
 import 'user_login_screen.dart';
@@ -113,8 +116,13 @@ class _ProfilUserScreenState extends State<ProfilUserScreen>
       end: Offset.zero,
     ).animate(CurvedAnimation(parent: _animCtrl, curve: Curves.easeOutCubic));
     AuthSession.instance.sessionChanges.addListener(_sessionChanged);
+    AuthSession.instance.profileChanges.addListener(_profileChanged);
     BookingEvents.changed.addListener(_loadJumlahPendaftaran);
     _loadJumlahPendaftaran();
+  }
+
+  void _profileChanged() {
+    if (mounted) setState(() {});
   }
 
   int _jumlahRequest = 0;
@@ -163,6 +171,7 @@ class _ProfilUserScreenState extends State<ProfilUserScreen>
   @override
   void dispose() {
     AuthSession.instance.sessionChanges.removeListener(_sessionChanged);
+    AuthSession.instance.profileChanges.removeListener(_profileChanged);
     BookingEvents.changed.removeListener(_loadJumlahPendaftaran);
     _animCtrl.dispose();
     super.dispose();
@@ -217,18 +226,17 @@ class _ProfilUserScreenState extends State<ProfilUserScreen>
   }
 
   void _bukaEditProfil(BuildContext context) {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.transparent,
-      isScrollControlled: true,
-      builder: (_) => _EditProfilSheet(
+    Navigator.of(context).push(MaterialPageRoute<void>(
+      builder: (_) => _EditProfilScreen(
         namaAwal: currentUser?.namaLengkap ?? '',
         teleponAwal: currentUser?.noTelepon ?? '',
         onSimpan: (nama, telepon) async {
           final session = AuthSession.instance;
           final generation = session.sessionGeneration;
           await session.updateProfile(nama, telepon);
-          if (!mounted || !session.isCurrentGeneration(generation)) return;
+          if (!mounted ||
+              !context.mounted ||
+              !session.isCurrentGeneration(generation)) return;
           setState(() {});
           ScaffoldMessenger.of(context).showSnackBar(SnackBar(
             content: const Text('Profil berhasil diperbarui!'),
@@ -240,7 +248,7 @@ class _ProfilUserScreenState extends State<ProfilUserScreen>
           ));
         },
       ),
-    );
+    ));
   }
 
   void _bukaRiwayatUlasan(BuildContext context) {
@@ -310,111 +318,170 @@ class _ProfilUserScreenState extends State<ProfilUserScreen>
               position: MediaQuery.disableAnimationsOf(context)
                   ? const AlwaysStoppedAnimation(Offset.zero)
                   : _slideAnim,
-              child: SingleChildScrollView(
-                padding: EdgeInsets.only(
-                    bottom: MediaQuery.paddingOf(context).bottom),
-                physics: const BouncingScrollPhysics(),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+              child: LayoutBuilder(
+                builder: (context, layoutConstraints) => Stack(
                   children: [
-                    Stack(
-                      clipBehavior: Clip.none,
+                    SizedBox(
+                      height: 270,
+                      width: double.infinity,
+                      child: TimeBasedScenicBackground(
+                        active: widget.active,
+                        child: const SizedBox.expand(),
+                      ),
+                    ),
+                    Column(
                       children: [
-                        SizedBox(
-                          height: 270,
-                          width: double.infinity,
-                          child: TimeBasedScenicBackground(
-                            active: widget.active,
-                            child: const SizedBox.expand(),
-                          ),
-                        ),
                         Padding(
                           padding: EdgeInsets.only(
                               top: MediaQuery.paddingOf(context).top + 8),
                           child: _buildTopBar(scenic: true),
                         ),
-                        Padding(
-                          padding: const EdgeInsets.fromLTRB(20, 215, 20, 0),
-                          child: _buildHeaderCard(user, tahunBergabung),
+                        Expanded(
+                          child: CustomScrollView(
+                            physics: const BouncingScrollPhysics(),
+                            slivers: [
+                              SliverToBoxAdapter(
+                                child: SizedBox(
+                                  height:
+                                      (149 - MediaQuery.paddingOf(context).top)
+                                          .clamp(0, 149)
+                                          .toDouble(),
+                                ),
+                              ),
+                              PinnedHeaderSliver(
+                                child: Padding(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 20),
+                                  child: _buildHeaderCard(user, tahunBergabung),
+                                ),
+                              ),
+                              SliverLayoutBuilder(
+                                builder: (context, constraints) =>
+                                    SliverToBoxAdapter(
+                                  child: ClipRect(
+                                    clipper: _ProfileMenuClipper(
+                                      constraints.scrollOffset +
+                                          270 -
+                                          (layoutConstraints.maxHeight -
+                                              constraints
+                                                  .viewportMainAxisExtent) -
+                                          (constraints.viewportMainAxisExtent -
+                                              constraints.remainingPaintExtent),
+                                    ),
+                                    child: Padding(
+                                      padding: EdgeInsets.only(
+                                          bottom: MediaQuery.paddingOf(context)
+                                              .bottom),
+                                      child: Padding(
+                                        padding: const EdgeInsets.fromLTRB(
+                                            20, 26, 20, 32),
+                                        child: Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          children: [
+                                            if (_jumlahError != null)
+                                              TextButton.icon(
+                                                onPressed:
+                                                    _loadJumlahPendaftaran,
+                                                icon: const Icon(
+                                                    Icons.refresh_rounded),
+                                                label: Text(
+                                                    '$_jumlahError Coba lagi'),
+                                              ),
+                                            const SizedBox(height: 26),
+
+                                            // Wisata Tersimpan
+                                            _sectionLabel('Wisata Tersimpan'),
+                                            const SizedBox(height: 12),
+                                            _buildWisataTersimpan(),
+                                            const SizedBox(height: 26),
+
+                                            // Akun section
+                                            _sectionLabel('Akun'),
+                                            const SizedBox(height: 12),
+                                            _buildMenuGroup([
+                                              _MenuItemData(
+                                                icon: Icons.rate_review_rounded,
+                                                iconColor:
+                                                    const Color(0xFF1E88E5),
+                                                title: 'Riwayat Ulasan',
+                                                subtitle:
+                                                    'Ulasan yang pernah kamu tulis',
+                                                onTap: () =>
+                                                    _bukaRiwayatUlasan(context),
+                                              ),
+                                              _MenuItemData(
+                                                icon:
+                                                    Icons.notifications_rounded,
+                                                iconColor:
+                                                    const Color(0xFFFF8C42),
+                                                title: 'Notifikasi',
+                                                subtitle: widget
+                                                            .onNotifications !=
+                                                        null
+                                                    ? 'Lihat aktivitas pendaftaran'
+                                                    : 'Preferensi belum tersedia',
+                                                onTap: widget.onNotifications ??
+                                                    () => _bukaNotifikasi(
+                                                        context),
+                                              ),
+                                              _MenuItemData(
+                                                icon: Icons.language_rounded,
+                                                iconColor:
+                                                    const Color(0xFF7E57C2),
+                                                title: 'Bahasa',
+                                                subtitle:
+                                                    'Indonesia ? bahasa lain belum tersedia',
+                                                onTap: () =>
+                                                    _bukaPilihBahasa(context),
+                                              ),
+                                              _MenuItemData(
+                                                icon: Icons.lock_reset_rounded,
+                                                iconColor:
+                                                    const Color(0xFF26A69A),
+                                                title: 'Ubah Password',
+                                                subtitle:
+                                                    'Belum tersedia untuk akun API',
+                                                onTap: () =>
+                                                    _bukaGantiPassword(context),
+                                              ),
+                                              _MenuItemData(
+                                                icon:
+                                                    Icons.info_outline_rounded,
+                                                iconColor: _C.blue,
+                                                title: 'Tentang Aplikasi',
+                                                subtitle:
+                                                    'Wisata Daerahku · versi 1.0.0',
+                                                onTap: () =>
+                                                    _tampilkanTentang(context),
+                                              ),
+                                              _MenuItemData(
+                                                icon: Icons
+                                                    .delete_outline_rounded,
+                                                iconColor: _C.danger,
+                                                title: 'Hapus Akun',
+                                                subtitle:
+                                                    'Belum tersedia untuk akun API',
+                                                onTap: () =>
+                                                    _konfirmasiHapusAkun(
+                                                        context),
+                                                isDanger: true,
+                                              ),
+                                            ]),
+                                            const SizedBox(height: 24),
+                                            _buildLogoutButton(context),
+                                            const SizedBox(height: 8),
+                                          ],
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
                       ],
-                    ),
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(20, 26, 20, 32),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          if (_jumlahError != null)
-                            TextButton.icon(
-                              onPressed: _loadJumlahPendaftaran,
-                              icon: const Icon(Icons.refresh_rounded),
-                              label: Text('$_jumlahError Coba lagi'),
-                            ),
-                          const SizedBox(height: 26),
-
-                          // Wisata Tersimpan
-                          _sectionLabel('Wisata Tersimpan'),
-                          const SizedBox(height: 12),
-                          _buildWisataTersimpan(),
-                          const SizedBox(height: 26),
-
-                          // Akun section
-                          _sectionLabel('Akun'),
-                          const SizedBox(height: 12),
-                          _buildMenuGroup([
-                            _MenuItemData(
-                              icon: Icons.rate_review_rounded,
-                              iconColor: const Color(0xFF1E88E5),
-                              title: 'Riwayat Ulasan',
-                              subtitle: 'Ulasan yang pernah kamu tulis',
-                              onTap: () => _bukaRiwayatUlasan(context),
-                            ),
-                            _MenuItemData(
-                              icon: Icons.notifications_rounded,
-                              iconColor: const Color(0xFFFF8C42),
-                              title: 'Notifikasi',
-                              subtitle: widget.onNotifications != null
-                                  ? 'Lihat aktivitas pendaftaran'
-                                  : 'Preferensi belum tersedia',
-                              onTap: widget.onNotifications ??
-                                  () => _bukaNotifikasi(context),
-                            ),
-                            _MenuItemData(
-                              icon: Icons.language_rounded,
-                              iconColor: const Color(0xFF7E57C2),
-                              title: 'Bahasa',
-                              subtitle:
-                                  'Indonesia ? bahasa lain belum tersedia',
-                              onTap: () => _bukaPilihBahasa(context),
-                            ),
-                            _MenuItemData(
-                              icon: Icons.lock_reset_rounded,
-                              iconColor: const Color(0xFF26A69A),
-                              title: 'Ubah Password',
-                              subtitle: 'Belum tersedia untuk akun API',
-                              onTap: () => _bukaGantiPassword(context),
-                            ),
-                            _MenuItemData(
-                              icon: Icons.info_outline_rounded,
-                              iconColor: _C.blue,
-                              title: 'Tentang Aplikasi',
-                              subtitle: 'Wisata Daerahku · versi 1.0.0',
-                              onTap: () => _tampilkanTentang(context),
-                            ),
-                            _MenuItemData(
-                              icon: Icons.delete_outline_rounded,
-                              iconColor: _C.danger,
-                              title: 'Hapus Akun',
-                              subtitle: 'Belum tersedia untuk akun API',
-                              onTap: () => _konfirmasiHapusAkun(context),
-                              isDanger: true,
-                            ),
-                          ]),
-                          const SizedBox(height: 24),
-                          _buildLogoutButton(context),
-                          const SizedBox(height: 8),
-                        ],
-                      ),
                     ),
                   ],
                 ),
@@ -493,12 +560,10 @@ class _ProfilUserScreenState extends State<ProfilUserScreen>
   // ══════════════════════════════════════════════════════════
   Widget _buildHeaderCard(User? user, String tahunBergabung) {
     final nama = user?.namaLengkap.trim() ?? '';
-    final initials = nama
-        .split(RegExp(r'\s+'))
-        .where((part) => part.isNotEmpty)
-        .take(2)
-        .map((part) => part.characters.first.toUpperCase())
-        .join();
+    final phone = parseBookingPhone(user?.noTelepon ?? '', IsoCode.ID);
+    final phoneDisplay = phone == null
+        ? user?.noTelepon ?? ''
+        : '+${phone.countryCode} ${phone.formatNsn(format: NsnFormat.international)}';
     final stats = [
       (
         'Pendaftaran',
@@ -523,13 +588,7 @@ class _ProfilUserScreenState extends State<ProfilUserScreen>
           ]),
       child: Column(children: [
         Row(children: [
-          CircleAvatar(
-              radius: 24,
-              backgroundColor: _C.blue,
-              child: initials.isEmpty
-                  ? const Icon(Icons.person_outline, color: Colors.white)
-                  : Text(initials,
-                      style: _font(16, FontWeight.w800, Colors.white))),
+          const ProfileAvatar(size: 52, camera: true),
           const SizedBox(width: 12),
           Expanded(
               child: Column(
@@ -539,14 +598,17 @@ class _ProfilUserScreenState extends State<ProfilUserScreen>
                     style: _font(14, FontWeight.w800, _C.navy)),
                 const SizedBox(height: 4),
                 Text(user?.email ?? '\u2014',
-                    style: _font(11, FontWeight.w500, _C.textMuted)),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: _font(12, FontWeight.w500, _C.textMuted)),
                 if (user?.noTelepon.isNotEmpty ?? false)
-                  Text(user!.noTelepon,
-                      style: _font(11, FontWeight.w500, _C.textMuted)),
+                  Text(phoneDisplay,
+                      style: _font(12, FontWeight.w500, _C.textMuted)),
               ])),
           const SizedBox(width: 4),
           IconButton(
             tooltip: 'Edit Profil',
+            constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
             onPressed: () => _bukaEditProfil(context),
             icon: Container(
               padding: const EdgeInsets.all(8),
@@ -570,7 +632,7 @@ class _ProfilUserScreenState extends State<ProfilUserScreen>
                 const SizedBox(height: 4),
                 Text(stat.$1,
                     textAlign: TextAlign.center,
-                    style: _font(10, FontWeight.w500, _C.textMuted)),
+                    style: _font(12, FontWeight.w500, _C.textMuted)),
               ]),
             ),
         ]),
@@ -584,7 +646,7 @@ class _ProfilUserScreenState extends State<ProfilUserScreen>
           const SizedBox(width: 6),
           Flexible(
             child: Text('Bergabung sejak $tahunBergabung',
-                style: _font(10, FontWeight.w500, _C.textMuted)),
+                style: _font(12, FontWeight.w500, _C.textMuted)),
           ),
         ]),
       ]),
@@ -893,58 +955,192 @@ class _MenuItemData {
 // ════════════════════════════════════════════════════════════
 //  BOTTOM SHEET — Ubah Password (Firebase Auth)
 // ════════════════════════════════════════════════════════════
-class _EditProfilSheet extends StatefulWidget {
+class _EditProfilScreen extends StatefulWidget {
   final String namaAwal;
   final String teleponAwal;
   final Future<void> Function(String nama, String telepon) onSimpan;
 
-  const _EditProfilSheet({
+  const _EditProfilScreen({
     required this.namaAwal,
     required this.teleponAwal,
     required this.onSimpan,
   });
 
   @override
-  State<_EditProfilSheet> createState() => _EditProfilSheetState();
+  State<_EditProfilScreen> createState() => _EditProfilScreenState();
 }
 
-class _EditProfilSheetState extends State<_EditProfilSheet> {
+class _EditProfilScreenState extends State<_EditProfilScreen> {
+  final _formKey = GlobalKey<FormState>();
   late final TextEditingController _namaCtrl;
   late final TextEditingController _teleponCtrl;
+  IsoCode _phoneCountry = IsoCode.ID;
+  late final String _initialPhone;
   bool _isLoading = false;
+  bool _allowPop = false;
+  bool _confirmingClose = false;
   String? _error;
+  String? _phoneError;
+  String? _nameError;
+
+  late final int _generation;
+  late final String? _owner;
+  bool get _validSession =>
+      AuthSession.instance.isCurrentGeneration(_generation) &&
+      currentUser?.id == _owner;
+  void _profileChanged() {
+    if (mounted) setState(() {});
+  }
 
   @override
   void initState() {
     super.initState();
+    _generation = AuthSession.instance.sessionGeneration;
+    _owner = currentUser?.id;
+    AuthSession.instance.profileChanges.addListener(_profileChanged);
+    AuthSession.instance.avatarBusy.addListener(_profileChanged);
+    AuthSession.instance.sessionChanges.addListener(_profileChanged);
+    final phone = parseBookingPhone(widget.teleponAwal, _phoneCountry);
+    if (phone != null) _phoneCountry = phone.isoCode;
+    _initialPhone = phone?.international ?? widget.teleponAwal.trim();
     _namaCtrl = TextEditingController(text: widget.namaAwal);
-    _teleponCtrl = TextEditingController(text: widget.teleponAwal);
+    _teleponCtrl = TextEditingController(
+      text: phone?.formatNsn(format: NsnFormat.international) ??
+          widget.teleponAwal,
+    );
+  }
+
+  bool get _hasChanges =>
+      _namaCtrl.text.trim() != widget.namaAwal.trim() ||
+      (parseBookingPhone(_teleponCtrl.text, _phoneCountry)?.international ??
+              _teleponCtrl.text.trim()) !=
+          _initialPhone;
+
+  void _phoneChanged() {
+    final text = _teleponCtrl.text;
+    if (text.trim().startsWith('+')) {
+      final phone = parseBookingPhone(text, _phoneCountry);
+      if (phone != null) {
+        _phoneCountry = phone.isoCode;
+        final formatted = phone.formatNsn(format: NsnFormat.international);
+        final selection = _teleponCtrl.selection;
+        int offset(int position) {
+          if (position < 0) return formatted.length;
+          final digitsBefore = text
+                  .substring(0, position.clamp(0, text.length))
+                  .replaceAll(RegExp(r'\D'), '')
+                  .length -
+              phone.countryCode.length;
+          if (digitsBefore <= 0) return 0;
+          var digits = 0;
+          for (var i = 0; i < formatted.length; i++) {
+            if (RegExp(r'\d').hasMatch(formatted[i])) digits++;
+            if (digits == digitsBefore) return i + 1;
+          }
+          return formatted.length;
+        }
+
+        _teleponCtrl.value = TextEditingValue(
+          text: formatted,
+          selection: TextSelection(
+            baseOffset: offset(selection.baseOffset),
+            extentOffset: offset(selection.extentOffset),
+          ),
+        );
+      }
+    }
+    setState(() => _phoneError = null);
+  }
+
+  void _countryChanged(IsoCode country) {
+    final previous = parseBookingPhone(_teleponCtrl.text, _phoneCountry);
+    setState(() {
+      _phoneCountry = country;
+      _phoneError = null;
+      // Preserve national digits when changing the dialing code.
+      final national = previous?.nsn ?? _teleponCtrl.text;
+      try {
+        final phone = PhoneNumber.parse(national, destinationCountry: country);
+        final formatted = phone.formatNsn(format: NsnFormat.international);
+        _teleponCtrl.value = TextEditingValue(
+          text: formatted,
+          selection: TextSelection.collapsed(offset: formatted.length),
+        );
+      } catch (_) {
+        _teleponCtrl.text = national;
+      }
+    });
+  }
+
+  Future<void> _close() async {
+    if (_isLoading || _confirmingClose || _allowPop) return;
+    if (_hasChanges) {
+      _confirmingClose = true;
+      final discard = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Buang perubahan?'),
+          content: const Text('Perubahan profil belum disimpan.'),
+          actions: [
+            TextButton(
+                onPressed: () => Navigator.pop(context, false),
+                child: const Text('Lanjut Edit')),
+            TextButton(
+                onPressed: () => Navigator.pop(context, true),
+                child: const Text('Buang Perubahan')),
+          ],
+        ),
+      );
+      _confirmingClose = false;
+      if (!mounted || discard != true) return;
+    }
+    if (!mounted) return;
+    setState(() => _allowPop = true);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) Navigator.pop(context);
+    });
   }
 
   @override
   void dispose() {
+    AuthSession.instance.profileChanges.removeListener(_profileChanged);
+    AuthSession.instance.avatarBusy.removeListener(_profileChanged);
+    AuthSession.instance.sessionChanges.removeListener(_profileChanged);
     _namaCtrl.dispose();
     _teleponCtrl.dispose();
     super.dispose();
   }
 
   Future<void> _submit() async {
-    final nama = _namaCtrl.text.trim();
-    if (nama.isEmpty) {
-      setState(() => _error = 'Nama tidak boleh kosong.');
-      return;
-    }
+    if (_isLoading ||
+        !_hasChanges ||
+        !_validSession ||
+        AuthSession.instance.avatarBusy.value) return;
     setState(() {
       _error = null;
-      _isLoading = true;
+      _phoneError = null;
+      _nameError = null;
     });
+    if (!_formKey.currentState!.validate()) return;
+    final phone = parseBookingPhone(_teleponCtrl.text, _phoneCountry)!;
+    setState(() => _isLoading = true);
     try {
-      await widget.onSimpan(nama, _teleponCtrl.text.trim());
+      await widget.onSimpan(_namaCtrl.text.trim(), phone.international);
       if (!mounted) return;
-      Navigator.pop(context);
+      setState(() => _allowPop = true);
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) Navigator.pop(context);
+      });
     } catch (e) {
+      if (!mounted) return;
       setState(() {
-        _error = 'Gagal menyimpan: $e';
+        _error = e is ApiException
+            ? e.message
+            : 'Profil belum dapat disimpan. Coba lagi.';
+        if (e is ApiException) {
+          _phoneError = e.fieldErrors['phone'];
+          _nameError = e.fieldErrors['name'];
+        }
         _isLoading = false;
       });
     }
@@ -952,123 +1148,181 @@ class _EditProfilSheetState extends State<_EditProfilSheet> {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: EdgeInsets.only(
-        bottom: MediaQuery.of(context).viewInsets.bottom + 24,
-        top: 24,
-        left: 20,
-        right: 20,
-      ),
-      decoration: BoxDecoration(
-        color: _C.card,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Center(
-            child: Container(
-              width: 40,
-              height: 4,
-              decoration: BoxDecoration(
-                color: _C.border,
-                borderRadius: BorderRadius.circular(2),
+    final border = OutlineInputBorder(
+      borderRadius: BorderRadius.circular(14),
+      borderSide: const BorderSide(color: _C.border),
+    );
+    if (!_validSession) {
+      return Scaffold(
+          appBar: AppBar(title: const Text('Edit Profil')),
+          body: const Center(
+              child: Text('Sesi telah berakhir. Silakan masuk kembali.')));
+    }
+    return PopScope(
+      canPop: _allowPop,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop) _close();
+      },
+      child: Theme(
+        data: Theme.of(context).copyWith(
+            textTheme: GoogleFonts.plusJakartaSansTextTheme(
+                Theme.of(context).textTheme)),
+        child: AnnotatedRegion<SystemUiOverlayStyle>(
+          value: const SystemUiOverlayStyle(
+              statusBarColor: Colors.transparent,
+              statusBarIconBrightness: Brightness.light),
+          child: Scaffold(
+            backgroundColor: _C.bg,
+            body: SafeArea(
+              top: false,
+              child: SingleChildScrollView(
+                keyboardDismissBehavior:
+                    ScrollViewKeyboardDismissBehavior.onDrag,
+                child: Form(
+                    key: _formKey,
+                    child: Column(children: [
+                      TimeBasedScenicBackground(
+                          child: SafeArea(
+                              bottom: false,
+                              child: Padding(
+                                  padding:
+                                      const EdgeInsets.fromLTRB(20, 8, 20, 0),
+                                  child: Column(children: [
+                                    Row(children: [
+                                      IconButton(
+                                          tooltip: 'Kembali',
+                                          onPressed: _isLoading ? null : _close,
+                                          icon: const Icon(
+                                              Icons.arrow_back_rounded,
+                                              color: Colors.white)),
+                                      Expanded(
+                                          child: Text('Edit Profil',
+                                              style: _font(20, FontWeight.w800,
+                                                  Colors.white))),
+                                    ]),
+                                    const SizedBox(height: 24),
+                                    IgnorePointer(
+                                        ignoring: _isLoading,
+                                        child: const ProfileAvatar(size: 112)),
+                                    const SizedBox(height: 12),
+                                    TextButton(
+                                        onPressed: _isLoading ||
+                                                AuthSession
+                                                    .instance.avatarBusy.value
+                                            ? null
+                                            : () => changeProfilePhoto(context),
+                                        style: TextButton.styleFrom(
+                                            foregroundColor: Colors.white),
+                                        child: const Text('Ganti Foto Profil')),
+                                    Text(
+                                        switch (currentUser?.avatarSource) {
+                                          'google' => 'Foto Google',
+                                          'custom' => 'Foto pilihanmu',
+                                          _ => 'Avatar inisial',
+                                        },
+                                        style: _font(
+                                            12, FontWeight.w500, Colors.white)),
+                                    const SizedBox(height: 28),
+                                  ])))),
+                      Container(
+                          margin: const EdgeInsets.fromLTRB(20, 20, 20, 28),
+                          padding: const EdgeInsets.all(20),
+                          decoration: BoxDecoration(
+                              color: _C.card,
+                              borderRadius: BorderRadius.circular(24)),
+                          child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                AbsorbPointer(
+                                  absorbing: _isLoading,
+                                  child: Column(children: [
+                                    TextFormField(
+                                      controller: _namaCtrl,
+                                      enabled: !_isLoading,
+                                      textCapitalization:
+                                          TextCapitalization.words,
+                                      textInputAction: TextInputAction.next,
+                                      autofillHints: const [AutofillHints.name],
+                                      style:
+                                          _font(14, FontWeight.w500, _C.text),
+                                      decoration: InputDecoration(
+                                        labelText: 'Nama Lengkap',
+                                        errorText: _nameError,
+                                        errorMaxLines: 3,
+                                        filled: true,
+                                        fillColor: _C.card,
+                                        border: border,
+                                        enabledBorder: border,
+                                        focusedBorder: border.copyWith(
+                                            borderSide: const BorderSide(
+                                                color: _C.blue, width: 2)),
+                                        contentPadding:
+                                            const EdgeInsets.symmetric(
+                                                horizontal: 16, vertical: 16),
+                                      ),
+                                      onChanged: (_) =>
+                                          setState(() => _nameError = null),
+                                      validator: (value) =>
+                                          value == null || value.trim().isEmpty
+                                              ? 'Nama tidak boleh kosong.'
+                                              : null,
+                                    ),
+                                    const SizedBox(height: 16),
+                                    TextFormField(
+                                      initialValue: currentUser?.email ?? '',
+                                      readOnly: true,
+                                      decoration: InputDecoration(
+                                          labelText: 'Email',
+                                          border: border,
+                                          suffixIcon:
+                                              const Icon(Icons.lock_outline)),
+                                      style: _font(
+                                          14, FontWeight.w500, _C.textMuted),
+                                    ),
+                                    const SizedBox(height: 16),
+                                    InternationalPhoneField(
+                                      split: true,
+                                      enabled: !_isLoading,
+                                      controller: _teleponCtrl,
+                                      country: _phoneCountry,
+                                      error: _phoneError,
+                                      onCountryChanged: _countryChanged,
+                                      onChanged: _phoneChanged,
+                                    ),
+                                  ]),
+                                ),
+                                if (_error != null) ...[
+                                  const SizedBox(height: 12),
+                                  _ErrorBanner(message: _error!),
+                                ],
+                                const SizedBox(height: 24),
+                                FilledButton(
+                                  onPressed: _isLoading ||
+                                          !_hasChanges ||
+                                          AuthSession.instance.avatarBusy.value
+                                      ? null
+                                      : _submit,
+                                  style: FilledButton.styleFrom(
+                                      minimumSize: const Size(0, 52),
+                                      backgroundColor: _C.blue,
+                                      foregroundColor: Colors.white,
+                                      shape: RoundedRectangleBorder(
+                                          borderRadius:
+                                              BorderRadius.circular(14))),
+                                  child: _isLoading
+                                      ? const SizedBox.square(
+                                          dimension: 22,
+                                          child: CircularProgressIndicator(
+                                              color: Colors.white,
+                                              strokeWidth: 2))
+                                      : const Text('Simpan Perubahan'),
+                                ),
+                              ])),
+                    ])),
               ),
             ),
           ),
-          const SizedBox(height: 20),
-          Text('Edit Profil',
-              style: TextStyle(
-                  color: _C.text, fontSize: 18, fontWeight: FontWeight.w800)),
-          const SizedBox(height: 20),
-          Text('Nama Lengkap',
-              style: TextStyle(
-                  color: _C.text, fontSize: 13, fontWeight: FontWeight.w600)),
-          const SizedBox(height: 8),
-          TextField(
-            controller: _namaCtrl,
-            style: TextStyle(color: _C.text),
-            decoration: InputDecoration(
-              hintText: 'Nama kamu',
-              hintStyle: TextStyle(color: _C.textDim),
-              filled: true,
-              fillColor: _C.bg,
-              enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(14),
-                borderSide: BorderSide(color: _C.border, width: 1.2),
-              ),
-              focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(14),
-                borderSide: BorderSide(color: _C.teal, width: 1.5),
-              ),
-              contentPadding:
-                  const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-            ),
-          ),
-          const SizedBox(height: 16),
-          Text('No. Telepon',
-              style: TextStyle(
-                  color: _C.text, fontSize: 13, fontWeight: FontWeight.w600)),
-          const SizedBox(height: 8),
-          TextField(
-            controller: _teleponCtrl,
-            keyboardType: TextInputType.phone,
-            style: TextStyle(color: _C.text),
-            decoration: InputDecoration(
-              hintText: '+62...',
-              hintStyle: TextStyle(color: _C.textDim),
-              filled: true,
-              fillColor: _C.bg,
-              enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(14),
-                borderSide: BorderSide(color: _C.border, width: 1.2),
-              ),
-              focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(14),
-                borderSide: BorderSide(color: _C.teal, width: 1.5),
-              ),
-              contentPadding:
-                  const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-            ),
-          ),
-          if (_error != null) ...[
-            const SizedBox(height: 12),
-            _ErrorBanner(message: _error!),
-          ],
-          const SizedBox(height: 20),
-          GestureDetector(
-            onTap: _isLoading ? null : _submit,
-            child: Container(
-              width: double.infinity,
-              height: 52,
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: _isLoading
-                      ? [_C.tealDark, _C.tealDark]
-                      : [_C.teal, _C.tealDark],
-                  begin: Alignment.centerLeft,
-                  end: Alignment.centerRight,
-                ),
-                borderRadius: BorderRadius.circular(14),
-              ),
-              child: Center(
-                child: _isLoading
-                    ? const SizedBox(
-                        width: 22,
-                        height: 22,
-                        child: CircularProgressIndicator(
-                            color: Colors.white, strokeWidth: 2.5),
-                      )
-                    : const Text('Simpan Perubahan',
-                        style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 15,
-                            fontWeight: FontWeight.w800)),
-              ),
-            ),
-          ),
-        ],
+        ),
       ),
     );
   }
@@ -1244,4 +1498,18 @@ class _ErrorBanner extends StatelessWidget {
           ],
         ),
       );
+}
+
+// Hide scrolling menus behind the scenic header while keeping the card above it.
+class _ProfileMenuClipper extends CustomClipper<Rect> {
+  const _ProfileMenuClipper(this.top);
+
+  final double top;
+
+  @override
+  Rect getClip(Size size) => Rect.fromLTRB(
+      0, top.clamp(0, size.height).toDouble(), size.width, size.height);
+
+  @override
+  bool shouldReclip(_ProfileMenuClipper oldClipper) => oldClipper.top != top;
 }

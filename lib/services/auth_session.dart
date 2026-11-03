@@ -72,6 +72,10 @@ class AuthSession {
   final String baseUrl;
   final ValueNotifier<bool> authenticated = ValueNotifier(false);
   final ValueNotifier<int> sessionChanges = ValueNotifier(0);
+  final ValueNotifier<int> profileChanges = ValueNotifier(0);
+  final ValueNotifier<bool> avatarBusy = ValueNotifier(false);
+  String? _avatarCacheKey;
+  Future<Uint8List>? _avatarCache;
   Map<String, dynamic>? _tokens;
   Future<void>? _refreshing;
   int? _refreshGeneration;
@@ -290,6 +294,18 @@ class AuthSession {
         nextRole == 0 && (verifiedAt is! String || verifiedAt.trim().isEmpty);
     role = nextRole;
     status = 'active';
+    final previous = currentUser;
+    if (previous != null &&
+        previous.id == data['guid'] &&
+        previous.avatarVersion > (data['avatar_version'] as int? ?? 0)) {
+      data = {
+        ...data,
+        'avatar_source': previous.avatarSource,
+        'avatar_url': previous.avatarUrl,
+        'avatar_version': previous.avatarVersion,
+        'google_avatar_available': previous.googleAvatarAvailable,
+      };
+    }
     currentUser = User(
         id: data['guid'] as String,
         namaLengkap: data['name'] as String,
@@ -299,7 +315,14 @@ class AuthSession {
         createdAt: DateTime.now(),
         emailVerifiedAt:
             verifiedAt is String ? DateTime.tryParse(verifiedAt) : null,
+        avatarSource: data['avatar_source'] as String? ?? 'default',
+        avatarUrl: data['avatar_url'] as String?,
+        avatarVersion: data['avatar_version'] as int? ?? 0,
+        googleAvatarAvailable: data['google_avatar_available'] == true,
         isLaravel: true);
+    _avatarCacheKey = null;
+    _avatarCache = null;
+    profileChanges.value++;
   }
 
   Future<void> _save(Map<String, dynamic> data, int generation) async {
@@ -363,6 +386,8 @@ class AuthSession {
     role = null;
     status = null;
     currentUser = null;
+    _avatarCacheKey = null;
+    _avatarCache = null;
     authenticated.value = false;
     sessionChanges.value++;
     try {
@@ -621,6 +646,78 @@ class AuthSession {
     _user(data);
   }
 
+  Future<Uint8List> avatarBytes() {
+    final user = currentUser;
+    if (user == null || user.avatarUrl == null) {
+      return Future.error(const ApiException('Avatar default.', 404));
+    }
+    final generation = _generation;
+    final key = '$generation:${user.id}:${user.avatarVersion}';
+    if (_avatarCacheKey == key && _avatarCache != null) return _avatarCache!;
+    _avatarCacheKey = key;
+    return _avatarCache =
+        requestBytes('profile/avatar?v=${user.avatarVersion}').then((response) {
+      if (!isCurrentGeneration(generation) ||
+          currentUser?.id != user.id ||
+          currentUser?.avatarVersion != user.avatarVersion) {
+        throw const ApiException('Sesi telah berubah.', 401);
+      }
+      return response.bytes;
+    }).catchError((Object error) {
+      if (_avatarCacheKey == key) {
+        _avatarCacheKey = null;
+        _avatarCache = null;
+      }
+      throw error;
+    });
+  }
+
+  Future<void> changeAvatar({Uint8List? bytes, String? source}) async {
+    if (avatarBusy.value) return;
+    final user = currentUser;
+    final generation = _generation;
+    if (user == null) throw const ApiException('Silakan masuk kembali.', 401);
+    avatarBusy.value = true;
+    try {
+      final Map<String, dynamic> data;
+      if (bytes != null) {
+        final envelope = await requestMultipart('POST', 'profile/avatar',
+            fields: {'avatar_version': '${user.avatarVersion}'},
+            files: [UploadFile('avatar', bytes, 'avatar.png')]);
+        final resource = envelope['data'];
+        if (resource is! Map<String, dynamic>) {
+          throw const ApiException('Respons layanan tidak valid.');
+        }
+        data = resource;
+      } else {
+        data = await request('PUT', 'profile/avatar/preference', body: {
+          'source': source,
+          'avatar_version': user.avatarVersion,
+        });
+      }
+      if (!isCurrentGeneration(generation) || currentUser?.id != user.id)
+        return;
+      if (data['guid'] != user.id) {
+        throw const ApiException('Respons identitas tidak valid.');
+      }
+      _user(data);
+    } on ApiException catch (error) {
+      if (error.status == 409 &&
+          isCurrentGeneration(generation) &&
+          currentUser?.id == user.id) {
+        try {
+          await me();
+        } catch (_) {}
+        throw const ApiException(
+            'Foto profil telah berubah. Periksa foto terbaru lalu coba lagi.',
+            409);
+      }
+      rethrow;
+    } finally {
+      avatarBusy.value = false;
+    }
+  }
+
 // =====================================================
 // FIREBASE CLOUD MESSAGING — DEVICE REGISTRATION
 // =====================================================
@@ -673,6 +770,8 @@ class AuthSession {
     role = null;
     status = null;
     currentUser = null;
+    _avatarCacheKey = null;
+    _avatarCache = null;
     authenticated.value = false;
     sessionChanges.value++;
     try {
@@ -704,6 +803,8 @@ class AuthSession {
     otpExpiresInSeconds = null;
     deviceSessionReady = false;
     currentUser = null;
+    _avatarCacheKey = null;
+    _avatarCache = null;
     authenticated.value = false;
     sessionChanges.value++;
     deviceSessionChanged?.call();

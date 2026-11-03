@@ -13,9 +13,17 @@ class User {
   String password;
   DateTime createdAt;
   final DateTime? emailVerifiedAt;
+  final String avatarSource;
+  final String? avatarUrl;
+  final int avatarVersion;
+  final bool googleAvatarAvailable;
 
   User({
     this.isLaravel = false,
+    this.avatarSource = 'default',
+    this.avatarUrl,
+    this.avatarVersion = 0,
+    this.googleAvatarAvailable = false,
     this.emailVerifiedAt,
     required this.id,
     required this.namaLengkap,
