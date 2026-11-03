@@ -91,6 +91,7 @@ void main() {
     await tester.tap(find.text('Asia/Makassar (WITA)').last);
     await tester.pumpAndSettle();
     await pickGalleryPhoto(tester);
+    await pickDraftLocation(tester);
     await tester.tap(find.text('Simpan Perubahan'));
     await tester.pumpAndSettle();
 
@@ -104,7 +105,11 @@ void main() {
       'cat-1',
       '25000',
       'Asia/Makassar',
-      'images[]'
+      'images[]',
+      'latitude',
+      '-5.14',
+      'longitude',
+      '119.41'
     ]) {
       expect(latin1.decode(post.bodyBytes), contains(value));
     }

@@ -15,6 +15,9 @@ import '../services/auth_session.dart';
 import '../data/gallery_draft.dart';
 import '../widgets/admin_destination_gallery_editor.dart';
 import '../data/favorite_state.dart';
+import 'package:latlong2/latlong.dart';
+import '../widgets/destination_location_map_preview.dart';
+import 'destination_location_picker_screen.dart';
 
 // ── Palet (sama dengan home_screen.dart) ─────────────────────
 class _C {
@@ -60,6 +63,9 @@ class _TambahWisataScreenState extends State<TambahWisataScreen> {
   bool _picking = false;
   bool _dirty = false;
   bool _isSaving = false;
+  LatLng? _locationPoint;
+  bool _locationEdited = false, _hydratingLocation = false;
+  Map<String, String> _locationErrors = {};
 
   late final BusinessRepository _repository =
       widget.repository ?? BusinessRepository();
@@ -83,6 +89,9 @@ class _TambahWisataScreenState extends State<TambahWisataScreen> {
     final w = widget.wisataEdit;
     namaCtrl = TextEditingController(text: w?.nama ?? '');
     lokasiCtrl = TextEditingController(text: w?.lokasi ?? '');
+    if (w?.latitude != null && w?.longitude != null) {
+      _locationPoint = LatLng(w!.latitude!, w.longitude!);
+    }
     deskCtrl = TextEditingController(text: w?.deskripsi ?? '');
     hargaCtrl =
         TextEditingController(text: w == null ? '' : '${w.ticketPrice}');
@@ -95,6 +104,11 @@ class _TambahWisataScreenState extends State<TambahWisataScreen> {
       jamCtrl
     ]) {
       controller.addListener(() {
+        if (_hydratingLocation) return;
+        if (controller == lokasiCtrl) {
+          _locationEdited = true;
+          _locationErrors = {};
+        }
         if (mounted) setState(() => _dirty = true);
       });
     }
@@ -149,6 +163,8 @@ class _TambahWisataScreenState extends State<TambahWisataScreen> {
       _gallery.isNotEmpty &&
       _gallery.length <= 10 &&
       _categoryGuid != null &&
+      (widget.wisataEdit != null || _locationPoint != null) &&
+      lokasiCtrl.text.trim().length <= 255 &&
       [namaCtrl, lokasiCtrl, deskCtrl, jamCtrl]
           .every((c) => c.text.trim().isNotEmpty) &&
       (int.tryParse(hargaCtrl.text.trim()) ?? -1) >= 0;
@@ -163,6 +179,14 @@ class _TambahWisataScreenState extends State<TambahWisataScreen> {
       final value = await _repository.adminDestination(_savedDestinationGuid!);
       if (!mounted || !_session.isCurrentGeneration(_sessionGeneration)) return;
       setState(() {
+        if (!_galleryReady && !_locationEdited) {
+          _hydratingLocation = true;
+          lokasiCtrl.text = value.location;
+          _locationPoint = value.hasCoordinates
+              ? LatLng(value.latitude!, value.longitude!)
+              : null;
+          _hydratingLocation = false;
+        }
         _galleryReady = true;
         _galleryVersion = value.galleryVersion;
         _gallery
@@ -281,6 +305,11 @@ class _TambahWisataScreenState extends State<TambahWisataScreen> {
   Future<void> _simpan() async {
     if (_isSaving || !_formKey.currentState!.validate()) return;
     final edit = widget.wisataEdit;
+    if (edit == null && _locationPoint == null) {
+      setState(() =>
+          _locationErrors = {'latitude': 'Pilih titik lokasi terlebih dahulu'});
+      return;
+    }
     if (!_session.isCurrentGeneration(_sessionGeneration) ||
         !canAccessAdmin(_session.role)) {
       _snack('Sesi telah berakhir. Silakan masuk kembali.');
@@ -306,6 +335,8 @@ class _TambahWisataScreenState extends State<TambahWisataScreen> {
       'destination_category_guid': _categoryGuid,
       'name': namaCtrl.text.trim(),
       'location': lokasiCtrl.text.trim(),
+      if (_locationPoint != null) 'latitude': _locationPoint!.latitude,
+      if (_locationPoint != null) 'longitude': _locationPoint!.longitude,
       'description': deskCtrl.text.trim(),
       'ticket_price': price,
       'opening_hours': jamCtrl.text.trim(),
@@ -380,6 +411,11 @@ class _TambahWisataScreenState extends State<TambahWisataScreen> {
       setState(() {
         _failedSave = true;
         _isSaving = false;
+        if (e is ApiException && e.status == 422) {
+          _locationErrors = Map.fromEntries(e.fieldErrors.entries.where(
+              (entry) =>
+                  ['location', 'latitude', 'longitude'].contains(entry.key)));
+        }
       });
       if (e is ApiException && e.status == 409) {
         final refresh = await showDialog<bool>(
@@ -657,15 +693,7 @@ class _TambahWisataScreenState extends State<TambahWisataScreen> {
                           : null,
                     ),
                     const SizedBox(height: 12),
-                    _field(
-                      ctrl: lokasiCtrl,
-                      label: 'Lokasi',
-                      hint: 'Contoh: Yogyakarta, DIY',
-                      icon: Icons.location_on_rounded,
-                      validator: (v) => (v == null || v.trim().isEmpty)
-                          ? 'Lokasi wajib diisi'
-                          : null,
-                    ),
+                    _locationSection(),
                     const SizedBox(height: 12),
                     _kategoriPicker(),
                     const SizedBox(height: 12),
@@ -855,6 +883,100 @@ class _TambahWisataScreenState extends State<TambahWisataScreen> {
   }
 
   // ── Section label ─────────────────────────────────────────
+  Future<void> _pickLocation() async {
+    if (_isSaving ||
+        !_galleryReady ||
+        _galleryLoading ||
+        !_session.isCurrentGeneration(_sessionGeneration) ||
+        !canAccessAdmin(_session.role)) {
+      return;
+    }
+    final result = await Navigator.push<DestinationLocationDraft>(
+        context,
+        MaterialPageRoute(
+            builder: (_) => DestinationLocationPickerScreen(
+                  initialPoint: _locationPoint,
+                  initialAddress: lokasiCtrl.text,
+                  repository: _repository,
+                  session: _session,
+                )));
+    if (result == null ||
+        !mounted ||
+        !_session.isCurrentGeneration(_sessionGeneration)) {
+      return;
+    }
+    setState(() {
+      _locationPoint = result.point;
+      lokasiCtrl.text = result.address;
+      _locationEdited = true;
+      _locationErrors = {};
+      _dirty = true;
+    });
+  }
+
+  Widget _locationSection() =>
+      Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        const Text('Lokasi Destinasi',
+            style: TextStyle(
+                color: _C.text, fontSize: 14, fontWeight: FontWeight.w700)),
+        const SizedBox(height: 6),
+        const Text('Tentukan titik akurat pada peta.',
+            style: TextStyle(color: _C.textMuted, fontSize: 12)),
+        const SizedBox(height: 12),
+        ClipRRect(
+            borderRadius: BorderRadius.circular(14),
+            child: SizedBox(
+                height: 160,
+                child: _locationPoint == null
+                    ? const ColoredBox(
+                        color: Colors.white,
+                        child: Center(
+                            child: Padding(
+                                padding: EdgeInsets.all(16),
+                                child: Text('Tentukan lokasi di peta',
+                                    textAlign: TextAlign.center))))
+                    : IgnorePointer(
+                        child: DestinationLocationMap(
+                            key: ValueKey(_locationPoint),
+                            point: _locationPoint)))),
+        const SizedBox(height: 8),
+        OutlinedButton.icon(
+            onPressed: _isSaving || !_galleryReady || _galleryLoading
+                ? null
+                : _pickLocation,
+            icon: const Icon(Icons.pin_drop_outlined, size: 20),
+            label: Text(_locationPoint == null
+                ? 'Pilih Titik Lokasi'
+                : 'Ubah Titik Lokasi')),
+        const SizedBox(height: 8),
+        _field(
+            ctrl: lokasiCtrl,
+            label: 'Alamat Lengkap',
+            hint: 'Contoh: Yogyakarta, DIY',
+            icon: Icons.location_on_rounded,
+            maxLines: 3,
+            maxLength: 255,
+            errorText: _locationErrors['location'],
+            validator: (value) {
+              if (value == null || value.trim().isEmpty) {
+                return 'Alamat lengkap wajib diisi';
+              }
+              return value.trim().length > 255 ? 'Maksimal 255 karakter' : null;
+            }),
+        const SizedBox(height: 8),
+        Text(
+            _locationPoint == null
+                ? widget.wisataEdit == null
+                    ? 'Pilih titik lokasi terlebih dahulu'
+                    : 'Lokasi peta belum ditentukan'
+                : 'Koordinat: ${_locationPoint!.latitude.toStringAsFixed(7)}, ${_locationPoint!.longitude.toStringAsFixed(7)}',
+            style: const TextStyle(color: _C.textMuted, fontSize: 12)),
+        for (final field in ['latitude', 'longitude'])
+          if (_locationErrors[field] != null)
+            Text(_locationErrors[field]!,
+                style: const TextStyle(color: _C.danger, fontSize: 12)),
+      ]);
+
   Widget _sectionLabel(String label) {
     return Row(
       children: [
@@ -967,6 +1089,8 @@ class _TambahWisataScreenState extends State<TambahWisataScreen> {
     required String hint,
     required IconData icon,
     int maxLines = 1,
+    int? maxLength,
+    String? errorText,
     TextInputType? keyboardType,
     List<TextInputFormatter>? formatters,
     String? Function(String?)? validator,
@@ -981,11 +1105,14 @@ class _TambahWisataScreenState extends State<TambahWisataScreen> {
         TextFormField(
           controller: ctrl,
           maxLines: maxLines,
+          maxLength: maxLength,
+          enabled: !_isSaving,
           keyboardType: keyboardType,
           inputFormatters: formatters,
           validator: validator,
           style: const TextStyle(color: _C.text, fontSize: 14),
           decoration: InputDecoration(
+            errorText: errorText,
             hintText: hint,
             hintStyle: const TextStyle(color: _C.textDim, fontSize: 13),
             prefixIcon: Padding(

@@ -15,6 +15,7 @@ import '../data/app_data.dart';
 import '../widgets/api_image.dart';
 import '../widgets/availability_calendar.dart';
 import '../widgets/international_phone_field.dart';
+import '../widgets/visit_format.dart';
 import 'permintaan_terkirim_screen.dart';
 import 'package:phone_numbers_parser/phone_numbers_parser.dart';
 
@@ -25,7 +26,6 @@ class _C {
   static const orange = Color(0xFFFF9800);
   static const bg = Color(0xFFF5F8FD);
   static const card = Colors.white;
-  static const surface = Colors.white;
   static const text = navy;
   static const textMuted = Color(0xFF728099);
   static const textDim = Color(0xFF9AA7BC);
@@ -44,14 +44,16 @@ class DaftarKunjunganScreen extends StatefulWidget {
   final BusinessRepository? repository;
   final BookingIntent? intent;
 
-  /// Pre-selected visit date (tests only; the user normally picks it).
+  /// Optional initial selection; availability is always revalidated by Laravel.
   final DateTime? initialDate;
+  final int initialQuantity;
   const DaftarKunjunganScreen(
       {super.key,
       required this.wisata,
       this.repository,
       this.intent,
-      this.initialDate});
+      this.initialDate,
+      this.initialQuantity = 1});
 
   @override
   State<DaftarKunjunganScreen> createState() => _DaftarKunjunganScreenState();
@@ -60,6 +62,12 @@ class DaftarKunjunganScreen extends StatefulWidget {
 class _DaftarKunjunganScreenState extends State<DaftarKunjunganScreen>
     with SingleTickerProviderStateMixin {
   final _formKey = GlobalKey<FormState>();
+  final _calendarKey = GlobalKey();
+  final _guestKey = GlobalKey();
+  BuildContext? _summaryContext;
+  bool _reviewing = false;
+  bool _pendingLoading = true;
+  Map<String, String> _fieldErrors = {};
 
   final _namaCtrl = TextEditingController();
   final _teleponCtrl = TextEditingController();
@@ -119,6 +127,7 @@ class _DaftarKunjunganScreenState extends State<DaftarKunjunganScreen>
       _emailCtrl.text = currentUser!.email;
     }
     _tanggal = widget.initialDate;
+    _jumlahOrang = widget.initialQuantity.clamp(1, 1000000);
     final initial =
         widget.initialDate ?? destinationCalendarNow(widget.wisata.timezone);
     _month = DateTime(initial.year, initial.month);
@@ -147,6 +156,13 @@ class _DaftarKunjunganScreenState extends State<DaftarKunjunganScreen>
   }
 
   void _sessionChanged() {
+    final summary = _summaryContext;
+    if (summary != null &&
+        summary.mounted &&
+        ModalRoute.of(summary)?.isCurrent == true)
+      Navigator.of(summary).pop(false);
+    _summaryContext = null;
+    _fieldErrors = {};
     _namaCtrl.clear();
     _teleponCtrl.clear();
     _phoneCountry = IsoCode.ID;
@@ -170,9 +186,11 @@ class _DaftarKunjunganScreenState extends State<DaftarKunjunganScreen>
         _intentMessage = null;
         _intentBusy = false;
         _isLoading = false;
+        _reviewing = false;
       });
     }
     _detectPhoneCountry();
+    _loadAvailability();
     _loadPendingIntent();
   }
 
@@ -185,8 +203,12 @@ class _DaftarKunjunganScreenState extends State<DaftarKunjunganScreen>
 
   /// Reads the stored unresolved attempt of the signed-in account (secure storage only).
   Future<void> _loadPendingIntent() async {
+    if (mounted) setState(() => _pendingLoading = true);
     final user = currentUser;
-    if (user == null || !user.isLaravel || !widget.wisata.isLaravel) return;
+    if (user == null || !user.isLaravel || !widget.wisata.isLaravel) {
+      if (mounted) setState(() => _pendingLoading = false);
+      return;
+    }
     final generation = _session.sessionGeneration;
     try {
       final pending = await _intent.pending(user.id);
@@ -196,11 +218,15 @@ class _DaftarKunjunganScreenState extends State<DaftarKunjunganScreen>
         return;
       }
       setState(() {
+        _pendingLoading = false;
         _pendingFields = pending;
         if (pending == null) _resolution = null;
       });
     } catch (_) {
-      /* Invalid session: the session listener resets this screen. */
+      if (_sameSession(user, generation)) {
+        setState(() => _intentMessage =
+            'Percobaan sebelumnya belum dapat diperiksa. Muat ulang sebelum melanjutkan.');
+      }
     }
   }
 
@@ -230,13 +256,19 @@ class _DaftarKunjunganScreenState extends State<DaftarKunjunganScreen>
       : _availability.data?.onDate(formatVisitDate(_tanggal!));
 
   bool get _canSubmit =>
+      widget.wisata.isActive &&
+      _session.authenticated.value &&
+      _session.deviceSessionReady &&
       !_availability.loading &&
       _availability.error == null &&
       _availability.data?.requestedQuantity == _jumlahOrang &&
       _selectedAvailability?.bookable == true;
 
   void _changeQuantity(int quantity) {
-    setState(() => _jumlahOrang = quantity);
+    setState(() {
+      _jumlahOrang = quantity;
+      _fieldErrors.remove('quantity');
+    });
     _loadAvailability();
   }
 
@@ -244,6 +276,8 @@ class _DaftarKunjunganScreenState extends State<DaftarKunjunganScreen>
   bool get _submitEnabled =>
       _canSubmit &&
       _pendingFields == null &&
+      !_pendingLoading &&
+      !_reviewing &&
       !_isLoading &&
       !_intentBusy &&
       !_completed;
@@ -302,7 +336,7 @@ class _DaftarKunjunganScreenState extends State<DaftarKunjunganScreen>
       return;
     }
 
-    if (_isLoading || _intentBusy || _completed) return;
+    if (_isLoading || _intentBusy || _completed || _pendingLoading) return;
     final user = currentUser;
     if (user == null || !user.isLaravel || !widget.wisata.isLaravel) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
@@ -324,6 +358,7 @@ class _DaftarKunjunganScreenState extends State<DaftarKunjunganScreen>
     setState(() {
       _isLoading = true;
       _phoneError = null;
+      _fieldErrors = {};
     });
     final fields = <String, dynamic>{
       'destination_guid': widget.wisata.id,
@@ -350,7 +385,18 @@ class _DaftarKunjunganScreenState extends State<DaftarKunjunganScreen>
         return;
       }
       if (error is ApiException && error.status == 422) {
-        setState(() => _phoneError = error.fieldErrors['visitor_phone']);
+        setState(() {
+          _fieldErrors = error.fieldErrors;
+          _phoneError = error.fieldErrors['visitor_phone'];
+        });
+        final target = error.fieldErrors.keys.any((key) => [
+                  'visitor_name',
+                  'visitor_email',
+                  'visitor_phone'
+                ].contains(key))
+            ? _guestKey
+            : _calendarKey;
+        _scrollTo(target);
       }
       _showMessage(bookingErrorMessage(error, mutation: true));
       // An unknown outcome leaves the intent behind: surface it. A definitive refusal
@@ -516,292 +562,489 @@ class _DaftarKunjunganScreenState extends State<DaftarKunjunganScreen>
     }
   }
 
+  String get _currency => widget.wisata.hargaTiket.split(' ').first;
+  String get _unitPrice => visitMoney(widget.wisata.ticketPrice, _currency);
+  bool get _busy => _isLoading || _intentBusy || _completed;
+
+  void _scrollTo(GlobalKey key) {
+    final target = key.currentContext;
+    if (target != null)
+      Scrollable.ensureVisible(target,
+          duration: MediaQuery.disableAnimationsOf(context)
+              ? Duration.zero
+              : const Duration(milliseconds: 250),
+          alignment: .08);
+  }
+
+  Future<void> _reviewRegistration() async {
+    if (!_submitEnabled) return;
+    if (!_formKey.currentState!.validate()) {
+      _scrollTo(_guestKey);
+      return;
+    }
+    final user = currentUser;
+    if (user == null || !user.isLaravel) return;
+    final generation = _session.sessionGeneration;
+    FocusManager.instance.primaryFocus?.unfocus();
+    setState(() => _reviewing = true);
+    final phone = parseBookingPhone(_teleponCtrl.text, _phoneCountry)!;
+    final date = _tanggal!;
+    final quantity = _jumlahOrang;
+    final name = _namaCtrl.text.trim();
+    final email = _emailCtrl.text.trim();
+    final notes = _catatanCtrl.text.trim();
+    var answered = false;
+    final confirmed = await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      showDragHandle: true,
+      backgroundColor: Colors.white,
+      builder: (context) {
+        _summaryContext = context;
+        return SafeArea(
+            top: false,
+            child: ConstrainedBox(
+              constraints: BoxConstraints(
+                  maxHeight: MediaQuery.sizeOf(context).height * .88),
+              child: SingleChildScrollView(
+                  padding: const EdgeInsets.fromLTRB(24, 8, 24, 24),
+                  child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        const Text('Ringkasan Pendaftaran',
+                            style: TextStyle(
+                                color: _C.navy,
+                                fontSize: 22,
+                                fontWeight: FontWeight.w800)),
+                        const SizedBox(height: 8),
+                        const Text(
+                            'Periksa kembali kunjungan Anda sebelum mengirim permintaan.',
+                            style: TextStyle(color: _C.textMuted, height: 1.5)),
+                        const SizedBox(height: 20),
+                        _summaryRow('Destinasi', widget.wisata.nama),
+                        _summaryRow('Tanggal kunjungan', visitDateLabel(date)),
+                        _summaryRow('Jumlah pengunjung', '$quantity orang'),
+                        const Divider(height: 28, color: _C.border),
+                        _summaryRow('Nama lengkap', name),
+                        _summaryRow('Nomor telepon', phone.international),
+                        _summaryRow('Email', email),
+                        if (notes.isNotEmpty) _summaryRow('Catatan', notes),
+                        const Divider(height: 28, color: _C.border),
+                        _summaryRow('Harga / orang', _unitPrice),
+                        _summaryRow(
+                            'Estimasi Total',
+                            visitMoney(widget.wisata.ticketPrice * quantity,
+                                _currency)),
+                        const SizedBox(height: 8),
+                        const Text(
+                            'Harga dan ketersediaan akhir mengikuti konfirmasi layanan. Permintaan ini belum berarti persetujuan pengelola atau pembayaran berhasil.',
+                            style: TextStyle(
+                                color: _C.textMuted,
+                                fontSize: 12,
+                                height: 1.6)),
+                        const SizedBox(height: 24),
+                        FilledButton(
+                            key: const ValueKey('confirmBookingButton'),
+                            onPressed: () {
+                              if (answered ||
+                                  ModalRoute.of(context)?.isCurrent != true)
+                                return;
+                              answered = true;
+                              Navigator.pop(context, true);
+                            },
+                            style: FilledButton.styleFrom(
+                                backgroundColor: _C.blue,
+                                padding: const EdgeInsets.all(16),
+                                shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(16))),
+                            child: const Text('Kirim Permintaan Kunjungan',
+                                textAlign: TextAlign.center)),
+                        const SizedBox(height: 8),
+                        TextButton(
+                            onPressed: () {
+                              if (answered ||
+                                  ModalRoute.of(context)?.isCurrent != true)
+                                return;
+                              answered = true;
+                              Navigator.pop(context, false);
+                            },
+                            child: const Text('Ubah Data')),
+                      ])),
+            ));
+      },
+    );
+    _summaryContext = null;
+    if (!_sameSession(user, generation)) return;
+    setState(() => _reviewing = false);
+    if (confirmed == true && _submitEnabled) await _submit();
+  }
+
+  Widget _summaryRow(String label, String value) => Padding(
+      padding: const EdgeInsets.symmetric(vertical: 7),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Text(label, style: const TextStyle(color: _C.textMuted, fontSize: 12)),
+        const SizedBox(height: 4),
+        Text(value,
+            style: const TextStyle(
+                color: _C.navy, fontWeight: FontWeight.w700, height: 1.5))
+      ]));
+
   @override
   Widget build(BuildContext context) {
+    final canChooseDate = !_busy && !_reviewing && _pendingFields == null;
+    final canGuide = canChooseDate &&
+        !_pendingLoading &&
+        widget.wisata.isActive &&
+        _session.deviceSessionReady;
+    final remaining = _selectedAvailability?.remaining;
     return Scaffold(
       backgroundColor: _C.bg,
       appBar: AppBar(
-        backgroundColor: _C.surface,
-        elevation: 0,
-        systemOverlayStyle: const SystemUiOverlayStyle(
-          statusBarColor: Colors.transparent,
-          statusBarIconBrightness: Brightness.dark,
-          systemNavigationBarColor: Colors.transparent,
-          systemNavigationBarIconBrightness: Brightness.dark,
-        ),
-        leading: IconButton(
-          tooltip: 'Kembali',
-          onPressed: () => Navigator.pop(context),
-          icon: const Icon(Icons.arrow_back_ios_new_rounded,
-              color: Color(0xFF102D59), size: 18),
-        ),
-        title: const Text(
-          'Daftar Kunjungan',
-          style: TextStyle(
-            color: Color(0xFF102D59),
-            fontWeight: FontWeight.w800,
-            fontSize: 17,
-            letterSpacing: -0.3,
-          ),
-        ),
-        centerTitle: true,
-        bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(1),
-          child: Container(height: 1, color: _C.teal.withValues(alpha: 0.12)),
-        ),
-      ),
-      bottomNavigationBar: SafeArea(
-        top: false,
-        child: Container(
-          padding: const EdgeInsets.fromLTRB(20, 12, 20, 12),
-          color: Colors.white,
-          child: Column(mainAxisSize: MainAxisSize.min, children: [
-            if (!_completed) ...[
-              Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-                const Flexible(
-                    child: Text('Estimasi total',
-                        style: TextStyle(color: _C.textMuted))),
-                Flexible(
-                    child: Text(
-                  widget.wisata.isLaravel
-                      ? '${widget.wisata.hargaTiket.split(' ').first} ${widget.wisata.ticketPrice * _jumlahOrang}'
-                      : '${widget.wisata.hargaTiket} x $_jumlahOrang',
-                  textAlign: TextAlign.end,
-                  style: const TextStyle(
-                      color: _C.navy, fontWeight: FontWeight.w800),
-                )),
-              ]),
-              const SizedBox(height: 10),
-            ],
-            Semantics(
-              button: true,
-              enabled: _submitEnabled,
-              label: 'Konfirmasi Pendaftaran',
-              child: GestureDetector(
-                key: const ValueKey('submitButton'),
-                onTap: _submitEnabled ? _submit : null,
-                child: Container(
-                  constraints: const BoxConstraints(minHeight: 56),
-                  width: double.infinity,
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                  decoration: BoxDecoration(
-                    color: _submitEnabled ? _C.blue : const Color(0xFFB5C7DD),
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                  child: Center(
-                    child: _isLoading
-                        ? const SizedBox(
-                            width: 24,
-                            height: 24,
-                            child: CircularProgressIndicator(
-                                color: Colors.white, strokeWidth: 2.5))
-                        : const Text('Konfirmasi Pendaftaran',
-                            textAlign: TextAlign.center,
-                            style: TextStyle(
-                                color: Colors.white,
-                                fontSize: 15,
-                                fontWeight: FontWeight.w800)),
-                  ),
-                ),
-              ),
-            ),
-          ]),
-        ),
-      ),
-      body: FadeTransition(
-        opacity: _fadeAnim,
-        child: SlideTransition(
-          position: _slideAnim,
-          child: Form(
-            key: _formKey,
-            child: ListView(
-              padding: const EdgeInsets.fromLTRB(20, 24, 20, 40),
-              children: [
-                // ── Destinasi Info Card ─────────────────────
-                _DestinasiCard(wisata: widget.wisata),
-                const SizedBox(height: 28),
-
-                // ── Section: Data Pengunjung ────────────────
-                _sectionLabel('Data Pengunjung'),
-                const SizedBox(height: 14),
-
-                _DarkField(
-                  controller: _namaCtrl,
-                  label: 'Nama Lengkap',
-                  hint: 'Masukkan nama lengkap',
-                  icon: Icons.person_rounded,
-                  validator: (v) => (v == null || v.trim().isEmpty)
-                      ? 'Nama wajib diisi'
-                      : null,
-                ),
-                const SizedBox(height: 14),
-
-                InternationalPhoneField(
-                  controller: _teleponCtrl,
-                  country: _phoneCountry,
-                  error: _phoneError,
-                  onCountryChanged: (country) => setState(() {
-                    _phoneCountry = country;
-                    _phoneError = null;
-                    if (_teleponCtrl.text.trim().startsWith('+')) {
-                      final phone =
-                          parseBookingPhone(_teleponCtrl.text, country);
-                      if (phone != null) _teleponCtrl.text = phone.nsn;
-                    }
-                    final phone = parseBookingPhone(_teleponCtrl.text, country);
-                    if (phone != null) {
-                      _teleponCtrl.text =
-                          phone.formatNsn(format: NsnFormat.international);
-                    }
-                  }),
-                  onChanged: () => setState(() {
-                    _phoneError = null;
-                    _detectPhoneCountry();
-                  }),
-                ),
-                const SizedBox(height: 14),
-
-                _DarkField(
-                  controller: _emailCtrl,
-                  label: 'Email',
-                  hint: 'nama@email.com',
-                  icon: Icons.email_rounded,
-                  keyboardType: TextInputType.emailAddress,
-                  // Backend mewajibkan email yang valid (StoreBookingRequest).
-                  validator: (v) => (v == null ||
-                          !RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$')
-                              .hasMatch(v.trim()))
-                      ? 'Email tidak valid'
-                      : null,
-                ),
-                const SizedBox(height: 28),
-
-                // ── Section: Detail Kunjungan ───────────────
-                _sectionLabel('Detail Kunjungan'),
-                const SizedBox(height: 14),
-
-                AvailabilityCalendar(
-                  month: _month,
-                  availability: _availability.data,
-                  selectedDate:
-                      _tanggal == null ? null : formatVisitDate(_tanggal!),
-                  enabled: !_availability.loading &&
-                      _availability.error == null &&
-                      !_isLoading &&
-                      !_intentBusy,
-                  onMonthChanged: (month) {
-                    setState(() {
-                      _month = month;
-                      _tanggal = null;
-                    });
-                    _loadAvailability();
-                  },
-                  onSelected: (day) =>
-                      setState(() => _tanggal = DateTime.parse(day.date)),
-                ),
-                const SizedBox(height: 10),
-                _buildAvailability(),
-                const SizedBox(height: 14),
-
-                // Jumlah Orang
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                  decoration: BoxDecoration(
-                    color: _C.card,
-                    borderRadius: BorderRadius.circular(14),
-                    border: Border.all(color: _C.border),
-                  ),
-                  child: Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(8),
-                        decoration: BoxDecoration(
-                          color: _C.gold.withValues(alpha: 0.12),
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        child:
-                            Icon(Icons.group_rounded, color: _C.gold, size: 18),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
+          backgroundColor: Colors.white,
+          foregroundColor: _C.navy,
+          elevation: 0,
+          surfaceTintColor: Colors.transparent,
+          systemOverlayStyle: const SystemUiOverlayStyle(
+              statusBarColor: Colors.transparent,
+              statusBarIconBrightness: Brightness.dark,
+              systemNavigationBarColor: Colors.transparent,
+              systemNavigationBarIconBrightness: Brightness.dark),
+          leading: IconButton(
+              tooltip: 'Kembali',
+              onPressed: () => Navigator.pop(context),
+              icon: const Icon(Icons.arrow_back_rounded)),
+          title: const Text('Daftar Kunjungan',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800)),
+          centerTitle: true),
+      bottomNavigationBar: MediaQuery.viewInsetsOf(context).bottom > 0
+          ? null
+          : Container(
+              decoration: const BoxDecoration(
+                  color: Colors.white,
+                  border: Border(top: BorderSide(color: _C.border))),
+              child: SafeArea(
+                  top: false,
+                  child: Padding(
+                      padding: const EdgeInsets.fromLTRB(20, 14, 20, 12),
+                      child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
-                            Text('Jumlah Pengunjung',
-                                style: TextStyle(
-                                    color: _C.textDim,
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.w500)),
-                            Text(
-                              '$_jumlahOrang orang',
-                              style: TextStyle(
-                                color: _C.text,
-                                fontSize: 14,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      Row(
-                        children: [
-                          _CounterBtn(
-                            icon: Icons.remove_rounded,
-                            onTap: _jumlahOrang > 1
-                                ? () => _changeQuantity(_jumlahOrang - 1)
-                                : null,
-                          ),
-                          Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 14),
-                            child: Text(
-                              '$_jumlahOrang',
-                              style: TextStyle(
-                                color: _C.teal,
-                                fontSize: 18,
-                                fontWeight: FontWeight.w800,
-                              ),
-                            ),
-                          ),
-                          _CounterBtn(
-                            icon: Icons.add_rounded,
-                            onTap: _jumlahOrang < 50
-                                ? () => _changeQuantity(_jumlahOrang + 1)
-                                : null,
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 14),
-
-                // Catatan
-                _DarkField(
-                  controller: _catatanCtrl,
-                  label: 'Catatan (opsional)',
-                  hint: 'Kebutuhan khusus, aksesibilitas, dll.',
-                  icon: Icons.notes_rounded,
-                  maxLines: 3,
-                ),
-                const SizedBox(height: 36),
-
-                if (_pendingFields != null && !_completed) ...[
-                  _buildIntentPanel(_pendingFields!),
-                  const SizedBox(height: 20),
-                ],
-
-                // ── Tombol Daftar ───────────────────────────
-              ],
+                            Wrap(
+                                alignment: WrapAlignment.spaceBetween,
+                                runSpacing: 8,
+                                spacing: 16,
+                                children: [
+                                  Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        const Text('Estimasi Total',
+                                            style: TextStyle(
+                                                color: _C.textMuted,
+                                                fontSize: 12)),
+                                        const SizedBox(height: 3),
+                                        Text(
+                                            visitMoney(
+                                                widget.wisata.ticketPrice *
+                                                    _jumlahOrang,
+                                                _currency),
+                                            style: const TextStyle(
+                                                color: _C.navy,
+                                                fontSize: 22,
+                                                fontWeight: FontWeight.w800))
+                                      ]),
+                                  Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        const Text('Tanggal kunjungan',
+                                            style: TextStyle(
+                                                color: _C.textMuted,
+                                                fontSize: 12)),
+                                        const SizedBox(height: 4),
+                                        Text(
+                                            _tanggal == null
+                                                ? 'Belum dipilih'
+                                                : visitDateLabel(_tanggal!),
+                                            style: const TextStyle(
+                                                color: _C.navy,
+                                                fontSize: 12,
+                                                fontWeight: FontWeight.w600))
+                                      ]),
+                                ]),
+                            const SizedBox(height: 12),
+                            FilledButton(
+                                key: const ValueKey('submitButton'),
+                                onPressed: _submitEnabled
+                                    ? _reviewRegistration
+                                    : canGuide && _tanggal == null
+                                        ? () => _scrollTo(_calendarKey)
+                                        : null,
+                                style: FilledButton.styleFrom(
+                                    backgroundColor: _C.blue,
+                                    disabledBackgroundColor:
+                                        const Color(0xFFB5C7DD),
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 16, vertical: 16),
+                                    shape: RoundedRectangleBorder(
+                                        borderRadius:
+                                            BorderRadius.circular(16))),
+                                child: _isLoading
+                                    ? const SizedBox(
+                                        width: 22,
+                                        height: 22,
+                                        child: CircularProgressIndicator(
+                                            color: Colors.white,
+                                            strokeWidth: 2))
+                                    : Text(
+                                        _pendingFields != null
+                                            ? 'Selesaikan Percobaan Sebelumnya'
+                                            : _tanggal == null
+                                                ? 'Pilih Tanggal Kunjungan'
+                                                : 'Tinjau Pendaftaran',
+                                        textAlign: TextAlign.center,
+                                        style: const TextStyle(
+                                            fontWeight: FontWeight.w800))),
+                          ]))),
             ),
-          ),
-        ),
-      ),
+      body: FadeTransition(
+          opacity: _fadeAnim,
+          child: SlideTransition(
+              position: _slideAnim,
+              child: Form(
+                  key: _formKey,
+                  child: ListView(
+                    keyboardDismissBehavior:
+                        ScrollViewKeyboardDismissBehavior.onDrag,
+                    padding: const EdgeInsets.fromLTRB(20, 20, 20, 32),
+                    children: [
+                      _DestinasiCard(
+                          wisata: widget.wisata, repository: _repository),
+                      if (!widget.wisata.isActive)
+                        const Padding(
+                            padding: EdgeInsets.only(top: 16),
+                            child: Text(
+                                'Destinasi ini sedang tidak menerima kunjungan.',
+                                style: TextStyle(color: _C.danger))),
+                      if (_pendingLoading)
+                        Padding(
+                            padding: const EdgeInsets.only(top: 16),
+                            child: _infoCard(
+                                child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                  Text(_intentMessage ??
+                                      'Memeriksa percobaan pendaftaran sebelumnya...'),
+                                  if (_intentMessage != null)
+                                    TextButton(
+                                        onPressed: _loadPendingIntent,
+                                        child: const Text('Coba lagi'))
+                                ]))),
+                      if (_pendingFields != null && !_completed) ...[
+                        const SizedBox(height: 16),
+                        _buildIntentPanel(_pendingFields!)
+                      ],
+                      const SizedBox(height: 28),
+                      KeyedSubtree(
+                          key: _guestKey,
+                          child: _sectionLabel('Data Pengunjung')),
+                      const SizedBox(height: 6),
+                      const Text(
+                          'Kontak untuk kunjungan ini. Perubahan tidak mengganti profil Anda.',
+                          style: TextStyle(
+                              color: _C.textMuted, fontSize: 12, height: 1.6)),
+                      const SizedBox(height: 16),
+                      _DarkField(
+                          controller: _namaCtrl,
+                          label: 'Nama Lengkap',
+                          hint: 'Masukkan nama lengkap',
+                          icon: Icons.person_outline_rounded,
+                          enabled: !_busy,
+                          error: _fieldErrors['visitor_name'],
+                          onChanged: () => setState(
+                              () => _fieldErrors.remove('visitor_name')),
+                          validator: (v) => v == null || v.trim().isEmpty
+                              ? 'Nama wajib diisi'
+                              : v.trim().length > 255
+                                  ? 'Nama maksimal 255 karakter'
+                                  : null),
+                      const SizedBox(height: 14),
+                      InternationalPhoneField(
+                          controller: _teleponCtrl,
+                          country: _phoneCountry,
+                          enabled: !_busy,
+                          error: _phoneError,
+                          onCountryChanged: (country) => setState(() {
+                                _phoneCountry = country;
+                                _phoneError = null;
+                                if (_teleponCtrl.text.trim().startsWith('+')) {
+                                  final phone = parseBookingPhone(
+                                      _teleponCtrl.text, country);
+                                  if (phone != null)
+                                    _teleponCtrl.text = phone.nsn;
+                                }
+                                final phone = parseBookingPhone(
+                                    _teleponCtrl.text, country);
+                                if (phone != null)
+                                  _teleponCtrl.text = phone.formatNsn(
+                                      format: NsnFormat.international);
+                              }),
+                          onChanged: () => setState(() {
+                                _phoneError = null;
+                                _detectPhoneCountry();
+                              })),
+                      const SizedBox(height: 14),
+                      _DarkField(
+                          controller: _emailCtrl,
+                          label: 'Email',
+                          hint: 'nama@email.com',
+                          icon: Icons.mail_outline_rounded,
+                          keyboardType: TextInputType.emailAddress,
+                          enabled: !_busy,
+                          error: _fieldErrors['visitor_email'],
+                          onChanged: () => setState(
+                              () => _fieldErrors.remove('visitor_email')),
+                          validator: (v) => v == null ||
+                                  !RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$')
+                                      .hasMatch(v.trim())
+                              ? 'Email tidak valid'
+                              : v.trim().length > 255
+                                  ? 'Email maksimal 255 karakter'
+                                  : null),
+                      const SizedBox(height: 30),
+                      KeyedSubtree(
+                          key: _calendarKey,
+                          child: _sectionLabel('Tanggal Kunjungan')),
+                      const SizedBox(height: 6),
+                      const Text(
+                          'Pilih tanggal dan lihat sisa tiket yang tersedia.',
+                          style: TextStyle(
+                              color: _C.textMuted, fontSize: 12, height: 1.6)),
+                      const SizedBox(height: 14),
+                      _infoCard(
+                          child: AvailabilityCalendar(
+                              month: _month,
+                              availability: _availability.data,
+                              selectedDate: _tanggal == null
+                                  ? null
+                                  : formatVisitDate(_tanggal!),
+                              enabled: canChooseDate &&
+                                  !_availability.loading &&
+                                  _availability.error == null,
+                              navigationEnabled: canChooseDate,
+                              earliestMonth: destinationCalendarNow(
+                                  _availability.data?.timezone ??
+                                      widget.wisata.timezone),
+                              onMonthChanged: (month) {
+                                setState(() {
+                                  _month = month;
+                                  _tanggal = null;
+                                  _fieldErrors.remove('visit_date');
+                                });
+                                _loadAvailability();
+                              },
+                              onSelected: (day) => setState(() {
+                                    _tanggal = DateTime.parse(day.date);
+                                    _fieldErrors.remove('visit_date');
+                                  }))),
+                      const SizedBox(height: 12),
+                      _buildAvailability(),
+                      if (_fieldErrors['visit_date'] != null)
+                        _inlineError(_fieldErrors['visit_date']!),
+                      const SizedBox(height: 26),
+                      _sectionLabel('Jumlah Pengunjung'),
+                      const SizedBox(height: 14),
+                      _infoCard(
+                          child: LayoutBuilder(builder: (context, constraints) {
+                        final label = Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text('$_jumlahOrang orang',
+                                  style: const TextStyle(
+                                      color: _C.navy,
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w800)),
+                              const SizedBox(height: 4),
+                              Text('$_unitPrice / orang',
+                                  style: const TextStyle(
+                                      color: _C.textMuted, fontSize: 12))
+                            ]);
+                        final counter =
+                            Row(mainAxisSize: MainAxisSize.min, children: [
+                          _CounterBtn(
+                              icon: Icons.remove_rounded,
+                              onTap: !_busy && _jumlahOrang > 1
+                                  ? () => _changeQuantity(_jumlahOrang - 1)
+                                  : null),
+                          Padding(
+                              padding:
+                                  const EdgeInsets.symmetric(horizontal: 12),
+                              child: Text('$_jumlahOrang',
+                                  style: const TextStyle(
+                                      color: _C.navy,
+                                      fontSize: 18,
+                                      fontWeight: FontWeight.w800))),
+                          _CounterBtn(
+                              icon: Icons.add_rounded,
+                              onTap: !_busy &&
+                                      _jumlahOrang < 1000000 &&
+                                      (remaining == null ||
+                                          _jumlahOrang < remaining)
+                                  ? () => _changeQuantity(_jumlahOrang + 1)
+                                  : null),
+                        ]);
+                        if (constraints.maxWidth < 300 ||
+                            MediaQuery.textScalerOf(context).scale(14) > 19)
+                          return Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                label,
+                                const SizedBox(height: 14),
+                                counter
+                              ]);
+                        return Row(children: [
+                          Expanded(child: label),
+                          const SizedBox(width: 8),
+                          counter
+                        ]);
+                      })),
+                      if (_fieldErrors['quantity'] != null)
+                        _inlineError(_fieldErrors['quantity']!),
+                      const SizedBox(height: 26),
+                      _sectionLabel('Catatan Tambahan'),
+                      const SizedBox(height: 12),
+                      _DarkField(
+                          controller: _catatanCtrl,
+                          label: 'Catatan (opsional)',
+                          hint:
+                              'Kebutuhan aksesibilitas atau informasi untuk pengelola',
+                          icon: Icons.notes_rounded,
+                          maxLines: 3,
+                          enabled: !_busy,
+                          error: _fieldErrors['notes'],
+                          onChanged: () =>
+                              setState(() => _fieldErrors.remove('notes')),
+                          validator: (v) => (v?.length ?? 0) > 5000
+                              ? 'Catatan maksimal 5000 karakter'
+                              : null),
+                      const SizedBox(height: 16),
+                      const Text(
+                          'Anda akan meninjau ringkasan sebelum permintaan dikirim.',
+                          style: TextStyle(
+                              color: _C.textMuted, fontSize: 12, height: 1.6)),
+                    ],
+                  )))),
     );
   }
 
-  // ── Ketersediaan (dihitung server) ──────────────────────────
+  Widget _inlineError(String message) => Padding(
+      padding: const EdgeInsets.only(top: 8),
+      child: Text(message,
+          style: const TextStyle(color: _C.danger, fontSize: 12)));
+
   Widget _infoCard({required Widget child, Color? accent}) => Container(
         width: double.infinity,
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -843,10 +1086,11 @@ class _DaftarKunjunganScreenState extends State<DaftarKunjunganScreen>
     final availability = _selectedAvailability;
     if (availability == null) {
       return _infoCard(
-        accent: _C.danger,
-        child: const Text(
-            'Kuota untuk tanggal ini belum tersedia. Pilih tanggal lain.',
-            style: TextStyle(color: _C.danger, fontSize: 12.5)),
+        child: Text(
+            _tanggal == null
+                ? 'Pilih tanggal untuk melihat ketersediaan tiket.'
+                : 'Ketersediaan tanggal terpilih belum tersedia. Pilih tanggal lain.',
+            style: const TextStyle(color: _C.textMuted, fontSize: 12.5)),
       );
     }
     final ok = availability.bookable;
@@ -856,7 +1100,10 @@ class _DaftarKunjunganScreenState extends State<DaftarKunjunganScreen>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(availabilityStatusLabel(availability.status),
+          Text(
+              ok
+                  ? '${availabilityLevelLabel(availability.level)} - ${availability.remaining ?? '\u2014'} tiket tersisa'
+                  : availabilityStatusLabel(availability.status),
               style: TextStyle(
                   color: ok ? _C.teal : _C.danger,
                   fontSize: 13,
@@ -928,44 +1175,25 @@ class _DaftarKunjunganScreenState extends State<DaftarKunjunganScreen>
     );
   }
 
-  Widget _sectionLabel(String label) => Row(
-        children: [
-          Container(
-            width: 3,
-            height: 16,
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: [_C.teal, _C.gold],
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-              ),
-              borderRadius: BorderRadius.circular(2),
-            ),
-          ),
-          const SizedBox(width: 8),
-          Text(
-            label,
-            style: TextStyle(
-              color: _C.text,
-              fontWeight: FontWeight.w800,
-              fontSize: 14,
-              letterSpacing: 0.2,
-            ),
-          ),
-        ],
-      );
+  Widget _sectionLabel(String label) => Text(label,
+      style: const TextStyle(
+          color: _C.navy, fontWeight: FontWeight.w800, fontSize: 17));
 }
 
 // ── Destinasi Info Card ────────────────────────────────────
 class _DestinasiCard extends StatelessWidget {
   final Wisata wisata;
-  const _DestinasiCard({required this.wisata});
+  final BusinessRepository repository;
+  const _DestinasiCard({required this.wisata, required this.repository});
 
   Widget _buildImage() {
     // Destinasi Laravel: gambar dimuat lewat API (imagePath selalu null).
     if (wisata.isLaravel) {
       return ApiImage(
-          imageUrl: wisata.imageUrl,
+          imageUrl: wisata.images.isEmpty
+              ? wisata.imageUrl
+              : wisata.images.first.url('thumbnail'),
+          repository: repository,
           fit: BoxFit.cover,
           placeholder: (_) => _placeholder());
     }
@@ -1052,13 +1280,17 @@ class _DestinasiCard extends StatelessWidget {
                 ),
                 const SizedBox(height: 3),
                 Text(
-                  '📍 ${wisata.lokasi}',
+                  wisata.lokasi,
                   style:
                       const TextStyle(color: Color(0xFF728099), fontSize: 12),
                 ),
                 const SizedBox(height: 3),
                 Text(
-                  '🎫 ${wisata.hargaTiket}  ·  🕐 ${wisata.jamBuka}',
+                  [
+                    wisata.kategori,
+                    wisata.jamBuka,
+                    '${visitMoney(wisata.ticketPrice, wisata.hargaTiket.split(' ').first)} / orang'
+                  ].where((value) => value.isNotEmpty).join(' - '),
                   style:
                       const TextStyle(color: Color(0xFF728099), fontSize: 12),
                 ),
@@ -1080,6 +1312,9 @@ class _DarkField extends StatelessWidget {
   final TextInputType? keyboardType;
   final String? Function(String?)? validator;
   final int maxLines;
+  final String? error;
+  final VoidCallback? onChanged;
+  final bool enabled;
 
   const _DarkField({
     required this.controller,
@@ -1089,17 +1324,25 @@ class _DarkField extends StatelessWidget {
     this.keyboardType,
     this.validator,
     this.maxLines = 1,
+    this.error,
+    this.onChanged,
+    this.enabled = true,
   });
 
   @override
   Widget build(BuildContext context) {
     return TextFormField(
       controller: controller,
+      enabled: enabled,
+      onChanged: (_) => onChanged?.call(),
+      scrollPadding: const EdgeInsets.all(24),
       keyboardType: keyboardType,
       maxLines: maxLines,
       validator: validator,
       style: const TextStyle(color: Color(0xFF102D59), fontSize: 14),
       decoration: InputDecoration(
+        errorText: error,
+        errorMaxLines: 3,
         labelText: label,
         hintText: hint,
         labelStyle: const TextStyle(color: Color(0xFF728099), fontSize: 13),

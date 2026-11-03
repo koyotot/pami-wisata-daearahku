@@ -133,6 +133,7 @@ void main() {
     await tester.tap(find.text('Pantai'));
     await tester.tap(find.byKey(const ValueKey('facility-f1')));
     await pickGalleryPhoto(tester);
+    await pickDraftLocation(tester);
     await tester.tap(find.text('Simpan Perubahan'));
     await tester.pumpAndSettle();
     expect(find.textContaining('Destinasi sudah tersimpan.'), findsOneWidget);

@@ -45,6 +45,7 @@ class Wisata {
   int ratingCount;
   List<DestinationImage> images;
   int galleryVersion;
+  double? latitude, longitude;
 
   /// Laravel-only fields. [imageUrl] is relative to the API base URL (load it with
   /// `ApiImage`); [imagePath] stays null for Laravel destinations because the backend
@@ -69,6 +70,8 @@ class Wisata {
     this.ratingCount = 0,
     this.images = const [],
     this.galleryVersion = 0,
+    this.latitude,
+    this.longitude,
     this.imageUrl,
     this.categoryGuid = '',
     this.timezone = 'Asia/Jakarta',
@@ -81,6 +84,8 @@ class Wisata {
       id: destination.guid,
       nama: destination.name,
       lokasi: destination.location,
+      latitude: destination.hasCoordinates ? destination.latitude : null,
+      longitude: destination.hasCoordinates ? destination.longitude : null,
       deskripsi: destination.description,
       hargaTiket: '${destination.currency} ${destination.ticketPrice}',
       jamBuka: destination.openingHours,

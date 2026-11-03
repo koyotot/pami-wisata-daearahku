@@ -48,6 +48,17 @@ class Destination {
   Category? get category =>
       json['category'] is Json ? Category(json['category'] as Json) : null;
   String get location => json['location'] as String? ?? '';
+  double? get latitude => _coordinate(json['latitude'], 90);
+  double? get longitude => _coordinate(json['longitude'], 180);
+  bool get hasCoordinates => latitude != null && longitude != null;
+
+  static double? _coordinate(dynamic value, double limit) {
+    final number = value is num ? value.toDouble() : double.tryParse('$value');
+    return number != null && number.isFinite && number.abs() <= limit
+        ? number
+        : null;
+  }
+
   String get description => json['description'] as String? ?? '';
   int get ticketPrice => (json['ticket_price'] as num?)?.toInt() ?? 0;
   String get currency => json['currency'] as String? ?? 'IDR';
@@ -453,6 +464,17 @@ class BusinessRepository {
   Future<Destination> adminDestination(String guid) async =>
       Destination(await api.object('GET', 'admin/destinations/${_id(guid)}',
           authenticated: true));
+
+  Future<String?> reverseGeocode(double latitude, double longitude) async {
+    final data = await api.object(
+        'GET',
+        _path('admin/geocoding/reverse', {
+          'latitude': latitude.toStringAsFixed(7),
+          'longitude': longitude.toStringAsFixed(7),
+        }),
+        authenticated: true);
+    return data['formatted_address'] as String?;
+  }
 
   Future<Destination> saveDestinationGallery(
       {String? guid,
