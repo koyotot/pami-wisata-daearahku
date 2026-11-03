@@ -288,43 +288,57 @@ class _BerandaUserScreenState extends State<BerandaUserScreen>
     return TimeBasedScenicBackground(
       active: widget.active,
       topInset: MediaQuery.paddingOf(context).top,
-      child: SafeArea(
-          bottom: false,
-          child: Center(
-              child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 640),
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(24, 22, 24, 48),
-              child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(children: [
-                      Expanded(
-                          child: Text('Wisata Daerahku',
-                              style: _text(15,
-                                  weight: FontWeight.w700,
-                                  color: Colors.white))),
-                      if (widget.onBukaMenu != null)
-                        IconButton(
-                            onPressed: widget.onBukaMenu,
-                            tooltip: 'Buka menu',
-                            icon: const Icon(Icons.menu_rounded,
-                                color: Colors.white)),
+      child: Stack(children: [
+        SafeArea(
+            bottom: false,
+            child: Center(
+                child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 640),
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(24, 22, 24, 48),
+                child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(children: [
+                        Expanded(
+                            child: Text('Wisata Daerahku',
+                                style: _text(15,
+                                    weight: FontWeight.w700,
+                                    color: Colors.white))),
+                        if (widget.onBukaMenu != null)
+                          IconButton(
+                              onPressed: widget.onBukaMenu,
+                              tooltip: 'Buka menu',
+                              icon: const Icon(Icons.menu_rounded,
+                                  color: Colors.white)),
+                      ]),
+                      const SizedBox(height: 30),
+                      Text('$greeting, ${name.isEmpty ? 'Pengunjung' : name}',
+                          style: _text(14, color: Colors.white)),
+                      const SizedBox(height: 10),
+                      Text('Siap untuk\npetualangan baru?',
+                          style: _text(30,
+                              weight: FontWeight.w800, color: Colors.white)),
+                      const SizedBox(height: 12),
+                      Text(
+                          'Rencana perjalanan dan tempat favoritmu, dalam satu tempat.',
+                          style: _text(14, color: Colors.white)),
                     ]),
-                    const SizedBox(height: 30),
-                    Text('$greeting, ${name.isEmpty ? 'Pengunjung' : name}',
-                        style: _text(14, color: Colors.white)),
-                    const SizedBox(height: 10),
-                    Text('Siap untuk\npetualangan baru?',
-                        style: _text(30,
-                            weight: FontWeight.w800, color: Colors.white)),
-                    const SizedBox(height: 12),
-                    Text(
-                        'Rencana perjalanan dan tempat favoritmu, dalam satu tempat.',
-                        style: _text(14, color: Colors.white)),
-                  ]),
+              ),
+            ))),
+        Positioned(
+          left: 0,
+          right: 0,
+          bottom: 0,
+          child: Container(
+            height: 32,
+            decoration: const BoxDecoration(
+              color: AppColors.bg,
+              borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
             ),
-          ))),
+          ),
+        ),
+      ]),
     );
   }
 

@@ -109,36 +109,25 @@ class _NotifikasiScreenState extends State<NotifikasiScreen> {
               child: const SizedBox.expand(),
             ),
           ),
+Positioned(
+                left: 0,
+                right: 0,
+                bottom: 0,
+                child: Container(
+                  height: 32,
+                  decoration: const BoxDecoration(
+                    color: AppColors.bg,
+                    borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
+                  ),
+                ),
+              ),
           Padding(
-            padding: EdgeInsets.fromLTRB(20, topInset + 8, 12, 20),
+            padding: EdgeInsets.fromLTRB(20, topInset + 8, 12, 52),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                ListenableBuilder(
-                  listenable: widget.state.count,
-                  builder: (context, _) {
-                    final count = widget.state.count.data;
-                    if (count == null || count == 0) {
-                      return const SizedBox(height: 30);
-                    }
-                    return Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 12, vertical: 6),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: .2),
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(
-                            color: Colors.white.withValues(alpha: .4)),
-                      ),
-                      child: Text('$count belum dibaca',
-                          style: const TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.w700)),
-                    );
-                  },
-                ),
-                const SizedBox(height: 64),
+                const SizedBox(height: 94),
                 const Text('Notifikasi',
                     style: TextStyle(
                         color: Colors.white,
@@ -157,14 +146,24 @@ class _NotifikasiScreenState extends State<NotifikasiScreen> {
   }
 
   Widget _buildFilters() => Padding(
-        padding: const EdgeInsets.fromLTRB(20, 14, 20, 4),
+        padding: const EdgeInsets.fromLTRB(20, 0, 20, 4),
         child: Wrap(
           spacing: 8,
           runSpacing: 8,
           children: [
             for (final unread in [false, true])
               ChoiceChip(
-                label: Text(unread ? 'Belum dibaca' : 'Semua'),
+                label: unread
+                    ? ListenableBuilder(
+                        listenable: widget.state.count,
+                        builder: (context, _) {
+                          final count = widget.state.count.data;
+                          return Text(count == null || count == 0
+                              ? 'Belum dibaca'
+                              : '$count Belum dibaca');
+                        },
+                      )
+                    : const Text('Semua'),
                 selected: _unreadOnly == unread,
                 onSelected: (_) => setState(() => _unreadOnly = unread),
                 showCheckmark: false,

@@ -267,6 +267,10 @@ class _CariWisataScreenState extends State<CariWisataScreen> {
       pinned: true,
       elevation: 0,
       scrolledUnderElevation: 0,
+      shadowColor: Colors.transparent,
+      surfaceTintColor: Colors.transparent,
+      shape: const Border(),
+      forceMaterialTransparency: true,
       backgroundColor: _blue,
       automaticallyImplyLeading: false,
       centerTitle: true,
@@ -311,6 +315,18 @@ class _CariWisataScreenState extends State<CariWisataScreen> {
           child: Stack(
             children: [
               Positioned(
+                left: 0,
+                right: 0,
+                bottom: 0,
+                child: Container(
+                  height: 32,
+                  decoration: const BoxDecoration(
+                    color: _background,
+                    borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
+                  ),
+                ),
+              ),
+              Positioned(
                 left: 22,
                 right: 22,
                 bottom: 90,
@@ -345,9 +361,9 @@ class _CariWisataScreenState extends State<CariWisataScreen> {
         ),
       ),
       bottom: PreferredSize(
-        preferredSize: const Size.fromHeight(72),
+        preferredSize: const Size.fromHeight(104),
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
+          padding: const EdgeInsets.fromLTRB(20, 0, 20, 48),
           child: Container(
             height: 54,
             decoration: BoxDecoration(
@@ -435,9 +451,9 @@ class _CariWisataScreenState extends State<CariWisataScreen> {
   Widget _buildCategoryChips() {
     final kategori = _catalog.categories.data ?? [];
     return SizedBox(
-      height: 62,
+      height: 46,
       child: ListView.separated(
-        padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
+        padding: const EdgeInsets.symmetric(horizontal: 20),
         scrollDirection: Axis.horizontal,
         physics: const BouncingScrollPhysics(
             parent: AlwaysScrollableScrollPhysics()),
