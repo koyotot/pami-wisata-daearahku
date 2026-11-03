@@ -24,17 +24,18 @@ void main() {
     await session.login(
         fixture['owner_email'] as String, fixture['password'] as String);
     await session.updateProfile('Flutter Live Profile', '0812999');
-    var booking = await repository.booking(guid);
+    final booking = await repository.booking(guid);
     expect(booking.status, 'confirmed');
-    expect(booking.canCheckIn, isTrue);
-    expect((await repository.profileStatistics()).json['visits'], 0);
-    booking = await repository.checkIn(guid);
-    expect(booking.checkedInAt, isNotNull);
-    expect(booking.canReview, isTrue);
+    expect(booking.json['can_check_in'], isNot(true));
+    final tickets = await repository.bookingTickets(guid);
+    expect(tickets.tickets.length, booking.quantity);
     await expectLater(
-        repository.checkIn(guid),
-        throwsA(isA<ApiException>()
-            .having((e) => e.code, 'code', 'check_in_duplicate')));
+        session.requestEnvelope('POST', 'bookings/$guid/check-in'),
+        throwsA(isA<ApiException>().having((e) => e.status, 'status', 410)));
+    // This integration fixture must now be checked in by authorized scanner staff.
+    expect(booking.canReview, isTrue,
+        reason:
+            'Prepare at least one ticket check-in through staff confirm first.');
     final review =
         await repository.createReview(guid, 4, 'Real HTTP integration fixture');
     expect(review.bookingGuid, guid);

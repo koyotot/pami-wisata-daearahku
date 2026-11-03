@@ -183,29 +183,40 @@ void main() {
     expect(empty.rating, 0);
   });
 
-  test('check-in sends booking GUID once and adopts server response', () async {
-    final pending = Completer<http.Response>();
-    var calls = 0;
+  test('ticket list preserves individual check-in status', () async {
     final session = await signedInSession((request) async {
-      calls++;
-      expect(request.method, 'POST');
-      expect(request.url.path, '/api/v1/bookings/booking-1/check-in');
-      return pending.future;
+      expect(request.method, 'GET');
+      expect(request.url.path, '/api/v1/bookings/booking-1/tickets');
+      return jsonResponse({
+        'data': {
+          'booking_guid': 'booking-1',
+          'quantity': 2,
+          'checked_in_count': 1,
+          'ticket_state': 'partially_checked_in',
+          'tickets': [
+            {
+              'guid': 'ticket-1',
+              'sequence': 1,
+              'status': 'checked_in',
+              'qr_available': false
+            },
+            {
+              'guid': 'ticket-2',
+              'sequence': 2,
+              'status': 'not_checked_in',
+              'qr_available': true
+            },
+          ],
+        }
+      });
     });
-    final state = BookingDetailController(
-        repositoryFor(session), Booking(visitBooking()));
-    final first = state.checkIn();
-    expect(await state.checkIn(), isFalse);
-    pending.complete(jsonResponse({'data': visitBooking(checkedIn: true)}));
-    expect(await first, isTrue);
-    expect(calls, 1);
-    expect(state.booking.checkedInAt, isNotNull);
-    expect(state.booking.canReview, isTrue);
-    state.dispose();
+    final tickets = await repositoryFor(session).bookingTickets('booking-1');
+    expect(tickets.checkedInCount, 1);
+    expect(tickets.tickets.first.checkedIn, isTrue);
+    expect(tickets.tickets.last.qrAvailable, isTrue);
   });
 
-  test('awaiting_payment cannot be checked in or reviewed by UI gate',
-      () async {
+  test('awaiting_payment cannot be reviewed by UI gate', () async {
     var calls = 0;
     final session = await signedInSession((_) async {
       calls++;
@@ -213,13 +224,12 @@ void main() {
     });
     final state = BookingDetailController(repositoryFor(session),
         Booking(bookingJson(status: 'awaiting_payment', cancellable: false)));
-    expect(await state.checkIn(), isFalse);
     expect(await state.submitReview(4, 'Test'), isFalse);
     expect(calls, 0);
     state.dispose();
   });
 
-  for (final kind in ['checkin', 'review']) {
+  for (final kind in ['review']) {
     test('$kind ignores response during pending logout', () async {
       final pending = Completer<http.Response>();
       final logout = Completer<http.Response>();
@@ -229,8 +239,7 @@ void main() {
       });
       final state = BookingDetailController(repositoryFor(session),
           Booking(visitBooking(checkedIn: kind == 'review')));
-      final result =
-          kind == 'review' ? state.submitReview(4, 'Test') : state.checkIn();
+      final result = state.submitReview(4, 'Test');
       final clearing = session.logout();
       pending.complete(jsonResponse({
         'data': kind == 'review' ? reviewJson() : visitBooking(checkedIn: true)
@@ -267,7 +276,7 @@ void main() {
     state.dispose();
   });
 
-  for (final kind in ['checkin', 'review']) {
+  for (final kind in ['review']) {
     test('$kind duplicate conflict reconciles with authoritative booking',
         () async {
       final session = await signedInSession((request) async {
@@ -287,11 +296,7 @@ void main() {
       });
       final state = BookingDetailController(repositoryFor(session),
           Booking(visitBooking(checkedIn: kind == 'review')));
-      expect(
-          await (kind == 'review'
-              ? state.submitReview(4, 'Test')
-              : state.checkIn()),
-          isFalse);
+      expect(await state.submitReview(4, 'Test'), isFalse);
       expect(state.booking.checkedInAt, isNotNull);
       if (kind == 'review') expect(state.booking.review, isNotNull);
       expect(state.message, contains(kind == 'review' ? 'Ulasan' : 'check-in'));

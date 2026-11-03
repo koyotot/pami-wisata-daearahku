@@ -232,7 +232,6 @@ class BookingDetailController extends ChangeNotifier {
   Booking booking;
   bool refreshing = false;
   bool cancelling = false;
-  bool checkingIn = false;
   bool reviewing = false;
   String? message;
   BookingDocuments? documents;
@@ -253,11 +252,9 @@ class BookingDetailController extends ChangeNotifier {
   /// Takes a copy from the list when nothing is in flight. Silent (no notification), so it
   /// is safe to call while the owner widget is rebuilding.
   void adopt(Booking fresh) {
-    if (fresh.guid != booking.guid ||
-        cancelling ||
-        refreshing ||
-        checkingIn ||
-        reviewing) return;
+    if (fresh.guid != booking.guid || cancelling || refreshing || reviewing) {
+      return;
+    }
     booking = fresh;
   }
 
@@ -320,38 +317,6 @@ class BookingDetailController extends ChangeNotifier {
       }
     }
     return confirmed;
-  }
-
-  Future<bool> checkIn() async {
-    if (!_sessionValid || checkingIn || !booking.canCheckIn) return false;
-    checkingIn = true;
-    message = null;
-    _notify();
-    try {
-      final fresh = await repository.checkIn(booking.guid);
-      if (!_sessionValid) return false;
-      if (fresh.guid != booking.guid || fresh.checkedInAt == null) {
-        throw const ApiException(
-            'Respons layanan tidak valid.', null, 'invalid_response');
-      }
-      booking = fresh;
-      BookingEvents.notify();
-      return true;
-    } catch (e) {
-      if (!_sessionValid) return false;
-      message = bookingErrorMessage(e, mutation: true);
-      if (e is ApiException && (e.status == 409 || e.outcomeUnknown)) {
-        await refresh();
-        if (_sessionValid && booking.checkedInAt != null)
-          BookingEvents.notify();
-      }
-      return false;
-    } finally {
-      if (_sessionValid) {
-        checkingIn = false;
-        _notify();
-      }
-    }
   }
 
   Future<bool> submitReview(int rating, String comment) async {

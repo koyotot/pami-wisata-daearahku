@@ -15,6 +15,7 @@ import '../data/booking_state.dart';
 import '../data/business_repository.dart';
 import '../services/auth_session.dart';
 import 'auth_presentation.dart';
+import '../widgets/booking_ticket_qr_section.dart';
 
 // ── Palet (sama dengan home_screen) ──────────────────────────
 const _blue = Color(0xFF1976D2);
@@ -940,6 +941,14 @@ class _TicketCardState extends State<_TicketCard> {
           _buildTicketHeader(p, st),
           _buildDashedDivider(),
           _buildTicketBody(p),
+          if (controller != null)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(18, 0, 18, 14),
+              child: Text(
+                '${controller.booking.checkedInCount}/${controller.booking.quantity} tiket sudah check-in',
+                style: _font(12, FontWeight.w600, _navy),
+              ),
+            ),
           if (widget.isLaravel || p.catatan.isNotEmpty || p.email.isNotEmpty)
             _buildExpandBtn(p),
           if (_controller?.booking.canReview == true || _sudahUlasan)
@@ -1270,18 +1279,11 @@ class _TicketCardState extends State<_TicketCard> {
               key: const ValueKey('detailMessage'),
               style: _font(12, FontWeight.w600, _red)),
         ),
-      if (b.checkedInAt != null)
-        Text('Sudah check-in', style: _font(12, FontWeight.w600, _greenDeep)),
-      if (b.canCheckIn) ...[
-        const SizedBox(height: 12),
-        SizedBox(
-            width: double.infinity,
-            child: OutlinedButton(
-              key: const ValueKey('checkInBooking'),
-              onPressed: c.checkingIn ? null : c.checkIn,
-              child: Text(c.checkingIn ? 'Memproses...' : 'Check-in Kunjungan'),
-            )),
-      ],
+      if (b.paymentStatus == 'paid')
+        BookingTicketQrSection(
+            repository: c.repository,
+            bookingGuid: b.guid,
+            onRefreshed: c.refresh),
       if (b.cancellable) ...[
         const SizedBox(height: 12),
         SizedBox(

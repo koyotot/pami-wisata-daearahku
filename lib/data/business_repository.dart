@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'ticket_models.dart';
 import '../services/api_client.dart';
 import '../services/auth_session.dart';
 
@@ -131,9 +132,13 @@ class Booking {
   String? get notes => json['notes'] as String?;
   String get status => json['status'] as String;
 
+  String get paymentStatus => json['payment_status'] as String? ?? 'unverified';
+
   /// Server-computed: true only while the owner may still cancel (pending approval).
   bool get cancellable => json['cancellable'] == true;
-  bool get canCheckIn => json['can_check_in'] == true;
+  int get checkedInCount =>
+      (json['checked_in_count'] as num?)?.toInt() ??
+      (checkedInAt == null ? 0 : quantity);
   bool get canReview => json['can_review'] == true;
   DateTime? get checkedInAt =>
       DateTime.tryParse(json['checked_in_at'] as String? ?? '');
@@ -426,9 +431,38 @@ class BusinessRepository {
       Review(await api.object('POST', 'bookings/${_id(bookingGuid)}/review',
           authenticated: true, body: {'rating': rating, 'comment': comment}));
 
-  Future<Booking> checkIn(String bookingGuid) async =>
-      Booking(await api.object('POST', 'bookings/${_id(bookingGuid)}/check-in',
+  Future<BookingTickets> bookingTickets(String bookingGuid) async =>
+      BookingTickets(await api.object(
+          'GET', 'bookings/${_id(bookingGuid)}/tickets',
           authenticated: true));
+
+  Future<BinaryResponse> ticketQr(String bookingGuid, String ticketGuid) =>
+      api.session.requestBytes(
+          'bookings/${_id(bookingGuid)}/tickets/${_id(ticketGuid)}/qr');
+
+  Future<Json> ticketScanScope() =>
+      api.object('GET', 'admin/ticket-check-ins/scope', authenticated: true);
+
+  Future<Json> previewTicket(String payload) =>
+      api.object('POST', 'admin/ticket-check-ins/preview',
+          authenticated: true, body: {'qr_payload': payload});
+
+  Future<Json> confirmTicket(String payload, String key) =>
+      api.object('POST', 'admin/ticket-check-ins/confirm',
+          authenticated: true,
+          body: {'qr_payload': payload},
+          headers: {'Idempotency-Key': key});
+
+  Future<List<String>> destinationAdmins(String guid) async =>
+      ((await api.object('GET', 'admin/destinations/${_id(guid)}/admins',
+              authenticated: true))['user_guids'] as List)
+          .cast<String>();
+
+  Future<void> assignDestinationAdmins(
+      String guid, List<String> userGuids) async {
+    await api.object('PUT', 'admin/destinations/${_id(guid)}/admins',
+        authenticated: true, body: {'user_guids': userGuids});
+  }
 
   Future<BookingDocuments> bookingDocuments(String guid) async =>
       BookingDocuments(await api.object(

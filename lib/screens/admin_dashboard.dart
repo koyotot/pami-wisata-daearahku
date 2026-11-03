@@ -21,6 +21,8 @@ import 'daftar_pendaftar_screen.dart';
 import 'kelola_admin_screen.dart';
 import 'kelola_kategori_screen.dart';
 import 'kelola_fasilitas_screen.dart';
+import 'admin_ticket_scanner_screen.dart';
+import 'destination_admin_assignments_screen.dart';
 
 // ── Palet & font (sama dengan home_screen.dart) ──────────────
 class _C {
@@ -607,6 +609,14 @@ class _AdminDashboardState extends State<AdminDashboard>
           const SizedBox(height: 26),
           _sectionLabel('Lainnya'),
           const SizedBox(height: 14),
+          _wideCard(_MenuAdmin(
+            icon: Icons.qr_code_scanner_rounded,
+            label: 'Scan Tiket',
+            sub: 'Verifikasi QR dan konfirmasi masuk pengunjung',
+            color: _C.blue,
+            onTap: () => _buka(const AdminTicketScannerScreen()),
+          )),
+          const SizedBox(height: 12),
           _wideCard(_menuPendaftar),
           if (_canManageQuota) ...[
             const SizedBox(height: 12),
@@ -619,6 +629,14 @@ class _AdminDashboardState extends State<AdminDashboard>
             _wideCard(_menuFasilitas),
           ],
           if (_isSuperAdmin) ...[
+            const SizedBox(height: 12),
+            _wideCard(_MenuAdmin(
+              icon: Icons.assignment_ind_outlined,
+              label: 'Penugasan Destinasi',
+              sub: 'Atur destinasi scanner untuk Admin',
+              color: _C.blue,
+              onTap: () => _buka(const DestinationAdminAssignmentsScreen()),
+            )),
             const SizedBox(height: 12),
             _wideCard(_menuKelolaAdmin),
           ],

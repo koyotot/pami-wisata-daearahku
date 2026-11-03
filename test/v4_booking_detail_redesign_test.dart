@@ -39,6 +39,54 @@ class _DetailRepository extends BusinessRepository {
 void main() {
   setUpAll(() => GoogleFonts.config.allowRuntimeFetching = false);
 
+  testWidgets('entry tickets only load after server verifies payment as paid',
+      (tester) async {
+    for (final paymentStatus in [
+      null,
+      'unverified',
+      'pending',
+      'refunded',
+      'paid'
+    ]) {
+      var ticketRequests = 0;
+      final session = await signedInSession((request) async {
+        expect(request.url.path, endsWith('/bookings/booking-1/tickets'));
+        ticketRequests++;
+        return jsonResponse({
+          'data': {
+            'booking_guid': 'booking-1',
+            'ticket_state': 'scheduled',
+            'quantity': 2,
+            'checked_in_count': 0,
+            'tickets': [],
+          },
+        });
+      });
+      final resource = bookingJson(status: 'confirmed');
+      if (paymentStatus != null) resource['payment_status'] = paymentStatus;
+      final repository = _DetailRepository(
+        session,
+        value: Booking(resource),
+        issuedTicket: true,
+      );
+      await tester.pumpWidget(MaterialApp(
+        home: BookingTicketScreen(
+          key: ValueKey(paymentStatus),
+          bookingGuid: 'booking-1',
+          repository: repository,
+        ),
+      ));
+      await tester.pumpAndSettle();
+
+      final paid = paymentStatus == 'paid';
+      expect(find.text('Tiket masuk'), paid ? findsOneWidget : findsNothing,
+          reason: '$paymentStatus');
+      expect(ticketRequests, paid ? 1 : 0, reason: '$paymentStatus');
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox.shrink());
+    }
+  });
+
   testWidgets('detail maps server statuses and titles from issued ticket only',
       (tester) async {
     tester.view.physicalSize = const Size(320, 740);
