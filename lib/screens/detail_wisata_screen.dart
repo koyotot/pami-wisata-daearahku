@@ -1,25 +1,20 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:latlong2/latlong.dart';
-import 'package:url_launcher/url_launcher.dart';
 import '../data/app_data.dart';
 import '../data/business_repository.dart';
 import '../data/favorite_state.dart';
 import '../services/api_client.dart';
 import '../services/auth_session.dart';
+import '../services/destination_directions.dart';
 import '../widgets/destination_hero_gallery.dart';
 import '../widgets/reviews_sheet.dart';
 import '../widgets/visit_format.dart';
 import '../widgets/destination_location_map_preview.dart';
 import 'daftar_kunjungan_screen.dart';
+import 'destination_map_screen.dart';
 
-Uri? destinationDirectionsUri(Destination destination) =>
-    !destination.hasCoordinates
-        ? null
-        : Uri.https('www.google.com', '/maps/dir/', {
-            'api': '1',
-            'destination': '${destination.latitude},${destination.longitude}',
-          });
+export '../services/destination_directions.dart' show destinationDirectionsUri;
 
 class _C {
   static const blue = Color(0xFF1976D2);
@@ -46,6 +41,7 @@ class _DetailWisataScreenState extends State<DetailWisataScreen> {
   bool get _isSaved => _favorites.isFavorite(widget.wisata.id);
   bool _loadingSave = false;
   bool _expanded = false;
+  bool _openingMap = false;
 
   @override
   void initState() {
@@ -424,31 +420,68 @@ class _DetailWisataScreenState extends State<DetailWisataScreen> {
                                           _location(destination.location),
                                           const SizedBox(height: 14),
                                           if (destination.hasCoordinates) ...[
-                                            ClipRRect(
+                                            Material(
+                                                clipBehavior: Clip.antiAlias,
                                                 borderRadius:
                                                     BorderRadius.circular(14),
-                                                child: SizedBox(
-                                                    height: 180,
-                                                    child: IgnorePointer(
-                                                        child: DestinationLocationMap(
-                                                            key: ValueKey(
-                                                                '${destination.latitude},${destination.longitude}'),
-                                                            point: LatLng(
-                                                                destination
-                                                                    .latitude!,
-                                                                destination
-                                                                    .longitude!))))),
+                                                child: InkWell(
+                                                    onTap: () => Navigator.push(
+                                                        context,
+                                                        MaterialPageRoute(
+                                                            builder: (_) =>
+                                                                DestinationMapScreen(
+                                                                    destination:
+                                                                        destination))),
+                                                    child: Semantics(
+                                                        button: true,
+                                                        label:
+                                                            'Lihat peta ${destination.name}',
+                                                        child: SizedBox(
+                                                            height: 180,
+                                                            child: Stack(
+                                                                children: [
+                                                                  Positioned.fill(
+                                                                      child: IgnorePointer(
+                                                                          child: DestinationLocationMap(
+                                                                              key: ValueKey('${destination.latitude},${destination.longitude}'),
+                                                                              point: LatLng(destination.latitude!, destination.longitude!)))),
+                                                                  const Positioned(
+                                                                    top: 12,
+                                                                    right: 12,
+                                                                    child: IgnorePointer(
+                                                                        child: DecoratedBox(
+                                                                      decoration: BoxDecoration(
+                                                                          color: Colors
+                                                                              .white,
+                                                                          borderRadius:
+                                                                              BorderRadius.all(Radius.circular(8))),
+                                                                      child: Padding(
+                                                                          padding: EdgeInsets.all(8),
+                                                                          child: Row(
+                                                                            mainAxisSize:
+                                                                                MainAxisSize.min,
+                                                                            children: [
+                                                                              Icon(Icons.fullscreen_rounded, color: _C.blue),
+                                                                              SizedBox(width: 4),
+                                                                              Text('Lihat peta', style: TextStyle(color: _C.navy))
+                                                                            ],
+                                                                          )),
+                                                                    )),
+                                                                  ),
+                                                                ]))))),
                                             const SizedBox(height: 10),
                                             OutlinedButton.icon(
-                                                onPressed: () =>
-                                                    _openMap(destination),
+                                                onPressed: _openingMap
+                                                    ? null
+                                                    : () =>
+                                                        _openMap(destination),
                                                 icon: const Icon(
                                                     Icons.directions_outlined),
                                                 label: const Text(
                                                     'Buka Google Maps')),
                                           ] else
                                             const Text(
-                                                'Lokasi peta belum tersedia',
+                                                'Lokasi destinasi belum tersedia',
                                                 style: TextStyle(
                                                     color: _C.textMuted,
                                                     fontSize: 12)),
@@ -485,21 +518,20 @@ class _DetailWisataScreenState extends State<DetailWisataScreen> {
   }
 
   Future<void> _openMap(Destination destination) async {
-    final uri = destinationDirectionsUri(destination);
-    if (uri == null) return;
-    var opened = false;
-    try {
-      opened =
-          await launchUrl(uri, mode: LaunchMode.externalNonBrowserApplication);
-    } catch (_) {/* Try the external browser below. */}
-    if (!opened) {
-      try {
-        opened = await launchUrl(uri, mode: LaunchMode.externalApplication);
-      } catch (_) {/* Show the same failure message below. */}
+    if (!mounted || _openingMap) return;
+    if (!destination.hasCoordinates) {
+      _showSnack('Lokasi destinasi belum tersedia');
+      return;
     }
-    if (!opened && mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Tidak dapat membuka peta')));
+    setState(() => _openingMap = true);
+    final opened = await openDestinationDirections(destination);
+    if (!mounted) return;
+    setState(() => _openingMap = false);
+    if (!opened) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: const Text('Google Maps dan browser tidak dapat dibuka.'),
+          action: SnackBarAction(
+              label: 'Coba Lagi', onPressed: () => _openMap(destination))));
     }
   }
 

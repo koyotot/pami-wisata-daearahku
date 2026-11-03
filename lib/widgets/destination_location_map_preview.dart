@@ -12,8 +12,17 @@ class DestinationLocationMap extends StatefulWidget {
   final LatLng? point;
   final MapController? controller;
   final ValueChanged<LatLng>? onTap;
+  final bool interactive;
+  final LatLng? userPoint;
+  final String? destinationName;
   const DestinationLocationMap(
-      {super.key, this.point, this.controller, this.onTap});
+      {super.key,
+      this.point,
+      this.controller,
+      this.onTap,
+      this.interactive = false,
+      this.userPoint,
+      this.destinationName});
 
   @override
   State<DestinationLocationMap> createState() => _DestinationLocationMapState();
@@ -31,9 +40,9 @@ class _DestinationLocationMapState extends State<DestinationLocationMap> {
             initialZoom: widget.point == null ? 3 : 15,
             maxZoom: 19,
             interactionOptions: InteractionOptions(
-                flags: widget.onTap == null
-                    ? InteractiveFlag.none
-                    : InteractiveFlag.all & ~InteractiveFlag.rotate),
+                flags: widget.interactive || widget.onTap != null
+                    ? InteractiveFlag.all & ~InteractiveFlag.rotate
+                    : InteractiveFlag.none),
             onTap: widget.onTap == null
                 ? null
                 : (_, point) => widget.onTap!(point),
@@ -56,15 +65,46 @@ class _DestinationLocationMapState extends State<DestinationLocationMap> {
               MarkerLayer(markers: [
                 Marker(
                   point: widget.point!,
-                  width: 44,
-                  height: 48,
+                  width: widget.destinationName == null ? 44 : 160,
+                  height: widget.destinationName == null ? 48 : 76,
                   alignment: Alignment.topCenter,
                   child: Semantics(
-                    label: 'Titik lokasi destinasi',
-                    child: const Icon(Icons.location_on,
-                        color: Color(0xFF1976D2), size: 44),
+                    label: widget.destinationName ?? 'Titik lokasi destinasi',
+                    child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        mainAxisAlignment: MainAxisAlignment.end,
+                        children: [
+                          if (widget.destinationName != null)
+                            Flexible(
+                                child: Container(
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 6, vertical: 3),
+                                    color: Colors.white,
+                                    child: Text(widget.destinationName!,
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: const TextStyle(
+                                            color: Color(0xFF102D59),
+                                            fontSize: 12)))),
+                          const Icon(Icons.location_on,
+                              color: Color(0xFF1976D2), size: 44),
+                        ]),
                   ),
                 ),
+                if (widget.userPoint != null)
+                  Marker(
+                    point: widget.userPoint!,
+                    width: 24,
+                    height: 24,
+                    child: Semantics(
+                        label: 'Lokasi Anda',
+                        child: Container(
+                            decoration: BoxDecoration(
+                                color: const Color(0xFF1976D2),
+                                shape: BoxShape.circle,
+                                border: Border.all(
+                                    color: Colors.white, width: 3)))),
+                  ),
               ]),
           ],
         ),
