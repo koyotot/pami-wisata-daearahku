@@ -115,65 +115,39 @@ class _NotifikasiScreenState extends State<NotifikasiScreen> {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                  Row(children: [
-                    const Expanded(
-                      child: Text('Notifikasi',
-                          style: TextStyle(
+                ListenableBuilder(
+                  listenable: widget.state.count,
+                  builder: (context, _) {
+                    final count = widget.state.count.data;
+                    if (count == null || count == 0) {
+                      return const SizedBox(height: 30);
+                    }
+                    return Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: .2),
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(
+                            color: Colors.white.withValues(alpha: .4)),
+                      ),
+                      child: Text('$count belum dibaca',
+                          style: const TextStyle(
                               color: Colors.white,
-                              fontSize: 26,
-                              fontWeight: FontWeight.w800)),
-                    ),
-                    ListenableBuilder(
-                      listenable: Listenable.merge(
-                          [widget.state.inbox, widget.state.count]),
-                      builder: (context, _) {
-                        final loading = widget.state.inbox.loading ||
-                            widget.state.count.loading;
-                        return IconButton(
-                          tooltip: 'Muat ulang aktivitas',
-                          onPressed: loading ? null : _refresh,
-                          icon: loading
-                              ? const SizedBox.square(
-                                  dimension: 20,
-                                  child: CircularProgressIndicator(
-                                      strokeWidth: 2, color: Colors.white))
-                              : const Icon(Icons.refresh_rounded),
-                          color: Colors.white,
-                          style: IconButton.styleFrom(
-                              minimumSize: const Size(48, 48),
-                              backgroundColor:
-                                  Colors.white.withValues(alpha: .18)),
-                        );
-                      },
-                    ),
-                  ]),
-                  const SizedBox(height: 4),
-                  const Text('Kabar terbaru tentang kunjungan Anda.',
-                      style: TextStyle(color: Colors.white, fontSize: 13)),
-                  const SizedBox(height: 16),
-                  ListenableBuilder(
-                    listenable: widget.state.count,
-                    builder: (context, _) {
-                      final count = widget.state.count.data;
-                      if (count == null || count == 0) {
-                        return const SizedBox(height: 30);
-                      }
-                      return Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 12, vertical: 6),
-                        decoration: BoxDecoration(
-                          color: Colors.white.withValues(alpha: .2),
-                          borderRadius: BorderRadius.circular(16),
-                          border: Border.all(
-                              color: Colors.white.withValues(alpha: .4)),
-                        ),
-                        child: Text('$count belum dibaca',
-                            style: const TextStyle(
-                                color: Colors.white,
-                                fontWeight: FontWeight.w700)),
-                      );
-                    },
-                  ),
+                              fontWeight: FontWeight.w700)),
+                    );
+                  },
+                ),
+                const SizedBox(height: 64),
+                const Text('Notifikasi',
+                    style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 26,
+                        height: 1.15,
+                        fontWeight: FontWeight.w800)),
+                const SizedBox(height: 2),
+                const Text('Kabar terbaru tentang kunjungan Anda.',
+                    style: TextStyle(color: Colors.white, fontSize: 13)),
               ],
             ),
           ),
@@ -184,16 +158,39 @@ class _NotifikasiScreenState extends State<NotifikasiScreen> {
 
   Widget _buildFilters() => Padding(
         padding: const EdgeInsets.fromLTRB(20, 14, 20, 4),
-        child: Wrap(spacing: 8, children: [
-          ChoiceChip(
-              label: const Text('Semua'),
-              selected: !_unreadOnly,
-              onSelected: (_) => setState(() => _unreadOnly = false)),
-          ChoiceChip(
-              label: const Text('Belum dibaca'),
-              selected: _unreadOnly,
-              onSelected: (_) => setState(() => _unreadOnly = true)),
-        ]),
+        child: Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            for (final unread in [false, true])
+              ChoiceChip(
+                label: Text(unread ? 'Belum dibaca' : 'Semua'),
+                selected: _unreadOnly == unread,
+                onSelected: (_) => setState(() => _unreadOnly = unread),
+                showCheckmark: false,
+                backgroundColor: Colors.white,
+                selectedColor: AppColors.blue,
+                surfaceTintColor: Colors.transparent,
+                labelStyle: TextStyle(
+                  fontSize: 12,
+                  fontWeight:
+                      _unreadOnly == unread ? FontWeight.w700 : FontWeight.w500,
+                  color: _unreadOnly == unread ? Colors.white : AppColors.navy,
+                ),
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                labelPadding: const EdgeInsets.symmetric(horizontal: 6),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10)),
+                side: BorderSide(
+                  color: _unreadOnly == unread
+                      ? AppColors.blue
+                      : const Color(0xFFD3E0F5),
+                ),
+                elevation: _unreadOnly == unread ? 3 : 0,
+                shadowColor: AppColors.blue.withValues(alpha: .18),
+              ),
+          ],
+        ),
       );
 
   Widget _buildActivitySliver(BuildContext context) {
@@ -269,6 +266,34 @@ class _NotifikasiScreenState extends State<NotifikasiScreen> {
           }
           final item = items[index - (showRefreshError ? 1 : 0)];
           final date = item.createdAt?.toLocal();
+          final (icon, tint, iconBackground) = switch (item.json['type']) {
+            'booking.rejected' => (
+                Icons.close_rounded,
+                const Color(0xFFFF5252),
+                const Color(0xFFFFECEC)
+              ),
+            'booking.approved' => (
+                Icons.check_rounded,
+                const Color(0xFF16A36D),
+                const Color(0xFFE9F8F0)
+              ),
+            'booking.expired' => (
+                Icons.access_time_rounded,
+                const Color(0xFFF58A00),
+                const Color(0xFFFFF4E2)
+              ),
+            'booking.payment_review' => (
+                Icons.notifications_none_rounded,
+                const Color(0xFFF58A00),
+                const Color(0xFFFFF4E2)
+              ),
+            _ => (
+                Icons.notifications_none_rounded,
+                AppColors.blue,
+                const Color(0xFFECF4FF)
+              ),
+          };
+          String twoDigits(int value) => value.toString().padLeft(2, '0');
           return Material(
             color: Colors.white,
             borderRadius: BorderRadius.circular(18),
@@ -280,63 +305,77 @@ class _NotifikasiScreenState extends State<NotifikasiScreen> {
                   ? null
                   : () => _open(item),
               child: Container(
-                padding: const EdgeInsets.fromLTRB(16, 14, 12, 14),
+                padding: const EdgeInsets.fromLTRB(14, 16, 14, 16),
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(18),
                   border: Border.all(
-                    color: item.unread ? AppColors.blue : AppColors.border,
-                    width: item.unread ? 1.3 : 1,
+                    color: item.unread
+                        ? const Color(0xFFBED7FF)
+                        : AppColors.border,
                   ),
                 ),
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Padding(
-                      padding: const EdgeInsets.only(top: 2, right: 12),
-                      child: Icon(
-                        item.bookingGuid == null
-                            ? Icons.notifications_none_rounded
-                            : Icons.confirmation_number_outlined,
-                        color: AppColors.textMuted,
-                        size: 22,
+                    Container(
+                      width: 38,
+                      height: 38,
+                      margin: const EdgeInsets.only(right: 12),
+                      decoration: BoxDecoration(
+                        color: iconBackground,
+                        borderRadius: BorderRadius.circular(12),
                       ),
+                      child: Icon(icon, color: tint, size: 21),
                     ),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(item.title,
-                              style: TextStyle(
-                                  fontWeight: item.unread
-                                      ? FontWeight.w800
-                                      : FontWeight.w600,
+                              style: const TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w800,
                                   color: AppColors.navy)),
                           const SizedBox(height: 5),
-                          Text(item.body),
-                          if (date != null)
-                            Padding(
-                              padding: const EdgeInsets.only(top: 7),
-                              child: Text(
-                                  '${date.day}/${date.month}/${date.year}',
-                                  style: const TextStyle(
-                                      fontSize: 12,
-                                      color: AppColors.textMuted)),
-                            ),
-                          const SizedBox(height: 4),
-                          Text(item.unread ? 'Belum dibaca' : 'Sudah dibaca',
+                          Text(item.body,
                               style: const TextStyle(
                                   fontSize: 12,
-                                  color: AppColors.textMuted,
-                                  fontWeight: FontWeight.w600)),
+                                  height: 1.6,
+                                  color: AppColors.textMuted)),
+                          if (date != null)
+                            Padding(
+                              padding: const EdgeInsets.only(top: 10),
+                              child: Text(
+                                  '${twoDigits(date.day)}/${twoDigits(date.month)}/${date.year} \u2022 ${twoDigits(date.hour)}:${twoDigits(date.minute)}',
+                                  style: const TextStyle(
+                                      fontSize: 10,
+                                      color: AppColors.textMuted)),
+                            ),
                         ],
                       ),
                     ),
-                    if (item.bookingGuid != null)
-                      const Padding(
-                        padding: EdgeInsets.only(top: 1),
-                        child: Icon(Icons.chevron_right_rounded,
-                            color: AppColors.textMuted),
-                      ),
+                    Padding(
+                      padding: const EdgeInsets.only(left: 8),
+                      child: Column(children: [
+                        Semantics(
+                          label: item.unread ? 'Belum dibaca' : 'Sudah dibaca',
+                          child: SizedBox.square(
+                            dimension: 8,
+                            child: item.unread
+                                ? const DecoratedBox(
+                                    decoration: BoxDecoration(
+                                        color: AppColors.blue,
+                                        shape: BoxShape.circle))
+                                : null,
+                          ),
+                        ),
+                        if (item.bookingGuid != null) ...[
+                          const SizedBox(height: 5),
+                          const Icon(Icons.chevron_right_rounded,
+                              color: Color(0xFF9AAEC9), size: 18),
+                        ],
+                      ]),
+                    ),
                   ],
                 ),
               ),

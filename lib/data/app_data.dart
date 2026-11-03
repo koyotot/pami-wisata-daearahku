@@ -12,9 +12,11 @@ class User {
   String noTelepon;
   String password;
   DateTime createdAt;
+  final DateTime? emailVerifiedAt;
 
   User({
     this.isLaravel = false,
+    this.emailVerifiedAt,
     required this.id,
     required this.namaLengkap,
     required this.email,

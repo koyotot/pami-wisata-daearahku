@@ -297,6 +297,8 @@ class AuthSession {
         noTelepon: data['phone'] as String? ?? '',
         password: '',
         createdAt: DateTime.now(),
+        emailVerifiedAt:
+            verifiedAt is String ? DateTime.tryParse(verifiedAt) : null,
         isLaravel: true);
   }
 

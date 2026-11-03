@@ -38,7 +38,11 @@ void main() {
     expect(find.text('99+'), findsOneWidget);
     final badge =
         tester.getRect(find.byKey(const ValueKey('notification-badge')));
-    final bell = tester.getRect(find.descendant(of: find.byTooltip('Notifikasi'), matching: find.byType(CustomPaint)).first);
+    final bell = tester.getRect(find
+        .descendant(
+            of: find.byTooltip('Notifikasi'),
+            matching: find.byType(CustomPaint))
+        .first);
     expect(badge.top, lessThan(bell.top));
     expect(badge.right, greaterThan(bell.right));
     expect(badge.left, lessThan(bell.right));
@@ -155,6 +159,57 @@ void main() {
     await tester.pump();
     expect(find.text('Aktivitas belum berhasil diperbarui.'), findsOneWidget);
     expect(find.text('Pendaftaran a'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('notification cards use event icons and readable compact layout',
+      (tester) async {
+    tester.view.physicalSize = const Size(320, 1800);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    final session = await signedInSession((request) async {
+      if (request.url.path.endsWith('unread-count')) {
+        return jsonResponse({
+          'data': {'unread_count': 3}
+        });
+      }
+      return jsonResponse({
+        'data': [
+          for (final event in [
+            'rejected',
+            'approved',
+            'expired',
+            'payment_review'
+          ])
+            {
+              ...item(event, read: event == 'approved'),
+              'type': 'booking.$event'
+            },
+        ],
+        'meta': {'last_page': 1},
+      });
+    });
+    final state = NotificationState(ApiClient(session));
+    addTearDown(state.dispose);
+    await state.refresh();
+    await tester.pumpWidget(MaterialApp(
+      home: MediaQuery(
+        data: const MediaQueryData(textScaler: TextScaler.linear(1.5)),
+        child: NotifikasiScreen(state: state, active: false),
+      ),
+    ));
+    expect(find.byIcon(Icons.close_rounded), findsOneWidget);
+    expect(find.byIcon(Icons.check_rounded), findsOneWidget);
+    expect(find.byIcon(Icons.access_time_rounded), findsOneWidget);
+    expect(
+        find.byWidgetPredicate((widget) =>
+            widget is Semantics && widget.properties.label == 'Belum dibaca'),
+        findsNWidgets(3));
+    expect(
+        find.byWidgetPredicate((widget) =>
+            widget is Semantics && widget.properties.label == 'Sudah dibaca'),
+        findsOneWidget);
+    expect(find.textContaining('02/11/2026'), findsNWidgets(4));
     expect(tester.takeException(), isNull);
   });
 

@@ -96,7 +96,6 @@ class _ProfilUserScreenState extends State<ProfilUserScreen>
   late Animation<double> _fadeAnim;
   late Animation<Offset> _slideAnim;
 
-  bool _loadingJumlah = true;
   int? _jumlahPendaftaran;
   int? _jumlahUlasan;
   int? _jumlahDikunjungi;
@@ -118,12 +117,6 @@ class _ProfilUserScreenState extends State<ProfilUserScreen>
     _loadJumlahPendaftaran();
   }
 
-  @override
-  void didUpdateWidget(ProfilUserScreen oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (widget.active && !oldWidget.active) _loadJumlahPendaftaran();
-  }
-
   int _jumlahRequest = 0;
 
   void _sessionChanged() {
@@ -133,7 +126,6 @@ class _ProfilUserScreenState extends State<ProfilUserScreen>
       _jumlahPendaftaran = null;
       _jumlahUlasan = null;
       _jumlahDikunjungi = null;
-      _loadingJumlah = true;
     });
     _loadJumlahPendaftaran();
   }
@@ -143,11 +135,9 @@ class _ProfilUserScreenState extends State<ProfilUserScreen>
     final generation = session.sessionGeneration;
     final request = ++_jumlahRequest;
     if (!session.authenticated.value || !session.deviceSessionReady) {
-      if (mounted) setState(() => _loadingJumlah = false);
       return;
     }
     setState(() {
-      _loadingJumlah = true;
       _jumlahError = null;
     });
     try {
@@ -159,14 +149,12 @@ class _ProfilUserScreenState extends State<ProfilUserScreen>
         _jumlahPendaftaran = counts.bookings;
         _jumlahUlasan = counts.reviews;
         _jumlahDikunjungi = counts.visits;
-        _loadingJumlah = false;
       });
     } catch (_) {
       if (!mounted ||
           !session.isCurrentGeneration(generation) ||
           request != _jumlahRequest) return;
       setState(() {
-        _loadingJumlah = false;
         _jumlahError = 'Statistik profil belum dapat dimuat.';
       });
     }
@@ -298,8 +286,7 @@ class _ProfilUserScreenState extends State<ProfilUserScreen>
   @override
   Widget build(BuildContext context) {
     final user = currentUser;
-    // AuthSession's legacy currentUser.createdAt is local hydration time.
-    const tahunBergabung = '\u2014';
+    final tahunBergabung = user?.emailVerifiedAt?.year.toString() ?? '\u2014';
 
     return Theme(
       // Font Plus Jakarta Sans untuk seluruh halaman, dialog & bottom sheet
@@ -324,6 +311,8 @@ class _ProfilUserScreenState extends State<ProfilUserScreen>
                   ? const AlwaysStoppedAnimation(Offset.zero)
                   : _slideAnim,
               child: SingleChildScrollView(
+                padding: EdgeInsets.only(
+                    bottom: MediaQuery.paddingOf(context).bottom),
                 physics: const BouncingScrollPhysics(),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -513,25 +502,17 @@ class _ProfilUserScreenState extends State<ProfilUserScreen>
     final stats = [
       (
         'Pendaftaran',
-        _loadingJumlah || _jumlahPendaftaran == null
-            ? '\u2014'
-            : '$_jumlahPendaftaran'
+        _jumlahPendaftaran == null ? '\u2014' : '$_jumlahPendaftaran'
       ),
       (
         'Dikunjungi',
-        _loadingJumlah || _jumlahDikunjungi == null
-            ? '\u2014'
-            : '$_jumlahDikunjungi'
+        _jumlahDikunjungi == null ? '\u2014' : '$_jumlahDikunjungi'
       ),
-      (
-        'Ulasan',
-        _loadingJumlah || _jumlahUlasan == null ? '\u2014' : '$_jumlahUlasan'
-      ),
-      ('Tahun bergabung', tahunBergabung),
+      ('Ulasan', _jumlahUlasan == null ? '\u2014' : '$_jumlahUlasan'),
     ];
     return Container(
       key: const ValueKey('profileIdentityCard'),
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(24),
@@ -540,55 +521,72 @@ class _ProfilUserScreenState extends State<ProfilUserScreen>
             BoxShadow(
                 color: Color(0x140F2D59), blurRadius: 16, offset: Offset(0, 6))
           ]),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      child: Column(children: [
+        Row(children: [
           CircleAvatar(
-              radius: 28,
+              radius: 24,
               backgroundColor: _C.blue,
               child: initials.isEmpty
                   ? const Icon(Icons.person_outline, color: Colors.white)
                   : Text(initials,
-                      style: _font(20, FontWeight.w800, Colors.white))),
-          const SizedBox(width: 14),
+                      style: _font(16, FontWeight.w800, Colors.white))),
+          const SizedBox(width: 12),
           Expanded(
               child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                 Text(nama.isEmpty ? 'Pengunjung' : nama,
-                    style: _font(20, FontWeight.w800, _C.navy)),
+                    style: _font(14, FontWeight.w800, _C.navy)),
                 const SizedBox(height: 4),
                 Text(user?.email ?? '\u2014',
-                    style: _font(13, FontWeight.w500, _C.textMuted)),
-                if (user?.noTelepon.isNotEmpty ?? false) ...[
-                  const SizedBox(height: 4),
+                    style: _font(11, FontWeight.w500, _C.textMuted)),
+                if (user?.noTelepon.isNotEmpty ?? false)
                   Text(user!.noTelepon,
-                      style: _font(13, FontWeight.w500, _C.textMuted)),
-                ],
+                      style: _font(11, FontWeight.w500, _C.textMuted)),
               ])),
-        ]),
-        const SizedBox(height: 16),
-        OutlinedButton.icon(
+          const SizedBox(width: 4),
+          IconButton(
+            tooltip: 'Edit Profil',
             onPressed: () => _bukaEditProfil(context),
-            icon: const Icon(Icons.edit_outlined, size: 18),
-            label: const Text('Edit Profil')),
-        const SizedBox(height: 16),
-        LayoutBuilder(
-            builder: (context, constraints) => Wrap(
-                spacing: 12,
-                runSpacing: 16,
-                children: stats
-                    .map((stat) => SizedBox(
-                        width: (constraints.maxWidth - 12) / 2,
-                        child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(stat.$2,
-                                  style: _font(24, FontWeight.w800, _C.navy)),
-                              Text(stat.$1,
-                                  style:
-                                      _font(12, FontWeight.w500, _C.textMuted)),
-                            ])))
-                    .toList())),
+            icon: Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: const Color(0xFFECF4FF),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: const Icon(Icons.edit_outlined, size: 16, color: _C.blue),
+            ),
+          ),
+        ]),
+        const Padding(
+          padding: EdgeInsets.symmetric(vertical: 16),
+          child: Divider(height: 1, color: _C.border),
+        ),
+        Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          for (final stat in stats)
+            Expanded(
+              child: Column(children: [
+                Text(stat.$2, style: _font(16, FontWeight.w800, _C.navy)),
+                const SizedBox(height: 4),
+                Text(stat.$1,
+                    textAlign: TextAlign.center,
+                    style: _font(10, FontWeight.w500, _C.textMuted)),
+              ]),
+            ),
+        ]),
+        const Padding(
+          padding: EdgeInsets.symmetric(vertical: 16),
+          child: Divider(height: 1, color: _C.border),
+        ),
+        Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+          const Icon(Icons.calendar_month_outlined,
+              size: 13, color: _C.textMuted),
+          const SizedBox(width: 6),
+          Flexible(
+            child: Text('Bergabung sejak $tahunBergabung',
+                style: _font(10, FontWeight.w500, _C.textMuted)),
+          ),
+        ]),
       ]),
     );
   }

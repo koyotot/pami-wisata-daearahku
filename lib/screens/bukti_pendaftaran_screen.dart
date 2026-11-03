@@ -279,62 +279,72 @@ class _BuktiPendaftaranScreenState extends State<BuktiPendaftaranScreen> {
             return CustomScrollView(
               physics: const BouncingScrollPhysics(),
               slivers: [
-                _buildHeader(
-                  total: semua.length,
-                  menunggu: hitung('menunggu'),
-                  disetujui: hitung('disetujui'),
-                  ditolak: hitung('ditolak'),
-                ),
-                if (isLoading)
-                  const SliverFillRemaining(
-                    hasScrollBody: false,
-                    child: Center(
-                      child: CircularProgressIndicator(color: _blue),
+                SliverSafeArea(
+                  top: false,
+                  left: false,
+                  right: false,
+                  sliver: SliverMainAxisGroup(slivers: [
+                    _buildHeader(
+                      total: semua.length,
+                      menunggu: hitung('menunggu'),
+                      disetujui: hitung('disetujui'),
+                      ditolak: hitung('ditolak'),
                     ),
-                  )
-                else if (hasError)
-                  SliverFillRemaining(
-                    hasScrollBody: false,
-                    child: Center(
-                        child:
-                            Column(mainAxisSize: MainAxisSize.min, children: [
-                      Text(bookingErrorMessage(_bookings.error!)),
-                      TextButton(
-                          onPressed: _refresh, child: const Text('Coba lagi')),
-                    ])),
-                  )
-                else if (semua.isEmpty)
-                  SliverFillRemaining(
-                      hasScrollBody: false, child: _buildEmpty())
-                else ...[
-                  SliverToBoxAdapter(child: _buildSectionTitle(tampil.length)),
-                  if (tampil.isEmpty)
-                    SliverFillRemaining(
-                        hasScrollBody: false, child: _buildFilterKosong())
-                  else
-                    SliverPadding(
-                      padding: const EdgeInsets.fromLTRB(20, 0, 20, 32),
-                      sliver: SliverList(
-                        delegate: SliverChildBuilderDelegate(
-                          (_, i) {
-                            final p = tampil[i];
-                            return _FadeSlide(
-                              // key menjaga state kartu (expand/ulasan)
-                              // saat filter berganti.
-                              key: ValueKey(p.id ?? p.nomorBukti),
-                              index: i,
-                              child: _TicketCard(
-                                  pendaftar: p,
-                                  booking: byGuid[p.id],
-                                  isLaravel: true,
-                                  onChanged: _bookings.replace),
-                            );
-                          },
-                          childCount: tampil.length,
+                    if (isLoading)
+                      const SliverFillRemaining(
+                        hasScrollBody: false,
+                        child: Center(
+                          child: CircularProgressIndicator(color: _blue),
                         ),
-                      ),
-                    ),
-                ],
+                      )
+                    else if (hasError)
+                      SliverFillRemaining(
+                        hasScrollBody: false,
+                        child: Center(
+                            child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                              Text(bookingErrorMessage(_bookings.error!)),
+                              TextButton(
+                                  onPressed: _refresh,
+                                  child: const Text('Coba lagi')),
+                            ])),
+                      )
+                    else if (semua.isEmpty)
+                      SliverFillRemaining(
+                          hasScrollBody: false, child: _buildEmpty())
+                    else ...[
+                      SliverToBoxAdapter(
+                          child: _buildSectionTitle(tampil.length)),
+                      if (tampil.isEmpty)
+                        SliverFillRemaining(
+                            hasScrollBody: false, child: _buildFilterKosong())
+                      else
+                        SliverPadding(
+                          padding: const EdgeInsets.fromLTRB(20, 0, 20, 32),
+                          sliver: SliverList(
+                            delegate: SliverChildBuilderDelegate(
+                              (_, i) {
+                                final p = tampil[i];
+                                return _FadeSlide(
+                                  // key menjaga state kartu (expand/ulasan)
+                                  // saat filter berganti.
+                                  key: ValueKey(p.id ?? p.nomorBukti),
+                                  index: i,
+                                  child: _TicketCard(
+                                      pendaftar: p,
+                                      booking: byGuid[p.id],
+                                      isLaravel: true,
+                                      onChanged: _bookings.replace),
+                                );
+                              },
+                              childCount: tampil.length,
+                            ),
+                          ),
+                        ),
+                    ],
+                  ]),
+                ),
               ],
             );
           },
@@ -1115,8 +1125,8 @@ class _TicketCardState extends State<_TicketCard> {
       duration: MediaQuery.disableAnimationsOf(context)
           ? Duration.zero
           : const Duration(milliseconds: 200),
-      child: const Icon(Icons.keyboard_arrow_down_rounded,
-          color: _blue, size: 18),
+      child:
+          const Icon(Icons.keyboard_arrow_down_rounded, color: _blue, size: 18),
     );
     final expandedContent = _expanded
         ? Container(

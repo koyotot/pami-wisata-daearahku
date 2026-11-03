@@ -41,6 +41,24 @@ Map<String, dynamic> tokens(String id) => {
 http.Response ok(Map<String, dynamic> data) =>
     http.Response(jsonEncode({'data': data}), 200);
 void main() {
+  for (final verifiedAt in ['2024-08-12T10:00:00Z', null, 'invalid']) {
+    test('profile verification date parses safely: $verifiedAt', () async {
+      final session = AuthSession(
+          baseUrl: 'https://api.example.test/api/v1',
+          store: MemoryStore(),
+          client: MockClient((request) async {
+            if (request.url.path.endsWith('/login')) return ok(tokens('u'));
+            return ok({...user('u'), 'email_verified_at': verifiedAt});
+          }));
+      await session.login('user@example.test', 'password');
+      expect(
+          currentUser?.emailVerifiedAt,
+          verifiedAt == '2024-08-12T10:00:00Z'
+              ? DateTime.utc(2024, 8, 12, 10)
+              : null);
+    });
+  }
+
   test('unverified register and restore stay gated until OTP activates session',
       () async {
     final store = MemoryStore();

@@ -269,9 +269,8 @@ class _CariWisataScreenState extends State<CariWisataScreen> {
       scrolledUnderElevation: 0,
       backgroundColor: _blue,
       automaticallyImplyLeading: false,
-      leadingWidth: 62,
       centerTitle: true,
-      // Pill jumlah destinasi, di antara tombol kembali & menu
+      // Pill jumlah destinasi
       title: Container(
         height: 34,
         padding: const EdgeInsets.symmetric(horizontal: 12),
@@ -292,22 +291,6 @@ class _CariWisataScreenState extends State<CariWisataScreen> {
           ],
         ),
       ),
-      // Tombol kembali
-      leading: (widget.embedded && widget.onKembali == null)
-          ? null
-          : _headerButton(
-              icon: Icons.arrow_back_ios_new_rounded,
-              iconSize: 17,
-              margin: const EdgeInsets.fromLTRB(20, 8, 0, 8),
-              onTap: () {
-                FocusScope.of(context).unfocus();
-                if (widget.onKembali != null) {
-                  widget.onKembali!();
-                } else {
-                  Navigator.maybePop(context);
-                }
-              },
-            ),
       // Tombol pembuka drawer
       actions: [
         if (widget.onBukaMenu != null)

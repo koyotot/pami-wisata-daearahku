@@ -137,6 +137,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen>
             if (!didPop) _gotoTab(0);
           },
           child: Scaffold(
+            extendBody: true,
             backgroundColor: AppColors.bg,
             body: FadeTransition(
               opacity: _tabOpacity,
