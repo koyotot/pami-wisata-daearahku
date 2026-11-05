@@ -151,7 +151,9 @@ void main() {
     expect(find.byType(TimeBasedScenicBackground), findsOneWidget);
     expect(find.text('Pendaftaran a'), findsOneWidget);
     expect(find.text('Pendaftaran b'), findsOneWidget);
-    await tester.tap(find.widgetWithText(ChoiceChip, 'Belum dibaca'));
+    await tester.tap(find.ancestor(
+        of: find.textContaining('Belum dibaca'),
+        matching: find.byType(ChoiceChip)));
     await tester.pump();
     expect(find.text('Pendaftaran b'), findsNothing);
     fail = true;
@@ -261,7 +263,9 @@ void main() {
                 disableAnimations: true),
             child: NotifikasiScreen(state: state))));
     await tester.pumpAndSettle();
-    await tester.tap(find.widgetWithText(ChoiceChip, 'Belum dibaca'));
+    await tester.tap(find.ancestor(
+        of: find.textContaining('Belum dibaca'),
+        matching: find.byType(ChoiceChip)));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Pendaftaran activity-1'));
     await tester.pumpAndSettle();
@@ -275,10 +279,16 @@ void main() {
     expect(requests, contains('GET /api/v1/bookings/booking-1'));
     await tester.pageBack();
     await tester.pumpAndSettle();
-    expect(find.widgetWithText(ChoiceChip, 'Belum dibaca'), findsOneWidget);
+    expect(
+        find.ancestor(
+            of: find.textContaining('Belum dibaca'),
+            matching: find.byType(ChoiceChip)),
+        findsOneWidget);
     expect(
         tester
-            .widget<ChoiceChip>(find.widgetWithText(ChoiceChip, 'Belum dibaca'))
+            .widget<ChoiceChip>(find.ancestor(
+                of: find.textContaining('Belum dibaca'),
+                matching: find.byType(ChoiceChip)))
             .selected,
         isTrue);
     expect(find.text('Semua aktivitas sudah dibaca.'), findsOneWidget);

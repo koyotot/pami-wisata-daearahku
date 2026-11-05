@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../services/auth_session.dart';
-import 'admin_dashboard.dart';
+import 'operations_navigation_shell.dart';
 import 'main_navigation_screen.dart';
 import 'user_login_screen.dart';
 import 'verify_email_otp_screen.dart';
@@ -20,7 +20,7 @@ Widget sessionDestination({AuthSession? session}) {
   }
   return switch (session.role) {
     0 => const MainNavigationScreen(),
-    1 || 2 => const AdminDashboard(),
+    1 || 2 => OperationsNavigationShell(session: session),
     _ => const UserLoginScreen(),
   };
 }

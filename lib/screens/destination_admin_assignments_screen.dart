@@ -67,7 +67,6 @@ class _DestinationAdminAssignmentsScreenState
       for (var page = 1;; page++) {
         final data = await _repository.adminAccounts(query: {
           'role': '1',
-          'status': 'all',
           'per_page': '100',
           'page': '$page'
         });
@@ -154,9 +153,9 @@ class _DestinationAdminAssignmentsScreenState
                     const SizedBox(height: 20),
                     if (_loading)
                       const LinearProgressIndicator()
-                    else if (_destinations.isEmpty)
+                    else if (_destinations.isEmpty && _error == null)
                       const Text('Belum ada destinasi.')
-                    else
+                    else if (_destinations.isNotEmpty)
                       DropdownButtonFormField<String>(
                         initialValue: _destination,
                         isExpanded: true,

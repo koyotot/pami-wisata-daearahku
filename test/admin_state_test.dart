@@ -12,8 +12,13 @@ Booking _booking(String guid, String status) =>
 
 ApiPage<Booking> _page(List<Booking> items,
         {int page = 1, int last = 1, int? total}) =>
-    ApiPage(items, {'current_page': page, 'last_page': last, 'total': total ?? items.length},
-        {'next': page < last ? 'next' : null});
+    ApiPage(items, {
+      'current_page': page,
+      'last_page': last,
+      'total': total ?? items.length
+    }, {
+      'next': page < last ? 'next' : null
+    });
 
 void main() {
   group('AdminBookingDecider', () {
@@ -24,7 +29,8 @@ void main() {
         await gate.future;
         return jsonResponse({'data': bookingJson('b1', 'confirmed')});
       }, role: 1, log: log);
-      final decider = AdminBookingDecider(repositoryFor(session), session: session);
+      final decider =
+          AdminBookingDecider(repositoryFor(session), session: session);
 
       final first = decider.decide('b1', approve: true);
       await Future<void>.delayed(Duration.zero);
@@ -46,7 +52,8 @@ void main() {
       final gate = Completer<void>();
       final session = await adminSession((request) async {
         if (request.method == 'GET') {
-          return jsonResponse(pageEnvelope([bookingJson('b1', 'pending_approval')]));
+          return jsonResponse(
+              pageEnvelope([bookingJson('b1', 'pending_approval')]));
         }
         await gate.future;
         // The server answers with a status the client did not predict.
@@ -56,7 +63,8 @@ void main() {
       final list = PagedListController<Booking>(
           session: session,
           keyOf: (b) => b.guid,
-          fetchPage: (page, filters) => repo.adminBookings(query: {'page': '$page'}));
+          fetchPage: (page, filters) =>
+              repo.adminBookings(query: {'page': '$page'}));
       await list.load();
       final decider = AdminBookingDecider(repo, session: session);
 
@@ -82,7 +90,8 @@ void main() {
         }
         return jsonResponse({'data': bookingJson('b1', 'confirmed')});
       }, role: 1, log: log);
-      final decider = AdminBookingDecider(repositoryFor(session), session: session);
+      final decider =
+          AdminBookingDecider(repositoryFor(session), session: session);
       final result = await decider.decide('b1', approve: false);
       expect(result.kind, DecisionKind.alreadyProcessed);
       expect(result.booking!.status, 'confirmed');
@@ -101,7 +110,8 @@ void main() {
           if (request.method == 'POST') return conflict(code);
           return jsonResponse({'data': bookingJson('b1', 'expired')});
         }, role: 1);
-        final decider = AdminBookingDecider(repositoryFor(session), session: session);
+        final decider =
+            AdminBookingDecider(repositoryFor(session), session: session);
         final result = await decider.decide('b1', approve: true);
         if (code == 'approval_deadline_passed') {
           expect(result.kind, DecisionKind.alreadyProcessed);
@@ -110,7 +120,7 @@ void main() {
         } else {
           expect(result.kind, DecisionKind.failed);
           expect(result.message, contains('terlalu dekat'));
-          expect(result.booking, isNull);
+          expect(result.booking!.status, 'expired');
         }
       }
     });
@@ -121,7 +131,8 @@ void main() {
       final session = await adminSession((request) async {
         return jsonResponse({'message': 'forbidden'}, 403);
       }, role: 1, log: log);
-      final decider = AdminBookingDecider(repositoryFor(session), session: session);
+      final decider =
+          AdminBookingDecider(repositoryFor(session), session: session);
       final result = await decider.decide('b1', approve: true);
       expect(result.kind, DecisionKind.failed);
       expect(result.message, contains('hak akses'));
@@ -135,7 +146,8 @@ void main() {
         if (request.method == 'POST') throw TimeoutException('slow');
         return jsonResponse({'data': bookingJson('b1', detailStatus)});
       }, role: 1, log: log);
-      final decider = AdminBookingDecider(repositoryFor(session), session: session);
+      final decider =
+          AdminBookingDecider(repositoryFor(session), session: session);
 
       var result = await decider.decide('b1', approve: true);
       expect(result.kind, DecisionKind.reconciled);
@@ -157,7 +169,8 @@ void main() {
       final session = await adminSession((request) async {
         throw TimeoutException('slow');
       }, role: 1);
-      final decider = AdminBookingDecider(repositoryFor(session), session: session);
+      final decider =
+          AdminBookingDecider(repositoryFor(session), session: session);
       final result = await decider.decide('b1', approve: true);
       expect(result.kind, DecisionKind.unconfirmed);
       expect(result.booking, isNull);
@@ -169,7 +182,8 @@ void main() {
         await gate.future;
         return jsonResponse({'data': bookingJson('b1', 'confirmed')});
       }, role: 1);
-      final decider = AdminBookingDecider(repositoryFor(session), session: session);
+      final decider =
+          AdminBookingDecider(repositoryFor(session), session: session);
       final pending = decider.decide('b1', approve: true);
       await Future<void>.delayed(Duration.zero);
       await session.clear();
@@ -182,12 +196,16 @@ void main() {
 
   group('PagedListController', () {
     test('loads every page and de-duplicates rows that shifted', () async {
-      final session = await adminSession((_) async => jsonResponse({}), role: 1);
+      final session =
+          await adminSession((_) async => jsonResponse({}), role: 1);
       final pages = <int, ApiPage<Booking>>{
-        1: _page([_booking('a', 'pending_approval'), _booking('b', 'pending_approval')],
-            page: 1, last: 3, total: 4),
+        1: _page([
+          _booking('a', 'pending_approval'),
+          _booking('b', 'pending_approval')
+        ], page: 1, last: 3, total: 4),
         // 'b' moved to page 2 because a newer row was inserted at the top.
-        2: _page([_booking('b', 'confirmed'), _booking('c', 'pending_approval')],
+        2: _page(
+            [_booking('b', 'confirmed'), _booking('c', 'pending_approval')],
             page: 2, last: 3, total: 4),
         3: _page([_booking('d', 'rejected')], page: 3, last: 3, total: 4),
       };
@@ -209,14 +227,16 @@ void main() {
     });
 
     test('forwards the server-side filter to every page request', () async {
-      final session = await adminSession((_) async => jsonResponse({}), role: 1);
+      final session =
+          await adminSession((_) async => jsonResponse({}), role: 1);
       final seen = <Map<String, String>>[];
       final list = PagedListController<Booking>(
           session: session,
           keyOf: (b) => b.guid,
           fetchPage: (page, filters) async {
             seen.add({...filters, 'page': '$page'});
-            return _page([_booking('p$page', 'confirmed')], page: page, last: 2);
+            return _page([_booking('p$page', 'confirmed')],
+                page: page, last: 2);
           });
       await list.load(filters: {'status': 'confirmed'});
       expect(seen, [
@@ -228,7 +248,8 @@ void main() {
 
     test('an older request finishing later does not overwrite a newer one',
         () async {
-      final session = await adminSession((_) async => jsonResponse({}), role: 1);
+      final session =
+          await adminSession((_) async => jsonResponse({}), role: 1);
       final gates = <String, Completer<ApiPage<Booking>>>{
         'pending_approval': Completer(),
         'confirmed': Completer(),
@@ -244,7 +265,8 @@ void main() {
       await newer;
       expect(list.items.map((b) => b.guid), ['new']);
 
-      gates['pending_approval']!.complete(_page([_booking('old', 'pending_approval')]));
+      gates['pending_approval']!
+          .complete(_page([_booking('old', 'pending_approval')]));
       await older;
       expect(list.items.map((b) => b.guid), ['new']);
       expect(list.loading, isFalse);
@@ -253,8 +275,12 @@ void main() {
     });
 
     test('an older failure cannot replace newer data with an error', () async {
-      final session = await adminSession((_) async => jsonResponse({}), role: 1);
-      final gates = [Completer<ApiPage<Booking>>(), Completer<ApiPage<Booking>>()];
+      final session =
+          await adminSession((_) async => jsonResponse({}), role: 1);
+      final gates = [
+        Completer<ApiPage<Booking>>(),
+        Completer<ApiPage<Booking>>()
+      ];
       var call = 0;
       final list = PagedListController<Booking>(
           session: session,
@@ -273,7 +299,8 @@ void main() {
 
     test('rows of another filter are cleared while the new filter loads',
         () async {
-      final session = await adminSession((_) async => jsonResponse({}), role: 1);
+      final session =
+          await adminSession((_) async => jsonResponse({}), role: 1);
       final gate = Completer<ApiPage<Booking>>();
       var first = true;
       final list = PagedListController<Booking>(
@@ -298,10 +325,13 @@ void main() {
     });
 
     test('logout or account switch drops a late response', () async {
-      final session = await adminSession((_) async => jsonResponse({}), role: 1);
+      final session =
+          await adminSession((_) async => jsonResponse({}), role: 1);
       final gate = Completer<ApiPage<Booking>>();
       final list = PagedListController<Booking>(
-          session: session, keyOf: (b) => b.guid, fetchPage: (page, f) => gate.future);
+          session: session,
+          keyOf: (b) => b.guid,
+          fetchPage: (page, f) => gate.future);
       final loading = list.load();
       expect(list.loading, isTrue);
 
@@ -317,10 +347,13 @@ void main() {
     });
 
     test('a late response after dispose is harmless', () async {
-      final session = await adminSession((_) async => jsonResponse({}), role: 1);
+      final session =
+          await adminSession((_) async => jsonResponse({}), role: 1);
       final gate = Completer<ApiPage<Booking>>();
       final list = PagedListController<Booking>(
-          session: session, keyOf: (b) => b.guid, fetchPage: (page, f) => gate.future);
+          session: session,
+          keyOf: (b) => b.guid,
+          fetchPage: (page, f) => gate.future);
       final loading = list.load();
       list.dispose();
       gate.complete(_page([_booking('x', 'confirmed')]));
@@ -361,16 +394,32 @@ void main() {
     test('image validation: JPEG/PNG/WebP up to 5 MB', () {
       final jpeg = [0xFF, 0xD8, 0xFF, 0xE0, 0, 0];
       final png = [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0];
-      final webp = [0x52, 0x49, 0x46, 0x46, 0, 0, 0, 0, 0x57, 0x45, 0x42, 0x50, 0];
+      final webp = [
+        0x52,
+        0x49,
+        0x46,
+        0x46,
+        0,
+        0,
+        0,
+        0,
+        0x57,
+        0x45,
+        0x42,
+        0x50,
+        0
+      ];
       final gif = [0x47, 0x49, 0x46, 0x38, 0x39, 0x61, 0, 0, 0, 0, 0, 0, 0];
       expect(validateDestinationImage(jpeg), isNull);
       expect(validateDestinationImage(png), isNull);
       expect(validateDestinationImage(webp), isNull);
       expect(validateDestinationImage(gif), contains('JPEG, PNG, atau WebP'));
       expect(validateDestinationImage(const []), isNotNull);
-      final big = List<int>.filled(kMaxImageBytes + 1, 0)..setRange(0, 3, [0xFF, 0xD8, 0xFF]);
+      final big = List<int>.filled(kMaxImageBytes + 1, 0)
+        ..setRange(0, 3, [0xFF, 0xD8, 0xFF]);
       expect(validateDestinationImage(big), contains('5 MB'));
-      final atLimit = List<int>.filled(kMaxImageBytes, 0)..setRange(0, 3, [0xFF, 0xD8, 0xFF]);
+      final atLimit = List<int>.filled(kMaxImageBytes, 0)
+        ..setRange(0, 3, [0xFF, 0xD8, 0xFF]);
       expect(validateDestinationImage(atLimit), isNull);
     });
 
@@ -421,18 +470,21 @@ void main() {
     });
 
     test('error messages are keyed on the structured code', () {
-      String message(String code, {int status = 409, Map<String, dynamic>? context}) =>
+      String message(String code,
+              {int status = 409, Map<String, dynamic>? context}) =>
           adminErrorMessage(ApiException('x', status, code, context));
       expect(message('category_in_use'), contains('destinasi aktif'));
       expect(message('category_inactive'), contains('kategorinya nonaktif'));
       expect(message('insufficient_capacity', context: {'remaining': 3}),
           contains('tersisa 3'));
-      expect(adminErrorMessage(const ApiException('x', 403)), contains('hak akses'));
+      expect(adminErrorMessage(const ApiException('x', 403)),
+          contains('hak akses'));
       expect(adminErrorMessage(const ApiException('Slug sudah dipakai.', 422)),
           'Slug sudah dipakai.');
       expect(
           adminErrorMessage(const ApiException(
-              'The last active superadmin cannot be suspended or demoted.', 422)),
+              'The last active superadmin cannot be suspended or demoted.',
+              422)),
           contains('Superadmin aktif terakhir'));
     });
 

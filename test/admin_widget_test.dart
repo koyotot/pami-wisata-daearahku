@@ -6,6 +6,7 @@ import 'package:wisata_daerahku/screens/kelola_admin_screen.dart';
 import 'package:wisata_daerahku/screens/kelola_kategori_screen.dart';
 import 'package:wisata_daerahku/screens/kelola_kuota_screen.dart';
 import 'admin_test_support.dart';
+import 'operations_test_support.dart';
 
 void tallSurface(WidgetTester tester) {
   tester.view.physicalSize = const Size(2000, 2400);
@@ -14,41 +15,77 @@ void tallSurface(WidgetTester tester) {
 }
 
 void main() {
-  testWidgets('booking list shows the status the server returned after approve',
-      (tester) async {
+  testWidgets('legacy history purges rows after scope revoke', (tester) async {
     tallSurface(tester);
-    final log = <http.Request>[];
-    var current = 'pending_approval';
-    final session = await adminSession((request) async {
-      if (request.method == 'POST') {
-        // The server decides; here it answers with a paid-flow status.
-        current = 'awaiting_payment';
-        return jsonResponse({'data': bookingJson('g1', current)});
-      }
-      return jsonResponse(pageEnvelope([bookingJson('g1', current)]));
-    }, role: 1, log: log);
-
+    var revoked = false;
+    final session = await adminSession(
+        (request) async => revoked
+            ? jsonResponse({'message': 'Forbidden'}, 403)
+            : jsonResponse(pageEnvelope([operationalBooking()])),
+        role: 1);
     await tester.pumpWidget(MaterialApp(
         home: DaftarPendaftarScreen(
             repository: repositoryFor(session), session: session)));
     await tester.pumpAndSettle();
-
-    final card = find.byKey(const ValueKey('g1'));
-    expect(find.descendant(of: card, matching: find.text('Menunggu')),
-        findsOneWidget);
-
-    await tester.tap(find.byKey(const ValueKey('approve-g1')));
+    expect(find.text('Budi'), findsOneWidget);
+    revoked = true;
+    await tester.tap(find.byKey(const ValueKey('chip-Ditolak')));
     await tester.pumpAndSettle();
-    await tester.tap(find.widgetWithText(ElevatedButton, 'Setujui'));
+    expect(find.text('Budi'), findsNothing);
+    expect(find.textContaining('Akses destinasi berubah'), findsOneWidget);
+  });
+  testWidgets(
+      'legacy booking history opens canonical detail and requires explicit claim',
+      (tester) async {
+    tallSurface(tester);
+    final log = <http.Request>[];
+    String? owner;
+    var status = 'pending_approval';
+    final session = await adminSession((request) async {
+      if (request.method == 'POST') {
+        if (request.url.path.endsWith('/claim')) {
+          owner = 'admin-1';
+          return jsonResponse({'data': operationalClaim(owner)});
+        }
+        status = 'awaiting_payment';
+        return jsonResponse({'data': operationalBooking(status)});
+      }
+      if (request.url.path.endsWith('/b1')) {
+        return jsonResponse({'data': operationalBooking(status)});
+      }
+      if (request.url.path.endsWith('approval-queue')) {
+        return jsonResponse(pageEnvelope([
+          if (status == 'pending_approval') operationalQueueRow(owner: owner)
+        ]));
+      }
+      return jsonResponse(pageEnvelope([operationalBooking(status)]));
+    }, role: 1, log: log);
+    await tester.pumpWidget(MaterialApp(
+        home: DaftarPendaftarScreen(
+            repository: repositoryFor(session), session: session)));
     await tester.pumpAndSettle();
-
-    expect(log.where((r) => r.method == 'POST'), hasLength(1));
-    expect(log.firstWhere((r) => r.method == 'POST').url.path,
-        '/api/v1/admin/bookings/g1/approve');
-    expect(find.descendant(of: card, matching: find.text('Menunggu pembayaran')),
-        findsOneWidget);
-    expect(find.byKey(const ValueKey('approve-g1')), findsNothing);
-    expect(find.textContaining('Status: Menunggu pembayaran'), findsOneWidget);
+    expect(find.byKey(const ValueKey('approve-b1')), findsNothing);
+    await tester.tap(find.byKey(const ValueKey('b1')));
+    await tester.pumpAndSettle();
+    final approve = find.byKey(const ValueKey('approve-booking'));
+    expect(tester.widget<FilledButton>(approve).onPressed, isNull);
+    await tester.tap(find.byKey(const ValueKey('claim-booking')));
+    await tester.pumpAndSettle();
+    expect(tester.widget<FilledButton>(approve).onPressed, isNotNull);
+    await tester.tap(approve);
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(FilledButton, 'Setujui').last);
+    await tester.pumpAndSettle();
+    expect(
+        log
+            .where((request) => request.method == 'POST')
+            .map((request) => request.url.path),
+        [
+          '/api/v1/admin/bookings/b1/claim',
+          '/api/v1/admin/bookings/b1/approve'
+        ]);
+    expect(find.text('Menunggu pembayaran'), findsOneWidget);
+    await tester.pumpWidget(const SizedBox.shrink());
   });
 
   testWidgets('status filter chip requests the status from the server',
@@ -144,7 +181,8 @@ void main() {
     final log = <http.Request>[];
     final session = await adminSession(
         (request) async => jsonResponse(pageEnvelope([])),
-        role: 1, log: log);
+        role: 1,
+        log: log);
     await tester.pumpWidget(MaterialApp(
         home: KelolaKategoriScreen(
             repository: repositoryFor(session), session: session)));
@@ -194,7 +232,12 @@ void main() {
     final log = <http.Request>[];
     final session = await adminSession((request) async {
       if (request.method == 'PUT') {
-        return jsonResponse({'message': 'x', 'errors': {'capacity': ['salah']}}, 422);
+        return jsonResponse({
+          'message': 'x',
+          'errors': {
+            'capacity': ['salah']
+          }
+        }, 422);
       }
       return jsonResponse(pageEnvelope([
         {

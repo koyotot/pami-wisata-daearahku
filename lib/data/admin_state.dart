@@ -105,6 +105,15 @@ String adminErrorMessage(Object error) {
     return 'Terjadi kesalahan. Silakan coba lagi.';
   }
   switch (error.code) {
+    case 'claim_owned':
+    case 'claim_not_owned':
+      return 'Claim dimiliki Admin lain. Muat status terbaru sebelum melanjutkan.';
+    case 'claim_required':
+      return 'Ambil claim terlebih dahulu untuk memproses booking.';
+    case 'override_reason_required':
+      return 'Alasan wajib diisi untuk perubahan claim Admin lain.';
+    case 'idempotency_conflict':
+      return 'Kunci tindakan berbeda dari permintaan semula. Muat status terbaru.';
     case 'booking_not_pending':
       return 'Pendaftaran ini sudah diproses sebelumnya.';
     case 'approval_deadline_passed':
@@ -203,7 +212,9 @@ class PagedListController<T> extends ChangeNotifier {
 
   bool _hasNext(ApiPage<T> page, int number) {
     final links = page.links;
-    if (links != null && links.containsKey('next')) return links['next'] != null;
+    if (links != null && links.containsKey('next')) {
+      return links['next'] != null;
+    }
     final last = page.meta?['last_page'];
     return last is num && number < last.toInt();
   }
@@ -236,7 +247,9 @@ class PagedListController<T> extends ChangeNotifier {
         }
         final metaTotal = page.meta?['total'];
         if (metaTotal is num) reportedTotal = metaTotal.toInt();
-        if (page.items.isEmpty || !_hasNext(page, number) || number >= maxPages) {
+        if (page.items.isEmpty ||
+            !_hasNext(page, number) ||
+            number >= maxPages) {
           break;
         }
         number++;
@@ -338,7 +351,9 @@ class BookingDecisionResult {
   final DecisionKind kind;
   final Booking? booking;
   final String message;
-  const BookingDecisionResult(this.kind, this.message, [this.booking]);
+  final ApiException? error;
+  const BookingDecisionResult(this.kind, this.message,
+      [this.booking, this.error]);
 
   /// Whether the UI should react (snack bar, list update).
   bool get actionable =>
@@ -359,12 +374,10 @@ class AdminBookingDecider extends InFlightGuard {
     final generation = session.sessionGeneration;
     final result = await run<BookingDecisionResult>(guid, () async {
       try {
-        final booking =
-            await repository.decideBooking(guid, approve: approve, reason: reason);
+        final booking = await repository.decideBooking(guid,
+            approve: approve, reason: reason);
         return BookingDecisionResult(
-            DecisionKind.applied,
-            _appliedMessage(booking.status),
-            booking);
+            DecisionKind.applied, _appliedMessage(booking.status), booking);
       } on ApiException catch (e) {
         return _reconcile(guid, e);
       } catch (_) {
@@ -376,8 +389,8 @@ class AdminBookingDecider extends InFlightGuard {
       }
     });
     if (result == null) {
-      return const BookingDecisionResult(
-          DecisionKind.inFlight, 'Keputusan untuk pendaftaran ini sedang diproses.');
+      return const BookingDecisionResult(DecisionKind.inFlight,
+          'Keputusan untuk pendaftaran ini sedang diproses.');
     }
     if (!session.isCurrentGeneration(generation)) {
       return const BookingDecisionResult(DecisionKind.stale, '');
@@ -396,10 +409,12 @@ class AdminBookingDecider extends InFlightGuard {
   Future<BookingDecisionResult> _reconcile(String guid, ApiException e) async {
     final unknown = e.outcomeUnknown;
     final reread = unknown ||
+        e.status == 409 ||
         e.code == 'booking_not_pending' ||
         e.code == 'approval_deadline_passed';
     if (!reread) {
-      return BookingDecisionResult(DecisionKind.failed, adminErrorMessage(e));
+      return BookingDecisionResult(
+          DecisionKind.failed, adminErrorMessage(e), null, e);
     }
     Booking? current;
     try {
@@ -425,12 +440,15 @@ class AdminBookingDecider extends InFlightGuard {
     }
     final status = current?.status ?? e.context?['status'] as String?;
     final base = adminErrorMessage(e);
+    final processed =
+        e.code == 'booking_not_pending' || e.code == 'approval_deadline_passed';
     return BookingDecisionResult(
-        DecisionKind.alreadyProcessed,
+        processed ? DecisionKind.alreadyProcessed : DecisionKind.failed,
         status == null
             ? base
             : '$base Status terkini: ${bookingStatusLabel(status)}.',
-        current);
+        current,
+        e);
   }
 }
 

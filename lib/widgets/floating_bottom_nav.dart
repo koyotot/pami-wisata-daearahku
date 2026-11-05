@@ -7,10 +7,12 @@ class FloatingBottomNav extends StatelessWidget {
       {super.key,
       required this.index,
       required this.onSelected,
-      this.unreadCount = 0});
+      this.unreadCount = 0,
+      this.operationsRole});
   final int index;
   final ValueChanged<int> onSelected;
   final int unreadCount;
+  final int? operationsRole;
 
   @override
   Widget build(BuildContext context) => SafeArea(
@@ -44,13 +46,17 @@ class FloatingBottomNav extends StatelessWidget {
       );
 
   Widget _tab(BuildContext context, int tab) {
-    const labels = ['Beranda', 'Riwayat', 'Jelajah', 'Notifikasi', 'Profil'];
+    final labels = operationsRole == 1
+        ? ['Beranda', 'Booking', 'Scan QR', 'Destinasi', 'Profil']
+        : operationsRole == 2
+            ? ['Ringkasan', 'Operasi', 'Analitik', 'Kelola', 'Profil']
+            : ['Beranda', 'Riwayat', 'Jelajah', 'Notifikasi', 'Profil'];
     final selected = index == tab;
     final center = tab == 2;
     return Semantics(
       selected: selected,
       button: true,
-      label: tab == 3 && unreadCount > 0
+      label: operationsRole == null && tab == 3 && unreadCount > 0
           ? 'Notifikasi, $unreadCount belum dibaca'
           : labels[tab],
       excludeSemantics: true,
@@ -80,8 +86,11 @@ class FloatingBottomNav extends StatelessWidget {
               child: Stack(clipBehavior: Clip.none, children: [
                 CustomPaint(
                     size: const Size.square(26),
-                    painter: _NavIconPainter(tab, selected)),
-                if (tab == 3 && unreadCount > 0)
+                    painter: operationsRole == null
+                        ? _NavIconPainter(tab, selected)
+                        : _OperationsIconPainter(
+                            tab, selected, operationsRole!)),
+                if (operationsRole == null && tab == 3 && unreadCount > 0)
                   Positioned(
                     top: -5,
                     right: -7,
@@ -110,6 +119,88 @@ class FloatingBottomNav extends StatelessWidget {
       ),
     );
   }
+}
+
+class _OperationsIconPainter extends CustomPainter {
+  const _OperationsIconPainter(this.tab, this.selected, this.role);
+  final int tab;
+  final bool selected;
+  final int role;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (tab == 0 || tab == 1 || tab == 4) {
+      _NavIconPainter(tab, selected).paint(canvas, size);
+      return;
+    }
+    canvas.scale(size.width / 24, size.height / 24);
+    final stroke = Paint()
+      ..color = tab == 2 ? Colors.white : const Color(0xFF6F8199)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.8
+      ..strokeCap = StrokeCap.round
+      ..strokeJoin = StrokeJoin.round;
+    final path = Path();
+    if (tab == 2 && role == 1) {
+      for (final origin in [
+        const Offset(3, 3),
+        const Offset(15, 3),
+        const Offset(3, 15)
+      ]) {
+        path.addRRect(RRect.fromRectAndRadius(
+            origin & const Size(6, 6), const Radius.circular(1)));
+      }
+      path
+        ..moveTo(15, 15)
+        ..lineTo(18, 15)
+        ..lineTo(18, 18)
+        ..lineTo(21, 18)
+        ..lineTo(21, 21)
+        ..moveTo(15, 21)
+        ..lineTo(15, 18);
+    } else if (tab == 2) {
+      path
+        ..moveTo(3, 3)
+        ..lineTo(3, 21)
+        ..lineTo(21, 21)
+        ..moveTo(7, 17)
+        ..lineTo(7, 12)
+        ..moveTo(12, 17)
+        ..lineTo(12, 7)
+        ..moveTo(17, 17)
+        ..lineTo(17, 3);
+    } else if (role == 1) {
+      path
+        ..moveTo(3, 20)
+        ..lineTo(8, 6)
+        ..lineTo(14, 16)
+        ..lineTo(18, 10)
+        ..lineTo(22, 20)
+        ..close();
+    } else {
+      for (final origin in [
+        const Offset(3, 3),
+        const Offset(14, 3),
+        const Offset(3, 14),
+        const Offset(14, 14)
+      ]) {
+        path.addRRect(RRect.fromRectAndRadius(
+            origin & const Size(7, 7), const Radius.circular(1.5)));
+      }
+    }
+    if (selected && tab == 3) {
+      canvas.drawPath(
+          path, Paint()..color = AppColors.blue.withValues(alpha: .18));
+      stroke.color = AppColors.blue;
+    }
+    canvas.drawPath(path, stroke);
+  }
+
+  @override
+  bool shouldRepaint(_OperationsIconPainter oldDelegate) =>
+      tab != oldDelegate.tab ||
+      selected != oldDelegate.selected ||
+      role != oldDelegate.role;
 }
 
 class _NavIconPainter extends CustomPainter {
@@ -186,8 +277,8 @@ class _NavIconPainter extends CustomPainter {
           ..close();
     }
     if (selected) {
-      canvas.drawPath(shape,
-          Paint()..color = tab == 2 ? Colors.white : AppColors.blue);
+      canvas.drawPath(
+          shape, Paint()..color = tab == 2 ? Colors.white : AppColors.blue);
     } else {
       canvas.drawPath(shape, outline);
       canvas.drawPath(detail, outline);

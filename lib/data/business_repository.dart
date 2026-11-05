@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'ticket_models.dart';
+import 'operational_models.dart';
 import '../services/api_client.dart';
 import '../services/auth_session.dart';
 
@@ -480,6 +481,42 @@ class BusinessRepository {
           authenticated: true);
   Future<Booking> adminBooking(String guid) async => Booking(await api
       .object('GET', 'admin/bookings/${_id(guid)}', authenticated: true));
+  Future<OperationalReport> operationalReport(String section,
+          {Map<String, String>? query}) async =>
+      OperationalReport(await api.object(
+          'GET', _path('admin/dashboard/${_id(section)}', query),
+          authenticated: true));
+
+  Future<ApiPage<OperationalRow>> operationalRows(String section,
+          {Map<String, String>? query}) =>
+      api.collection(
+          _path(
+              section == 'approval-queue'
+                  ? 'admin/approval-queue'
+                  : 'admin/dashboard/${_id(section)}',
+              query),
+          OperationalRow.new,
+          authenticated: true);
+
+  Future<ApiPage<OperationalRow>> approvalQueue({Map<String, String>? query}) =>
+      operationalRows('approval-queue', query: query);
+
+  Future<ApprovalClaim> mutateApprovalClaim(
+      String guid, String action, String key,
+      {Json body = const {}}) async {
+    if (!const ['claim', 'release', 'reassign'].contains(action)) {
+      throw ArgumentError.value(action, 'action');
+    }
+    final result = ApprovalClaim(await api.object('POST',
+        '${action == 'reassign' ? 'superadmin' : 'admin'}/bookings/${_id(guid)}/$action',
+        authenticated: true, body: body, headers: {'Idempotency-Key': key}));
+    if (result.raw['booking_guid'] != guid) {
+      throw const ApiException(
+          'Respons claim tidak cocok.', null, 'invalid_response');
+    }
+    return result;
+  }
+
   Future<Booking> decideBooking(String guid,
           {required bool approve, String? reason}) async =>
       Booking(await api.object('POST',

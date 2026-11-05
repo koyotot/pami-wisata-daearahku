@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:wisata_daerahku/screens/admin_dashboard.dart';
+import 'package:wisata_daerahku/screens/operations_navigation_shell.dart';
 import 'package:wisata_daerahku/screens/main_navigation_screen.dart';
 import 'package:wisata_daerahku/screens/session_destination.dart';
 import 'package:wisata_daerahku/screens/user_login_screen.dart';
@@ -25,7 +26,7 @@ void main() {
     expect(sessionDestination(), isA<MainNavigationScreen>());
     for (final role in [1, 2]) {
       session.role = role;
-      expect(sessionDestination(), isA<AdminDashboard>());
+      expect(sessionDestination(), isA<OperationsNavigationShell>());
     }
     session.role = 3;
     expect(sessionDestination(), isA<UserLoginScreen>());
@@ -44,7 +45,8 @@ void main() {
     expect(find.byType(AdminDashboard), findsNothing);
   });
 
-  testWidgets('role 0 opening admin is routed to the user shell', (tester) async {
+  testWidgets('role 0 opening admin is routed to the user shell',
+      (tester) async {
     session.authenticated.value = true;
     session.deviceSessionReady = true;
     session.role = 0;
@@ -58,6 +60,6 @@ void main() {
     session.deviceSessionReady = true;
     session.role = 1;
     await tester.pumpWidget(const MaterialApp(home: MainNavigationScreen()));
-    expect(find.byType(AdminDashboard), findsOneWidget);
+    expect(find.byType(OperationsNavigationShell), findsOneWidget);
   });
 }
