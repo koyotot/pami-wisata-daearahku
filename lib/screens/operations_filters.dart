@@ -3,7 +3,8 @@ part of 'operations_dashboard.dart';
 Future<Map<String, String>?> showOperationsFilters(BuildContext context,
         {required BusinessRepository repository,
         required AuthSession session,
-        required Map<String, String> initial}) =>
+        required Map<String, String> initial,
+        bool financial = false}) =>
     showModalBottomSheet<Map<String, String>>(
         context: context,
         isScrollControlled: true,
@@ -13,14 +14,21 @@ Future<Map<String, String>?> showOperationsFilters(BuildContext context,
         shape: const RoundedRectangleBorder(
             borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
         builder: (_) => _OperationsFilters(
-            repository: repository, session: session, initial: initial));
+            repository: repository,
+            session: session,
+            initial: initial,
+            financial: financial));
 
 class _OperationsFilters extends StatefulWidget {
   const _OperationsFilters(
-      {required this.repository, required this.session, required this.initial});
+      {required this.repository,
+      required this.session,
+      required this.initial,
+      this.financial = false});
   final BusinessRepository repository;
   final AuthSession session;
   final Map<String, String> initial;
+  final bool financial;
   @override
   State<_OperationsFilters> createState() => _OperationsFiltersState();
 }
@@ -31,6 +39,8 @@ class _OperationsFiltersState extends State<_OperationsFilters> {
   late String? _destination = widget.initial['destination_guid'];
   late DateTime? _from = DateTime.tryParse(widget.initial['from'] ?? '');
   late DateTime? _to = DateTime.tryParse(widget.initial['to'] ?? '');
+  late String _financePeriod =
+      widget.initial['from'] == null ? 'month' : 'custom';
   final Map<String, Destination> _destinations = {};
   int _page = 0;
   bool _next = true;
@@ -48,6 +58,7 @@ class _OperationsFiltersState extends State<_OperationsFilters> {
   void initState() {
     super.initState();
     widget.session.sessionChanges.addListener(_changed);
+    if (widget.financial) operationsDataChanges.addListener(_changed);
     _load();
   }
 
@@ -57,6 +68,12 @@ class _OperationsFiltersState extends State<_OperationsFilters> {
         _request++;
         _destinations.clear();
         _destination = null;
+        if (widget.financial) {
+          _from = null;
+          _to = null;
+          _financePeriod = 'month';
+          _validation = null;
+        }
         _page = 0;
         _next = true;
         _loading = false;
@@ -69,6 +86,7 @@ class _OperationsFiltersState extends State<_OperationsFilters> {
   @override
   void dispose() {
     widget.session.sessionChanges.removeListener(_changed);
+    if (widget.financial) operationsDataChanges.removeListener(_changed);
     super.dispose();
   }
 
@@ -119,11 +137,17 @@ class _OperationsFiltersState extends State<_OperationsFilters> {
         helpText: 'Pilih periode maksimal 366 hari');
     if (range == null || !_valid) return;
     setState(() {
-      if (range.end.difference(range.start).inDays > 366) {
-        _validation = 'Periode maksimal 366 hari.';
+      final days = DateTime.utc(range.end.year, range.end.month, range.end.day)
+          .difference(DateTime.utc(
+              range.start.year, range.start.month, range.start.day))
+          .inDays;
+      if (widget.financial ? days >= 366 : days > 366) {
+        _validation =
+            'Periode maksimal 366 hari${widget.financial ? ' inklusif' : ''}.';
       } else {
         _from = range.start;
         _to = range.end;
+        if (widget.financial) _financePeriod = 'custom';
         _validation = null;
       }
     });
@@ -138,22 +162,33 @@ class _OperationsFiltersState extends State<_OperationsFilters> {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-            const Text('Filter Destinasi',
-                style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800,
+            Text(widget.financial ? 'Filter Keuangan' : 'Filter Destinasi',
+                style: const TextStyle(
+                    fontSize: 22,
+                    fontWeight: FontWeight.w800,
                     color: AppColors.navy)),
             const SizedBox(height: 6),
-            const Text('Sesuaikan destinasi dan periode operasional.',
-                style: TextStyle(fontSize: 13, height: 1.5,
-                    color: Color(0xFF526787))),
+            Text(
+                widget.financial
+                    ? 'Periode UTC, maksimal 366 hari inklusif. Scope mengikuti akses Anda.'
+                    : 'Sesuaikan destinasi dan periode operasional.',
+                style: const TextStyle(
+                    fontSize: 13, height: 1.5, color: Color(0xFF526787))),
             const SizedBox(height: 24),
             const Text('Destinasi yang dapat diakses',
-                style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700,
+                style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
                     color: AppColors.navy)),
             const SizedBox(height: 8),
             DropdownButtonFormField<String>(
+                key: widget.financial
+                    ? ValueKey(
+                        '$_destination-${_destinations.containsKey(_destination)}')
+                    : null,
                 decoration: InputDecoration(
-                    prefixIcon: const Icon(Icons.place_outlined,
-                        color: AppColors.blue),
+                    prefixIcon:
+                        const Icon(Icons.place_outlined, color: AppColors.blue),
                     filled: true,
                     fillColor: Colors.white,
                     contentPadding: const EdgeInsets.all(14),
@@ -197,11 +232,41 @@ class _OperationsFiltersState extends State<_OperationsFilters> {
                   'Belum ada destinasi ditugaskan. Hubungi Superadmin.'),
             const SizedBox(height: 20),
             const Text('Periode',
-                style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700,
+                style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
                     color: AppColors.navy)),
             const SizedBox(height: 8),
+            if (widget.financial) ...[
+              DropdownButtonFormField<String>(
+                  key: ValueKey(_financePeriod),
+                  initialValue: _financePeriod,
+                  decoration: const InputDecoration(labelText: 'Periode UTC'),
+                  items: const [
+                    DropdownMenuItem(value: 'month', child: Text('Bulan ini')),
+                    DropdownMenuItem(
+                        value: 'week', child: Text('7 hari terakhir')),
+                    DropdownMenuItem(
+                        value: 'custom', child: Text('Rentang khusus')),
+                  ],
+                  onChanged: !_valid
+                      ? null
+                      : (value) => setState(() {
+                            _financePeriod = value!;
+                            _validation = null;
+                            if (value == 'month') {
+                              _from = null;
+                              _to = null;
+                            } else if (value == 'week') {
+                              final now = DateTime.now().toUtc();
+                              _to = DateTime.utc(now.year, now.month, now.day);
+                              _from = _to!.subtract(const Duration(days: 6));
+                            }
+                          })),
+              const SizedBox(height: 8),
+            ],
             OutlinedButton.icon(
-                onPressed: _dates,
+                onPressed: _valid ? _dates : null,
                 style: OutlinedButton.styleFrom(
                     backgroundColor: Colors.white,
                     foregroundColor: AppColors.blue,
@@ -212,7 +277,11 @@ class _OperationsFiltersState extends State<_OperationsFilters> {
                         borderRadius: BorderRadius.circular(14))),
                 icon: const Icon(Icons.date_range_outlined),
                 label: Text(_from == null
-                    ? 'Pilih periode'
+                    ? widget.financial
+                        ? _financePeriod == 'custom'
+                            ? 'Pilih rentang UTC'
+                            : 'Bulan ini · UTC (default)'
+                        : 'Pilih periode'
                     : '${isoDay(_from!)} — ${isoDay(_to!)}')),
             if (_validation != null) _Notice(_validation!),
             const SizedBox(height: 16),
@@ -221,6 +290,9 @@ class _OperationsFiltersState extends State<_OperationsFilters> {
                         !_loading &&
                         _error == null &&
                         _validation == null &&
+                        (!widget.financial ||
+                            _financePeriod != 'custom' ||
+                            (_from != null && _to != null)) &&
                         (_destination == null ||
                             _destinations.containsKey(_destination))
                     ? () => Navigator.pop(context, <String, String>{
@@ -240,6 +312,7 @@ class _OperationsFiltersState extends State<_OperationsFilters> {
                           _destination = null;
                           _from = null;
                           _to = null;
+                          _financePeriod = 'month';
                           _validation = null;
                         });
                       }

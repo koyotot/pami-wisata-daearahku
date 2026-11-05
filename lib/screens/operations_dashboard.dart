@@ -18,6 +18,7 @@ import 'operations_queue_screen.dart';
 part 'operations_reports.dart';
 part 'operations_filters.dart';
 part 'operations_presentation.dart';
+part 'operations_financial.dart';
 
 class OperationsPage extends StatelessWidget {
   const OperationsPage(
@@ -54,16 +55,17 @@ class OperationsPage extends StatelessWidget {
     return Scaffold(
         backgroundColor: AppColors.bg,
         body: AnnotatedRegion<SystemUiOverlayStyle>(
-          value: const SystemUiOverlayStyle(
-              statusBarColor: Colors.transparent,
-              statusBarIconBrightness: Brightness.light,
-              statusBarBrightness: Brightness.dark),
-          child: SafeArea(
-            top: false,
-            bottom: false,
-            child: onRefresh == null
-                ? content
-                : RefreshIndicator(onRefresh: onRefresh!, child: content))));
+            value: const SystemUiOverlayStyle(
+                statusBarColor: Colors.transparent,
+                statusBarIconBrightness: Brightness.light,
+                statusBarBrightness: Brightness.dark),
+            child: SafeArea(
+                top: false,
+                bottom: false,
+                child: onRefresh == null
+                    ? content
+                    : RefreshIndicator(
+                        onRefresh: onRefresh!, child: content))));
   }
 }
 
@@ -209,8 +211,10 @@ class _OperationsDashboardState extends State<OperationsDashboard>
       executive: _role == 2,
       hasActions: _actions.isNotEmpty,
       onOpen: () => _open(OperationsReportScreen(
-          section: 'action-center', initialFilters: _filters,
-          repository: _repository, session: _session)));
+          section: 'action-center',
+          initialFilters: _filters,
+          repository: _repository,
+          session: _session)));
 
   @override
   Widget build(BuildContext context) {
@@ -240,11 +244,13 @@ class _OperationsDashboardState extends State<OperationsDashboard>
                   children: [
                     _DashboardHero(
                       executive: _role == 2,
-                      onActions: noAssignment ? null : () => _open(OperationsReportScreen(
-                          section: 'action-center',
-                          initialFilters: _filters,
-                          repository: _repository,
-                          session: _session)),
+                      onActions: noAssignment
+                          ? null
+                          : () => _open(OperationsReportScreen(
+                              section: 'action-center',
+                              initialFilters: _filters,
+                              repository: _repository,
+                              session: _session)),
                     ),
                     Padding(
                       padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
@@ -253,12 +259,26 @@ class _OperationsDashboardState extends State<OperationsDashboard>
                           children: [
                             if (_loading)
                               const OperationsSkeleton()
-                            else if (_error != null)
+                            else if (_error != null) ...[
                               _errorBlock(_error!,
-                                  _scopeError(_error) ? _filter : _load)
-                            else if (noAssignment)
-                              _NoAssignmentState(onRefresh: _load)
-                            else if (data != null) ...[
+                                  _scopeError(_error) ? _filter : _load),
+                              const SizedBox(height: 16),
+                              OperationsFinancialScreen(
+                                  key: ValueKey('finance-$_request'),
+                                  repository: _repository,
+                                  session: _session,
+                                  preview: true,
+                                  active: widget.active),
+                            ] else if (noAssignment) ...[
+                              _NoAssignmentState(onRefresh: _load),
+                              const SizedBox(height: 16),
+                              OperationsFinancialScreen(
+                                  key: ValueKey('finance-$_request'),
+                                  repository: _repository,
+                                  session: _session,
+                                  preview: true,
+                                  active: widget.active),
+                            ] else if (data != null) ...[
                               _freshness(data.generatedAt, _load),
                               if (_role == 1) ...[
                                 SegmentedButton<bool>(
@@ -312,11 +332,15 @@ class _OperationsDashboardState extends State<OperationsDashboard>
                                     ? _decisionValues(metrics ?? {})
                                     : [
                                         (
-                                          _role == 2 ? 'Pending global' : 'Pending approval',
+                                          _role == 2
+                                              ? 'Pending global'
+                                              : 'Pending approval',
                                           _value(metrics?['pending_approvals'])
                                         ),
                                         (
-                                          _role == 2 ? 'Destinasi global' : 'Destinasi ditugaskan',
+                                          _role == 2
+                                              ? 'Destinasi global'
+                                              : 'Destinasi ditugaskan',
                                           _value(
                                               metrics?['assigned_destinations'])
                                         ),
@@ -369,6 +393,13 @@ class _OperationsDashboardState extends State<OperationsDashboard>
                               ],
                               const SizedBox(height: 16),
                               _actionCenter(data),
+                              const SizedBox(height: 16),
+                              OperationsFinancialScreen(
+                                  key: ValueKey('finance-$_request'),
+                                  repository: _repository,
+                                  session: _session,
+                                  preview: true,
+                                  active: widget.active),
                               const SizedBox(height: 12),
                               if (_approvals != null) ...[
                                 _DashboardCard(
@@ -376,9 +407,9 @@ class _OperationsDashboardState extends State<OperationsDashboard>
                                   crossAxisAlignment:
                                       CrossAxisAlignment.stretch,
                                   children: [
-                                    const _SectionTitle(
-                                        'Tren Keputusan Tim'),
-                                    Text('Keputusan tim · UTC · ${_period(_approvals!.period)}',
+                                    const _SectionTitle('Tren Keputusan Tim'),
+                                    Text(
+                                        'Keputusan tim · UTC · ${_period(_approvals!.period)}',
                                         style: const TextStyle(
                                             fontSize: 12,
                                             color: Color(0xFF526787))),
@@ -484,12 +515,6 @@ class _OperationsDashboardState extends State<OperationsDashboard>
                                         session: _session,
                                         initialFilters: _filters))),
                               ])),
-                              const SizedBox(height: 16),
-                              const FinancialUnavailablePanel(),
-                              _routeLink(
-                                  'Detail keuangan',
-                                  () => _open(
-                                      const OperationsUnavailableScreen())),
                             ],
                           ]),
                     ),
@@ -501,9 +526,11 @@ class _OperationsDashboardState extends State<OperationsDashboard>
 }
 
 class OperationsAnalyticsHub extends StatelessWidget {
-  const OperationsAnalyticsHub({super.key, this.repository, this.session});
+  const OperationsAnalyticsHub(
+      {super.key, this.repository, this.session, this.active = true});
   final BusinessRepository? repository;
   final AuthSession? session;
+  final bool active;
   @override
   Widget build(BuildContext context) => OperationsPage(
           title: 'Analitik',
@@ -519,27 +546,39 @@ class OperationsAnalyticsHub extends StatelessWidget {
               ('visitors', 'Kunjungan', 'Check-in yang teramati')
             ])
               Card(
-                margin: const EdgeInsets.only(bottom: 8),
-                color: Colors.white,
-                elevation: 0,
-                shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(14),
-                    side: const BorderSide(color: AppColors.border)),
-                clipBehavior: Clip.antiAlias,
-                child: ListTile(
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                  title: Text(entry.$2, style: const TextStyle(fontSize: 14,
-                      fontWeight: FontWeight.w700, color: AppColors.navy)),
-                  subtitle: Text(entry.$3, style: const TextStyle(fontSize: 12,
-                      height: 1.5, color: Color(0xFF526787))),
-                  trailing: const Icon(Icons.chevron_right, color: AppColors.blue),
-                  onTap: () => Navigator.of(context).push(
-                      MaterialPageRoute<void>(
-                          builder: (_) => OperationsReportScreen(
-                              section: entry.$1,
-                              repository: repository,
-                              session: session))))),
+                  margin: const EdgeInsets.only(bottom: 8),
+                  color: Colors.white,
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                      side: const BorderSide(color: AppColors.border)),
+                  clipBehavior: Clip.antiAlias,
+                  child: ListTile(
+                      contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 14, vertical: 8),
+                      title: Text(entry.$2,
+                          style: const TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w700,
+                              color: AppColors.navy)),
+                      subtitle: Text(entry.$3,
+                          style: const TextStyle(
+                              fontSize: 12,
+                              height: 1.5,
+                              color: Color(0xFF526787))),
+                      trailing: const Icon(Icons.chevron_right,
+                          color: AppColors.blue),
+                      onTap: () => Navigator.of(context).push(
+                          MaterialPageRoute<void>(
+                              builder: (_) => OperationsReportScreen(
+                                  section: entry.$1,
+                                  repository: repository,
+                                  session: session))))),
             const SizedBox(height: 20),
-            const FinancialUnavailablePanel(),
+            OperationsFinancialScreen(
+                repository: repository,
+                session: session,
+                preview: true,
+                active: active),
           ]);
 }

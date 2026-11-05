@@ -48,6 +48,8 @@ class _NotifikasiScreenState extends State<NotifikasiScreen> {
               bookingGuid: guid,
               repository: BusinessRepository(widget.state.api)),
         ));
+        if (mounted && session.isCurrentGeneration(generation))
+          await _refresh();
       }
     } catch (_) {
       if (mounted && session.isCurrentGeneration(generation)) {
@@ -109,18 +111,18 @@ class _NotifikasiScreenState extends State<NotifikasiScreen> {
               child: const SizedBox.expand(),
             ),
           ),
-Positioned(
-                left: 0,
-                right: 0,
-                bottom: 0,
-                child: Container(
-                  height: 32,
-                  decoration: const BoxDecoration(
-                    color: AppColors.bg,
-                    borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
-                  ),
-                ),
+          Positioned(
+            left: 0,
+            right: 0,
+            bottom: 0,
+            child: Container(
+              height: 32,
+              decoration: const BoxDecoration(
+                color: AppColors.bg,
+                borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
               ),
+            ),
+          ),
           Padding(
             padding: EdgeInsets.fromLTRB(20, topInset + 8, 12, 52),
             child: Column(
@@ -266,6 +268,11 @@ Positioned(
           final item = items[index - (showRefreshError ? 1 : 0)];
           final date = item.createdAt?.toLocal();
           final (icon, tint, iconBackground) = switch (item.json['type']) {
+            'booking.demo_paid' => (
+                Icons.account_balance_wallet_outlined,
+                AppColors.blueDeep,
+                const Color(0xFFECF4FF)
+              ),
             'booking.rejected' => (
                 Icons.close_rounded,
                 const Color(0xFFFF5252),

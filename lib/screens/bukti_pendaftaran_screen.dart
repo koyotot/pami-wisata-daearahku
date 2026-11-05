@@ -16,6 +16,8 @@ import '../data/business_repository.dart';
 import '../services/auth_session.dart';
 import 'auth_presentation.dart';
 import '../widgets/booking_ticket_qr_section.dart';
+import '../widgets/booking_payment_section.dart';
+import '../widgets/payment_deadline.dart';
 
 // ── Palet (sama dengan home_screen) ──────────────────────────
 const _blue = Color(0xFF1976D2);
@@ -413,7 +415,8 @@ class _BuktiPendaftaranScreenState extends State<BuktiPendaftaranScreen> {
                   height: 32,
                   decoration: const BoxDecoration(
                     color: _background,
-                    borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
+                    borderRadius:
+                        BorderRadius.vertical(top: Radius.circular(32)),
                   ),
                 ),
               ),
@@ -953,6 +956,23 @@ class _TicketCardState extends State<_TicketCard> {
           _buildTicketHeader(p, st),
           _buildDashedDivider(),
           _buildTicketBody(p),
+          if (controller != null &&
+              controller.booking.status == 'awaiting_payment')
+            Padding(
+              padding: const EdgeInsets.fromLTRB(18, 0, 18, 14),
+              child: PaymentDeadline(
+                  expiresAt: controller.booking.paymentExpiresAt,
+                  onElapsed: () {
+                    controller.refresh();
+                    BookingEvents.notify();
+                  }),
+            ),
+          if (controller?.booking.paymentTestOnly == true)
+            Padding(
+                padding: const EdgeInsets.fromLTRB(18, 0, 18, 12),
+                child: Text(
+                    '${controller!.booking.paymentLabel ?? 'DEMO'} / TEST_ONLY · tanpa uang nyata',
+                    style: _font(12, FontWeight.w700, _blueDeep))),
           if (controller != null)
             Padding(
               padding: const EdgeInsets.fromLTRB(18, 0, 18, 14),
@@ -1291,7 +1311,18 @@ class _TicketCardState extends State<_TicketCard> {
               key: const ValueKey('detailMessage'),
               style: _font(12, FontWeight.w600, _red)),
         ),
-      if (b.paymentStatus == 'paid')
+      if (const ['awaiting_payment', 'payment_verification', 'payment_review']
+              .contains(b.status) ||
+          (b.paymentTestOnly && b.paymentStatus != 'paid'))
+        BookingPaymentSection(
+            booking: b,
+            repository: c.repository,
+            onReturned: () async {
+              await c.refresh();
+              await c.loadDocuments();
+            }),
+      if (b.status == 'confirmed' &&
+          (b.paymentStatus == 'paid' || b.paymentTestOnly))
         BookingTicketQrSection(
             repository: c.repository,
             bookingGuid: b.guid,

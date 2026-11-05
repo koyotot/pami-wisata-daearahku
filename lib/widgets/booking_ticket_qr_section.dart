@@ -174,6 +174,15 @@ class _BookingTicketQrSectionState extends State<BookingTicketQrSection>
         ]),
         if (_loading) const LinearProgressIndicator(),
         if (data != null) ...[
+          if (data.paymentTestOnly) ...[
+            Text(
+                '${data.paymentLabel ?? 'DEMO'} / TEST_ONLY · tanpa uang nyata',
+                style: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.blueDeep)),
+            const SizedBox(height: 8),
+          ],
           Text('${data.checkedInCount}/${data.quantity} tiket sudah check-in'),
           const SizedBox(height: 8),
           SingleChildScrollView(

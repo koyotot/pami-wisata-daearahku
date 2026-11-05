@@ -130,7 +130,8 @@ class _OperationsNavigationShellState extends State<OperationsNavigationShell>
           session: _session,
           embedded: true,
           active: _index == 1),
-      2 => OperationsAnalyticsHub(repository: _repository, session: _session),
+      2 => OperationsAnalyticsHub(
+          repository: _repository, session: _session, active: _index == 2),
       3 => _role == 1
           ? OperationsReportScreen(
               section: 'destinations',

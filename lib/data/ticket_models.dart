@@ -18,6 +18,8 @@ class BookingTickets {
   String get state => json['ticket_state'] as String;
   String get availableFrom => json['qr_available_from'] as String? ?? '';
   String get timezone => json['timezone'] as String? ?? '';
+  bool get paymentTestOnly => json['payment_test_only'] == true;
+  String? get paymentLabel => json['payment_label'] as String?;
   int get quantity => (json['quantity'] as num).toInt();
   int get checkedInCount => (json['checked_in_count'] as num).toInt();
   List<BookingTicket> get tickets =>

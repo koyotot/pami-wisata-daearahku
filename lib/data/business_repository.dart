@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'ticket_models.dart';
 import 'operational_models.dart';
+import 'payment_models.dart';
 import '../services/api_client.dart';
 import '../services/auth_session.dart';
 
@@ -134,6 +135,12 @@ class Booking {
   String get status => json['status'] as String;
 
   String get paymentStatus => json['payment_status'] as String? ?? 'unverified';
+  DateTime? get paymentExpiresAt =>
+      DateTime.tryParse(json['payment_expires_at'] as String? ?? '');
+  String? get paymentProvider => json['payment_provider'] as String?;
+  String? get paymentEnvironment => json['payment_environment'] as String?;
+  bool get paymentTestOnly => json['payment_test_only'] == true;
+  String? get paymentLabel => json['payment_label'] as String?;
 
   /// Server-computed: true only while the owner may still cancel (pending approval).
   bool get cancellable => json['cancellable'] == true;
@@ -368,6 +375,21 @@ class BusinessRepository {
       .collection(_path('bookings', query), Booking.new, authenticated: true);
   Future<Booking> booking(String guid) async => Booking(
       await api.object('GET', 'bookings/${_id(guid)}', authenticated: true));
+  Future<PaymentSnapshot> paymentMethods(String guid) async => PaymentSnapshot(
+      await api.object('GET', _path('payments/methods', {'booking_guid': guid}),
+          authenticated: true));
+  Future<PaymentSnapshot> paymentIntent(String guid) async => PaymentSnapshot(
+      await api.object('GET', 'bookings/${_id(guid)}/payment-intent',
+          authenticated: true));
+  Future<Json> initiateDemoPayment(String guid, String key) =>
+      api.object('POST', 'bookings/${_id(guid)}/demo-payment',
+          authenticated: true, body: {}, headers: {'Idempotency-Key': key});
+  Future<Json> simulateDemoPayment(
+          String guid, String key, String attemptGuid, String outcome) =>
+      api.object('POST', 'bookings/${_id(guid)}/demo-payment/simulate',
+          authenticated: true,
+          body: {'attempt_guid': attemptGuid, 'outcome': outcome},
+          headers: {'Idempotency-Key': key});
   Future<Booking> createBooking(Json fields, String idempotencyKey) async =>
       Booking(await api.object('POST', 'bookings',
           authenticated: true,

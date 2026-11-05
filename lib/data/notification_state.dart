@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import '../services/api_client.dart';
 import '../services/auth_session.dart';
+import 'booking_state.dart';
 
 class InboxItem {
   InboxItem(this.json);
@@ -18,6 +19,7 @@ class InboxItem {
 class NotificationState extends ChangeNotifier {
   NotificationState([ApiClient? client]) : api = client ?? ApiClient() {
     api.session.sessionChanges.addListener(_sessionChanged);
+    BookingEvents.changed.addListener(_bookingChanged);
   }
   final ApiClient api;
   final inbox = RequestState<List<InboxItem>>();
@@ -28,6 +30,10 @@ class NotificationState extends ChangeNotifier {
       api.session.deviceSessionReady &&
       api.session.authenticated.value &&
       api.session.role == 0;
+
+  void _bookingChanged() {
+    if (!_disposed && _allowed) refresh();
+  }
 
   void _sessionChanged() {
     inbox.reset();
@@ -84,6 +90,7 @@ class NotificationState extends ChangeNotifier {
   void dispose() {
     _disposed = true;
     api.session.sessionChanges.removeListener(_sessionChanged);
+    BookingEvents.changed.removeListener(_bookingChanged);
     inbox.dispose();
     count.dispose();
     super.dispose();
