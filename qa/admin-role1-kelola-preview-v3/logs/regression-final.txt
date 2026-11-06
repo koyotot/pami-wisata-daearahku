@@ -1,0 +1,173 @@
+﻿00:00 +0: loading C:/laragon/www/pami-mobile/pami-wisata-daearahku/test/operations_reports_test.dart
+00:00 +0: C:/laragon/www/pami-mobile/pami-wisata-daearahku/test/operations_reports_test.dart: (setUpAll)
+00:00 +0: C:/laragon/www/pami-mobile/pami-wisata-daearahku/test/operations_reports_test.dart: destination report stays usable at approved mobile sizes and large text
+00:01 +1: C:/laragon/www/pami-mobile/pami-wisata-daearahku/test/operations_shell_test.dart: logout removes private child routes above the operations shell
+00:01 +2: C:/laragon/www/pami-mobile/pami-wisata-daearahku/test/operations_shell_test.dart: logout removes private child routes above the operations shell
+00:02 +3: C:/laragon/www/pami-mobile/pami-wisata-daearahku/test/operations_shell_test.dart: logout removes private child routes above the operations shell
+00:02 +4: C:/laragon/www/pami-mobile/pami-wisata-daearahku/test/operations_shell_test.dart: logout removes private child routes above the operations shell
+00:02 +5: C:/laragon/www/pami-mobile/pami-wisata-daearahku/test/operations_shell_test.dart: logout removes private child routes above the operations shell
+00:02 +6: C:/laragon/www/pami-mobile/pami-wisata-daearahku/test/operations_shell_test.dart: logout removes private child routes above the operations shell
+00:02 +7: C:/laragon/www/pami-mobile/pami-wisata-daearahku/test/operations_shell_test.dart: logout removes private child routes above the operations shell
+00:02 +8: C:/laragon/www/pami-mobile/pami-wisata-daearahku/test/operations_shell_test.dart: logout removes private child routes above the operations shell
+00:02 +9: C:/laragon/www/pami-mobile/pami-wisata-daearahku/test/operations_shell_test.dart: logout removes private child routes above the operations shell
+00:02 +10: C:/laragon/www/pami-mobile/pami-wisata-daearahku/test/operations_shell_test.dart: logout removes private child routes above the operations shell
+00:02 +11: C:/laragon/www/pami-mobile/pami-wisata-daearahku/test/admin_destination_form_test.dart: create form submits category, integer price and timezone
+00:03 +12: C:/laragon/www/pami-mobile/pami-wisata-daearahku/test/admin_destination_form_test.dart: create form submits category, integer price and timezone
+00:03 +13: C:/laragon/www/pami-mobile/pami-wisata-daearahku/test/admin_destination_form_test.dart: create form submits category, integer price and timezone
+00:03 +14: C:/laragon/www/pami-mobile/pami-wisata-daearahku/test/admin_destination_form_test.dart: create form submits category, integer price and timezone
+00:03 +15: C:/laragon/www/pami-mobile/pami-wisata-daearahku/test/admin_destination_form_test.dart: create form submits category, integer price and timezone
+00:03 +16: C:/laragon/www/pami-mobile/pami-wisata-daearahku/test/admin_destination_form_test.dart: create form submits category, integer price and timezone
+00:03 +17: C:/laragon/www/pami-mobile/pami-wisata-daearahku/test/admin_destination_form_test.dart: create form submits category, integer price and timezone
+00:03 +18: C:/laragon/www/pami-mobile/pami-wisata-daearahku/test/admin_destination_form_test.dart: create form submits category, integer price and timezone
+00:04 +19: C:/laragon/www/pami-mobile/pami-wisata-daearahku/test/admin_destination_form_test.dart: create form submits category, integer price and timezone
+00:04 +20: C:/laragon/www/pami-mobile/pami-wisata-daearahku/test/admin_destination_form_test.dart: create form submits category, integer price and timezone
+00:04 +21: C:/laragon/www/pami-mobile/pami-wisata-daearahku/test/admin_destination_form_test.dart: create form submits category, integer price and timezone
+00:04 +22: C:/laragon/www/pami-mobile/pami-wisata-daearahku/test/admin_destination_form_test.dart: create form submits category, integer price and timezone
+00:04 +22: C:/laragon/www/pami-mobile/pami-wisata-daearahku/test/operations_shell_test.dart: Admin center pushes full-screen scanner then returns to previous tab; back returns home
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following TestFailure was thrown running a test:
+Expected: no matching candidates
+  Actual: _TypeWidgetFinder:<Found 1 widget with type "FloatingBottomNav": [
+            FloatingBottomNav,
+          ]>
+   Which: means one was found but none were expected
+
+When the exception was thrown, this was the stack:
+#4      main.<anonymous closure> (file:///C:/laragon/www/pami-mobile/pami-wisata-daearahku/test/operations_shell_test.dart:126:5)
+<asynchronous suspension>
+#5      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#6      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided one frame from package:stack_trace)
+
+This was caught by the test expectation on the following line:
+  file:///C:/laragon/www/pami-mobile/pami-wisata-daearahku/test/operations_shell_test.dart line 126
+The test description was:
+  Admin center pushes full-screen scanner then returns to previous tab; back returns home
+════════════════════════════════════════════════════════════════════════════════════════════════════
+00:04 +22 -1: C:/laragon/www/pami-mobile/pami-wisata-daearahku/test/admin_destination_form_test.dart: create form submits category, integer price and timezone
+00:04 +22 -1: C:/laragon/www/pami-mobile/pami-wisata-daearahku/test/operations_shell_test.dart: Admin center pushes full-screen scanner then returns to previous tab; back returns home [E]
+  Test failed. See exception logs above.
+  The test description was: Admin center pushes full-screen scanner then returns to previous tab; back returns home
+  
+00:04 +23 -1: C:/laragon/www/pami-mobile/pami-wisata-daearahku/test/admin_destination_form_test.dart: create form submits category, integer price and timezone
+00:04 +24 -1: C:/laragon/www/pami-mobile/pami-wisata-daearahku/test/admin_destination_form_test.dart: create form submits category, integer price and timezone
+00:05 +25 -1: C:/laragon/www/pami-mobile/pami-wisata-daearahku/test/admin_destination_form_test.dart: create form submits category, integer price and timezone
+00:05 +26 -1: C:/laragon/www/pami-mobile/pami-wisata-daearahku/test/admin_destination_form_test.dart: create form submits category, integer price and timezone
+Error: google_fonts was unable to load font PlusJakartaSans-Regular because the following exception occurred:
+Exception: GoogleFonts.config.allowRuntimeFetching is false but font PlusJakartaSans-Regular was not found in the application assets. Ensure PlusJakartaSans-Regular.ttf exists in a folder that is included in your pubspec's assets.
+
+There is likely something wrong with your test. Please see https://github.com/flutter/packages/blob/main/packages/google_fonts/example/test for examples of how to test with google_fonts.
+If troubleshooting doesn't solve the problem, please file an issue at https://github.com/flutter/flutter/issues/new/choose.
+
+Error: google_fonts was unable to load font PlusJakartaSans-Regular because the following exception occurred:
+Exception: GoogleFonts.config.allowRuntimeFetching is false but font PlusJakartaSans-Regular was not found in the application assets. Ensure PlusJakartaSans-Regular.ttf exists in a folder that is included in your pubspec's assets.
+
+There is likely something wrong with your test. Please see https://github.com/flutter/packages/blob/main/packages/google_fonts/example/test for examples of how to test with google_fonts.
+If troubleshooting doesn't solve the problem, please file an issue at https://github.com/flutter/flutter/issues/new/choose.
+
+00:05 +27 -1: C:/laragon/www/pami-mobile/pami-wisata-daearahku/test/admin_destination_form_test.dart: create form submits category, integer price and timezone
+00:05 +28 -1: C:/laragon/www/pami-mobile/pami-wisata-daearahku/test/admin_destination_form_test.dart: create form submits category, integer price and timezone
+00:05 +29 -1: C:/laragon/www/pami-mobile/pami-wisata-daearahku/test/admin_destination_form_test.dart: create form submits category, integer price and timezone
+00:05 +30 -1: C:/laragon/www/pami-mobile/pami-wisata-daearahku/test/admin_destination_form_test.dart: create form submits category, integer price and timezone
+00:05 +31 -1: C:/laragon/www/pami-mobile/pami-wisata-daearahku/test/admin_destination_form_test.dart: create form submits category, integer price and timezone
+00:05 +32 -1: C:/laragon/www/pami-mobile/pami-wisata-daearahku/test/admin_destination_form_test.dart: create form submits category, integer price and timezone
+00:06 +33 -1: C:/laragon/www/pami-mobile/pami-wisata-daearahku/test/admin_destination_form_test.dart: create form submits category, integer price and timezone
+00:06 +34 -1: C:/laragon/www/pami-mobile/pami-wisata-daearahku/test/admin_destination_form_test.dart: create form submits category, integer price and timezone
+00:06 +35 -1: C:/laragon/www/pami-mobile/pami-wisata-daearahku/test/admin_destination_form_test.dart: create form submits category, integer price and timezone
+00:06 +36 -1: C:/laragon/www/pami-mobile/pami-wisata-daearahku/test/admin_destination_form_test.dart: create form submits category, integer price and timezone
+00:06 +37 -1: C:/laragon/www/pami-mobile/pami-wisata-daearahku/test/admin_destination_form_test.dart: create form submits category, integer price and timezone
+00:06 +38 -1: C:/laragon/www/pami-mobile/pami-wisata-daearahku/test/admin_destination_form_test.dart: create form submits category, integer price and timezone
+00:06 +39 -1: C:/laragon/www/pami-mobile/pami-wisata-daearahku/test/admin_destination_form_test.dart: create form submits category, integer price and timezone
+00:06 +40 -1: C:/laragon/www/pami-mobile/pami-wisata-daearahku/test/admin_destination_form_test.dart: create form submits category, integer price and timezone
+00:06 +41 -1: C:/laragon/www/pami-mobile/pami-wisata-daearahku/test/admin_destination_form_test.dart: create form submits category, integer price and timezone
+00:06 +42 -1: C:/laragon/www/pami-mobile/pami-wisata-daearahku/test/admin_destination_form_test.dart: create form submits category, integer price and timezone
+00:06 +43 -1: C:/laragon/www/pami-mobile/pami-wisata-daearahku/test/admin_destination_form_test.dart: create form submits category, integer price and timezone
+00:06 +44 -1: C:/laragon/www/pami-mobile/pami-wisata-daearahku/test/admin_destination_form_test.dart: create form submits category, integer price and timezone
+00:07 +45 -1: C:/laragon/www/pami-mobile/pami-wisata-daearahku/test/admin_destination_form_test.dart: create form submits category, integer price and timezone
+00:07 +46 -1: C:/laragon/www/pami-mobile/pami-wisata-daearahku/test/admin_destination_form_test.dart: create form submits category, integer price and timezone
+00:07 +47 -1: C:/laragon/www/pami-mobile/pami-wisata-daearahku/test/admin_destination_form_test.dart: create form submits category, integer price and timezone
+00:07 +48 -1: C:/laragon/www/pami-mobile/pami-wisata-daearahku/test/admin_destination_form_test.dart: create form submits category, integer price and timezone
+  [1m[flutter_map][0m
+    We want to help keep OpenStreetMap available for everyone. Our examples
+    and demo app use the public tile servers, but they are NOT free to use by
+    everyone! Please review whether the OpenStreetMap tile servers are suitable
+    for your project.
+    See:
+      * https://operations.osmfoundation.org/policies/tiles (OSM Tile Usage Policy)
+      * https://docs.fleaflet.dev/osm-warn for more information about this warning
+00:07 +49 -1: C:/laragon/www/pami-mobile/pami-wisata-daearahku/test/admin_destination_form_test.dart: create form submits category, integer price and timezone
+00:07 +50 -1: C:/laragon/www/pami-mobile/pami-wisata-daearahku/test/admin_destination_form_test.dart: create form submits category, integer price and timezone
+  [1m[flutter_map][0m
+    We want to help keep OpenStreetMap available for everyone. Our examples
+    and demo app use the public tile servers, but they are NOT free to use by
+    everyone! Please review whether the OpenStreetMap tile servers are suitable
+    for your project.
+    See:
+      * https://operations.osmfoundation.org/policies/tiles (OSM Tile Usage Policy)
+      * https://docs.fleaflet.dev/osm-warn for more information about this warning
+00:07 +51 -1: C:/laragon/www/pami-mobile/pami-wisata-daearahku/test/detail_description_test.dart: description toggle follows actual four-line overflow
+00:07 +52 -1: C:/laragon/www/pami-mobile/pami-wisata-daearahku/test/detail_description_test.dart: description toggle follows actual four-line overflow
+00:07 +53 -1: C:/laragon/www/pami-mobile/pami-wisata-daearahku/test/detail_description_test.dart: description toggle follows actual four-line overflow
+00:07 +54 -1: C:/laragon/www/pami-mobile/pami-wisata-daearahku/test/detail_description_test.dart: description toggle follows actual four-line overflow
+00:07 +55 -1: C:/laragon/www/pami-mobile/pami-wisata-daearahku/test/detail_description_test.dart: description toggle follows actual four-line overflow
+00:07 +56 -1: C:/laragon/www/pami-mobile/pami-wisata-daearahku/test/detail_description_test.dart: description toggle follows actual four-line overflow
+00:07 +57 -1: C:/laragon/www/pami-mobile/pami-wisata-daearahku/test/detail_description_test.dart: description toggle follows actual four-line overflow
+00:07 +58 -1: C:/laragon/www/pami-mobile/pami-wisata-daearahku/test/detail_description_test.dart: description toggle follows actual four-line overflow
+00:08 +59 -1: C:/laragon/www/pami-mobile/pami-wisata-daearahku/test/detail_description_test.dart: description toggle follows actual four-line overflow
+00:08 +60 -1: C:/laragon/www/pami-mobile/pami-wisata-daearahku/test/detail_description_test.dart: description toggle follows actual four-line overflow
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following TestFailure was thrown running a test:
+Expected: no matching candidates
+  Actual: _TextWidgetFinder:<Found 1 widget with text "Baca selengkapnya": [
+            Text("Baca selengkapnya", dependencies: [DefaultSelectionStyle, DefaultTextStyle,
+MediaQuery]),
+          ]>
+   Which: means one was found but none were expected
+
+When the exception was thrown, this was the stack:
+#4      main.<anonymous closure> (file:///C:/laragon/www/pami-mobile/pami-wisata-daearahku/test/detail_description_test.dart:65:5)
+<asynchronous suspension>
+#5      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#6      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided one frame from package:stack_trace)
+
+This was caught by the test expectation on the following line:
+  file:///C:/laragon/www/pami-mobile/pami-wisata-daearahku/test/detail_description_test.dart line 65
+The test description was:
+  description toggle follows actual four-line overflow
+════════════════════════════════════════════════════════════════════════════════════════════════════
+00:08 +60 -2: C:/laragon/www/pami-mobile/pami-wisata-daearahku/test/destination_gallery_editor_test.dart: last image cannot be deleted and unsaved form asks before exit
+00:08 +60 -2: C:/laragon/www/pami-mobile/pami-wisata-daearahku/test/detail_description_test.dart: description toggle follows actual four-line overflow [E]
+  Test failed. See exception logs above.
+  The test description was: description toggle follows actual four-line overflow
+  
+Warning: At least one test in this suite creates an HttpClient. When running a test suite that uses
+TestWidgetsFlutterBinding, all HTTP requests will return status code 400, and no network request
+will actually be made. Any test expecting a real network connection and status code will fail.
+To test code that needs an HttpClient, provide your own HttpClient implementation to the code under
+test, so that your test can consistently provide a testable response to the code under test.
+00:08 +61 -2: C:/laragon/www/pami-mobile/pami-wisata-daearahku/test/destination_gallery_editor_test.dart: last image cannot be deleted and unsaved form asks before exit
+00:09 +62 -2: C:/laragon/www/pami-mobile/pami-wisata-daearahku/test/operations_post_relayout_test.dart: custom calendar preset 0 returns calendar dates
+00:09 +63 -2: C:/laragon/www/pami-mobile/pami-wisata-daearahku/test/operations_post_relayout_test.dart: calendar financial=false boundary allowed=true
+00:12 +64 -2: C:/laragon/www/pami-mobile/pami-wisata-daearahku/test/operations_post_relayout_test.dart: calendar financial=false boundary allowed=false
+00:14 +65 -2: C:/laragon/www/pami-mobile/pami-wisata-daearahku/test/operations_post_relayout_test.dart: calendar financial=true boundary allowed=true
+00:15 +66 -2: C:/laragon/www/pami-mobile/pami-wisata-daearahku/test/operations_post_relayout_test.dart: calendar financial=true boundary allowed=false
+00:17 +67 -2: C:/laragon/www/pami-mobile/pami-wisata-daearahku/test/operations_post_relayout_test.dart: calendar reverse selection spans leap day and reset disables apply
+00:18 +68 -2: C:/laragon/www/pami-mobile/pami-wisata-daearahku/test/operations_post_relayout_test.dart: role1 explicit claim then reject with blank optional reason
+00:18 +69 -2: C:/laragon/www/pami-mobile/pami-wisata-daearahku/test/operations_post_relayout_test.dart: role1 claim release stays in secondary menu
+00:18 +70 -2: C:/laragon/www/pami-mobile/pami-wisata-daearahku/test/operations_post_relayout_test.dart: resume with changed claim owner disables an open decision sheet
+00:19 +71 -2: C:/laragon/www/pami-mobile/pami-wisata-daearahku/test/operations_post_relayout_test.dart: role1 legacy history scrolls nine statuses and opens guarded detail
+00:19 +72 -2: C:/laragon/www/pami-mobile/pami-wisata-daearahku/test/operations_post_relayout_test.dart: hidden operations pages mute tickers after scanner returns
+00:19 +73 -2: C:/laragon/www/pami-mobile/pami-wisata-daearahku/test/operations_post_relayout_test.dart: (tearDownAll)
+00:19 +73 -2: Some tests failed.
+
+Failing tests:
+  C:/laragon/www/pami-mobile/pami-wisata-daearahku/test/detail_description_test.dart: description toggle follows actual four-line overflow
+  C:/laragon/www/pami-mobile/pami-wisata-daearahku/test/operations_shell_test.dart: Admin center pushes full-screen scanner then returns to previous tab; back returns home
+

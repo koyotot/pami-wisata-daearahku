@@ -12,6 +12,7 @@ import 'operations_dashboard.dart'
     show
         OperationsPage,
         OperationsSkeleton,
+        showOperationsFilters,
         showOperationsDestinationPicker,
         showOperationsDateRangeCalendar;
 
@@ -62,6 +63,14 @@ class _OperationsQueueScreenState extends State<OperationsQueueScreen>
   void initState() {
     super.initState();
     _filters = Map.of(widget.filters ?? const {});
+    if (_role == 1) {
+      final now = DateTime.now().toUtc();
+      _filters = {
+        'from': isoDay(DateTime(now.year, now.month)),
+        'to': isoDay(DateTime(now.year, now.month + 1, 0)),
+        ..._filters,
+      };
+    }
     _session.sessionChanges.addListener(_changedSession);
     WidgetsBinding.instance.addObserver(this);
     if (widget.active) _load();
@@ -131,6 +140,32 @@ class _OperationsQueueScreenState extends State<OperationsQueueScreen>
       }
     }
     if (_valid && request == _request) setState(() => _loading = false);
+  }
+
+  Future<void> _filter() async {
+    if (!_valid || _revoked) return;
+    final request = _request;
+    final revision = _session.sessionChanges.value;
+    var destinationLabel = _destinationLabel;
+    final filters = await showOperationsFilters(context,
+        repository: _repository,
+        session: _session,
+        initial: _filters,
+        home: true,
+        utc: true,
+        destinationLabel: _destinationLabel,
+        onDestinationLabelSelected: (label) => destinationLabel = label);
+    if (filters == null ||
+        !_valid ||
+        _revoked ||
+        request != _request ||
+        revision != _session.sessionChanges.value) return;
+    setState(() {
+      _filters = filters;
+      _destinationLabel =
+          filters['destination_guid'] == null ? null : destinationLabel;
+    });
+    await _load();
   }
 
   Future<void> _destinationFilter() async {
@@ -211,8 +246,16 @@ class _OperationsQueueScreenState extends State<OperationsQueueScreen>
             keyPrefix: 'queue',
             destinationLabel: _destinationLabel,
             dateTooltip: 'Filter tanggal pembuatan booking · UTC',
-            onDestinationPressed: _revoked ? null : _destinationFilter,
-            onDatePressed: _revoked ? null : _dateFilter),
+            onDestinationPressed: _revoked
+                ? null
+                : _role == 1
+                    ? _filter
+                    : _destinationFilter,
+            onDatePressed: _revoked
+                ? null
+                : _role == 1
+                    ? _filter
+                    : _dateFilter),
         const SizedBox(height: 12),
         Container(
             padding: const EdgeInsets.all(4),
@@ -254,7 +297,7 @@ class _OperationsQueueScreenState extends State<OperationsQueueScreen>
                                     fontWeight: FontWeight.w700))))),
             ])),
         const SizedBox(height: 12),
-        if (_filters.isNotEmpty)
+        if (_role != 1 && _filters.isNotEmpty)
           TextButton(
               onPressed: () {
                 setState(() {

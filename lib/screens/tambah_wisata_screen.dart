@@ -45,8 +45,13 @@ class TambahWisataScreen extends StatefulWidget {
   final Wisata? wisataEdit;
   final BusinessRepository? repository;
   final AuthSession? session;
+  final bool initialGallery;
   const TambahWisataScreen(
-      {super.key, this.wisataEdit, this.repository, this.session});
+      {super.key,
+      this.wisataEdit,
+      this.repository,
+      this.session,
+      this.initialGallery = false});
 
   @override
   State<TambahWisataScreen> createState() => _TambahWisataScreenState();
@@ -54,6 +59,7 @@ class TambahWisataScreen extends StatefulWidget {
 
 class _TambahWisataScreenState extends State<TambahWisataScreen> {
   final _formKey = GlobalKey<FormState>();
+  final _galleryKey = GlobalKey();
   late TextEditingController namaCtrl, lokasiCtrl, deskCtrl, hargaCtrl, jamCtrl;
   double _rating = 0;
   final List<GalleryDraftItem> _gallery = [];
@@ -134,6 +140,14 @@ class _TambahWisataScreenState extends State<TambahWisataScreen> {
         .map(GalleryDraftItem.existing));
     _galleryReady = w == null;
     if (w != null) _loadGallery();
+    if (widget.initialGallery) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        final galleryContext = _galleryKey.currentContext;
+        if (mounted && galleryContext != null) {
+          Scrollable.ensureVisible(galleryContext);
+        }
+      });
+    }
     if (canAccessAdmin(_session.role)) {
       _load();
       _facilities.load(w?.id);
@@ -670,7 +684,9 @@ class _TambahWisataScreenState extends State<TambahWisataScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         // ── Upload Foto ──────────────────────────────
-                        _sectionLabel('Foto Destinasi'),
+                        KeyedSubtree(
+                            key: _galleryKey,
+                            child: _sectionLabel('Foto Destinasi')),
                         const SizedBox(height: 12),
                         if (_galleryLoading) const LinearProgressIndicator(),
                         if (_galleryReady &&
@@ -813,10 +829,12 @@ class _TambahWisataScreenState extends State<TambahWisataScreen> {
           children: [
             SizedBox(
               width: double.infinity,
-              height: 54,
               child: ElevatedButton(
                 onPressed: _canSave ? _simpan : null,
                 style: ElevatedButton.styleFrom(
+                  minimumSize: const Size(48, 54),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                   backgroundColor: _C.teal,
                   disabledBackgroundColor: _C.teal.withValues(alpha: 0.5),
                   foregroundColor: Colors.white,
@@ -835,11 +853,13 @@ class _TambahWisataScreenState extends State<TambahWisataScreen> {
                                 color: Colors.white, strokeWidth: 2.5),
                           ),
                           SizedBox(width: 10),
-                          Text(
+                          Flexible(
+                              child: Text(
                             'Menyimpan...',
+                            textAlign: TextAlign.center,
                             style: TextStyle(
                                 fontSize: 14, fontWeight: FontWeight.w700),
-                          ),
+                          )),
                         ],
                       )
                     : Row(
@@ -852,11 +872,13 @@ class _TambahWisataScreenState extends State<TambahWisataScreen> {
                             size: 20,
                           ),
                           const SizedBox(width: 10),
-                          const Text(
+                          const Flexible(
+                              child: Text(
                             'Simpan Perubahan',
+                            textAlign: TextAlign.center,
                             style: TextStyle(
                                 fontSize: 15, fontWeight: FontWeight.w800),
-                          ),
+                          )),
                         ],
                       ),
               ),
@@ -1049,8 +1071,11 @@ class _TambahWisataScreenState extends State<TambahWisataScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          Wrap(
+            alignment: WrapAlignment.spaceBetween,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            spacing: 12,
+            runSpacing: 8,
             children: [
               const Text(
                 'Rating Destinasi',

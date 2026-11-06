@@ -1,0 +1,80 @@
+﻿00:00 +0: loading C:/Users/itsba/AppData/Local/Temp/wisata-v3-baseline-bbab506/test/operations_shell_test.dart
+00:00 +0: C:/Users/itsba/AppData/Local/Temp/wisata-v3-baseline-bbab506/test/operations_shell_test.dart: (setUpAll)
+00:00 +0: C:/Users/itsba/AppData/Local/Temp/wisata-v3-baseline-bbab506/test/operations_shell_test.dart: logout removes private child routes above the operations shell
+00:01 +1: C:/Users/itsba/AppData/Local/Temp/wisata-v3-baseline-bbab506/test/detail_description_test.dart: description toggle follows actual four-line overflow
+00:02 +2: C:/Users/itsba/AppData/Local/Temp/wisata-v3-baseline-bbab506/test/detail_description_test.dart: description toggle follows actual four-line overflow
+00:02 +3: C:/Users/itsba/AppData/Local/Temp/wisata-v3-baseline-bbab506/test/detail_description_test.dart: description toggle follows actual four-line overflow
+00:02 +4: C:/Users/itsba/AppData/Local/Temp/wisata-v3-baseline-bbab506/test/detail_description_test.dart: description toggle follows actual four-line overflow
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following TestFailure was thrown running a test:
+Expected: no matching candidates
+  Actual: _TextWidgetFinder:<Found 1 widget with text "Baca selengkapnya": [
+            Text("Baca selengkapnya", dependencies: [DefaultSelectionStyle, DefaultTextStyle,
+MediaQuery]),
+          ]>
+   Which: means one was found but none were expected
+
+When the exception was thrown, this was the stack:
+#4      main.<anonymous closure> (file:///C:/Users/itsba/AppData/Local/Temp/wisata-v3-baseline-bbab506/test/detail_description_test.dart:65:5)
+<asynchronous suspension>
+#5      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#6      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided one frame from package:stack_trace)
+
+This was caught by the test expectation on the following line:
+  file:///C:/Users/itsba/AppData/Local/Temp/wisata-v3-baseline-bbab506/test/detail_description_test.dart line 65
+The test description was:
+  description toggle follows actual four-line overflow
+════════════════════════════════════════════════════════════════════════════════════════════════════
+00:02 +4 -1: C:/Users/itsba/AppData/Local/Temp/wisata-v3-baseline-bbab506/test/operations_shell_test.dart: Admin center pushes full-screen scanner then returns to previous tab; back returns home
+00:02 +4 -1: C:/Users/itsba/AppData/Local/Temp/wisata-v3-baseline-bbab506/test/detail_description_test.dart: description toggle follows actual four-line overflow [E]
+  Test failed. See exception logs above.
+  The test description was: description toggle follows actual four-line overflow
+  
+Warning: At least one test in this suite creates an HttpClient. When running a test suite that uses
+TestWidgetsFlutterBinding, all HTTP requests will return status code 400, and no network request
+will actually be made. Any test expecting a real network connection and status code will fail.
+To test code that needs an HttpClient, provide your own HttpClient implementation to the code under
+test, so that your test can consistently provide a testable response to the code under test.
+00:02 +4 -1: C:/Users/itsba/AppData/Local/Temp/wisata-v3-baseline-bbab506/test/operations_shell_test.dart: Admin center pushes full-screen scanner then returns to previous tab; back returns home
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following TestFailure was thrown running a test:
+Expected: no matching candidates
+  Actual: _TypeWidgetFinder:<Found 1 widget with type "FloatingBottomNav": [
+            FloatingBottomNav,
+          ]>
+   Which: means one was found but none were expected
+
+When the exception was thrown, this was the stack:
+#4      main.<anonymous closure> (file:///C:/Users/itsba/AppData/Local/Temp/wisata-v3-baseline-bbab506/test/operations_shell_test.dart:126:5)
+<asynchronous suspension>
+#5      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#6      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided one frame from package:stack_trace)
+
+This was caught by the test expectation on the following line:
+  file:///C:/Users/itsba/AppData/Local/Temp/wisata-v3-baseline-bbab506/test/operations_shell_test.dart line 126
+The test description was:
+  Admin center pushes full-screen scanner then returns to previous tab; back returns home
+════════════════════════════════════════════════════════════════════════════════════════════════════
+00:02 +4 -2: C:/Users/itsba/AppData/Local/Temp/wisata-v3-baseline-bbab506/test/operations_shell_test.dart: Admin center pushes full-screen scanner then returns to previous tab; back returns home [E]
+  Test failed. See exception logs above.
+  The test description was: Admin center pushes full-screen scanner then returns to previous tab; back returns home
+  
+00:02 +4 -2: C:/Users/itsba/AppData/Local/Temp/wisata-v3-baseline-bbab506/test/operations_shell_test.dart: Superadmin center is retained analytics tab and hides navbar for keyboard
+00:03 +5 -2: C:/Users/itsba/AppData/Local/Temp/wisata-v3-baseline-bbab506/test/operations_shell_test.dart: same-generation scope revalidation purges all cached tab content
+00:03 +6 -2: C:/Users/itsba/AppData/Local/Temp/wisata-v3-baseline-bbab506/test/operations_shell_test.dart: role 1 resume reloads fresh data without access confirmation
+00:04 +7 -2: C:/Users/itsba/AppData/Local/Temp/wisata-v3-baseline-bbab506/test/operations_shell_test.dart: role 2 resume reloads fresh data without access confirmation
+00:04 +8 -2: C:/Users/itsba/AppData/Local/Temp/wisata-v3-baseline-bbab506/test/operations_shell_test.dart: (tearDownAll)
+00:04 +8 -2: Some tests failed.
+
+Failing tests:
+  C:/Users/itsba/AppData/Local/Temp/wisata-v3-baseline-bbab506/test/detail_description_test.dart: description toggle follows actual four-line overflow
+  C:/Users/itsba/AppData/Local/Temp/wisata-v3-baseline-bbab506/test/operations_shell_test.dart: Admin center pushes full-screen scanner then returns to previous tab; back returns home
+

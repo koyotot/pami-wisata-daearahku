@@ -4,6 +4,22 @@ import '../screens/auth_presentation.dart';
 import '../theme/app_colors.dart';
 import 'visit_format.dart' show visitMonths;
 
+String operationsPeriodLabel(Map<String, String> filters,
+    {bool includeYear = false}) {
+  final from = DateTime.tryParse(filters['from'] ?? '');
+  final to = DateTime.tryParse(filters['to'] ?? '');
+  if (from == null || to == null) return 'Semua tanggal';
+  final month = visitMonths[to.month - 1].substring(0, 3);
+  if (from.year != to.year) return '${formatDate(from)}–${formatDate(to)}';
+  final year = includeYear ? ' ${to.year}' : '';
+  if (from.month != to.month) {
+    return '${from.day} ${visitMonths[from.month - 1].substring(0, 3)}–${to.day} $month$year';
+  }
+  return from.day == to.day
+      ? '${from.day} $month$year'
+      : '${from.day}–${to.day} $month$year';
+}
+
 class OperationsFilterBar extends StatelessWidget {
   const OperationsFilterBar(
       {super.key,
@@ -20,21 +36,7 @@ class OperationsFilterBar extends StatelessWidget {
   final VoidCallback? onDestinationPressed;
   final VoidCallback? onDatePressed;
 
-  String get _dateLabel {
-    final from = DateTime.tryParse(filters['from'] ?? '');
-    final to = DateTime.tryParse(filters['to'] ?? '');
-    if (from == null || to == null) return 'Semua tanggal';
-    final month = visitMonths[to.month - 1].substring(0, 3);
-    if (from.year != to.year) {
-      return '${formatDate(from)}–${formatDate(to)}';
-    }
-    if (from.month != to.month) {
-      return '${from.day} ${visitMonths[from.month - 1].substring(0, 3)}–${to.day} $month';
-    }
-    return from.day == to.day
-        ? '${from.day} $month'
-        : '${from.day}–${to.day} $month';
-  }
+  String get _dateLabel => operationsPeriodLabel(filters);
 
   @override
   Widget build(BuildContext context) => Row(children: [

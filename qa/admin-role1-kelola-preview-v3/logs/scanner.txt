@@ -1,0 +1,27 @@
+﻿00:00 +0: loading C:/laragon/www/pami-mobile/pami-wisata-daearahku/test/operations_scanner_scope_regression_test.dart
+00:00 +0: scanner drops stale preview after same-generation role downgrade
+00:00 +0 -1: scanner drops stale preview after same-generation role downgrade [E]
+  Expected: false
+    Actual: <true>
+  Revalidated access must invalidate the previous QR preview.
+  
+  package:matcher                                          expect
+  package:flutter_test/src/widget_tester.dart 473:18       expect
+  test\operations_scanner_scope_regression_test.dart 75:7  main.<fn>
+  
+00:00 +0 -1: scanner drops stale preview after same-generation assignment revoke
+00:00 +0 -2: scanner drops stale preview after same-generation assignment revoke [E]
+  Expected: false
+    Actual: <true>
+  Revalidated access must invalidate the previous QR preview.
+  
+  package:matcher                                          expect
+  package:flutter_test/src/widget_tester.dart 473:18       expect
+  test\operations_scanner_scope_regression_test.dart 75:7  main.<fn>
+  
+00:00 +0 -2: Some tests failed.
+
+Failing tests:
+  C:/laragon/www/pami-mobile/pami-wisata-daearahku/test/operations_scanner_scope_regression_test.dart: scanner drops stale preview after same-generation assignment revoke
+  C:/laragon/www/pami-mobile/pami-wisata-daearahku/test/operations_scanner_scope_regression_test.dart: scanner drops stale preview after same-generation role downgrade
+

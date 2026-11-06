@@ -30,15 +30,24 @@ class _C {
 class DetailWisataScreen extends StatefulWidget {
   final Wisata wisata;
   final BusinessRepository? repository;
-  const DetailWisataScreen({super.key, required this.wisata, this.repository});
+  final bool adminPreview;
+  final AuthSession? session;
+  const DetailWisataScreen(
+      {super.key,
+      required this.wisata,
+      this.repository,
+      this.adminPreview = false,
+      this.session});
   @override
   State<DetailWisataScreen> createState() => _DetailWisataScreenState();
 }
 
 class _DetailWisataScreenState extends State<DetailWisataScreen> {
-  late final _repository = widget.repository ?? BusinessRepository();
+  late final _repository =
+      widget.repository ?? BusinessRepository(ApiClient(widget.session));
+  AuthSession get _session => _repository.api.session;
   final _detail = RequestState<Destination>();
-  final _favorites = FavoriteState.instance;
+  FavoriteState get _favorites => FavoriteState.instance;
   bool get _isSaved => _favorites.isFavorite(widget.wisata.id);
   bool _loadingSave = false;
   bool _expanded = false;
@@ -48,7 +57,15 @@ class _DetailWisataScreenState extends State<DetailWisataScreen> {
   void initState() {
     super.initState();
     _detail.addListener(_detailChanged);
-    _favorites.favorites.addListener(_detailChanged);
+    if (!widget.adminPreview) _favorites.favorites.addListener(_detailChanged);
+    if (widget.adminPreview) {
+      _session.sessionChanges.addListener(_previewSessionChanged);
+    }
+    _loadDetail();
+  }
+
+  void _previewSessionChanged() {
+    _detail.reset();
     _loadDetail();
   }
 
@@ -59,7 +76,21 @@ class _DetailWisataScreenState extends State<DetailWisataScreen> {
   Future<void> _loadDetail() {
     final id = widget.wisata.id;
     return _detail.load(() async {
-      final destination = await _repository.destination(id);
+      final revision = _session.sessionChanges.value;
+      if (widget.adminPreview &&
+          (!_session.authenticated.value ||
+              !_session.deviceSessionReady ||
+              _session.role != 1)) {
+        throw const ApiException(
+            'Akses pratinjau berakhir. Kembali ke Kelola.', 403);
+      }
+      final destination = widget.adminPreview
+          ? await _repository.adminDestination(id)
+          : await _repository.destination(id);
+      if (widget.adminPreview && revision != _session.sessionChanges.value) {
+        throw const ApiException(
+            'Akses diperbarui. Tarik turun untuk menyinkronkan.', 403);
+      }
       if (destination.guid != id) {
         throw const ApiException('Identitas wisata tidak sesuai.');
       }
@@ -70,7 +101,17 @@ class _DetailWisataScreenState extends State<DetailWisataScreen> {
   @override
   void didUpdateWidget(covariant DetailWisataScreen oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.wisata.id != widget.wisata.id) {
+    if (oldWidget.adminPreview != widget.adminPreview) {
+      if (widget.adminPreview) {
+        _favorites.favorites.removeListener(_detailChanged);
+        _session.sessionChanges.addListener(_previewSessionChanged);
+      } else {
+        _session.sessionChanges.removeListener(_previewSessionChanged);
+        _favorites.favorites.addListener(_detailChanged);
+      }
+    }
+    if (oldWidget.wisata.id != widget.wisata.id ||
+        oldWidget.adminPreview != widget.adminPreview) {
       _expanded = false;
       _detail.reset();
       _loadDetail();
@@ -79,14 +120,19 @@ class _DetailWisataScreenState extends State<DetailWisataScreen> {
 
   @override
   void dispose() {
-    _favorites.favorites.removeListener(_detailChanged);
+    if (widget.adminPreview) {
+      _session.sessionChanges.removeListener(_previewSessionChanged);
+    }
+    if (!widget.adminPreview) {
+      _favorites.favorites.removeListener(_detailChanged);
+    }
     _detail.removeListener(_detailChanged);
     _detail.dispose();
     super.dispose();
   }
 
   Future<void> _toggleSave() async {
-    if (_loadingSave) return;
+    if (widget.adminPreview || _loadingSave) return;
     if (!_favorites.session.authenticated.value ||
         !_favorites.session.deviceSessionReady) {
       _showSnack('Login dulu untuk menyimpan wisata.');
@@ -148,17 +194,29 @@ class _DetailWisataScreenState extends State<DetailWisataScreen> {
     );
   }
 
-  void _openReviews() => showModalBottomSheet<void>(
-        context: context,
-        isScrollControlled: true,
-        useSafeArea: true,
-        builder: (_) => ReviewsSheet(
-            destinationGuid: widget.wisata.id, repository: _repository),
-      );
+  void _openReviews() {
+    if (widget.adminPreview &&
+        (_detail.data == null ||
+            _detail.loading ||
+            _detail.error != null ||
+            !_session.authenticated.value ||
+            _session.role != 1)) {
+      return;
+    }
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      builder: (_) => ReviewsSheet(
+          destinationGuid: widget.wisata.id,
+          repository: _repository,
+          adminPreview: widget.adminPreview),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
-    final roleOne = _repository.api.session.role == 1;
+    final roleOne = widget.adminPreview || _repository.api.session.role == 1;
     final destination = _detail.data;
     if (_detail.loading ||
         _detail.error != null ||
@@ -178,7 +236,9 @@ class _DetailWisataScreenState extends State<DetailWisataScreen> {
                         children: [
                           OperationsScenicHeader(
                               title: 'Detail Destinasi',
-                              subtitle: widget.wisata.nama,
+                              subtitle: widget.adminPreview
+                                  ? 'Mode Pratinjau'
+                                  : widget.wisata.nama,
                               onBack: () => Navigator.maybePop(context)),
                           Padding(
                               padding: const EdgeInsets.all(24),
@@ -218,8 +278,9 @@ class _DetailWisataScreenState extends State<DetailWisataScreen> {
       );
     }
     final heroHeight = MediaQuery.sizeOf(context).height * .48;
-    final knownFavorite =
-        _favorites.favorites.data != null && _favorites.favorites.error == null;
+    final knownFavorite = !widget.adminPreview &&
+        _favorites.favorites.data != null &&
+        _favorites.favorites.error == null;
     final rating =
         destination.ratingCount > 0 && destination.ratingAverage != null
             ? destination.ratingAverage!.toStringAsFixed(1)
@@ -245,18 +306,29 @@ class _DetailWisataScreenState extends State<DetailWisataScreen> {
                           subtitle: destination.name,
                           onBack: () => Navigator.maybePop(context),
                           actions: [
-                        IconButton(
-                            tooltip: _isSaved
-                                ? 'Hapus dari favorit'
-                                : 'Simpan favorit',
-                            onPressed:
-                                _loadingSave || _favorites.favorites.loading
-                                    ? null
-                                    : _toggleSave,
-                            icon: Icon(_isSaved
-                                ? Icons.favorite
-                                : Icons.favorite_border)),
+                        if (!widget.adminPreview)
+                          IconButton(
+                              tooltip: _isSaved
+                                  ? 'Hapus dari favorit'
+                                  : 'Simpan favorit',
+                              onPressed:
+                                  _loadingSave || _favorites.favorites.loading
+                                      ? null
+                                      : _toggleSave,
+                              icon: Icon(_isSaved
+                                  ? Icons.favorite
+                                  : Icons.favorite_border)),
                       ])),
+                if (widget.adminPreview)
+                  const SliverToBoxAdapter(
+                      child: Padding(
+                    padding: EdgeInsets.all(16),
+                    child: Text(
+                        'Mode Pratinjau · Tidak dapat melakukan pemesanan',
+                        key: ValueKey('v3-preview-mode'),
+                        style: TextStyle(
+                            color: _C.navy, fontWeight: FontWeight.w700)),
+                  )),
                 SliverToBoxAdapter(
                     child: SizedBox(
                         height: heroHeight,
@@ -266,6 +338,9 @@ class _DetailWisataScreenState extends State<DetailWisataScreen> {
                                   key: ValueKey(
                                       '${destination.guid}-${destination.galleryVersion}'),
                                   images: destination.images,
+                                  adminGuid: widget.adminPreview
+                                      ? destination.guid
+                                      : null,
                                   repository: _repository)),
                           const Positioned(
                               top: 0,
@@ -470,15 +545,13 @@ class _DetailWisataScreenState extends State<DetailWisataScreen> {
                                                 borderRadius:
                                                     BorderRadius.circular(14),
                                                 child: InkWell(
-                                                    onTap: () => Navigator.push(
-                                                        context,
-                                                        MaterialPageRoute(
-                                                            builder: (_) =>
-                                                                DestinationMapScreen(
-                                                                    destination:
-                                                                        destination))),
+                                                    onTap: widget.adminPreview
+                                                        ? null
+                                                        : () => _viewMap(
+                                                            destination),
                                                     child: Semantics(
-                                                        button: true,
+                                                        button: !widget
+                                                            .adminPreview,
                                                         label:
                                                             'Lihat peta ${destination.name}',
                                                         child: SizedBox(
@@ -516,7 +589,9 @@ class _DetailWisataScreenState extends State<DetailWisataScreen> {
                                                                 ]))))),
                                             const SizedBox(height: 10),
                                             OutlinedButton.icon(
-                                                onPressed: _openingMap
+                                                onPressed: widget
+                                                            .adminPreview ||
+                                                        _openingMap
                                                     ? null
                                                     : () =>
                                                         _openMap(destination),
@@ -563,7 +638,7 @@ class _DetailWisataScreenState extends State<DetailWisataScreen> {
   }
 
   Future<void> _openMap(Destination destination) async {
-    if (!mounted || _openingMap) return;
+    if (widget.adminPreview || !mounted || _openingMap) return;
     if (!destination.hasCoordinates) {
       _showSnack('Lokasi destinasi belum tersedia');
       return;
@@ -580,6 +655,28 @@ class _DetailWisataScreenState extends State<DetailWisataScreen> {
     }
   }
 
+  void _viewMap(Destination destination) {
+    if (widget.adminPreview) return;
+    Navigator.push(
+        context,
+        MaterialPageRoute(
+            builder: (_) => DestinationMapScreen(destination: destination)));
+  }
+
+  void _book(Destination destination) {
+    if (widget.adminPreview ||
+        !destination.isActive ||
+        destination.category?.isActive == false) {
+      return;
+    }
+    Navigator.push(
+        context,
+        MaterialPageRoute(
+            builder: (_) => DaftarKunjunganScreen(
+                wisata: Wisata.fromDestination(destination),
+                repository: _repository)));
+  }
+
   Widget _bookingBar(Destination destination) {
     final price = Column(
         mainAxisSize: MainAxisSize.min,
@@ -593,15 +690,11 @@ class _DetailWisataScreenState extends State<DetailWisataScreen> {
                   color: _C.navy, fontSize: 21, fontWeight: FontWeight.w800)),
         ]);
     final action = FilledButton(
-        onPressed:
-            destination.isActive && destination.category?.isActive != false
-                ? () => Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                        builder: (_) => DaftarKunjunganScreen(
-                            wisata: Wisata.fromDestination(destination),
-                            repository: _repository)))
-                : null,
+        onPressed: !widget.adminPreview &&
+                destination.isActive &&
+                destination.category?.isActive != false
+            ? () => _book(destination)
+            : null,
         style: FilledButton.styleFrom(
             backgroundColor: _C.blue,
             minimumSize: const Size(0, 54),
@@ -609,9 +702,12 @@ class _DetailWisataScreenState extends State<DetailWisataScreen> {
             shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(16))),
         child: Text(
-            destination.isActive && destination.category?.isActive != false
+            widget.adminPreview
                 ? 'Daftar Kunjungan'
-                : 'Tidak tersedia',
+                : destination.isActive &&
+                        destination.category?.isActive != false
+                    ? 'Daftar Kunjungan'
+                    : 'Tidak tersedia',
             textAlign: TextAlign.center));
     return Container(
         decoration: const BoxDecoration(

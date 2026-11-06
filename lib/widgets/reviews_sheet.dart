@@ -3,11 +3,17 @@ import 'package:flutter/material.dart';
 import '../data/business_repository.dart';
 import '../data/review_state.dart';
 import '../services/api_client.dart';
+import '../services/auth_session.dart';
 
 class ReviewsSheet extends StatefulWidget {
   final String? destinationGuid;
   final BusinessRepository? repository;
-  const ReviewsSheet({super.key, this.destinationGuid, this.repository});
+  final bool adminPreview;
+  const ReviewsSheet(
+      {super.key,
+      this.destinationGuid,
+      this.repository,
+      this.adminPreview = false});
 
   @override
   State<ReviewsSheet> createState() => _ReviewsSheetState();
@@ -25,8 +31,30 @@ class _ReviewsSheetState extends State<ReviewsSheet> {
     _load();
   }
 
-  void _load() => _reviews.load(() =>
-      loadAllReviews(_repository, destinationGuid: widget.destinationGuid));
+  void _load() => _reviews.load(() async {
+        final session = _repository.api.session;
+        final revision = session.sessionChanges.value;
+        if (widget.adminPreview) {
+          if (!session.authenticated.value ||
+              !session.deviceSessionReady ||
+              session.role != 1 ||
+              widget.destinationGuid == null) {
+            throw const ApiException('Akses pratinjau berakhir.', 403);
+          }
+          final destination =
+              await _repository.adminDestination(widget.destinationGuid!);
+          if (destination.guid != widget.destinationGuid ||
+              revision != session.sessionChanges.value) {
+            throw const ApiException('Akses pratinjau berubah.', 403);
+          }
+        }
+        final reviews = await loadAllReviews(_repository,
+            destinationGuid: widget.destinationGuid);
+        if (widget.adminPreview && revision != session.sessionChanges.value) {
+          throw const ApiException('Akses pratinjau berubah.', 403);
+        }
+        return reviews;
+      });
 
   void _changed() {
     if (mounted) setState(() {});

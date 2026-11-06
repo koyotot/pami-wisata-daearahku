@@ -8,6 +8,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:wisata_daerahku/screens/operations_dashboard.dart';
 import 'package:wisata_daerahku/screens/operations_navigation_shell.dart';
 import 'package:wisata_daerahku/widgets/floating_bottom_nav.dart';
+import 'package:wisata_daerahku/widgets/operations_tabs.dart';
 import 'admin_test_support.dart';
 import 'operations_shell_test.dart' show overviewFixture;
 
@@ -156,7 +157,7 @@ void main() {
           if (screen == 'x01') {
             expect(find.byType(OperationsMetrics), findsNothing);
             expect(find.byType(OperationsTrend), findsNothing);
-            expect(find.byType(SegmentedButton<bool>), findsNothing);
+            expect(find.byType(OperationsHomeTabs), findsNothing);
             await tester.scrollUntilVisible(
                 find.text('Tarik turun untuk memeriksa penugasan.'), 150);
             await tester.drag(
@@ -180,18 +181,18 @@ void main() {
             final metrics = tester.widget<OperationsMetrics>(
                 find.byType(OperationsMetrics).first);
             expect(metrics.values.map((v) => v.$2),
-                role == 1 ? ['1', '1', '2', '—'] : ['3', '1', '2', '1']);
-            expect(metrics.icons, role == 1 ? isNull : hasLength(4));
+                role == 1 ? ['3', '1'] : ['3', '1', '2', '1']);
+            expect(metrics.icons, hasLength(role == 1 ? 2 : 4));
             expect(metrics.metadata, role == 1 ? isNull : hasLength(4));
             if (scale == 1) {
-              final pending = tester.getRect(find
-                  .text(role == 1 ? 'Destinasi ditugaskan' : 'Pending global'));
-              final destination = tester.getRect(
-                  find.text(role == 1 ? 'Claim saya' : 'Destinasi global'));
+              final pending = tester.getRect(
+                  find.text(role == 1 ? 'Pending approval' : 'Pending global'));
+              final destination = tester.getRect(find.text(
+                  role == 1 ? 'Destinasi ditugaskan' : 'Destinasi global'));
               expect(pending.top, closeTo(destination.top, 1));
               expect(pending.left, lessThan(destination.left));
             }
-            expect(find.byType(SegmentedButton<bool>),
+            expect(find.byType(OperationsHomeTabs),
                 role == 1 ? findsOneWidget : findsNothing);
             final chartTitle = find
                 .text(role == 2 ? 'Tren Keputusan Tim' : 'Aktivitas booking');
@@ -206,10 +207,13 @@ void main() {
               await _screenshot(
                   tester, boundary, '$screen-${size.width.toInt()}-chart');
             }
-            await tester.drag(
-                find.byType(ListView).first, const Offset(0, -5000));
+            final financeLink = find.text(role == 1
+                ? 'Buka dashboard keuangan'
+                : 'Buka Financial Dashboard');
+            await Scrollable.ensureVisible(tester.element(financeLink),
+                alignment: .1);
             await tester.pumpAndSettle();
-            expect(tester.getRect(find.text('Buka Financial Dashboard')).bottom,
+            expect(tester.getRect(financeLink).bottom,
                 lessThan(tester.getRect(find.byType(FloatingBottomNav)).top));
           }
           expect(tester.takeException(), isNull);

@@ -472,10 +472,12 @@ class OperationsMetrics extends StatelessWidget {
       required this.values,
       this.compact = false,
       this.icons,
+      this.labelStyle,
       this.metadata});
   final List<(String, String)> values;
   final bool compact;
   final List<IconData>? icons;
+  final TextStyle? labelStyle;
   final List<String>? metadata;
   @override
   Widget build(BuildContext context) =>
@@ -524,10 +526,11 @@ class OperationsMetrics extends StatelessWidget {
                           if (icons != null) ...[
                             const SizedBox(height: 4),
                             Text(values[i].$1,
-                                style: const TextStyle(
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.w600,
-                                    color: AppColors.navy)),
+                                style: labelStyle ??
+                                    const TextStyle(
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.w600,
+                                        color: AppColors.navy)),
                           ],
                           if (metadata != null) ...[
                             const SizedBox(height: 2),

@@ -1,0 +1,37 @@
+﻿{
+    "baseline":  "bbab5069fcc01c2e2ce6397d453d9ff000b68d6d",
+    "v3":  {
+               "pass":  21,
+               "skipped":  0,
+               "fail":  0
+           },
+    "regression":  {
+                       "baseline_reproduced":  true,
+                       "pass":  73,
+                       "skipped":  0,
+                       "fail":  2
+                   },
+    "scanner":  {
+                    "pass":  0,
+                    "skipped":  0,
+                    "fail":  2
+                },
+    "analyzer":  {
+                     "new_diagnostics":  0,
+                     "infos":  6,
+                     "errors":  0,
+                     "warnings":  1,
+                     "exit":  1
+                 },
+    "baseline_analyzer":  {
+                              "infos":  6,
+                              "errors":  0,
+                              "warnings":  2,
+                              "exit":  1
+                          },
+    "format":  "PASS",
+    "diff_check":  "PASS",
+    "android_admin_e2e":  "BLOCKED",
+    "screenshots":  "7 native widget fixture captures",
+    "release":  "BLOCKED"
+}

@@ -1,9 +1,21 @@
 part of 'operations_dashboard.dart';
 
+DateTimeRange _operationsMonthRange(DateTime date) => DateTimeRange(
+    start: DateTime(date.year, date.month),
+    end: DateTime(date.year, date.month + 1, 0));
+
+Map<String, String> _homeMonthFilters() {
+  final month = _operationsMonthRange(DateTime.now().toUtc());
+  return {'from': isoDay(month.start), 'to': isoDay(month.end)};
+}
+
 Future<Map<String, String>?> showOperationsFilters(BuildContext context,
         {required BusinessRepository repository,
         required AuthSession session,
         required Map<String, String> initial,
+        bool home = false,
+        String? destinationLabel,
+        ValueChanged<String?>? onDestinationLabelSelected,
         bool financial = false,
         bool utc = false}) =>
     showModalBottomSheet<Map<String, String>>(
@@ -11,7 +23,7 @@ Future<Map<String, String>?> showOperationsFilters(BuildContext context,
         isScrollControlled: true,
         useSafeArea: true,
         showDragHandle: true,
-        backgroundColor: AppColors.bg,
+        backgroundColor: home ? AppColors.surface : AppColors.bg,
         shape: const RoundedRectangleBorder(
             borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
         builder: (_) => Theme(
@@ -22,6 +34,9 @@ Future<Map<String, String>?> showOperationsFilters(BuildContext context,
                 repository: repository,
                 session: session,
                 initial: initial,
+                home: home,
+                destinationLabel: destinationLabel,
+                onDestinationLabelSelected: onDestinationLabelSelected,
                 financial: financial,
                 utc: utc)));
 
@@ -30,11 +45,17 @@ class _OperationsFilters extends StatefulWidget {
       {required this.repository,
       required this.session,
       required this.initial,
+      this.home = false,
+      this.destinationLabel,
+      this.onDestinationLabelSelected,
       this.financial = false,
       this.utc = false});
   final BusinessRepository repository;
   final AuthSession session;
   final Map<String, String> initial;
+  final bool home;
+  final String? destinationLabel;
+  final ValueChanged<String?>? onDestinationLabelSelected;
   final bool financial;
   final bool utc;
   @override
@@ -45,7 +66,7 @@ class _OperationsFiltersState extends State<_OperationsFilters> {
   late final int _generation = widget.session.sessionGeneration;
   late final int? _role = widget.session.role;
   late String? _destination = widget.initial['destination_guid'];
-  String? _destinationLabel;
+  late String? _destinationLabel = widget.destinationLabel;
   late DateTime? _from = DateTime.tryParse(widget.initial['from'] ?? '');
   late DateTime? _to = DateTime.tryParse(widget.initial['to'] ?? '');
   late String _financePeriod =
@@ -138,7 +159,11 @@ class _OperationsFiltersState extends State<_OperationsFilters> {
     final now = DateTime.now();
     final range = _role == 1
         ? await showOperationsDateRangeCalendar(context,
-            from: _from, to: _to, financial: widget.financial, utc: widget.utc)
+            from: _from,
+            to: _to,
+            financial: widget.financial,
+            utc: widget.utc,
+            home: widget.home)
         : await showDateRangePicker(
             context: context,
             firstDate: DateTime(2020),
@@ -153,7 +178,7 @@ class _OperationsFiltersState extends State<_OperationsFilters> {
           .difference(DateTime.utc(
               range.start.year, range.start.month, range.start.day))
           .inDays;
-      if (widget.financial ? days >= 366 : days > 366) {
+      if (widget.financial || widget.home ? days >= 366 : days > 366) {
         _validation =
             'Periode maksimal 366 hari${widget.financial ? ' inklusif' : ''}.';
       } else {
@@ -167,7 +192,9 @@ class _OperationsFiltersState extends State<_OperationsFilters> {
 
   @override
   Widget build(BuildContext context) => _role == 1
-      ? _roleOneFilters(context)
+      ? widget.home
+          ? _homeFilters(context)
+          : _roleOneFilters(context)
       : Padding(
           padding: EdgeInsets.fromLTRB(
               20, 0, 20, MediaQuery.viewInsetsOf(context).bottom + 24),
@@ -341,6 +368,99 @@ class _OperationsFiltersState extends State<_OperationsFilters> {
                     child: const Text('Reset filter')),
               ])));
 
+  Widget _homeFilters(BuildContext context) {
+    final enabled = _valid && _error == null;
+    return SafeArea(
+        top: false,
+        child: Padding(
+            padding: EdgeInsets.fromLTRB(AppSpacing.md, 0, AppSpacing.md,
+                MediaQuery.viewInsetsOf(context).bottom + AppSpacing.lg),
+            child: SingleChildScrollView(
+                child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                  const _OperationsSheetHeading(
+                      home: true,
+                      title: 'Filter Destinasi',
+                      subtitle: 'Sesuaikan destinasi dan periode operasional.'),
+                  const SizedBox(height: AppSpacing.lg),
+                  const _OperationsFilterLabel('DESTINASI YANG DAPAT DIAKSES'),
+                  const SizedBox(height: AppSpacing.sm),
+                  _OperationsFilterField(
+                      home: true,
+                      label: _destination == null
+                          ? 'Semua destinasi'
+                          : _destinationLabel ?? 'Destinasi terpilih',
+                      icon: Icons.place_outlined,
+                      onPressed: !enabled
+                          ? null
+                          : () async {
+                              String? label;
+                              final value =
+                                  await showOperationsDestinationPicker(context,
+                                      repository: widget.repository,
+                                      session: widget.session,
+                                      home: true,
+                                      initial: _destination,
+                                      onLabelSelected: (selected) =>
+                                          label = selected);
+                              if (!_valid || _error != null || value == null)
+                                return;
+                              setState(() {
+                                _destination = value.isEmpty ? null : value;
+                                _destinationLabel =
+                                    value.isEmpty ? null : label;
+                              });
+                            }),
+                  const SizedBox(height: AppSpacing.xl),
+                  const _OperationsFilterLabel('PERIODE'),
+                  const SizedBox(height: AppSpacing.sm),
+                  _OperationsFilterField(
+                      home: true,
+                      label: _from != null && _to != null
+                          ? operationsPeriodLabel(
+                              {'from': isoDay(_from!), 'to': isoDay(_to!)},
+                              includeYear: true)
+                          : 'Pilih periode',
+                      icon: Icons.calendar_today_outlined,
+                      trailing: Icons.chevron_right_rounded,
+                      onPressed: enabled ? _dates : null),
+                  if (_validation != null) _Notice(_validation!),
+                  if (!enabled)
+                    const _Notice(
+                        'Akses berubah. Tutup filter dan buka kembali dari akun aktif.'),
+                  const SizedBox(height: AppSpacing.lg),
+                  _OperationsSheetActions(
+                      onReset: !enabled
+                          ? null
+                          : () => setState(() {
+                                final month = _operationsMonthRange(
+                                    DateTime.now().toUtc());
+                                _destination = null;
+                                _destinationLabel = null;
+                                _from = month.start;
+                                _to = month.end;
+                                _validation = null;
+                              }),
+                      onApply: enabled &&
+                              _validation == null &&
+                              _from != null &&
+                              _to != null
+                          ? () {
+                              widget.onDestinationLabelSelected
+                                  ?.call(_destinationLabel);
+                              Navigator.pop(context, <String, String>{
+                                if (_destination != null)
+                                  'destination_guid': _destination!,
+                                'from': isoDay(_from!),
+                                'to': isoDay(_to!),
+                              });
+                            }
+                          : null),
+                ]))));
+  }
+
   Widget _roleOneFilters(BuildContext context) => SafeArea(
       top: false,
       child: Padding(
@@ -431,19 +551,23 @@ Future<String?> showOperationsDestinationPicker(BuildContext context,
         {required BusinessRepository repository,
         required AuthSession session,
         String? initial,
+        bool home = false,
         ValueChanged<String>? onLabelSelected}) =>
     showModalBottomSheet<String>(
         context: context,
         useSafeArea: true,
         isScrollControlled: true,
         showDragHandle: true,
-        backgroundColor: AppColors.bg,
+        backgroundColor: home ? AppColors.surface : AppColors.bg,
+        shape: const RoundedRectangleBorder(
+            borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
         builder: (_) => Theme(
             data: AppColors.operationsTheme,
             child: _OperationsDestinationPicker(
                 repository: repository,
                 session: session,
                 initial: initial,
+                home: home,
                 onLabelSelected: onLabelSelected)));
 
 class _OperationsDestinationPicker extends StatefulWidget {
@@ -451,10 +575,12 @@ class _OperationsDestinationPicker extends StatefulWidget {
       {required this.repository,
       required this.session,
       this.initial,
+      this.home = false,
       this.onLabelSelected});
   final BusinessRepository repository;
   final AuthSession session;
   final String? initial;
+  final bool home;
   final ValueChanged<String>? onLabelSelected;
 
   @override
@@ -556,32 +682,49 @@ class _OperationsDestinationPickerState
         top: false,
         child: Padding(
             padding: EdgeInsets.fromLTRB(
-                20, 0, 20, MediaQuery.viewInsetsOf(context).bottom + 16),
-            child: SizedBox(
-                height: math.max(
-                    0,
-                    MediaQuery.sizeOf(context).height * .8 -
-                        MediaQuery.viewInsetsOf(context).bottom),
+                widget.home ? AppSpacing.md : 20,
+                0,
+                widget.home ? AppSpacing.md : 20,
+                MediaQuery.viewInsetsOf(context).bottom + AppSpacing.lg),
+            child: ConstrainedBox(
+                constraints: BoxConstraints(
+                    minHeight: widget.home
+                        ? 0
+                        : math.max(
+                            0,
+                            MediaQuery.sizeOf(context).height * .8 -
+                                MediaQuery.viewInsetsOf(context).bottom),
+                    maxHeight: math.max(
+                        0,
+                        MediaQuery.sizeOf(context).height * .8 -
+                            MediaQuery.viewInsetsOf(context).bottom)),
                 child: Column(
+                    mainAxisSize: MainAxisSize.min,
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      const _OperationsSheetHeading(
+                      _OperationsSheetHeading(
+                          home: widget.home,
                           title: 'Pilih destinasi',
-                          subtitle: 'Hanya destinasi dalam penugasan Anda.'),
+                          subtitle: widget.home
+                              ? 'Hanya lokasi yang termasuk penugasan Anda.'
+                              : 'Hanya destinasi dalam penugasan Anda.'),
                       const SizedBox(height: 16),
                       TextField(
                           key: const ValueKey('operations-destination-search'),
-                          decoration: const InputDecoration(
-                              labelText: 'Cari destinasi',
+                          decoration: InputDecoration(
+                              labelText: widget.home ? null : 'Cari destinasi',
+                              hintText:
+                                  widget.home ? 'Cari destinasi...' : null,
                               prefixIcon: Icon(Icons.search)),
                           onChanged: (value) =>
                               setState(() => _search = value)),
                       const SizedBox(height: 12),
                       if (_loading) const LinearProgressIndicator(),
-                      Expanded(
+                      Flexible(
                           child: RefreshIndicator(
                               onRefresh: _load,
                               child: ListView(
+                                  shrinkWrap: widget.home,
                                   physics:
                                       const AlwaysScrollableScrollPhysics(),
                                   children: [
@@ -590,7 +733,9 @@ class _OperationsDestinationPickerState
                                           ? 'Pilihan destinasi belum tersedia. Tarik ke bawah untuk mencoba kembali.'
                                           : 'Sesi atau akses berubah. Tutup pemilih destinasi.'),
                                     _option(
-                                        'Semua destinasi saya',
+                                        widget.home
+                                            ? 'Semua destinasi'
+                                            : 'Semua destinasi saya',
                                         '',
                                         widget.initial == null ||
                                             widget.initial!.isEmpty,
@@ -613,18 +758,21 @@ class _OperationsDestinationPickerState
 
   Widget _option(String label, String value, bool selected, bool enabled) =>
       Padding(
-          padding: const EdgeInsets.only(bottom: 8),
+          padding: EdgeInsets.only(bottom: widget.home ? 0 : AppSpacing.sm),
           child: Semantics(
               selected: selected,
               child: TextButton(
                   key: ValueKey('operations-destination-$value'),
                   style: TextButton.styleFrom(
-                      foregroundColor: AppColors.navy,
+                      foregroundColor: widget.home && selected
+                          ? AppColors.blue
+                          : AppColors.navy,
                       backgroundColor: selected
                           ? AppColors.blue.withValues(alpha: .08)
                           : AppColors.surface,
-                      minimumSize: const Size(48, 56),
-                      padding: const EdgeInsets.all(16),
+                      minimumSize: Size(48, widget.home ? 48 : 56),
+                      padding: EdgeInsets.all(
+                          widget.home ? AppSpacing.md : AppSpacing.lg),
                       shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(14))),
                   onPressed: enabled
@@ -636,14 +784,25 @@ class _OperationsDestinationPickerState
                   child: Row(children: [
                     const Icon(Icons.place_outlined, size: 20),
                     const SizedBox(width: 12),
-                    Expanded(child: Text(label)),
+                    Expanded(
+                        child: Text(label,
+                            style: widget.home
+                                ? TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: selected
+                                        ? FontWeight.w700
+                                        : FontWeight.w400)
+                                : null)),
                     const SizedBox(width: 8),
-                    Icon(
-                        selected
-                            ? Icons.radio_button_checked
-                            : Icons.radio_button_off,
-                        size: 20,
-                        color: AppColors.blue),
+                    if (!widget.home || selected)
+                      Icon(
+                          selected
+                              ? widget.home
+                                  ? Icons.check_rounded
+                                  : Icons.radio_button_checked
+                              : Icons.radio_button_off,
+                          size: 20,
+                          color: AppColors.blue),
                   ]))));
 }
 
@@ -652,6 +811,7 @@ Future<DateTimeRange?> showOperationsDateRangeCalendar(BuildContext context,
         DateTime? to,
         bool financial = false,
         bool utc = false,
+        bool home = false,
         bool singleDay = false,
         DateTime? firstDate,
         DateTime? lastDate}) =>
@@ -660,7 +820,9 @@ Future<DateTimeRange?> showOperationsDateRangeCalendar(BuildContext context,
         useSafeArea: true,
         isScrollControlled: true,
         showDragHandle: true,
-        backgroundColor: AppColors.bg,
+        backgroundColor: home ? AppColors.surface : AppColors.bg,
+        shape: const RoundedRectangleBorder(
+            borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
         builder: (_) => Theme(
             data: AppColors.operationsTheme,
             child: _OperationsDateRangeCalendar(
@@ -668,6 +830,7 @@ Future<DateTimeRange?> showOperationsDateRangeCalendar(BuildContext context,
                 to: to,
                 financial: financial,
                 utc: utc,
+                home: home,
                 singleDay: singleDay,
                 firstDate: firstDate,
                 lastDate: lastDate)));
@@ -678,6 +841,7 @@ class _OperationsDateRangeCalendar extends StatefulWidget {
       this.to,
       this.financial = false,
       this.utc = false,
+      this.home = false,
       this.singleDay = false,
       this.firstDate,
       this.lastDate});
@@ -685,6 +849,7 @@ class _OperationsDateRangeCalendar extends StatefulWidget {
   final DateTime? to;
   final bool financial;
   final bool utc;
+  final bool home;
   final bool singleDay;
   final DateTime? firstDate;
   final DateTime? lastDate;
@@ -741,9 +906,9 @@ class _OperationsDateRangeCalendarState
       }
       if (_from != null && _to != null) {
         final days = _day(_to!).difference(_day(_from!)).inDays;
-        if (widget.financial ? days >= 366 : days > 366) {
+        if (widget.financial || widget.home ? days >= 366 : days > 366) {
           _validation =
-              'Periode maksimal 366 hari${widget.financial ? ' inklusif' : ''}.';
+              'Periode maksimal 366 hari${widget.financial || widget.home ? ' inklusif' : ''}.';
           _to = null;
         }
       }
@@ -751,7 +916,9 @@ class _OperationsDateRangeCalendarState
   }
 
   void _preset(int? days) => setState(() {
-        _to = DateTime(_now.year, _now.month, _now.day);
+        _to = days == null && widget.home
+            ? _operationsMonthRange(_now).end
+            : DateTime(_now.year, _now.month, _now.day);
         _from = days == null
             ? DateTime(_now.year, _now.month)
             : DateTime(_now.year, _now.month, _now.day - days + 1);
@@ -764,23 +931,60 @@ class _OperationsDateRangeCalendarState
   Widget build(BuildContext context) => SafeArea(
       top: false,
       child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+          padding: EdgeInsets.fromLTRB(widget.home ? AppSpacing.md : 16, 0,
+              widget.home ? AppSpacing.md : 16, AppSpacing.lg),
           child: ConstrainedBox(
               constraints: BoxConstraints(
                   maxHeight: MediaQuery.sizeOf(context).height * .86),
               child: Column(mainAxisSize: MainAxisSize.min, children: [
                 _OperationsSheetHeading(
-                    title: widget.singleDay ? 'Pilih tanggal' : 'Pilih periode',
+                    home: widget.home,
+                    title: widget.singleDay
+                        ? 'Pilih tanggal'
+                        : widget.home
+                            ? 'Pilih rentang tanggal'
+                            : 'Pilih periode',
                     subtitle: widget.singleDay
                         ? 'Tanggal kalender destinasi'
-                        : widget.financial || widget.utc
-                            ? 'Kalender UTC · maksimal 366 hari${widget.financial ? ' inklusif' : ''}'
-                            : 'Rentang tanggal · maksimal 366 hari'),
+                        : widget.home
+                            ? 'Gunakan preset atau pilih Start Date dan End Date.\nMaksimal 366 hari inklusif.'
+                            : widget.financial || widget.utc
+                                ? 'Kalender UTC · maksimal 366 hari${widget.financial ? ' inklusif' : ''}'
+                                : 'Rentang tanggal · maksimal 366 hari'),
                 Flexible(
                     child: SingleChildScrollView(
                         child: Column(children: [
                   const SizedBox(height: 16),
-                  if (!widget.singleDay)
+                  if (widget.home)
+                    Row(children: [
+                      for (final preset in <(String, int?)>[
+                        ('7 hari', 7),
+                        ('30 hari', 30),
+                        ('Bulan ini', null)
+                      ]) ...[
+                        if (preset.$2 != 7)
+                          const SizedBox(width: AppSpacing.sm),
+                        Expanded(
+                            child: OutlinedButton(
+                                key: ValueKey(
+                                    'operations-preset-${preset.$2 ?? 'month'}'),
+                                style: OutlinedButton.styleFrom(
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: AppSpacing.xs),
+                                    side: const BorderSide(
+                                        color: AppColors.border),
+                                    shape: RoundedRectangleBorder(
+                                        borderRadius:
+                                            BorderRadius.circular(12))),
+                                onPressed: () => _preset(preset.$2),
+                                child: Text(preset.$1,
+                                    textAlign: TextAlign.center,
+                                    style: const TextStyle(
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w700)))),
+                      ],
+                    ])
+                  else if (!widget.singleDay)
                     Wrap(spacing: 8, runSpacing: 8, children: [
                       for (final preset in <(String, int?)>[
                         ('7 hari', 7),
@@ -798,8 +1002,16 @@ class _OperationsDateRangeCalendarState
                     Row(children: [
                       Expanded(
                           child: _OperationsFilterField(
-                              label:
-                                  'Mulai\n${_from == null ? 'Pilih tanggal' : isoDay(_from!)}',
+                              home: widget.home,
+                              caption: widget.home ? 'START DATE' : null,
+                              trailing: widget.home
+                                  ? null
+                                  : Icons.keyboard_arrow_down,
+                              label: widget.home
+                                  ? _from == null
+                                      ? 'Pilih tanggal'
+                                      : isoDay(_from!)
+                                  : 'Mulai\n${_from == null ? 'Pilih tanggal' : isoDay(_from!)}',
                               onPressed: () => setState(() {
                                     _selectingStart = true;
                                     _validation = null;
@@ -807,8 +1019,16 @@ class _OperationsDateRangeCalendarState
                       const SizedBox(width: 8),
                       Expanded(
                           child: _OperationsFilterField(
-                              label:
-                                  'Selesai\n${_to == null ? 'Pilih tanggal' : isoDay(_to!)}',
+                              home: widget.home,
+                              caption: widget.home ? 'END DATE' : null,
+                              trailing: widget.home
+                                  ? null
+                                  : Icons.keyboard_arrow_down,
+                              label: widget.home
+                                  ? _to == null
+                                      ? 'Pilih tanggal'
+                                      : isoDay(_to!)
+                                  : 'Selesai\n${_to == null ? 'Pilih tanggal' : isoDay(_to!)}',
                               onPressed: () => setState(() {
                                     _to = null;
                                     _selectingStart = false;
@@ -849,28 +1069,46 @@ class _OperationsDateRangeCalendarState
                               width: math.max(constraints.maxWidth, 336),
                               child: _calendar(context)))),
                   if (_validation != null) _Notice(_validation!),
-                  TextButton(
-                      key: const ValueKey('operations-reset-period'),
-                      onPressed: () => setState(() {
-                            _from = null;
-                            _to = null;
-                            _validation = null;
-                          }),
-                      child: const Text('Pilih ulang tanggal')),
+                  if (!widget.home)
+                    TextButton(
+                        key: const ValueKey('operations-reset-period'),
+                        onPressed: () => setState(() {
+                              _from = null;
+                              _to = null;
+                              _validation = null;
+                            }),
+                        child: const Text('Pilih ulang tanggal')),
                 ]))),
                 const SizedBox(height: 8),
-                SizedBox(
-                    width: double.infinity,
-                    child: FilledButton(
-                        key: const ValueKey('operations-apply-period'),
-                        onPressed:
-                            _from != null && _to != null && _validation == null
-                                ? () => Navigator.pop(context,
-                                    DateTimeRange(start: _from!, end: _to!))
-                                : null,
-                        child: Text(widget.singleDay
-                            ? 'Pilih tanggal'
-                            : 'Terapkan periode'))),
+                if (widget.home)
+                  _OperationsSheetActions(
+                      calendar: true,
+                      onReset: () => setState(() {
+                            _from = null;
+                            _to = null;
+                            _selectingStart = false;
+                            _validation = null;
+                          }),
+                      onApply: _from != null &&
+                              _to != null &&
+                              _validation == null
+                          ? () => Navigator.pop(
+                              context, DateTimeRange(start: _from!, end: _to!))
+                          : null)
+                else
+                  SizedBox(
+                      width: double.infinity,
+                      child: FilledButton(
+                          key: const ValueKey('operations-apply-period'),
+                          onPressed: _from != null &&
+                                  _to != null &&
+                                  _validation == null
+                              ? () => Navigator.pop(context,
+                                  DateTimeRange(start: _from!, end: _to!))
+                              : null,
+                          child: Text(widget.singleDay
+                              ? 'Pilih tanggal'
+                              : 'Terapkan periode'))),
               ]))));
 
   Widget _calendar(BuildContext context) {
@@ -941,9 +1179,11 @@ class _OperationsDateRangeCalendarState
 }
 
 class _OperationsSheetHeading extends StatelessWidget {
-  const _OperationsSheetHeading({required this.title, required this.subtitle});
+  const _OperationsSheetHeading(
+      {required this.title, required this.subtitle, this.home = false});
   final String title;
   final String subtitle;
+  final bool home;
 
   @override
   Widget build(BuildContext context) =>
@@ -952,28 +1192,45 @@ class _OperationsSheetHeading extends StatelessWidget {
             child:
                 Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Text(title,
-              style: const TextStyle(
-                  fontSize: 22,
+              style: TextStyle(
+                  fontSize: home ? 18 : 22,
                   fontWeight: FontWeight.w800,
                   color: AppColors.navy)),
           const SizedBox(height: 6),
           Text(subtitle,
-              style: const TextStyle(
-                  fontSize: 13, height: 1.5, color: AppColors.navy)),
+              style: TextStyle(
+                  fontSize: home ? 12 : 13,
+                  height: 1.5,
+                  color: home ? AppColors.textSecondary : AppColors.navy)),
         ])),
         IconButton(
             tooltip: 'Tutup',
+            style: home
+                ? IconButton.styleFrom(
+                    backgroundColor: AppColors.bg,
+                    foregroundColor: AppColors.textSecondary,
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12)))
+                : null,
             onPressed: () => Navigator.pop(context),
-            icon: const Icon(Icons.close)),
+            icon: Icon(Icons.close, size: home ? 18 : 24)),
       ]);
 }
 
 class _OperationsFilterField extends StatelessWidget {
   const _OperationsFilterField(
-      {required this.label, this.icon, this.onPressed});
+      {required this.label,
+      this.icon,
+      this.onPressed,
+      this.home = false,
+      this.caption,
+      this.trailing = Icons.keyboard_arrow_down});
   final String label;
   final IconData? icon;
   final VoidCallback? onPressed;
+  final bool home;
+  final String? caption;
+  final IconData? trailing;
 
   @override
   Widget build(BuildContext context) => OutlinedButton(
@@ -981,15 +1238,98 @@ class _OperationsFilterField extends StatelessWidget {
       style: OutlinedButton.styleFrom(
           foregroundColor: AppColors.navy,
           backgroundColor: AppColors.surface,
-          minimumSize: const Size(48, 56),
-          padding: const EdgeInsets.all(16),
+          minimumSize: Size(48, home ? 48 : 56),
+          padding: EdgeInsets.all(home ? AppSpacing.md : AppSpacing.lg),
           side: const BorderSide(color: AppColors.border),
-          shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(14))),
+          shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(home ? 12 : 14))),
       child: Row(children: [
-        if (icon != null) ...[Icon(icon, size: 20), const SizedBox(width: 12)],
-        Expanded(child: Text(label)),
-        const SizedBox(width: 8),
-        const Icon(Icons.keyboard_arrow_down, size: 20),
+        if (icon != null) ...[
+          Icon(icon, size: 20, color: home ? AppColors.blue : null),
+          const SizedBox(width: AppSpacing.md)
+        ],
+        Expanded(
+            child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+              if (caption != null) ...[
+                Text(caption!,
+                    style: const TextStyle(
+                        fontSize: 9, color: AppColors.textSecondary)),
+                const SizedBox(height: AppSpacing.xs),
+              ],
+              Text(label,
+                  style: home
+                      ? const TextStyle(
+                          fontSize: 12, fontWeight: FontWeight.w700)
+                      : null),
+            ])),
+        if (trailing != null) ...[
+          const SizedBox(width: AppSpacing.sm),
+          Icon(trailing, size: 20, color: home ? AppColors.blue : null),
+        ],
       ]));
+}
+
+class _OperationsFilterLabel extends StatelessWidget {
+  const _OperationsFilterLabel(this.label);
+  final String label;
+
+  @override
+  Widget build(BuildContext context) => Text(label,
+      style: const TextStyle(
+          fontSize: 11,
+          letterSpacing: .8,
+          fontWeight: FontWeight.w700,
+          color: AppColors.textSecondary));
+}
+
+class _OperationsSheetActions extends StatelessWidget {
+  const _OperationsSheetActions(
+      {required this.onReset, required this.onApply, this.calendar = false});
+  final VoidCallback? onReset;
+  final VoidCallback? onApply;
+  final bool calendar;
+
+  @override
+  Widget build(BuildContext context) {
+    final reset = OutlinedButton(
+        key: ValueKey(
+            calendar ? 'operations-reset-period' : 'operations-reset-filters'),
+        onPressed: onReset,
+        style: OutlinedButton.styleFrom(
+            foregroundColor: AppColors.blue,
+            side: const BorderSide(color: AppColors.border),
+            shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12))),
+        child: Text(calendar ? 'Reset' : 'Reset filter',
+            textAlign: TextAlign.center,
+            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700)));
+    final apply = FilledButton(
+        key: ValueKey(
+            calendar ? 'operations-apply-period' : 'operations-apply-filters'),
+        onPressed: onApply,
+        style: FilledButton.styleFrom(
+            backgroundColor: AppColors.blue,
+            foregroundColor: AppColors.surface,
+            shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12))),
+        child: Text(calendar ? 'Terapkan periode' : 'Terapkan filter',
+            textAlign: TextAlign.center,
+            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700)));
+    return LayoutBuilder(builder: (context, constraints) {
+      if (constraints.maxWidth < 280 ||
+          MediaQuery.textScalerOf(context).scale(14) > 20) {
+        return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [reset, const SizedBox(height: AppSpacing.sm), apply]);
+      }
+      return Row(children: [
+        Expanded(child: reset),
+        const SizedBox(width: AppSpacing.sm),
+        Expanded(child: apply)
+      ]);
+    });
+  }
 }

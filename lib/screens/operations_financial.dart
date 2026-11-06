@@ -27,6 +27,10 @@ class _OperationsFinancialState extends State<OperationsFinancialScreen>
   bool _analytics = false;
   Map<String, String> _filters = {};
   Json? _financial;
+  List<Json>? _bookingTrend;
+  Object? _activityError;
+  bool _activityLoading = false;
+  String? _destinationLabel;
   DateTime? _receivedAt;
   Object? _error;
   bool _loading = true;
@@ -53,6 +57,10 @@ class _OperationsFinancialState extends State<OperationsFinancialScreen>
     setState(() {
       _request++;
       _financial = null;
+      _bookingTrend = null;
+      _activityError = null;
+      _activityLoading = false;
+      _destinationLabel = null;
       _receivedAt = null;
       _filters = {};
       _environment = 'demo';
@@ -94,6 +102,9 @@ class _OperationsFinancialState extends State<OperationsFinancialScreen>
       _error = null;
       _financial = null;
       _receivedAt = null;
+      _bookingTrend = null;
+      _activityError = null;
+      _activityLoading = _role == 1 && !widget.preview;
     });
     try {
       final report = await _repository.operationalReport('financial',
@@ -126,13 +137,53 @@ class _OperationsFinancialState extends State<OperationsFinancialScreen>
         _receivedAt = DateTime.now();
         _loading = false;
       });
+      if (_role == 1 && !widget.preview) {
+        final period = financial['period'];
+        await _loadActivity(request, {
+          ...filters,
+          if (period is Json) ...{
+            'from': '${period['from']}',
+            'to': '${period['to']}',
+          },
+        });
+      }
     } catch (e) {
       if (!_valid || request != _request) return;
       setState(() {
         _error = e;
         _financial = null;
         _loading = false;
-        if (_scopeError(e)) _filters = {};
+        _activityLoading = false;
+        if (_scopeError(e)) {
+          _filters = {};
+          _destinationLabel = null;
+        }
+      });
+      if (_scopeError(e)) _session.me().catchError((Object _) {});
+    }
+  }
+
+  Future<void> _loadActivity(int request, Map<String, String> filters) async {
+    try {
+      final report =
+          await _repository.operationalReport('overview', query: filters);
+      if (!_valid || request != _request) return;
+      setState(() {
+        _bookingTrend = report.bookingTrend;
+        _activityLoading = false;
+      });
+    } catch (e) {
+      if (!_valid || request != _request) return;
+      setState(() {
+        _activityError = e;
+        _activityLoading = false;
+        if (_scopeError(e)) {
+          _financial = null;
+          _receivedAt = null;
+          _error = e;
+          _filters = {};
+          _destinationLabel = null;
+        }
       });
       if (_scopeError(e)) _session.me().catchError((Object _) {});
     }
@@ -140,13 +191,24 @@ class _OperationsFinancialState extends State<OperationsFinancialScreen>
 
   Future<void> _filter() async {
     final request = _request;
+    final period = _financial?['period'];
+    String? destinationLabel = _destinationLabel;
     final filters = await showOperationsFilters(context,
         repository: _repository,
         session: _session,
-        initial: _filters,
+        initial: {
+          if (_role == 1 && period is Json)
+            for (final key in ['from', 'to']) key: '${period[key]}',
+          ..._filters,
+        },
+        home: _role == 1,
+        destinationLabel: _destinationLabel,
+        onDestinationLabelSelected: (label) => destinationLabel = label,
         financial: true);
     if (filters == null || !_valid || request != _request) return;
     _filters = filters;
+    _destinationLabel =
+        filters['destination_guid'] == null ? null : destinationLabel;
     await _load();
   }
 
@@ -170,6 +232,7 @@ class _OperationsFinancialState extends State<OperationsFinancialScreen>
   Widget build(BuildContext context) {
     if (!_valid) return const SizedBox.shrink();
     if (widget.preview) return _preview();
+    if (_role == 1) return _adminPage();
     final financial = _financial;
     final period = financial?['period'];
     return Theme(
@@ -307,6 +370,177 @@ class _OperationsFinancialState extends State<OperationsFinancialScreen>
             ]));
   }
 
+  Widget _adminPage() {
+    final financial = _financial;
+    final period = financial?['period'];
+    final filters = {
+      if (period is Json)
+        for (final key in ['from', 'to']) key: '${period[key]}',
+      ..._filters,
+    };
+    return OperationsPage(
+        role: _role,
+        title: 'Keuangan',
+        subtitle: 'Ringkasan pencatatan transaksi',
+        embedded: false,
+        onRefresh: _load,
+        children: [
+          OperationsFilterBar(
+              filters: filters,
+              keyPrefix: 'financial',
+              destinationLabel: _destinationLabel,
+              dateTooltip: 'Periode pembayaran dan aktivitas booking (UTC)',
+              onDestinationPressed: _filter,
+              onDatePressed: _filter),
+          const SizedBox(height: AppSpacing.sm),
+          Wrap(
+              alignment: WrapAlignment.spaceBetween,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              spacing: AppSpacing.sm,
+              runSpacing: AppSpacing.xs,
+              children: [
+                Row(mainAxisSize: MainAxisSize.min, children: [
+                  Icon(Icons.circle,
+                      size: AppSpacing.sm,
+                      color: _receivedAt == null
+                          ? AppColors.textMuted
+                          : AppColors.success),
+                  const SizedBox(width: AppSpacing.xs),
+                  Flexible(
+                      child: Text(
+                          _loading
+                              ? 'Memuat data…'
+                              : _receivedAt == null
+                                  ? 'Data belum tersinkron'
+                                  : 'Snapshot · ${formatDateTime(_receivedAt!)}',
+                          style: const TextStyle(
+                              fontSize: 10, color: AppColors.textSecondary))),
+                ]),
+                const Text('Tarik untuk sinkron',
+                    style: TextStyle(
+                        fontSize: 10, color: AppColors.textSecondary)),
+              ]),
+          const SizedBox(height: AppSpacing.md),
+          Container(
+              padding: const EdgeInsets.all(AppSpacing.md),
+              decoration: BoxDecoration(
+                  color: AppColors.warningTint,
+                  border: Border.all(color: AppColors.warningBorder),
+                  borderRadius: BorderRadius.circular(AppSpacing.lg)),
+              child: const Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Text('DEMO / TEST_ONLY · Bukan uang nyata',
+                        style: TextStyle(
+                            fontSize: 13,
+                            height: 1.5,
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.warningText)),
+                    SizedBox(height: AppSpacing.sm),
+                    Text(
+                        'Angka berasal dari simulasi pembayaran DEMO, '
+                        'bukan transaksi uang nyata atau settlement DOKU.',
+                        style: TextStyle(
+                            fontSize: 12,
+                            height: 1.6,
+                            color: AppColors.warningText)),
+                  ])),
+          const SizedBox(height: AppSpacing.md),
+          if (_loading)
+            const OperationsSkeleton()
+          else if (_error != null)
+            _errorBlock(_error!, _scopeError(_error) ? _filter : _load,
+                role: _role)
+          else if (financial != null) ...[
+            _DashboardCard(
+                child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                  const Text('GROSS TERCATAT',
+                      style: TextStyle(
+                          fontSize: 11,
+                          letterSpacing: .8,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.textSecondary)),
+                  const SizedBox(height: AppSpacing.sm),
+                  Text(_metric('gross_revenue', money: true),
+                      style: TextStyle(
+                          fontSize: _available ? 32 : 20,
+                          height: 1.2,
+                          fontWeight: FontWeight.w800,
+                          color: AppColors.navy,
+                          fontFeatures: const [FontFeature.tabularFigures()])),
+                  const SizedBox(height: AppSpacing.xs),
+                  Text(
+                      _available
+                          ? '${_metric('successful_transactions')} transaksi sukses'
+                          : _financialReason(financial['reason']),
+                      style: const TextStyle(
+                          fontSize: 12,
+                          height: 1.6,
+                          color: AppColors.textSecondary)),
+                ])),
+            const SizedBox(height: AppSpacing.md),
+            OperationsMetrics(
+                values: [
+                  ('Pembayaran berhasil', _metric('successful_transactions')),
+                  ('Tiket terkait booking', _metric('tickets_sold')),
+                ],
+                icons: const [
+                  Icons.payments_outlined,
+                  Icons.confirmation_number_outlined
+                ],
+                labelStyle: const TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w500,
+                    color: AppColors.navy)),
+            const SizedBox(height: AppSpacing.md),
+            _DashboardCard(
+                child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                  const _AdminHomeHeading('Aktivitas booking'),
+                  const Text('Booking dibuat · tanggal UTC',
+                      style: TextStyle(
+                          fontSize: 12, color: AppColors.textSecondary)),
+                  const SizedBox(height: AppSpacing.xl),
+                  if (_activityLoading)
+                    const LinearProgressIndicator()
+                  else if (_activityError != null) ...[
+                    Text(adminErrorMessage(_activityError!),
+                        style: const TextStyle(
+                            fontSize: 12,
+                            height: 1.6,
+                            color: AppColors.textSecondary)),
+                    Align(
+                        alignment: Alignment.centerRight,
+                        child: TextButton(
+                            onPressed: _load,
+                            child: const Text('Muat ulang aktivitas'))),
+                  ] else if (_bookingTrend?.isEmpty ?? true)
+                    const _Notice('Belum ada aktivitas pada periode ini.')
+                  else
+                    _FinancialBookingChart(rows: _bookingTrend!),
+                ])),
+            const SizedBox(height: AppSpacing.md),
+            _DashboardCard(
+                child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                  const _AdminHomeHeading('Sumber data'),
+                  Text(
+                      '${financial['source'] ?? 'unavailable'} · '
+                      '${financial['availability']}. '
+                      'Jangan tafsirkan sebagai saldo tersedia atau net settlement.',
+                      style: const TextStyle(
+                          fontSize: 12,
+                          height: 1.6,
+                          color: AppColors.textSecondary)),
+                ])),
+          ],
+        ]);
+  }
+
   Widget _provenance() => Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
@@ -324,46 +558,106 @@ class _OperationsFinancialState extends State<OperationsFinancialScreen>
               fontWeight: FontWeight.w600,
               color: Color(0xFF795018))));
 
-  Widget _preview() => _DashboardCard(
+  Widget _preview() => _role == 1
+      ? _adminPreview()
+      : _DashboardCard(
           child:
               Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-        const _SectionTitle('Ringkasan Keuangan'),
+          const _SectionTitle('Ringkasan Keuangan'),
+          const Text('DEMO / TEST_ONLY · Bukan uang nyata',
+              style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.blueDeep)),
+          const SizedBox(height: 12),
+          if (_loading)
+            const SizedBox(
+                height: 40, child: Center(child: LinearProgressIndicator()))
+          else if (_error != null) ...[
+            Text(adminErrorMessage(_error!),
+                style: const TextStyle(fontSize: 13, height: 1.5)),
+            if (_role != 1)
+              TextButton(
+                  onPressed: _load, child: const Text('Muat ulang keuangan')),
+          ] else if (!_available)
+            Text(_financialReason(_financial?['reason']),
+                style: const TextStyle(
+                    fontSize: 13, height: 1.5, color: Color(0xFF526787)))
+          else
+            Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Expanded(
+                  child: _financialFigure(
+                      'Gross tercatat', _metric('gross_revenue', money: true))),
+              const SizedBox(width: 12),
+              Expanded(
+                  child: _financialFigure(
+                      'Transaksi sukses', _metric('successful_transactions'))),
+            ]),
+          const SizedBox(height: 8),
+          if (_financial != null)
+            Text(
+                'Sumber: ${_financial!['source']} · ${_financial!['availability']}',
+                style: const TextStyle(
+                    fontSize: 12, height: 1.5, color: Color(0xFF526787))),
+          _routeLink('Buka Financial Dashboard', _open),
+        ]));
+
+  Widget _adminPreview() => _DashboardCard(
+          child:
+              Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        Row(children: [
+          const Expanded(
+              child: Text('Ringkasan Keuangan',
+                  style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.navy))),
+          Tooltip(
+              message: 'Ringkasan DEMO bulan ini (UTC), seluruh penugasan. '
+                  'Filter keuangan tersedia di dashboard. '
+                  'Sumber: ${_financial?['source'] ?? 'belum tersedia'}',
+              child: const Icon(Icons.payments_outlined,
+                  size: 20, color: AppColors.navy)),
+        ]),
+        const SizedBox(height: AppSpacing.xs),
         const Text('DEMO / TEST_ONLY · Bukan uang nyata',
-            style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w700,
-                color: AppColors.blueDeep)),
-        const SizedBox(height: 12),
+            style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+        const SizedBox(height: AppSpacing.sm),
         if (_loading)
-          const SizedBox(
-              height: 40, child: Center(child: LinearProgressIndicator()))
+          const LinearProgressIndicator()
         else if (_error != null) ...[
           Text(adminErrorMessage(_error!),
               style: const TextStyle(fontSize: 13, height: 1.5)),
-          if (_role != 1)
-            TextButton(
-                onPressed: _load, child: const Text('Muat ulang keuangan')),
+          TextButton(
+              onPressed: _load, child: const Text('Muat ulang keuangan')),
         ] else if (!_available)
           Text(_financialReason(_financial?['reason']),
               style: const TextStyle(
-                  fontSize: 13, height: 1.5, color: Color(0xFF526787)))
-        else
-          Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Expanded(
-                child: _financialFigure(
-                    'Gross tercatat', _metric('gross_revenue', money: true))),
-            const SizedBox(width: 12),
-            Expanded(
-                child: _financialFigure(
-                    'Transaksi sukses', _metric('successful_transactions'))),
-          ]),
-        const SizedBox(height: 8),
-        if (_financial != null)
-          Text(
-              'Sumber: ${_financial!['source']} · ${_financial!['availability']}',
-              style: const TextStyle(
-                  fontSize: 12, height: 1.5, color: Color(0xFF526787))),
-        _routeLink('Buka Financial Dashboard', _open),
+                  fontSize: 13, height: 1.5, color: AppColors.textSecondary))
+        else ...[
+          _financialRow(
+              'Gross tercatat', _metric('gross_revenue', money: true)),
+          const Divider(height: AppSpacing.sm, color: AppColors.border),
+          _financialRow('Transaksi sukses', _metric('successful_transactions')),
+          if (_financial?['availability'] == 'partial')
+            Text('Sumber: ${_financial!['source']} · partial',
+                style: const TextStyle(
+                    fontSize: 12, height: 1.5, color: AppColors.textSecondary)),
+        ],
+        const Divider(height: AppSpacing.sm, color: AppColors.border),
+        Align(
+            alignment: Alignment.centerRight,
+            child: TextButton.icon(
+                key: const ValueKey('home-financial-dashboard'),
+                onPressed: _open,
+                style: TextButton.styleFrom(
+                    padding: EdgeInsets.zero,
+                    foregroundColor: AppColors.blueDeep),
+                iconAlignment: IconAlignment.end,
+                icon: const Icon(Icons.arrow_forward_rounded, size: 20),
+                label: const Text('Buka dashboard keuangan',
+                    style:
+                        TextStyle(fontSize: 12, fontWeight: FontWeight.w700)))),
       ]));
 
   List<Widget> _summaryContent(Json financial) => [
@@ -547,6 +841,83 @@ class _OperationsFinancialState extends State<OperationsFinancialScreen>
             style:
                 TextStyle(fontSize: 12, height: 1.5, color: Color(0xFF526787))),
     ]));
+  }
+}
+
+class _FinancialBookingChart extends StatelessWidget {
+  const _FinancialBookingChart({required this.rows});
+  final List<Json> rows;
+
+  @override
+  Widget build(BuildContext context) {
+    final values = rows.map((row) => _number(row['bookings'])).toList();
+    if (values.any((value) => value == null || !value.isFinite || value < 0)) {
+      return const _Notice('Data aktivitas booking belum tersedia.');
+    }
+    final maximum = values.fold<num>(1, (max, value) => math.max(max, value!));
+    return Semantics(
+        label: 'Aktivitas booking. '
+            '${rows.map((row) => "${row['date']}: ${_value(row['bookings'])} booking").join(', ')}',
+        excludeSemantics: true,
+        child: LayoutBuilder(builder: (context, constraints) {
+          final slot = math.max(
+              MediaQuery.textScalerOf(context).scale(kMinInteractiveDimension),
+              constraints.maxWidth / rows.length);
+          return SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: SizedBox(
+                  width: slot * rows.length,
+                  child: Column(children: [
+                    SizedBox(
+                        height: 112,
+                        child: Stack(children: [
+                          Column(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                for (var i = 0; i < 4; i++)
+                                  const Divider(
+                                      height: 1, color: AppColors.border),
+                              ]),
+                          Positioned.fill(
+                              child: Row(
+                                  crossAxisAlignment: CrossAxisAlignment.end,
+                                  children: [
+                                for (final value in values)
+                                  Expanded(
+                                      child: Align(
+                                          alignment: Alignment.bottomCenter,
+                                          child: FractionallySizedBox(
+                                              widthFactor: .42,
+                                              heightFactor:
+                                                  value! / maximum * .92,
+                                              child: const DecoratedBox(
+                                                  decoration: BoxDecoration(
+                                                      color: AppColors.blue,
+                                                      borderRadius:
+                                                          BorderRadius.vertical(
+                                                              top: Radius.circular(
+                                                                  AppSpacing
+                                                                      .xs))))))),
+                              ])),
+                        ])),
+                    const SizedBox(height: AppSpacing.sm),
+                    Row(children: [
+                      for (final row in rows)
+                        Expanded(
+                            child: Text(
+                                DateTime.tryParse('${row['date']}') == null
+                                    ? '${row['date']}'
+                                    : operationsPeriodLabel({
+                                        'from': '${row['date']}',
+                                        'to': '${row['date']}'
+                                      }),
+                                textAlign: TextAlign.center,
+                                style: const TextStyle(
+                                    fontSize: 10,
+                                    color: AppColors.textSecondary))),
+                    ]),
+                  ])));
+        }));
   }
 }
 

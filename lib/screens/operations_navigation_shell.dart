@@ -125,7 +125,11 @@ class _OperationsNavigationShellState extends State<OperationsNavigationShell>
     _pages.add(index);
     return switch (index) {
       0 => OperationsDashboard(
-          repository: _repository, session: _session, active: _index == 0),
+          repository: _repository,
+          session: _session,
+          active: _index == 0,
+          onOpenQueue: () => _select(1),
+          onOpenDestinations: () => _select(3)),
       1 => OperationsQueueScreen(
           repository: _repository,
           session: _session,
@@ -337,7 +341,9 @@ class _OperationsProfileState extends State<_OperationsProfile> {
       return 'Belum tersedia · tarik untuk mencoba lagi';
     }
     if (_destinations.items.isEmpty) return 'Belum ada penugasan';
-    return _destinations.items.map((destination) => destination.name).join(' & ');
+    return _destinations.items
+        .map((destination) => destination.name)
+        .join(' & ');
   }
 
   @override

@@ -5,8 +5,9 @@ import '../services/auth_session.dart';
 import '../services/api_client.dart';
 import 'admin_common.dart';
 import 'operations_booking_screen.dart';
-import 'operations_dashboard.dart' show OperationsPage;
+import 'operations_dashboard.dart' show OperationsPage, showOperationsFilters;
 import '../theme/app_colors.dart';
+import '../widgets/operations_chrome.dart';
 
 /// Legacy history entry point; decisions always open the explicit claim flow.
 class DaftarPendaftarScreen extends StatefulWidget {
@@ -26,6 +27,8 @@ class _DaftarPendaftarScreenState extends State<DaftarPendaftarScreen> {
   late final int? _role = _session.role;
   late final PagedListController<Booking> _list;
   String? _status;
+  Map<String, String> _filters = {};
+  String? _destinationLabel;
   bool _accessRevoked = false;
   final Map<String?, GlobalKey> _statusKeys = {};
   bool get _valid =>
@@ -39,6 +42,13 @@ class _DaftarPendaftarScreenState extends State<DaftarPendaftarScreen> {
   @override
   void initState() {
     super.initState();
+    if (_role == 1) {
+      final now = DateTime.now().toUtc();
+      _filters = {
+        'from': isoDay(DateTime(now.year, now.month)),
+        'to': isoDay(DateTime(now.year, now.month + 1, 0)),
+      };
+    }
     _list = PagedListController<Booking>(
         session: _session,
         keyOf: (booking) => booking.guid,
@@ -76,6 +86,41 @@ class _DaftarPendaftarScreenState extends State<DaftarPendaftarScreen> {
     if (_valid) await _load();
   }
 
+  Future<void> _filter() async {
+    if (!_valid || _accessRevoked) return;
+    final revision = _session.sessionChanges.value;
+    var destinationLabel = _destinationLabel;
+    final result = await showOperationsFilters(context,
+        repository: _repository,
+        session: _session,
+        initial: _filters,
+        home: true,
+        destinationLabel: _destinationLabel,
+        onDestinationLabelSelected: (label) => destinationLabel = label);
+    if (result == null ||
+        !_valid ||
+        _accessRevoked ||
+        revision != _session.sessionChanges.value) return;
+    setState(() {
+      _filters = result;
+      _destinationLabel =
+          result['destination_guid'] == null ? null : destinationLabel;
+    });
+    await _load();
+  }
+
+  bool _matchesFilters(Booking booking) {
+    if (_role != 1) return true;
+    // shortcut: filter the loaded history (up to 10,000 rows); use server filters when the list API supports them.
+    final destination = _filters['destination_guid'];
+    final from = _filters['from'];
+    final to = _filters['to'];
+    final day = visitDay(booking.visitDate);
+    return (destination == null || booking.destinationGuid == destination) &&
+        (from == null || day.compareTo(from) >= 0) &&
+        (to == null || day.compareTo(to) <= 0);
+  }
+
   @override
   void dispose() {
     _list
@@ -87,7 +132,9 @@ class _DaftarPendaftarScreenState extends State<DaftarPendaftarScreen> {
   @override
   Widget build(BuildContext context) {
     if (!_valid) return const SizedBox.shrink();
-    final rows = _list.error == null ? _list.items : <Booking>[];
+    final rows = _list.error == null
+        ? _list.items.where(_matchesFilters).toList()
+        : <Booking>[];
     if (_role == 1)
       return OperationsPage(
           role: _role,
@@ -96,6 +143,14 @@ class _DaftarPendaftarScreenState extends State<DaftarPendaftarScreen> {
           embedded: false,
           onRefresh: _load,
           children: [
+            OperationsFilterBar(
+                filters: _filters,
+                keyPrefix: 'registrants',
+                destinationLabel: _destinationLabel,
+                dateTooltip: 'Tanggal kunjungan · kalender lokal destinasi',
+                onDestinationPressed: _accessRevoked ? null : _filter,
+                onDatePressed: _accessRevoked ? null : _filter),
+            const SizedBox(height: AppSpacing.md),
             SingleChildScrollView(
                 scrollDirection: Axis.horizontal,
                 child: Row(children: [
@@ -105,33 +160,57 @@ class _DaftarPendaftarScreenState extends State<DaftarPendaftarScreen> {
                       (bookingStatusLabel(status), status),
                   ])
                     Padding(
-                        padding: const EdgeInsets.only(right: 8),
-                        child: ChoiceChip(
-                            key: _statusKeys.putIfAbsent(
-                                item.$2, () => GlobalKey()),
-                            label: Text(item.$1),
+                        padding: const EdgeInsets.only(right: AppSpacing.sm),
+                        child: Semantics(
                             selected: _status == item.$2,
-                            showCheckmark: false,
-                            onSelected: (_) {
-                              setState(() => _status = item.$2);
-                              WidgetsBinding.instance.addPostFrameCallback((_) {
-                                final chipContext =
-                                    _statusKeys[item.$2]?.currentContext;
-                                if (mounted && chipContext != null)
-                                  Scrollable.of(chipContext)
-                                      .position
-                                      .ensureVisible(
-                                          chipContext.findRenderObject()!,
-                                          alignment: .5,
-                                          duration:
-                                              MediaQuery.disableAnimationsOf(
-                                                      context)
-                                                  ? Duration.zero
-                                                  : const Duration(
-                                                      milliseconds: 200));
-                              });
-                              _load();
-                            })),
+                            child: TextButton(
+                                key: _statusKeys.putIfAbsent(
+                                    item.$2, () => GlobalKey()),
+                                style: TextButton.styleFrom(
+                                    foregroundColor: _status == item.$2
+                                        ? AppColors.surface
+                                        : AppColors.blueDeep,
+                                    backgroundColor: _status == item.$2
+                                        ? AppColors.blue
+                                        : AppColors.surface,
+                                    minimumSize: const Size(48, 48),
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: AppSpacing.lg,
+                                        vertical: AppSpacing.sm),
+                                    shape: StadiumBorder(
+                                        side: BorderSide(
+                                            color: _status == item.$2
+                                                ? AppColors.blue
+                                                : AppColors.border))),
+                                onPressed: !_valid || _accessRevoked
+                                    ? null
+                                    : () {
+                                        setState(() => _status = item.$2);
+                                        WidgetsBinding.instance
+                                            .addPostFrameCallback((_) {
+                                          final chipContext =
+                                              _statusKeys[item.$2]
+                                                  ?.currentContext;
+                                          if (mounted && chipContext != null)
+                                            Scrollable.of(chipContext)
+                                                .position
+                                                .ensureVisible(
+                                                    chipContext
+                                                        .findRenderObject()!,
+                                                    alignment: .5,
+                                                    duration: MediaQuery
+                                                            .disableAnimationsOf(
+                                                                context)
+                                                        ? Duration.zero
+                                                        : const Duration(
+                                                            milliseconds: 200));
+                                        });
+                                        _load();
+                                      },
+                                child: Text(item.$1,
+                                    style: const TextStyle(
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w700))))),
                 ])),
             const SizedBox(height: 16),
             if (_list.loading) const LinearProgressIndicator(),
@@ -144,42 +223,48 @@ class _DaftarPendaftarScreenState extends State<DaftarPendaftarScreen> {
             else if (!_list.loading && rows.isEmpty)
               const Padding(
                   padding: EdgeInsets.symmetric(vertical: 24),
-                  child: Text('Belum ada pendaftar untuk status ini.',
+                  child: Text('Belum ada pendaftar untuk filter ini.',
                       textAlign: TextAlign.center)),
             for (final booking in rows)
-              Card(
+              Padding(
                   key: ValueKey(booking.guid),
-                  elevation: 0,
-                  color: AppColors.surface,
-                  child: ListTile(
-                      contentPadding: const EdgeInsets.all(16),
-                      title: Text(booking.visitorName,
-                          style: const TextStyle(fontWeight: FontWeight.w700)),
-                      subtitle: Padding(
-                          padding: const EdgeInsets.only(top: 8),
-                          child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(booking.destinationName),
-                                Text(
-                                    '${visitDay(booking.visitDate)} · ${booking.quantity} orang'),
-                                const SizedBox(height: 8),
-                                Container(
-                                    padding: const EdgeInsets.symmetric(
-                                        horizontal: 8, vertical: 4),
-                                    decoration: BoxDecoration(
-                                        color: AdminColors.tint,
-                                        borderRadius:
-                                            BorderRadius.circular(12)),
-                                    child: Text(
-                                        bookingStatusLabel(booking.status),
-                                        style: const TextStyle(
-                                            fontSize: 12,
-                                            fontWeight: FontWeight.w700,
-                                            color: AdminColors.blueDeep))),
-                              ])),
-                      trailing: const Icon(Icons.chevron_right),
-                      onTap: () => _open(booking))),
+                  padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+                  child: Material(
+                      color: AppColors.surface,
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16),
+                          side: const BorderSide(color: AppColors.border)),
+                      clipBehavior: Clip.antiAlias,
+                      child: ListTile(
+                          contentPadding: const EdgeInsets.symmetric(
+                              horizontal: AppSpacing.md),
+                          isThreeLine: true,
+                          titleAlignment: ListTileTitleAlignment.center,
+                          leading: Container(
+                              padding: const EdgeInsets.all(AppSpacing.md),
+                              decoration: BoxDecoration(
+                                  color: AppColors.blueTint,
+                                  borderRadius: BorderRadius.circular(12)),
+                              child: const Icon(Icons.people_outline_rounded,
+                                  color: AppColors.blue, size: 20)),
+                          title: Text(booking.visitorName,
+                              style: const TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w700,
+                                  color: AppColors.navy)),
+                          subtitle: Padding(
+                              padding:
+                                  const EdgeInsets.only(top: AppSpacing.xs),
+                              child: Text(
+                                  '${booking.destinationName} · ${visitDay(booking.visitDate)}\n'
+                                  '${booking.quantity} orang · ${bookingStatusLabel(booking.status)}',
+                                  style: const TextStyle(
+                                      fontSize: 11,
+                                      height: 1.8,
+                                      color: AppColors.textSecondary))),
+                          trailing: const Icon(Icons.chevron_right_rounded,
+                              color: AppColors.navy, size: 20),
+                          onTap: () => _open(booking)))),
           ]);
     return AdminPage(
         badge: 'DATA PENGUNJUNG',

@@ -9,8 +9,11 @@ import '../data/admin_state.dart';
 import '../data/app_data.dart';
 import '../data/business_repository.dart';
 import '../services/auth_session.dart';
+import '../services/api_client.dart';
+import '../theme/app_colors.dart';
 import '../widgets/api_image.dart';
 import '../widgets/operations_chrome.dart';
+import '../widgets/visit_format.dart' show visitMoney;
 import 'admin_common.dart';
 import 'detail_wisata_screen.dart';
 import 'kelola_kuota_screen.dart';
@@ -64,14 +67,19 @@ class DaftarWisataScreen extends StatefulWidget {
   final String mode; // 'view' | 'edit' | 'hapus' | 'kuota'
   final BusinessRepository? repository;
   final AuthSession? session;
+  final bool embedded;
   const DaftarWisataScreen(
-      {super.key, this.mode = 'view', this.repository, this.session});
+      {super.key,
+      this.mode = 'view',
+      this.repository,
+      this.session,
+      this.embedded = false});
 
   @override
-  State<DaftarWisataScreen> createState() => _DaftarWisataScreenState();
+  State<DaftarWisataScreen> createState() => DaftarWisataScreenState();
 }
 
-class _DaftarWisataScreenState extends State<DaftarWisataScreen>
+class DaftarWisataScreenState extends State<DaftarWisataScreen>
     with SingleTickerProviderStateMixin {
   String _cari = '';
   String _status = 'active';
@@ -79,7 +87,7 @@ class _DaftarWisataScreenState extends State<DaftarWisataScreen>
 
   late final AnimationController _fabCtrl;
   late final BusinessRepository _repository =
-      widget.repository ?? BusinessRepository();
+      widget.repository ?? BusinessRepository(ApiClient(_session));
   late final AuthSession _session = widget.session ?? AuthSession.instance;
   late final PagedListController<Destination> _catalog;
   late final PagedListController<Category> _categories;
@@ -102,7 +110,22 @@ class _DaftarWisataScreenState extends State<DaftarWisataScreen>
 
   Future<void> _loadCategories() => _categories.load();
 
-  Future<void> _loadCatalog() => _catalog.load(filters: _filters);
+  Future<void> _loadCatalog() async {
+    if (!canAccessAdmin(_session.role)) return;
+    await _catalog.load(filters: _filters);
+  }
+
+  Future<void> refresh() => _refreshView();
+
+  bool get _hub => widget.mode == 'manage';
+
+  bool _current(int generation, int revision) =>
+      mounted &&
+      _session.authenticated.value &&
+      _session.deviceSessionReady &&
+      canAccessAdmin(_session.role) &&
+      _session.isCurrentGeneration(generation) &&
+      _session.sessionChanges.value == revision;
 
   Future<void> _refreshView() async {
     await Future.wait([
@@ -137,6 +160,7 @@ class _DaftarWisataScreenState extends State<DaftarWisataScreen>
   @override
   void initState() {
     super.initState();
+    if (_hub) _status = 'all';
     _fabCtrl = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 600),
@@ -158,7 +182,9 @@ class _DaftarWisataScreenState extends State<DaftarWisataScreen>
   }
 
   void _sessionChanged() {
-    if (_session.authenticated.value && _session.deviceSessionReady) {
+    if (_session.authenticated.value &&
+        _session.deviceSessionReady &&
+        canAccessAdmin(_session.role)) {
       _refreshView();
     }
   }
@@ -187,113 +213,113 @@ class _DaftarWisataScreenState extends State<DaftarWisataScreen>
   Future<bool> _konfirmasi(Wisata w) async {
     final nonaktifkan = w.isActive;
     final warna = nonaktifkan ? _C.danger : _C.teal;
+    final generation = _session.sessionGeneration;
+    final revision = _session.sessionChanges.value;
     final ok = await showDialog<bool>(
       context: context,
-      builder: (ctx) => OperationsTheme(
-          role: _session.role,
-          child: Dialog(
-            backgroundColor: _C.card,
-            shape:
-                RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-            child: Padding(
-              padding: const EdgeInsets.all(28),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(18),
-                    decoration: BoxDecoration(
-                      color: warna.withValues(alpha: 0.12),
-                      shape: BoxShape.circle,
-                      border: Border.all(color: warna.withValues(alpha: 0.3)),
-                    ),
-                    child: Icon(
-                        nonaktifkan
-                            ? Icons.delete_rounded
-                            : Icons.restore_rounded,
-                        color: warna,
-                        size: 36),
-                  ),
-                  const SizedBox(height: 20),
-                  Text(nonaktifkan ? 'Hapus Wisata?' : 'Aktifkan Kembali?',
-                      style: const TextStyle(
-                        color: _C.text,
-                        fontWeight: FontWeight.w800,
-                        fontSize: 20,
-                      )),
-                  const SizedBox(height: 10),
-                  Text(
-                    nonaktifkan
-                        ? '"${w.nama}" akan dinonaktifkan dari katalog.'
-                        : '"${w.nama}" akan ditampilkan kembali di katalog.',
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(
-                        color: _C.textMuted, fontSize: 13, height: 1.5),
-                  ),
-                  const SizedBox(height: 28),
-                  Row(children: [
-                    Expanded(
-                      child: OutlinedButton(
-                        onPressed: () => Navigator.pop(ctx, false),
-                        style: OutlinedButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(vertical: 14),
-                          shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(14)),
-                          side: const BorderSide(color: _C.border),
-                          foregroundColor: _C.textMuted,
-                        ),
-                        child: const Text('Batal'),
+      builder: (ctx) => ValueListenableBuilder<int>(
+          valueListenable: _session.sessionChanges,
+          builder: (_, value, child) => !_current(generation, revision)
+              ? AlertDialog(
+                  title: const Text('Akses berubah'),
+                  content: const Text('Tutup dan muat kembali destinasi.'),
+                  actions: [
+                      TextButton(
+                          onPressed: () => Navigator.pop(ctx, false),
+                          child: const Text('Tutup'))
+                    ])
+              : OperationsTheme(
+                  role: _session.role,
+                  child: Dialog(
+                    backgroundColor: _C.card,
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(24)),
+                    child: SingleChildScrollView(
+                      padding: const EdgeInsets.all(28),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(18),
+                            decoration: BoxDecoration(
+                              color: warna.withValues(alpha: 0.12),
+                              shape: BoxShape.circle,
+                              border: Border.all(
+                                  color: warna.withValues(alpha: 0.3)),
+                            ),
+                            child: Icon(
+                                nonaktifkan
+                                    ? Icons.delete_rounded
+                                    : Icons.restore_rounded,
+                                color: warna,
+                                size: 36),
+                          ),
+                          const SizedBox(height: 20),
+                          Text(
+                              nonaktifkan
+                                  ? 'Nonaktifkan Destinasi?'
+                                  : 'Aktifkan Kembali?',
+                              style: const TextStyle(
+                                color: _C.text,
+                                fontWeight: FontWeight.w800,
+                                fontSize: 20,
+                              )),
+                          const SizedBox(height: 10),
+                          Text(
+                            nonaktifkan
+                                ? '"${w.nama}" akan dinonaktifkan dari katalog.'
+                                : '"${w.nama}" akan ditampilkan kembali di katalog.',
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(
+                                color: _C.textMuted, fontSize: 13, height: 1.5),
+                          ),
+                          const SizedBox(height: 28),
+                          OverflowBar(
+                              spacing: 12,
+                              overflowSpacing: 12,
+                              alignment: MainAxisAlignment.end,
+                              children: [
+                                OutlinedButton(
+                                    onPressed: () => Navigator.pop(ctx, false),
+                                    child: const Text('Batal')),
+                                ElevatedButton(
+                                    style: ElevatedButton.styleFrom(
+                                        backgroundColor: warna,
+                                        foregroundColor: Colors.white),
+                                    onPressed: () => Navigator.pop(ctx, true),
+                                    child: Text(nonaktifkan
+                                        ? 'Nonaktifkan'
+                                        : 'Aktifkan')),
+                              ]),
+                        ],
                       ),
                     ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: ElevatedButton(
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: warna,
-                          foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(vertical: 14),
-                          elevation: 0,
-                          shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(14)),
-                        ),
-                        onPressed: () => Navigator.pop(ctx, true),
-                        child: Text(nonaktifkan ? 'Hapus' : 'Aktifkan',
-                            style:
-                                const TextStyle(fontWeight: FontWeight.w700)),
-                      ),
-                    ),
-                  ]),
-                ],
-              ),
-            ),
-          )),
+                  ))),
     );
     return ok == true;
   }
 
   Future<void> _toggleActive(Wisata w) async {
     if (_guard.isBusy(w.id)) return;
-    final nonaktifkan = w.isActive;
-    final yakin = await _konfirmasi(w);
-    if (!yakin || !mounted) return;
     final generation = _session.sessionGeneration;
+    final revision = _session.sessionChanges.value;
     await _guard.run<void>(w.id, () async {
+      if (!_current(generation, revision) || !await _konfirmasi(w)) return;
+      if (!_current(generation, revision)) return;
       try {
-        if (nonaktifkan) {
+        if (w.isActive) {
           await _repository.deactivateDestination(w.id);
         } else {
           await _repository.reactivateDestination(w.id);
         }
-        if (!mounted || !_session.isCurrentGeneration(generation)) return;
+        if (!mounted || !_current(generation, revision)) return;
         showAdminSnack(context,
-            nonaktifkan ? 'Wisata dinonaktifkan' : 'Wisata diaktifkan kembali');
+            w.isActive ? 'Wisata dinonaktifkan' : 'Wisata diaktifkan kembali');
       } catch (e) {
-        if (!mounted || !_session.isCurrentGeneration(generation)) return;
+        if (!mounted || !_current(generation, revision)) return;
         showAdminSnack(context, adminErrorMessage(e), error: true);
       }
-      if (mounted && _session.isCurrentGeneration(generation)) {
-        await _loadCatalog();
-      }
+      if (_current(generation, revision)) await _loadCatalog();
     });
   }
 
@@ -312,8 +338,425 @@ class _DaftarWisataScreenState extends State<DaftarWisataScreen>
     );
   }
 
+  Future<void> _preview(Wisata w) async {
+    if (!canAccessAdmin(_session.role)) return;
+    await Navigator.push<void>(
+        context,
+        MaterialPageRoute(
+            builder: (_) => OperationsTheme(
+                role: _session.role,
+                child: DetailWisataScreen(
+                    wisata: w,
+                    repository: _repository,
+                    session: _session,
+                    adminPreview: true))));
+  }
+
+  Future<void> _editor({Wisata? wisata, bool gallery = false}) async {
+    final generation = _session.sessionGeneration;
+    final revision = _session.sessionChanges.value;
+    if (!_current(generation, revision)) return;
+    final saved = await Navigator.push<bool>(
+        context,
+        MaterialPageRoute(
+            builder: (_) => TambahWisataScreen(
+                wisataEdit: wisata,
+                repository: _repository,
+                session: _session,
+                initialGallery: gallery)));
+    if (saved == true && _current(generation, revision)) await _loadCatalog();
+  }
+
+  Future<void> _manageDestination(Wisata w) async {
+    final generation = _session.sessionGeneration;
+    final revision = _session.sessionChanges.value;
+    if (!_current(generation, revision)) return;
+    final action = await showModalBottomSheet<String>(
+        context: context,
+        isScrollControlled: true,
+        useSafeArea: true,
+        backgroundColor: AppColors.surface,
+        shape: const RoundedRectangleBorder(
+            borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+        builder: (sheetContext) => OperationsTheme(
+            role: _session.role,
+            child: SafeArea(
+                top: false,
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.all(16),
+                  child: ValueListenableBuilder<int>(
+                      valueListenable: _session.sessionChanges,
+                      builder: (context, value, child) => Column(
+                              mainAxisSize: MainAxisSize.min,
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                Row(children: [
+                                  Expanded(
+                                      child: Text(
+                                          _current(generation, revision)
+                                              ? 'Kelola ${w.nama}'
+                                              : 'Kelola Destinasi',
+                                          style: const TextStyle(
+                                              fontSize: 18,
+                                              fontWeight: FontWeight.w800,
+                                              color: AppColors.navy))),
+                                  IconButton(
+                                      tooltip: 'Tutup',
+                                      onPressed: () =>
+                                          Navigator.pop(sheetContext),
+                                      icon: const Icon(Icons.close))
+                                ]),
+                                const SizedBox(height: 8),
+                                if (!_current(generation, revision))
+                                  const Text(
+                                      'Akses berubah. Tutup dan muat kembali destinasi.')
+                                else ...[
+                                  const Text(
+                                      'Pilih tindakan untuk destinasi ini',
+                                      style: TextStyle(
+                                          color: AppColors.navy, fontSize: 12)),
+                                  const SizedBox(height: 16),
+                                  for (final item in [
+                                    (
+                                      'preview',
+                                      'Preview Pengunjung',
+                                      Icons.visibility_outlined
+                                    ),
+                                    (
+                                      'edit',
+                                      'Ubah Informasi',
+                                      Icons.edit_outlined
+                                    ),
+                                    (
+                                      'gallery',
+                                      'Kelola Galeri',
+                                      Icons.photo_library_outlined
+                                    ),
+                                    (
+                                      'quota',
+                                      'Kelola Kuota',
+                                      Icons.calendar_today_outlined
+                                    ),
+                                    (
+                                      'status',
+                                      w.isActive
+                                          ? 'Nonaktifkan'
+                                          : 'Aktifkan Kembali',
+                                      w.isActive
+                                          ? Icons.block_outlined
+                                          : Icons.restore_rounded
+                                    ),
+                                  ]) ...[
+                                    if (item.$1 == 'status')
+                                      const Divider(color: AppColors.border),
+                                    ListTile(
+                                        key: ValueKey('v3-action-${item.$1}'),
+                                        minTileHeight: 56,
+                                        contentPadding: EdgeInsets.zero,
+                                        leading: Icon(item.$3,
+                                            color: item.$1 == 'status' &&
+                                                    w.isActive
+                                                ? Theme.of(context)
+                                                    .colorScheme
+                                                    .error
+                                                : AppColors.blue),
+                                        title: Text(item.$2),
+                                        onTap: () => Navigator.pop(
+                                            sheetContext, item.$1)),
+                                  ],
+                                ],
+                              ])),
+                ))));
+    if (!mounted || !_current(generation, revision)) return;
+    switch (action) {
+      case 'preview':
+        await _preview(w);
+      case 'edit':
+        await _editor(wisata: w);
+      case 'gallery':
+        await _editor(wisata: w, gallery: true);
+      case 'quota':
+        await Navigator.push<void>(
+            context,
+            MaterialPageRoute(
+                builder: (_) => KelolaKuotaScreen(
+                    destinationGuid: w.id,
+                    destinationName: w.nama,
+                    timezone: w.timezone,
+                    repository: _repository,
+                    session: _session)));
+        if (_current(generation, revision)) await _loadCatalog();
+      case 'status':
+        await _toggleActive(w);
+    }
+  }
+
+  Widget _manageHub() =>
+      Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        Row(children: [
+          const Expanded(
+              child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('Destinasi Saya',
+                  style: TextStyle(
+                      color: AppColors.navy,
+                      fontSize: 16,
+                      fontWeight: FontWeight.w800)),
+              SizedBox(height: 4),
+              Text('Kelola lokasi dalam penugasan Anda',
+                  style: TextStyle(
+                      color: AppColors.textSecondary,
+                      fontSize: 11,
+                      height: 1.5)),
+            ],
+          )),
+          const SizedBox(width: 8),
+          FilledButton.icon(
+              key: const ValueKey('v3-add'),
+              style: FilledButton.styleFrom(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                  textStyle: Theme.of(context)
+                      .textTheme
+                      .labelLarge
+                      ?.copyWith(fontSize: 12, fontWeight: FontWeight.w700),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12))),
+              onPressed: () => _editor(),
+              icon: const Icon(Icons.add, size: 18),
+              label: const Text('Tambah')),
+        ]),
+        const SizedBox(height: 16),
+        TextField(
+            key: const ValueKey('v3-search'),
+            controller: _searchController,
+            onChanged: _onSearch,
+            style: const TextStyle(fontSize: 12, color: AppColors.navy),
+            decoration: InputDecoration(
+                hintText: 'Cari nama destinasi...',
+                hintStyle: const TextStyle(
+                    color: AppColors.textSecondary, fontSize: 12),
+                contentPadding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                prefixIcon:
+                    const Icon(Icons.search, color: AppColors.blue, size: 20),
+                suffixIcon: _cari.isEmpty
+                    ? null
+                    : IconButton(
+                        tooltip: 'Hapus pencarian',
+                        onPressed: () {
+                          _searchController.clear();
+                          _onSearch('');
+                        },
+                        icon: const Icon(Icons.close)))),
+        const SizedBox(height: 12),
+        Wrap(spacing: 8, runSpacing: 8, children: [
+          for (final status in const [
+            ('all', 'Semua'),
+            ('active', 'Aktif'),
+            ('inactive', 'Nonaktif')
+          ])
+            Semantics(
+                selected: _status == status.$1,
+                child: OutlinedButton(
+                    key: ValueKey('v3-status-${status.$1}'),
+                    style: OutlinedButton.styleFrom(
+                        side: const BorderSide(color: AppColors.border),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 16, vertical: 12),
+                        textStyle: Theme.of(context)
+                            .textTheme
+                            .labelLarge
+                            ?.copyWith(
+                                fontSize: 11, fontWeight: FontWeight.w700),
+                        backgroundColor: _status == status.$1
+                            ? AppColors.blue
+                            : AppColors.surface,
+                        foregroundColor: _status == status.$1
+                            ? AppColors.surface
+                            : AppColors.textSecondary),
+                    onPressed: () {
+                      if (_status == status.$1) return;
+                      setState(() => _status = status.$1);
+                      _loadCatalog();
+                    },
+                    child: Text(status.$2))),
+        ]),
+        const SizedBox(height: 16),
+        if (_catalog.loading) const LinearProgressIndicator(),
+        if (_catalog.error != null)
+          Padding(
+              padding: const EdgeInsets.symmetric(vertical: 16),
+              child: Text(
+                  '${adminErrorMessage(_catalog.error!)} Tarik turun untuk mencoba lagi.')),
+        if (_catalog.hasLoaded && _catalog.error == null) ...[
+          Container(
+              padding: const EdgeInsets.only(left: 8),
+              decoration: const BoxDecoration(
+                  border: Border(
+                      left: BorderSide(color: AppColors.blue, width: 2))),
+              child: Text(
+                  _catalog.total == null
+                      ? '${_catalog.items.length} destinasi dimuat'
+                      : '${_catalog.total} destinasi ditemukan',
+                  style: const TextStyle(
+                      color: AppColors.textSecondary, fontSize: 11))),
+          const SizedBox(height: 12),
+          if (_catalog.items.isEmpty)
+            const Padding(
+                padding: EdgeInsets.symmetric(vertical: 24),
+                child: Text(
+                    'Tidak ada destinasi untuk pencarian atau status ini.')),
+          for (final w in _filtered) _compactCard(w),
+        ],
+      ]);
+
+  Widget _compactCard(Wisata w) => Container(
+      key: ValueKey('v3-card-${w.id}'),
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+          color: AppColors.surface,
+          border: Border.all(color: AppColors.border),
+          borderRadius: BorderRadius.circular(16)),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          ClipRRect(
+              borderRadius: BorderRadius.circular(12),
+              child: SizedBox(
+                  width: 80,
+                  height: 80,
+                  child: ApiImage(
+                      imageUrl: w.images.isEmpty
+                          ? w.imageUrl
+                          : w.images.first.url('thumbnail'),
+                      adminGuid: w.id,
+                      repository: _repository,
+                      placeholder: (_) => const ColoredBox(
+                          color: AppColors.bg,
+                          child: Icon(Icons.landscape_outlined,
+                              color: AppColors.blue))))),
+          const SizedBox(width: 12),
+          Expanded(
+              child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                Text(w.nama,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                        color: AppColors.navy,
+                        fontWeight: FontWeight.w800,
+                        fontSize: 14)),
+                const SizedBox(height: 4),
+                Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  const Icon(Icons.location_on_outlined,
+                      size: 14, color: AppColors.blue),
+                  const SizedBox(width: 4),
+                  Expanded(
+                      child: Text(
+                          w.lokasi.isEmpty
+                              ? 'Lokasi belum dicantumkan'
+                              : w.lokasi,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                              color: AppColors.textSecondary,
+                              fontSize: 11,
+                              height: 1.5))),
+                ]),
+                const SizedBox(height: 8),
+                Text(visitMoney(w.ticketPrice, 'IDR'),
+                    style: const TextStyle(
+                        color: AppColors.blue,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700)),
+              ])),
+        ]),
+        const Divider(height: 24, color: AppColors.border),
+        Wrap(
+            alignment: WrapAlignment.spaceBetween,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              Row(mainAxisSize: MainAxisSize.min, children: [
+                Icon(Icons.circle,
+                    size: 8,
+                    color: w.isActive
+                        ? AppColors.success
+                        : AppColors.textSecondary),
+                const SizedBox(width: 8),
+                Text(w.isActive ? 'Aktif' : 'Nonaktif',
+                    style: TextStyle(
+                        color: w.isActive ? AppColors.success : AppColors.navy,
+                        fontWeight: FontWeight.w700,
+                        fontSize: 11)),
+              ]),
+              Wrap(spacing: 8, runSpacing: 8, children: [
+                OutlinedButton.icon(
+                    key: ValueKey('v3-preview-${w.id}'),
+                    style: OutlinedButton.styleFrom(
+                        foregroundColor: AppColors.blue,
+                        backgroundColor: AppColors.bg,
+                        side: const BorderSide(color: AppColors.border),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 12, vertical: 12),
+                        textStyle: Theme.of(context)
+                            .textTheme
+                            .labelLarge
+                            ?.copyWith(
+                                fontSize: 11, fontWeight: FontWeight.w700),
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12))),
+                    onPressed: _guard.isBusy(w.id) ? null : () => _preview(w),
+                    icon: const Icon(Icons.visibility_outlined, size: 16),
+                    label: const Text('Preview')),
+                FilledButton.icon(
+                    key: ValueKey('v3-manage-${w.id}'),
+                    style: FilledButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 12, vertical: 12),
+                        textStyle: Theme.of(context)
+                            .textTheme
+                            .labelLarge
+                            ?.copyWith(
+                                fontSize: 11, fontWeight: FontWeight.w700),
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12))),
+                    onPressed: _guard.isBusy(w.id)
+                        ? null
+                        : () => _manageDestination(w),
+                    iconAlignment: IconAlignment.end,
+                    icon: const Icon(Icons.tune_rounded, size: 16),
+                    label: const Text('Kelola')),
+              ]),
+            ]),
+      ]));
+
   @override
   Widget build(BuildContext context) {
+    if (_hub) {
+      final hub = _manageHub();
+      return widget.embedded
+          ? hub
+          : OperationsTheme(
+              role: _session.role,
+              child: Scaffold(
+                  backgroundColor: AppColors.bg,
+                  body: RefreshIndicator(
+                      onRefresh: refresh,
+                      child: ListView(
+                          physics: const AlwaysScrollableScrollPhysics(),
+                          children: [
+                            const OperationsScenicHeader(
+                                title: 'Kelola Destinasi',
+                                subtitle: 'Destinasi dalam penugasan Anda'),
+                            Padding(
+                                padding: const EdgeInsets.all(16), child: hub)
+                          ]))));
+    }
     final accent = _accentColor;
     final filtered = _filtered;
 

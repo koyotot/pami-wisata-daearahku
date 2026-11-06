@@ -11,9 +11,14 @@ class AppColors {
   static const surface = Colors.white;
   static const border = Color(0xFFDCE4F0);
   static const textMuted = Color(0xFF728099);
+  static const textSecondary = Color(0xFF64748B);
   static const orange = Color(0xFFFF9800);
   static const success = Color(0xFF16784C);
   static const successTint = Color(0xFFEDF9F2);
+  static const blueTint = Color(0xFFE8F3FF);
+  static const warningTint = Color(0xFFFFF7EA);
+  static const warningBorder = Color(0xFFFFE0AD);
+  static const warningText = Color(0xFF98621E);
 
   static ThemeData get operationsTheme => visitorTheme.copyWith(
         splashFactory: NoSplash.splashFactory,
@@ -68,4 +73,14 @@ class AppColors {
                 borderRadius: BorderRadius.circular(14),
                 borderSide: const BorderSide(color: blue, width: 2))),
       );
+}
+
+/// Shared 4px rhythm for the compact operations home.
+class AppSpacing {
+  AppSpacing._();
+  static const xs = 4.0;
+  static const sm = 8.0;
+  static const md = 12.0;
+  static const lg = 16.0;
+  static const xl = 24.0;
 }

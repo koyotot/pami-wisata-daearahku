@@ -10,6 +10,7 @@ class OperationsReportScreen extends StatefulWidget {
       this.active = true,
       this.personal = false,
       this.initialFilters = const {},
+      this.initialDestinationLabel,
       this.adminGuid,
       this.adminName});
   final String section;
@@ -19,6 +20,7 @@ class OperationsReportScreen extends StatefulWidget {
   final bool personal;
   final bool active;
   final Map<String, String> initialFilters;
+  final String? initialDestinationLabel;
   final String? adminGuid;
   final String? adminName;
   @override
@@ -33,7 +35,7 @@ class _OperationsReportScreenState extends State<OperationsReportScreen>
   late final _generation = _session.sessionGeneration;
   late final _role = _session.role;
   late Map<String, String> _filters = Map.of(widget.initialFilters);
-  String? _destinationLabel;
+  late String? _destinationLabel = widget.initialDestinationLabel;
   OperationalReport? _data;
   ApiPage<OperationalRow>? _rows;
   ApiPage<AdminAccount>? _accounts;
@@ -42,6 +44,8 @@ class _OperationsReportScreenState extends State<OperationsReportScreen>
   bool _loading = true;
   int _page = 1;
   bool _manage = false;
+  bool _manageOpened = false;
+  final _manageKey = GlobalKey<DaftarWisataScreenState>();
   int _accountPage = 0;
   int _request = 0;
   bool get _valid =>
@@ -54,9 +58,15 @@ class _OperationsReportScreenState extends State<OperationsReportScreen>
       (widget.adminGuid == null || _role == 2);
   bool get _paginated =>
       widget.section == 'destinations' || widget.section == 'action-center';
+  bool get _usesHomeFilters =>
+      _role == 1 &&
+      (widget.section == 'destinations' || widget.section == 'visitors');
   @override
   void initState() {
     super.initState();
+    if (_usesHomeFilters) {
+      _filters = {..._homeMonthFilters(), ..._filters};
+    }
     _session.sessionChanges.addListener(_changed);
     operationsDataChanges.addListener(_dataChanged);
     WidgetsBinding.instance.addObserver(this);
@@ -158,7 +168,7 @@ class _OperationsReportScreenState extends State<OperationsReportScreen>
         _error = e;
         _loading = false;
         if (_scopeError(e)) {
-          _filters = {};
+          _filters = _usesHomeFilters ? _homeMonthFilters() : {};
           _destinationLabel = null;
         }
       });
@@ -193,53 +203,34 @@ class _OperationsReportScreenState extends State<OperationsReportScreen>
   }
 
   Future<void> _filter() async {
+    final request = _request;
+    var destinationLabel = _destinationLabel;
     final filters = await showOperationsFilters(context,
         repository: _repository,
         session: _session,
         initial: _filters,
+        home: _usesHomeFilters,
+        destinationLabel: _destinationLabel,
+        onDestinationLabelSelected: (label) => destinationLabel = label,
         utc: widget.section != 'destinations' && widget.section != 'visitors');
-    if (filters != null && _valid) {
+    if (filters != null && _valid && request == _request) {
       _filters = filters;
-      _destinationLabel = null;
+      _destinationLabel =
+          _usesHomeFilters && filters['destination_guid'] != null
+              ? destinationLabel
+              : null;
       _page = 1;
       await _load();
     }
   }
 
-  Future<void> _destinationFilter() async {
-    if (!_valid) return;
-    String? label;
-    final destination = await showOperationsDestinationPicker(context,
-        repository: _repository,
-        session: _session,
-        initial: _filters['destination_guid'],
-        onLabelSelected: (value) => label = value);
-    if (!_valid || destination == null) return;
-    setState(() {
-      _destinationLabel = destination.isEmpty ? null : label;
-      if (destination.isEmpty) {
-        _filters.remove('destination_guid');
-      } else {
-        _filters['destination_guid'] = destination;
-      }
-      _page = 1;
-    });
-    await _load();
-  }
-
-  Future<void> _dateFilter() async {
-    if (!_valid) return;
-    final range = await showOperationsDateRangeCalendar(context,
-        from: DateTime.tryParse(_filters['from'] ?? ''),
-        to: DateTime.tryParse(_filters['to'] ?? ''));
-    if (!_valid || range == null) return;
-    setState(() {
-      _filters['from'] = isoDay(range.start);
-      _filters['to'] = isoDay(range.end);
-      _page = 1;
-    });
-    await _load();
-  }
+  Widget _reportFilterBar() => OperationsFilterBar(
+      filters: _filters,
+      keyPrefix: widget.section,
+      destinationLabel: _destinationLabel,
+      dateTooltip: 'Tanggal kunjungan · kalender lokal destinasi',
+      onDestinationPressed: _filter,
+      onDatePressed: _filter);
 
   Future<void> _booking(OperationalRow row) async {
     if (row.bookingGuid == null) return;
@@ -278,16 +269,12 @@ class _OperationsReportScreenState extends State<OperationsReportScreen>
                     ? 'Prioritas operasional dari server'
                     : 'Basis tanggal keputusan · UTC',
         embedded: widget.embedded,
-        onRefresh: _load,
+        onRefresh: _manage
+            ? () => _manageKey.currentState?.refresh() ?? Future<void>.value()
+            : _load,
         children: [
           if (_role == 1 && widget.section == 'destinations') ...[
-            OperationsFilterBar(
-                filters: _filters,
-                keyPrefix: 'destinations',
-                destinationLabel: _destinationLabel,
-                dateTooltip: 'Tanggal kunjungan · kalender lokal destinasi',
-                onDestinationPressed: _destinationFilter,
-                onDatePressed: _dateFilter),
+            if (!_manage) _reportFilterBar(),
             const SizedBox(height: 12),
             Container(
                 padding: const EdgeInsets.all(4),
@@ -295,7 +282,10 @@ class _OperationsReportScreenState extends State<OperationsReportScreen>
                     color: AppColors.blue.withValues(alpha: .08),
                     borderRadius: BorderRadius.circular(16)),
                 child: Row(children: [
-                  for (final tab in const [(false, 'Kinerja'), (true, 'Kelola')])
+                  for (final tab in const [
+                    (false, 'Kinerja'),
+                    (true, 'Kelola')
+                  ])
                     Expanded(
                         child: Semantics(
                             selected: _manage == tab.$1,
@@ -314,29 +304,23 @@ class _OperationsReportScreenState extends State<OperationsReportScreen>
                                     shape: RoundedRectangleBorder(
                                         borderRadius:
                                             BorderRadius.circular(12))),
-                                onPressed: () =>
-                                    setState(() => _manage = tab.$1),
+                                onPressed: () => setState(() {
+                                      _manage = tab.$1;
+                                      if (_manage) _manageOpened = true;
+                                    }),
                                 child: Text(tab.$2,
                                     textAlign: TextAlign.center,
                                     style: const TextStyle(
                                         fontSize: 12,
                                         fontWeight: FontWeight.w700))))),
                 ])),
-            if (_filters.isNotEmpty)
-              TextButton(
-                  onPressed: () {
-                    setState(() {
-                      _filters = {};
-                      _destinationLabel = null;
-                      _page = 1;
-                    });
-                    _load();
-                  },
-                  child: const Text('Reset filter')),
             const SizedBox(height: 16),
           ],
           if (!_manage) ...[
-            if (_role != 1 || widget.section != 'destinations') ...[
+            if (_role == 1 && widget.section == 'visitors') ...[
+              _reportFilterBar(),
+              const SizedBox(height: AppSpacing.lg),
+            ] else if (!_usesHomeFilters) ...[
               _filterButton(_filters, _filter),
               const SizedBox(height: 16),
             ],
@@ -387,7 +371,8 @@ class _OperationsReportScreenState extends State<OperationsReportScreen>
                         width: double.infinity,
                         child: FilledButton.icon(
                             onPressed: () => showAdminTicketScannerSheet(
-                                context, repository: _repository),
+                                context,
+                                repository: _repository),
                             icon: const Icon(Icons.qr_code_scanner_rounded),
                             label: const Text('Buka Scan QR'))),
                   ])),
@@ -472,81 +457,17 @@ class _OperationsReportScreenState extends State<OperationsReportScreen>
               ],
             ],
           ],
-          if (widget.section == 'destinations' && _role == 1 && _manage) ...[
-            const Text('Pengelolaan destinasi',
-                style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.bold,
-                    color: AppColors.navy)),
-            const SizedBox(height: 8),
-            const Text('Kelola destinasi dan kuota sesuai penugasan Anda.',
-                style: TextStyle(
-                    fontSize: 12, height: 1.5, color: AppColors.textMuted)),
-            const SizedBox(height: 12),
-            Material(
-                color: AppColors.surface,
-                shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(16),
-                    side: const BorderSide(color: AppColors.border)),
-                clipBehavior: Clip.antiAlias,
-                child: Column(children: [
-                  for (final item in const [
-                    ('view', 'Kelola destinasi dan kuota', Icons.place_outlined),
-                    ('edit', 'Ubah destinasi', Icons.tune_rounded),
-                    ('hapus', 'Hapus destinasi', Icons.warning_amber_rounded),
-                    ('kuota', 'Kelola kuota', Icons.calendar_today_outlined),
-                  ]) ...[
-                    ListTile(
-                        key: ValueKey('destinations-manage-${item.$1}'),
-                        minTileHeight: 52,
-                        minLeadingWidth: 20,
-                        horizontalTitleGap: 12,
-                        contentPadding:
-                            const EdgeInsets.symmetric(horizontal: 16),
-                        leading:
-                            Icon(item.$3, size: 20, color: AppColors.blue),
-                        title: Text(item.$2,
-                            style: const TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w700,
-                                color: AppColors.navy)),
-                        trailing: const Icon(Icons.chevron_right_rounded,
-                            size: 20, color: AppColors.textMuted),
-                        onTap: () => Navigator.of(context).push(
-                            MaterialPageRoute<void>(
-                                builder: (_) => DaftarWisataScreen(
-                                    mode: item.$1,
-                                    repository: _repository,
-                                    session: _session)))),
-                    if (item.$1 != 'kuota')
-                      const Divider(height: 1, color: AppColors.border),
-                  ],
-                ])),
-            const SizedBox(height: 12),
-            Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                    color: AppColors.blue.withValues(alpha: .06),
-                    border: Border.all(
-                        color: AppColors.blue.withValues(alpha: .18)),
-                    borderRadius: BorderRadius.circular(16)),
-                child: const Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      Text('Hak akses tetap dijaga',
-                          style: TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.w700,
-                              color: AppColors.blueDeep)),
-                      SizedBox(height: 8),
-                      Text(
-                          'Anda hanya dapat mengelola destinasi yang ditugaskan kepada akun Anda.',
-                          style: TextStyle(
-                              fontSize: 12,
-                              height: 1.5,
-                              color: AppColors.textMuted)),
-                    ])),
-          ],
+          if (widget.section == 'destinations' && _role == 1 && _manageOpened)
+            Offstage(
+                offstage: !_manage,
+                child: TickerMode(
+                    enabled: _manage,
+                    child: DaftarWisataScreen(
+                        key: _manageKey,
+                        mode: 'manage',
+                        embedded: true,
+                        repository: _repository,
+                        session: _session))),
           if (widget.section == 'destinations' && _role != 1) ...[
             const SizedBox(height: 16),
             _routeLink(
