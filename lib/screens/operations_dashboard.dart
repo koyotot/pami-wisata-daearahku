@@ -302,8 +302,6 @@ class _OperationsDashboardState extends State<OperationsDashboard>
                                       preview: true,
                                       active: widget.active),
                                 ] else if (data != null) ...[
-                                  _freshness(data.generatedAt, _load,
-                                      role: _role),
                                   if (_role == 1) ...[
                                     SegmentedButton<bool>(
                                       showSelectedIcon: false,

@@ -1,0 +1,15 @@
+{
+  "baseline_whole": {
+    "info": 102,
+    "warning": 2
+  },
+  "baseline_in_final_scope": {
+    "info": 11,
+    "warning": 1
+  },
+  "final_scope": {
+    "info": 11,
+    "warning": 1
+  },
+  "new_diagnostics": []
+}

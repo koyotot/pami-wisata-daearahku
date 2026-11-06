@@ -12,6 +12,8 @@ class AppColors {
   static const border = Color(0xFFDCE4F0);
   static const textMuted = Color(0xFF728099);
   static const orange = Color(0xFFFF9800);
+  static const success = Color(0xFF16784C);
+  static const successTint = Color(0xFFEDF9F2);
 
   static ThemeData get operationsTheme => visitorTheme.copyWith(
         splashFactory: NoSplash.splashFactory,

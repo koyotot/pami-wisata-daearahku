@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../data/app_data.dart';
+import '../data/admin_state.dart';
 import '../data/approval_queue_state.dart';
 import '../data/business_repository.dart';
 import '../services/auth_session.dart';
@@ -106,11 +107,11 @@ class _OperationsNavigationShellState extends State<OperationsNavigationShell>
   }
 
   Future<void> _select(int index) async {
+    if (!_valid) return;
     FocusManager.instance.primaryFocus?.unfocus();
     if (index == 2 && _role == 1) {
-      await Navigator.of(context).push(MaterialPageRoute<void>(
-          builder: widget.scannerBuilder ??
-              (_) => const AdminTicketScannerScreen()));
+      await showAdminTicketScannerSheet(context,
+          repository: _repository, builder: widget.scannerBuilder);
       if (mounted && _valid) operationsDataChanges.value++;
       return;
     }
@@ -140,7 +141,10 @@ class _OperationsNavigationShellState extends State<OperationsNavigationShell>
               embedded: true,
               active: _index == 3)
           : _ManagementPage(repository: _repository, session: _session),
-      _ => _OperationsProfile(session: _session, onRefresh: _revalidateSession),
+      _ => _OperationsProfile(
+          repository: _repository,
+          session: _session,
+          onRefresh: _revalidateSession),
     };
   }
 
@@ -177,11 +181,13 @@ class _OperationsNavigationShellState extends State<OperationsNavigationShell>
                     index: _index,
                     children: List.generate(
                         5,
-                        (i) => KeyedSubtree(
-                            key: ValueKey('operations-$_revision-$i'),
-                            child: _pages.contains(i)
-                                ? _page(i)
-                                : const SizedBox.shrink()))),
+                        (i) => TickerMode(
+                            enabled: _index == i,
+                            child: KeyedSubtree(
+                                key: ValueKey('operations-$_revision-$i'),
+                                child: _pages.contains(i)
+                                    ? _page(i)
+                                    : const SizedBox.shrink())))),
             bottomNavigationBar: MediaQuery.viewInsetsOf(context).bottom > 0
                 ? null
                 : FloatingBottomNav(
@@ -273,7 +279,11 @@ class _ManagementPage extends StatelessWidget {
 }
 
 class _OperationsProfile extends StatefulWidget {
-  const _OperationsProfile({required this.session, required this.onRefresh});
+  const _OperationsProfile(
+      {required this.repository,
+      required this.session,
+      required this.onRefresh});
+  final BusinessRepository repository;
   final AuthSession session;
   final Future<void> Function() onRefresh;
   @override
@@ -282,37 +292,161 @@ class _OperationsProfile extends StatefulWidget {
 
 class _OperationsProfileState extends State<_OperationsProfile> {
   bool _busy = false;
+  late final PagedListController<Destination> _destinations;
+
+  @override
+  void initState() {
+    super.initState();
+    _destinations = PagedListController<Destination>(
+        session: widget.session,
+        keyOf: (destination) => destination.guid,
+        fetchPage: (page, _) => widget.repository.adminDestinations(query: {
+              'page': '$page',
+              'per_page': '100',
+              'status': 'all',
+            }))
+      ..addListener(_changed);
+    if (widget.session.role == 1) _destinations.load();
+  }
+
+  void _changed() {
+    if (mounted) setState(() {});
+  }
+
+  @override
+  void dispose() {
+    _destinations.removeListener(_changed);
+    _destinations.dispose();
+    super.dispose();
+  }
+
+  Future<void> _refresh() async {
+    await widget.onRefresh();
+    if (mounted && widget.session.role == 1) await _destinations.load();
+  }
+
+  Future<void> _logout() async {
+    setState(() => _busy = true);
+    await widget.session.logout();
+    if (mounted) setState(() => _busy = false);
+  }
+
+  String get _location {
+    if (_destinations.loading) return 'Memuat destinasi…';
+    if (_destinations.error != null) {
+      return 'Belum tersedia · tarik untuk mencoba lagi';
+    }
+    if (_destinations.items.isEmpty) return 'Belum ada penugasan';
+    return _destinations.items.map((destination) => destination.name).join(' & ');
+  }
+
   @override
   Widget build(BuildContext context) => OperationsPage(
           role: widget.session.role,
-          onRefresh: widget.session.role == 1 ? widget.onRefresh : null,
+          onRefresh: widget.session.role == 1 ? _refresh : null,
           title: 'Profil',
           subtitle: 'Akun operasional Wisata Daerahku',
           children: [
-            if (widget.session.role == 1)
-              Card(
-                  elevation: 0,
-                  color: AppColors.surface,
-                  child: Padding(
-                      padding: const EdgeInsets.all(20),
-                      child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Icon(Icons.person_outline,
-                                color: AppColors.blue, size: 32),
-                            const SizedBox(height: 16),
-                            Text(currentUser?.namaLengkap ?? 'Admin',
-                                style: const TextStyle(
-                                    fontSize: 22, fontWeight: FontWeight.w800)),
-                            const SizedBox(height: 8),
-                            Text(currentUser?.email ?? ''),
-                            const SizedBox(height: 16),
-                            const Text('Admin · Role 1',
-                                style: TextStyle(fontWeight: FontWeight.w700)),
-                            const SizedBox(height: 8),
-                            const Text(
-                                'Akses hanya untuk destinasi yang ditugaskan oleh Superadmin.'),
-                          ]))),
+            if (widget.session.role == 1) ...[
+              Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                      color: AppColors.surface,
+                      border: Border.all(color: AppColors.border),
+                      borderRadius: BorderRadius.circular(16)),
+                  child: Row(children: [
+                    Container(
+                        width: 52,
+                        height: 52,
+                        decoration: BoxDecoration(
+                            color: AppColors.blue.withValues(alpha: .1),
+                            borderRadius: BorderRadius.circular(16)),
+                        child: const Icon(Icons.person_outline_rounded,
+                            size: 24, color: AppColors.blue)),
+                    const SizedBox(width: 12),
+                    Expanded(
+                        child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                          Text(currentUser?.namaLengkap ?? 'Admin',
+                              style: const TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.w800,
+                                  color: AppColors.navy)),
+                          const SizedBox(height: 4),
+                          Text(currentUser?.email ?? '',
+                              style: const TextStyle(
+                                  fontSize: 12,
+                                  height: 1.5,
+                                  color: AppColors.textMuted)),
+                          const SizedBox(height: 4),
+                          const Text('Admin · destinasi yang ditugaskan',
+                              style: TextStyle(
+                                  fontSize: 12,
+                                  height: 1.5,
+                                  color: AppColors.textMuted)),
+                        ])),
+                  ])),
+              const SizedBox(height: 12),
+              Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                      color: AppColors.surface,
+                      border: Border.all(color: AppColors.border),
+                      borderRadius: BorderRadius.circular(16)),
+                  child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        const Text('Akses akun',
+                            style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                                color: AppColors.navy)),
+                        for (final detail in [
+                          ('Role', 'Admin'),
+                          ('Cakupan', 'Destinasi assigned'),
+                          ('Lokasi', _location),
+                        ]) ...[
+                          const Divider(height: 1, color: AppColors.border),
+                          Padding(
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                              child: Row(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Expanded(
+                                        child: Text(detail.$1,
+                                            style: const TextStyle(
+                                                fontSize: 12,
+                                                color: AppColors.textMuted))),
+                                    const SizedBox(width: 12),
+                                    Expanded(
+                                        flex: 2,
+                                        child: Text(detail.$2,
+                                            textAlign: TextAlign.end,
+                                            style: const TextStyle(
+                                                fontSize: 12,
+                                                height: 1.5,
+                                                fontWeight: FontWeight.w600,
+                                                color: AppColors.navy))),
+                                  ])),
+                        ],
+                      ])),
+              const SizedBox(height: 12),
+              OutlinedButton.icon(
+                  key: const ValueKey('operations-profile-logout'),
+                  onPressed: _busy ? null : _logout,
+                  style: OutlinedButton.styleFrom(
+                      foregroundColor: AppColors.blue,
+                      backgroundColor: AppColors.surface,
+                      minimumSize: const Size(48, 48),
+                      side: const BorderSide(color: AppColors.border),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12))),
+                  icon: const Icon(Icons.logout_rounded, size: 16),
+                  label: Text(_busy ? 'Keluar…' : 'Keluar akun',
+                      style: const TextStyle(
+                          fontSize: 12, fontWeight: FontWeight.bold))),
+            ],
             if (widget.session.role != 1) ...[
               Text(currentUser?.namaLengkap ?? 'Akun operasional',
                   style: const TextStyle(
@@ -324,16 +458,12 @@ class _OperationsProfileState extends State<_OperationsProfile> {
                   ? 'Superadmin · akses global'
                   : 'Admin · destinasi yang ditugaskan'),
             ],
-            SizedBox(height: widget.session.role == 1 ? 24 : 32),
-            ElevatedButton.icon(
-                onPressed: _busy
-                    ? null
-                    : () async {
-                        setState(() => _busy = true);
-                        await widget.session.logout();
-                        if (mounted) setState(() => _busy = false);
-                      },
-                icon: const Icon(Icons.logout),
-                label: Text(_busy ? 'Keluar…' : 'Keluar akun')),
+            if (widget.session.role != 1) ...[
+              const SizedBox(height: 32),
+              ElevatedButton.icon(
+                  onPressed: _busy ? null : _logout,
+                  icon: const Icon(Icons.logout),
+                  label: Text(_busy ? 'Keluar…' : 'Keluar akun')),
+            ],
           ]);
 }

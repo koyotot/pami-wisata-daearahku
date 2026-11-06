@@ -1,0 +1,9 @@
+﻿ lib/screens/operations_navigation_shell.dart | 12 +++--
+ lib/widgets/floating_bottom_nav.dart         |  1 +
+ test/admin_widget_test.dart                  | 23 +++++---
+ test/auth_prd_redesign_test.dart             |  8 +--
+ test/operations_booking_test.dart            |  6 ++-
+ test/operations_dashboard_layout_test.dart   | 80 ++++++++++++++++------------
+ test/operations_reports_test.dart            | 49 +++++++++++------
+ test/operations_shell_test.dart              | 24 +++++----
+ 8 files changed, 125 insertions(+), 78 deletions(-)

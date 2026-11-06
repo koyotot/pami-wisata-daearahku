@@ -1,6 +1,96 @@
 import 'package:flutter/material.dart';
+import '../data/admin_state.dart' show formatDate;
 import '../screens/auth_presentation.dart';
 import '../theme/app_colors.dart';
+import 'visit_format.dart' show visitMonths;
+
+class OperationsFilterBar extends StatelessWidget {
+  const OperationsFilterBar(
+      {super.key,
+      required this.filters,
+      required this.keyPrefix,
+      required this.dateTooltip,
+      required this.onDestinationPressed,
+      required this.onDatePressed,
+      this.destinationLabel});
+  final Map<String, String> filters;
+  final String keyPrefix;
+  final String dateTooltip;
+  final String? destinationLabel;
+  final VoidCallback? onDestinationPressed;
+  final VoidCallback? onDatePressed;
+
+  String get _dateLabel {
+    final from = DateTime.tryParse(filters['from'] ?? '');
+    final to = DateTime.tryParse(filters['to'] ?? '');
+    if (from == null || to == null) return 'Semua tanggal';
+    final month = visitMonths[to.month - 1].substring(0, 3);
+    if (from.year != to.year) {
+      return '${formatDate(from)}–${formatDate(to)}';
+    }
+    if (from.month != to.month) {
+      return '${from.day} ${visitMonths[from.month - 1].substring(0, 3)}–${to.day} $month';
+    }
+    return from.day == to.day
+        ? '${from.day} $month'
+        : '${from.day}–${to.day} $month';
+  }
+
+  @override
+  Widget build(BuildContext context) => Row(children: [
+        Expanded(
+            flex: 2,
+            child: OutlinedButton(
+                key: ValueKey('$keyPrefix-destination-filter'),
+                onPressed: onDestinationPressed,
+                style: OutlinedButton.styleFrom(
+                    foregroundColor: AppColors.navy,
+                    backgroundColor: AppColors.surface,
+                    minimumSize: const Size(48, 48),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 12, vertical: 12),
+                    side: const BorderSide(color: AppColors.border),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12))),
+                child: Row(children: [
+                  const Icon(Icons.place_outlined,
+                      size: 16, color: AppColors.blue),
+                  const SizedBox(width: 8),
+                  Expanded(
+                      child: Text(
+                          filters['destination_guid'] == null
+                              ? 'Semua destinasi'
+                              : destinationLabel ?? 'Destinasi terpilih',
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(
+                              fontSize: 12, fontWeight: FontWeight.w600))),
+                  const SizedBox(width: 8),
+                  const Icon(Icons.keyboard_arrow_down_rounded,
+                      size: 16, color: AppColors.blue),
+                ]))),
+        const SizedBox(width: 8),
+        Expanded(
+            child: Tooltip(
+                message: dateTooltip,
+                child: TextButton(
+                    key: ValueKey('$keyPrefix-date-filter'),
+                    onPressed: onDatePressed,
+                    style: TextButton.styleFrom(
+                        foregroundColor: AppColors.navy,
+                        minimumSize: const Size(48, 48),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 8, vertical: 12)),
+                    child: Row(children: [
+                      const Icon(Icons.calendar_today_outlined,
+                          size: 16, color: AppColors.blue),
+                      const SizedBox(width: 8),
+                      Expanded(
+                          child: Text(_dateLabel,
+                              textAlign: TextAlign.end,
+                              style: const TextStyle(fontSize: 12))),
+                    ])))),
+      ]);
+}
 
 /// Role-one routes share the visitor identity without changing the app theme.
 class OperationsTheme extends StatelessWidget {

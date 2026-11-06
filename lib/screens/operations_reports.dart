@@ -33,6 +33,7 @@ class _OperationsReportScreenState extends State<OperationsReportScreen>
   late final _generation = _session.sessionGeneration;
   late final _role = _session.role;
   late Map<String, String> _filters = Map.of(widget.initialFilters);
+  String? _destinationLabel;
   OperationalReport? _data;
   ApiPage<OperationalRow>? _rows;
   ApiPage<AdminAccount>? _accounts;
@@ -156,7 +157,10 @@ class _OperationsReportScreenState extends State<OperationsReportScreen>
         _names.clear();
         _error = e;
         _loading = false;
-        if (_scopeError(e)) _filters = {};
+        if (_scopeError(e)) {
+          _filters = {};
+          _destinationLabel = null;
+        }
       });
       if (_scopeError(e)) _session.me().catchError((Object _) {});
     }
@@ -196,9 +200,45 @@ class _OperationsReportScreenState extends State<OperationsReportScreen>
         utc: widget.section != 'destinations' && widget.section != 'visitors');
     if (filters != null && _valid) {
       _filters = filters;
+      _destinationLabel = null;
       _page = 1;
       await _load();
     }
+  }
+
+  Future<void> _destinationFilter() async {
+    if (!_valid) return;
+    String? label;
+    final destination = await showOperationsDestinationPicker(context,
+        repository: _repository,
+        session: _session,
+        initial: _filters['destination_guid'],
+        onLabelSelected: (value) => label = value);
+    if (!_valid || destination == null) return;
+    setState(() {
+      _destinationLabel = destination.isEmpty ? null : label;
+      if (destination.isEmpty) {
+        _filters.remove('destination_guid');
+      } else {
+        _filters['destination_guid'] = destination;
+      }
+      _page = 1;
+    });
+    await _load();
+  }
+
+  Future<void> _dateFilter() async {
+    if (!_valid) return;
+    final range = await showOperationsDateRangeCalendar(context,
+        from: DateTime.tryParse(_filters['from'] ?? ''),
+        to: DateTime.tryParse(_filters['to'] ?? ''));
+    if (!_valid || range == null) return;
+    setState(() {
+      _filters['from'] = isoDay(range.start);
+      _filters['to'] = isoDay(range.end);
+      _page = 1;
+    });
+    await _load();
   }
 
   Future<void> _booking(OperationalRow row) async {
@@ -241,27 +281,70 @@ class _OperationsReportScreenState extends State<OperationsReportScreen>
         onRefresh: _load,
         children: [
           if (_role == 1 && widget.section == 'destinations') ...[
-            SegmentedButton<bool>(
-                showSelectedIcon: false,
-                segments: const [
-                  ButtonSegment(value: false, label: Text('Kinerja')),
-                  ButtonSegment(value: true, label: Text('Kelola'))
-                ],
-                selected: {_manage},
-                onSelectionChanged: (value) =>
-                    setState(() => _manage = value.first)),
+            OperationsFilterBar(
+                filters: _filters,
+                keyPrefix: 'destinations',
+                destinationLabel: _destinationLabel,
+                dateTooltip: 'Tanggal kunjungan · kalender lokal destinasi',
+                onDestinationPressed: _destinationFilter,
+                onDatePressed: _dateFilter),
+            const SizedBox(height: 12),
+            Container(
+                padding: const EdgeInsets.all(4),
+                decoration: BoxDecoration(
+                    color: AppColors.blue.withValues(alpha: .08),
+                    borderRadius: BorderRadius.circular(16)),
+                child: Row(children: [
+                  for (final tab in const [(false, 'Kinerja'), (true, 'Kelola')])
+                    Expanded(
+                        child: Semantics(
+                            selected: _manage == tab.$1,
+                            child: TextButton(
+                                key: ValueKey('destinations-tab-${tab.$1}'),
+                                style: TextButton.styleFrom(
+                                    foregroundColor: _manage == tab.$1
+                                        ? AppColors.blue
+                                        : AppColors.textMuted,
+                                    backgroundColor: _manage == tab.$1
+                                        ? AppColors.surface
+                                        : Colors.transparent,
+                                    minimumSize: const Size(48, 48),
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 8, vertical: 12),
+                                    shape: RoundedRectangleBorder(
+                                        borderRadius:
+                                            BorderRadius.circular(12))),
+                                onPressed: () =>
+                                    setState(() => _manage = tab.$1),
+                                child: Text(tab.$2,
+                                    textAlign: TextAlign.center,
+                                    style: const TextStyle(
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w700))))),
+                ])),
+            if (_filters.isNotEmpty)
+              TextButton(
+                  onPressed: () {
+                    setState(() {
+                      _filters = {};
+                      _destinationLabel = null;
+                      _page = 1;
+                    });
+                    _load();
+                  },
+                  child: const Text('Reset filter')),
             const SizedBox(height: 16),
           ],
           if (!_manage) ...[
-            _filterButton(_filters, _filter),
-            const SizedBox(height: 16),
+            if (_role != 1 || widget.section != 'destinations') ...[
+              _filterButton(_filters, _filter),
+              const SizedBox(height: 16),
+            ],
             if (_loading) const OperationsSkeleton(),
             if (_error != null)
               _errorBlock(_error!, _scopeError(_error) ? _filter : _load,
                   role: _role),
             if (!_loading && _rows != null) ...[
-              _freshness(_rows!.meta?['generated_at'] as String?, _load,
-                  role: _role),
               if (_rows!.items.isEmpty)
                 _Notice(_filters.isEmpty
                     ? 'Tidak ada data operasional pada rentang ini.'
@@ -273,7 +356,6 @@ class _OperationsReportScreenState extends State<OperationsReportScreen>
               _pagination(_rows!.meta, _rows!.links),
             ],
             if (!_loading && data != null) ...[
-              _freshness(data.generatedAt, _load, role: _role),
               Text('Periode: ${_period(data.period)}',
                   style: const TextStyle(
                       fontSize: 12, color: AppColors.textMuted)),
@@ -304,10 +386,8 @@ class _OperationsReportScreenState extends State<OperationsReportScreen>
                     SizedBox(
                         width: double.infinity,
                         child: FilledButton.icon(
-                            onPressed: () => Navigator.of(context).push(
-                                MaterialPageRoute<void>(
-                                    builder: (_) =>
-                                        const AdminTicketScannerScreen())),
+                            onPressed: () => showAdminTicketScannerSheet(
+                                context, repository: _repository),
                             icon: const Icon(Icons.qr_code_scanner_rounded),
                             label: const Text('Buka Scan QR'))),
                   ])),
@@ -392,14 +472,83 @@ class _OperationsReportScreenState extends State<OperationsReportScreen>
               ],
             ],
           ],
-          if (widget.section == 'destinations' && (_role != 1 || _manage)) ...[
+          if (widget.section == 'destinations' && _role == 1 && _manage) ...[
+            const Text('Pengelolaan destinasi',
+                style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.navy)),
+            const SizedBox(height: 8),
+            const Text('Kelola destinasi dan kuota sesuai penugasan Anda.',
+                style: TextStyle(
+                    fontSize: 12, height: 1.5, color: AppColors.textMuted)),
+            const SizedBox(height: 12),
+            Material(
+                color: AppColors.surface,
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                    side: const BorderSide(color: AppColors.border)),
+                clipBehavior: Clip.antiAlias,
+                child: Column(children: [
+                  for (final item in const [
+                    ('view', 'Kelola destinasi dan kuota', Icons.place_outlined),
+                    ('edit', 'Ubah destinasi', Icons.tune_rounded),
+                    ('hapus', 'Hapus destinasi', Icons.warning_amber_rounded),
+                    ('kuota', 'Kelola kuota', Icons.calendar_today_outlined),
+                  ]) ...[
+                    ListTile(
+                        key: ValueKey('destinations-manage-${item.$1}'),
+                        minTileHeight: 52,
+                        minLeadingWidth: 20,
+                        horizontalTitleGap: 12,
+                        contentPadding:
+                            const EdgeInsets.symmetric(horizontal: 16),
+                        leading:
+                            Icon(item.$3, size: 20, color: AppColors.blue),
+                        title: Text(item.$2,
+                            style: const TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w700,
+                                color: AppColors.navy)),
+                        trailing: const Icon(Icons.chevron_right_rounded,
+                            size: 20, color: AppColors.textMuted),
+                        onTap: () => Navigator.of(context).push(
+                            MaterialPageRoute<void>(
+                                builder: (_) => DaftarWisataScreen(
+                                    mode: item.$1,
+                                    repository: _repository,
+                                    session: _session)))),
+                    if (item.$1 != 'kuota')
+                      const Divider(height: 1, color: AppColors.border),
+                  ],
+                ])),
+            const SizedBox(height: 12),
+            Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                    color: AppColors.blue.withValues(alpha: .06),
+                    border: Border.all(
+                        color: AppColors.blue.withValues(alpha: .18)),
+                    borderRadius: BorderRadius.circular(16)),
+                child: const Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Text('Hak akses tetap dijaga',
+                          style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w700,
+                              color: AppColors.blueDeep)),
+                      SizedBox(height: 8),
+                      Text(
+                          'Anda hanya dapat mengelola destinasi yang ditugaskan kepada akun Anda.',
+                          style: TextStyle(
+                              fontSize: 12,
+                              height: 1.5,
+                              color: AppColors.textMuted)),
+                    ])),
+          ],
+          if (widget.section == 'destinations' && _role != 1) ...[
             const SizedBox(height: 16),
-            if (_role == 1)
-              _routeLink(
-                  'Tambah destinasi',
-                  () => Navigator.of(context).push(MaterialPageRoute<void>(
-                      builder: (_) => OperationsTheme(
-                          role: _role, child: const TambahWisataScreen())))),
             _routeLink(
                 'Kelola destinasi dan kuota',
                 () => Navigator.of(context).push(MaterialPageRoute<void>(

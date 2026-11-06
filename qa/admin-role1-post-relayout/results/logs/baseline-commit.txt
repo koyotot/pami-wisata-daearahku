@@ -1,0 +1,65 @@
+﻿commit 48ab11c0a14fafa9d60383ee0c27530d675358de
+Author:     joytimess <victorw7286@gmail.com>
+AuthorDate: Fri Nov 6 13:36:17 2026 +0700
+Commit:     joytimess <victorw7286@gmail.com>
+CommitDate: Fri Nov 6 13:36:17 2026 +0700
+
+    feat(admin): terapkan relayout UI/UX operasional role 1
+    
+    - seragamkan tema, tipografi, dan header scenic admin
+    - perbarui dashboard, antrean, detail booking, dan pengelolaan wisata
+    - tambahkan pemilih destinasi dan kalender rentang tanggal custom
+    - rapikan alur claim, keputusan booking, dan pull-to-refresh
+    - sertakan PRD, wireframe, dan referensi visual
+
+ .../PRD-Flutter-Admin-Role1-UIUX-Relayout-V1.md    |  193 ++++
+ docs/previews/desktop.png                          |  Bin 0 -> 309052 bytes
+ docs/previews/mobile.png                           |  Bin 0 -> 124569 bytes
+ .../01_Screenshot_2026-11-06_105336.png            |  Bin 0 -> 95660 bytes
+ .../02_Screenshot_2026-11-06_105341.png            |  Bin 0 -> 64946 bytes
+ .../03_Screenshot_2026-11-06_105345.png            |  Bin 0 -> 45737 bytes
+ .../04_Screenshot_2026-11-06_105411.png            |  Bin 0 -> 52646 bytes
+ .../05_Screenshot_2026-11-06_105426.png            |  Bin 0 -> 34850 bytes
+ .../06_Screenshot_2026-11-06_105430.png            |  Bin 0 -> 34527 bytes
+ .../07_Screenshot_2026-11-06_105437.png            |  Bin 0 -> 45128 bytes
+ .../08_Screenshot_2026-11-06_105503.png            |  Bin 0 -> 69710 bytes
+ .../09_Screenshot_2026-11-06_105507.png            |  Bin 0 -> 73775 bytes
+ .../10_Screenshot_2026-11-06_105511.png            |  Bin 0 -> 72973 bytes
+ .../11_Screenshot_2026-11-06_105518.png            |  Bin 0 -> 34305 bytes
+ .../12_Screenshot_2026-11-06_105543.png            |  Bin 0 -> 85447 bytes
+ .../13_Screenshot_2026-11-06_105550.png            |  Bin 0 -> 54848 bytes
+ .../14_Screenshot_2026-11-06_105557.png            |  Bin 0 -> 44769 bytes
+ .../15_Screenshot_2026-11-06_105626.png            |  Bin 0 -> 66775 bytes
+ .../16_Screenshot_2026-11-06_105638.png            |  Bin 0 -> 106168 bytes
+ .../17_Screenshot_2026-11-06_105642.png            |  Bin 0 -> 68410 bytes
+ .../18_Screenshot_2026-11-06_105703.png            |  Bin 0 -> 102769 bytes
+ .../19_Screenshot_2026-11-06_105714.png            |  Bin 0 -> 70875 bytes
+ .../20_Screenshot_2026-11-06_105717.png            |  Bin 0 -> 70108 bytes
+ .../21_Screenshot_2026-11-06_105722.png            |  Bin 0 -> 70934 bytes
+ .../22_Screenshot_2026-11-06_105726.png            |  Bin 0 -> 83915 bytes
+ .../23_Screenshot_2026-11-06_105733.png            |  Bin 0 -> 67640 bytes
+ .../24_Screenshot_2026-11-06_105752.png            |  Bin 0 -> 98132 bytes
+ .../25_Screenshot_2026-11-06_105756.png            |  Bin 0 -> 57317 bytes
+ .../26_Screenshot_2026-11-06_105802.png            |  Bin 0 -> 34663 bytes
+ .../27_Screenshot_2026-11-06_105809.png            |  Bin 0 -> 45724 bytes
+ .../28_Screenshot_2026-11-06_105825.png            |  Bin 0 -> 95276 bytes
+ .../29_Screenshot_2026-11-06_105828.png            |  Bin 0 -> 67491 bytes
+ .../wisata_admin_interactive_wireframe_v1.html     |  295 ++++++
+ lib/screens/admin_common.dart                      |  276 +++---
+ lib/screens/admin_ticket_scanner_screen.dart       |   63 +-
+ lib/screens/daftar_pendaftar_screen.dart           |   96 ++
+ lib/screens/daftar_wisata_screen.dart              |  991 ++++++++++---------
+ lib/screens/detail_wisata_screen.dart              |  101 +-
+ lib/screens/kelola_kuota_screen.dart               |   67 +-
+ lib/screens/operations_booking_screen.dart         |  667 +++++++++----
+ lib/screens/operations_dashboard.dart              |  726 ++++++++------
+ lib/screens/operations_filters.dart                | 1029 ++++++++++++++++----
+ lib/screens/operations_financial.dart              |   18 +-
+ lib/screens/operations_navigation_shell.dart       |   79 +-
+ lib/screens/operations_presentation.dart           |  588 ++++++-----
+ lib/screens/operations_queue_screen.dart           |  392 ++++----
+ lib/screens/operations_reports.dart                |  340 ++++---
+ lib/screens/tambah_wisata_screen.dart              |  557 ++++++-----
+ lib/theme/app_colors.dart                          |   23 +
+ lib/widgets/operations_chrome.dart                 |   72 ++
+ 50 files changed, 4378 insertions(+), 2195 deletions(-)

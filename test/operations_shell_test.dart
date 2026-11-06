@@ -130,7 +130,7 @@ void main() {
     expect(find.text('Akun operasional Wisata Daerahku'), findsOneWidget);
     await tester.binding.handlePopRoute();
     await tester.pumpAndSettle();
-    expect(find.text('Beranda Admin'), findsOneWidget);
+    expect(find.text('Halo, Admin.'), findsOneWidget);
   });
   testWidgets(
       'Superadmin center is retained analytics tab and hides navbar for keyboard',
@@ -177,13 +177,15 @@ void main() {
     await session.me();
     await tester.pumpAndSettle();
     expect(find.text('Akses diperbarui'), findsOneWidget);
-    expect(find.text('Beranda Admin'), findsNothing);
-    await tester.tap(find.text('Muat sesuai akses terbaru'));
+    expect(find.text('Halo, Admin.'), findsNothing);
+    expect(find.text('Muat sesuai akses terbaru'), findsNothing);
+    await tester.drag(find.byType(ListView).first, const Offset(0, 400));
     await tester.pumpAndSettle();
-    expect(find.text('Beranda Admin'), findsOneWidget);
+    expect(find.text('Halo, Admin.'), findsOneWidget);
   });
   for (final role in [1, 2]) {
-    testWidgets('role $role resume reloads fresh data without access confirmation',
+    testWidgets(
+        'role $role resume reloads fresh data without access confirmation',
         (tester) async {
       var overviewReads = 0;
       final session = await adminSession((request) async {
@@ -192,11 +194,13 @@ void main() {
           return jsonResponse({'data': overviewFixture()});
         }
         if (request.url.path.endsWith('/approvals')) {
-          return jsonResponse({'data': {
-            'period': overviewFixture()['period'],
-            'series': <dynamic>[],
-            'team_operational_totals': <String, dynamic>{},
-          }});
+          return jsonResponse({
+            'data': {
+              'period': overviewFixture()['period'],
+              'series': <dynamic>[],
+              'team_operational_totals': <String, dynamic>{},
+            }
+          });
         }
         return jsonResponse(pageEnvelope([]));
       }, role: role);

@@ -1,0 +1,18 @@
+{
+  "required_artifacts": 7,
+  "matrix_cases": 45,
+  "matrix_counts": {
+    "PASS": 27,
+    "BLOCKED": 10,
+    "FAIL": 4,
+    "NOT_RUN": 4
+  },
+  "tests": {
+    "success": 180,
+    "failure": 2
+  },
+  "android_pngs": 10,
+  "widget_pngs": 10,
+  "jwt_pattern_matches": 0,
+  "status": "PASS"
+}

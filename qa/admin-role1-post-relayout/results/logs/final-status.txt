@@ -1,0 +1,15 @@
+﻿ M lib/screens/operations_navigation_shell.dart
+ M lib/widgets/floating_bottom_nav.dart
+ M test/admin_widget_test.dart
+ M test/auth_prd_redesign_test.dart
+ M test/operations_booking_test.dart
+ M test/operations_dashboard_layout_test.dart
+ M test/operations_reports_test.dart
+ M test/operations_shell_test.dart
+?? docs/matrix/
+?? docs/prd/PRD_QA_Regression_Testing_Flutter_Admin_Role1_V1.md
+?? qa/
+?? test/operations_accessibility_regression_test.dart
+?? test/operations_post_relayout_test.dart
+?? test/operations_queue_finance_regression_test.dart
+?? test/operations_scanner_scope_regression_test.dart

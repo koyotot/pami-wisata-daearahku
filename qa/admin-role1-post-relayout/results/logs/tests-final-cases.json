@@ -1,0 +1,1094 @@
+[
+  {
+    "name": "malformed mutation response remains unknown and retains its key",
+    "file": "file:///C:/laragon/www/pami-mobile/pami-wisata-daearahku/test/approval_queue_state_test.dart",
+    "result": "success",
+    "skipped": false
+  },
+  {
+    "name": "release timeout recovers original payload and idempotency key",
+    "file": "file:///C:/laragon/www/pami-mobile/pami-wisata-daearahku/test/approval_queue_state_test.dart",
+    "result": "success",
+    "skipped": false
+  },
+  {
+    "name": "reassign timeout recovers original payload and idempotency key",
+    "file": "file:///C:/laragon/www/pami-mobile/pami-wisata-daearahku/test/approval_queue_state_test.dart",
+    "result": "success",
+    "skipped": false
+  },
+  {
+    "name": "unknown mutation followed by revoked access clears uncertainty",
+    "file": "file:///C:/laragon/www/pami-mobile/pami-wisata-daearahku/test/approval_queue_state_test.dart",
+    "result": "success",
+    "skipped": false
+  },
+  {
+    "name": "expired claim and completed booking disable decision; role1 cannot reassign",
+    "file": "file:///C:/laragon/www/pami-mobile/pami-wisata-daearahku/test/approval_queue_state_test.dart",
+    "result": "success",
+    "skipped": false
+  },
+  {
+    "name": "422 reassignment stays a definite failure and preserves field message",
+    "file": "file:///C:/laragon/www/pami-mobile/pami-wisata-daearahku/test/approval_queue_state_test.dart",
+    "result": "success",
+    "skipped": false
+  },
+  {
+    "name": "explicit claim before decisions, server confirmation then release",
+    "file": "file:///C:/laragon/www/pami-mobile/pami-wisata-daearahku/test/approval_queue_state_test.dart",
+    "result": "success",
+    "skipped": false
+  },
+  {
+    "name": "claim lookup reads later pages without unsupported booking filter",
+    "file": "file:///C:/laragon/www/pami-mobile/pami-wisata-daearahku/test/approval_queue_state_test.dart",
+    "result": "success",
+    "skipped": false
+  },
+  {
+    "name": "409 claim_owned rereads state and sends no second mutation",
+    "file": "file:///C:/laragon/www/pami-mobile/pami-wisata-daearahku/test/approval_queue_state_test.dart",
+    "result": "success",
+    "skipped": false
+  },
+  {
+    "name": "unknown claim keeps key and payload across refresh and explicit recovery",
+    "file": "file:///C:/laragon/www/pami-mobile/pami-wisata-daearahku/test/approval_queue_state_test.dart",
+    "result": "success",
+    "skipped": false
+  },
+  {
+    "name": "confirmed write followed by failed read stays refreshable",
+    "file": "file:///C:/laragon/www/pami-mobile/pami-wisata-daearahku/test/approval_queue_state_test.dart",
+    "result": "success",
+    "skipped": false
+  },
+  {
+    "name": "assignment revoke purges private booking and prevents new writes",
+    "file": "file:///C:/laragon/www/pami-mobile/pami-wisata-daearahku/test/approval_queue_state_test.dart",
+    "result": "success",
+    "skipped": false
+  },
+  {
+    "name": "role change with same generation drops in-flight private response",
+    "file": "file:///C:/laragon/www/pami-mobile/pami-wisata-daearahku/test/approval_queue_state_test.dart",
+    "result": "success",
+    "skipped": false
+  },
+  {
+    "name": "decision rereads ownership before POST and blocks changed owner",
+    "file": "file:///C:/laragon/www/pami-mobile/pami-wisata-daearahku/test/approval_queue_state_test.dart",
+    "result": "success",
+    "skipped": false
+  },
+  {
+    "name": "reports preserve null metrics and collection metadata/date bases",
+    "file": "file:///C:/laragon/www/pami-mobile/pami-wisata-daearahku/test/operations_contract_test.dart",
+    "result": "success",
+    "skipped": false
+  },
+  {
+    "name": "claim release and reassign use exact authenticated routes, body and key",
+    "file": "file:///C:/laragon/www/pami-mobile/pami-wisata-daearahku/test/operations_contract_test.dart",
+    "result": "success",
+    "skipped": false
+  },
+  {
+    "name": "personal segment keeps API values and unavailable metrics",
+    "file": "package:flutter_test/src/widget_tester.dart",
+    "result": "success",
+    "skipped": false
+  },
+  {
+    "name": "scanner previews once and retries unknown confirm with same payload and key",
+    "file": "file:///C:/laragon/www/pami-mobile/pami-wisata-daearahku/test/smart_ticket_test.dart",
+    "result": "success",
+    "skipped": false
+  },
+  {
+    "name": "session change drops scanner preview and prevents confirm",
+    "file": "file:///C:/laragon/www/pami-mobile/pami-wisata-daearahku/test/smart_ticket_test.dart",
+    "result": "success",
+    "skipped": false
+  },
+  {
+    "name": "a00 360x800 text 1.0",
+    "file": "package:flutter_test/src/widget_tester.dart",
+    "result": "success",
+    "skipped": false
+  },
+  {
+    "name": "a00 360x800 text 2.0",
+    "file": "package:flutter_test/src/widget_tester.dart",
+    "result": "success",
+    "skipped": false
+  },
+  {
+    "name": "destination requires a validated session and exact role",
+    "file": "file:///C:/laragon/www/pami-mobile/pami-wisata-daearahku/test/unified_routing_test.dart",
+    "result": "success",
+    "skipped": false
+  },
+  {
+    "name": "reassign only offers active assigned Admin and requires a reason",
+    "file": "package:flutter_test/src/widget_tester.dart",
+    "result": "success",
+    "skipped": false
+  },
+  {
+    "name": "a00 393x852 text 1.0",
+    "file": "package:flutter_test/src/widget_tester.dart",
+    "result": "success",
+    "skipped": false
+  },
+  {
+    "name": "a00 393x852 text 2.0",
+    "file": "package:flutter_test/src/widget_tester.dart",
+    "result": "success",
+    "skipped": false
+  },
+  {
+    "name": "destination report stays usable at approved mobile sizes and large text",
+    "file": "package:flutter_test/src/widget_tester.dart",
+    "result": "success",
+    "skipped": false
+  },
+  {
+    "name": "e00 360x800 text 1.0",
+    "file": "package:flutter_test/src/widget_tester.dart",
+    "result": "success",
+    "skipped": false
+  },
+  {
+    "name": "zero assignments shows explicit scoped state without made-up revenue",
+    "file": "package:flutter_test/src/widget_tester.dart",
+    "result": "success",
+    "skipped": false
+  },
+  {
+    "name": "unknown claim blocks back until explicit same-key recovery",
+    "file": "package:flutter_test/src/widget_tester.dart",
+    "result": "success",
+    "skipped": false
+  },
+  {
+    "name": "logout removes private child routes above the operations shell",
+    "file": "package:flutter_test/src/widget_tester.dart",
+    "result": "success",
+    "skipped": false
+  },
+  {
+    "name": "visitor analytics preserves unavailable attendance and no-show",
+    "file": "package:flutter_test/src/widget_tester.dart",
+    "result": "success",
+    "skipped": false
+  },
+  {
+    "name": "e00 360x800 text 2.0",
+    "file": "package:flutter_test/src/widget_tester.dart",
+    "result": "success",
+    "skipped": false
+  },
+  {
+    "name": "visitor navbar defaults remain icon-only and operation centers have separate labels",
+    "file": "package:flutter_test/src/widget_tester.dart",
+    "result": "success",
+    "skipped": false
+  },
+  {
+    "name": "operations navigation fits safe area at 360dp with large text",
+    "file": "package:flutter_test/src/widget_tester.dart",
+    "result": "success",
+    "skipped": false
+  },
+  {
+    "name": "session routing preserves visitor and directs both staff roles into shell",
+    "file": "file:///C:/laragon/www/pami-mobile/pami-wisata-daearahku/test/operations_shell_test.dart",
+    "result": "success",
+    "skipped": false
+  },
+  {
+    "name": "e00 393x852 text 1.0",
+    "file": "package:flutter_test/src/widget_tester.dart",
+    "result": "success",
+    "skipped": false
+  },
+  {
+    "name": "destination rows paginate and capacity-zero occupancy stays unavailable",
+    "file": "package:flutter_test/src/widget_tester.dart",
+    "result": "success",
+    "skipped": false
+  },
+  {
+    "name": "e00 393x852 text 2.0",
+    "file": "package:flutter_test/src/widget_tester.dart",
+    "result": "success",
+    "skipped": false
+  },
+  {
+    "name": "staff details use filtered team metrics and never infer per-admin SLA from aggregate list",
+    "file": "package:flutter_test/src/widget_tester.dart",
+    "result": "success",
+    "skipped": false
+  },
+  {
+    "name": "unvalidated routes do not render admin or user dashboard",
+    "file": "package:flutter_test/src/widget_tester.dart",
+    "result": "success",
+    "skipped": false
+  },
+  {
+    "name": "scope revoked removes report rows and requires explicit scoped selector",
+    "file": "package:flutter_test/src/widget_tester.dart",
+    "result": "success",
+    "skipped": false
+  },
+  {
+    "name": "x01 360x800 text 1.0",
+    "file": "package:flutter_test/src/widget_tester.dart",
+    "result": "success",
+    "skipped": false
+  },
+  {
+    "name": "audit route presents honest backend gap",
+    "file": "package:flutter_test/src/widget_tester.dart",
+    "result": "success",
+    "skipped": false
+  },
+  {
+    "name": "Admin center pushes full-screen scanner then returns to previous tab; back returns home",
+    "file": "package:flutter_test/src/widget_tester.dart",
+    "result": "success",
+    "skipped": false
+  },
+  {
+    "name": "hidden report loads only after activation and does not fetch on app resume",
+    "file": "package:flutter_test/src/widget_tester.dart",
+    "result": "success",
+    "skipped": false
+  },
+  {
+    "name": "x01 360x800 text 2.0",
+    "file": "package:flutter_test/src/widget_tester.dart",
+    "result": "success",
+    "skipped": false
+  },
+  {
+    "name": "AdminBookingDecider a second tap while in flight sends no second request",
+    "file": "file:///C:/laragon/www/pami-mobile/pami-wisata-daearahku/test/admin_state_test.dart",
+    "result": "success",
+    "skipped": false
+  },
+  {
+    "name": "AdminBookingDecider status is only what the server returns (no optimistic update)",
+    "file": "file:///C:/laragon/www/pami-mobile/pami-wisata-daearahku/test/admin_state_test.dart",
+    "result": "success",
+    "skipped": false
+  },
+  {
+    "name": "AdminBookingDecider 409 booking_not_pending re-reads the detail and reports its status",
+    "file": "file:///C:/laragon/www/pami-mobile/pami-wisata-daearahku/test/admin_state_test.dart",
+    "result": "success",
+    "skipped": false
+  },
+  {
+    "name": "AdminBookingDecider approval_deadline_passed and visit_date_too_close are precise",
+    "file": "file:///C:/laragon/www/pami-mobile/pami-wisata-daearahku/test/admin_state_test.dart",
+    "result": "success",
+    "skipped": false
+  },
+  {
+    "name": "AdminBookingDecider 403 and 422 are reported as definite failures without re-reading",
+    "file": "file:///C:/laragon/www/pami-mobile/pami-wisata-daearahku/test/admin_state_test.dart",
+    "result": "success",
+    "skipped": false
+  },
+  {
+    "name": "AdminBookingDecider timeout reconciles via adminBooking and never re-POSTs",
+    "file": "file:///C:/laragon/www/pami-mobile/pami-wisata-daearahku/test/admin_state_test.dart",
+    "result": "success",
+    "skipped": false
+  },
+  {
+    "name": "AdminBookingDecider unknown outcome with a failing re-read is reported unconfirmed",
+    "file": "file:///C:/laragon/www/pami-mobile/pami-wisata-daearahku/test/admin_state_test.dart",
+    "result": "success",
+    "skipped": false
+  },
+  {
+    "name": "AdminBookingDecider a result arriving after logout is ignored",
+    "file": "file:///C:/laragon/www/pami-mobile/pami-wisata-daearahku/test/admin_state_test.dart",
+    "result": "success",
+    "skipped": false
+  },
+  {
+    "name": "PagedListController loads every page and de-duplicates rows that shifted",
+    "file": "file:///C:/laragon/www/pami-mobile/pami-wisata-daearahku/test/admin_state_test.dart",
+    "result": "success",
+    "skipped": false
+  },
+  {
+    "name": "PagedListController forwards the server-side filter to every page request",
+    "file": "file:///C:/laragon/www/pami-mobile/pami-wisata-daearahku/test/admin_state_test.dart",
+    "result": "success",
+    "skipped": false
+  },
+  {
+    "name": "PagedListController an older request finishing later does not overwrite a newer one",
+    "file": "file:///C:/laragon/www/pami-mobile/pami-wisata-daearahku/test/admin_state_test.dart",
+    "result": "success",
+    "skipped": false
+  },
+  {
+    "name": "PagedListController an older failure cannot replace newer data with an error",
+    "file": "file:///C:/laragon/www/pami-mobile/pami-wisata-daearahku/test/admin_state_test.dart",
+    "result": "success",
+    "skipped": false
+  },
+  {
+    "name": "PagedListController rows of another filter are cleared while the new filter loads",
+    "file": "file:///C:/laragon/www/pami-mobile/pami-wisata-daearahku/test/admin_state_test.dart",
+    "result": "success",
+    "skipped": false
+  },
+  {
+    "name": "PagedListController logout or account switch drops a late response",
+    "file": "file:///C:/laragon/www/pami-mobile/pami-wisata-daearahku/test/admin_state_test.dart",
+    "result": "success",
+    "skipped": false
+  },
+  {
+    "name": "PagedListController a late response after dispose is harmless",
+    "file": "file:///C:/laragon/www/pami-mobile/pami-wisata-daearahku/test/admin_state_test.dart",
+    "result": "success",
+    "skipped": false
+  },
+  {
+    "name": "role gating menu entries follow the role (UX only)",
+    "file": "file:///C:/laragon/www/pami-mobile/pami-wisata-daearahku/test/admin_state_test.dart",
+    "result": "success",
+    "skipped": false
+  },
+  {
+    "name": "role gating own account never offers role or status changes",
+    "file": "file:///C:/laragon/www/pami-mobile/pami-wisata-daearahku/test/admin_state_test.dart",
+    "result": "success",
+    "skipped": false
+  },
+  {
+    "name": "helpers slug suggestion from a name",
+    "file": "file:///C:/laragon/www/pami-mobile/pami-wisata-daearahku/test/admin_state_test.dart",
+    "result": "success",
+    "skipped": false
+  },
+  {
+    "name": "Superadmin center is retained analytics tab and hides navbar for keyboard",
+    "file": "package:flutter_test/src/widget_tester.dart",
+    "result": "success",
+    "skipped": false
+  },
+  {
+    "name": "x01 393x852 text 1.0",
+    "file": "package:flutter_test/src/widget_tester.dart",
+    "result": "success",
+    "skipped": false
+  },
+  {
+    "name": "helpers image validation: JPEG/PNG/WebP up to 5 MB",
+    "file": "file:///C:/laragon/www/pami-mobile/pami-wisata-daearahku/test/admin_state_test.dart",
+    "result": "success",
+    "skipped": false
+  },
+  {
+    "name": "helpers quota input validation: closes must be after opens",
+    "file": "file:///C:/laragon/www/pami-mobile/pami-wisata-daearahku/test/admin_state_test.dart",
+    "result": "success",
+    "skipped": false
+  },
+  {
+    "name": "role 0 opening admin is routed to the user shell",
+    "file": "package:flutter_test/src/widget_tester.dart",
+    "result": "success",
+    "skipped": false
+  },
+  {
+    "name": "helpers quota payload uses UTC ISO-8601 with Z",
+    "file": "file:///C:/laragon/www/pami-mobile/pami-wisata-daearahku/test/admin_state_test.dart",
+    "result": "success",
+    "skipped": false
+  },
+  {
+    "name": "helpers error messages are keyed on the structured code",
+    "file": "file:///C:/laragon/www/pami-mobile/pami-wisata-daearahku/test/admin_state_test.dart",
+    "result": "success",
+    "skipped": false
+  },
+  {
+    "name": "helpers server visit_date timestamps are shown as a day",
+    "file": "file:///C:/laragon/www/pami-mobile/pami-wisata-daearahku/test/admin_state_test.dart",
+    "result": "success",
+    "skipped": false
+  },
+  {
+    "name": "legacy history purges rows after scope revoke",
+    "file": "package:flutter_test/src/widget_tester.dart",
+    "result": "success",
+    "skipped": false
+  },
+  {
+    "name": "admin opening user shell is routed to admin",
+    "file": "package:flutter_test/src/widget_tester.dart",
+    "result": "success",
+    "skipped": false
+  },
+  {
+    "name": "same-session revalidation clears assigned filter choices",
+    "file": "package:flutter_test/src/widget_tester.dart",
+    "result": "success",
+    "skipped": false
+  },
+  {
+    "name": "x01 393x852 text 2.0",
+    "file": "package:flutter_test/src/widget_tester.dart",
+    "result": "success",
+    "skipped": false
+  },
+  {
+    "name": "same-generation scope revalidation purges all cached tab content",
+    "file": "package:flutter_test/src/widget_tester.dart",
+    "result": "success",
+    "skipped": false
+  },
+  {
+    "name": "role 1 resume reloads fresh data without access confirmation",
+    "file": "package:flutter_test/src/widget_tester.dart",
+    "result": "success",
+    "skipped": false
+  },
+  {
+    "name": "root tabs retain explore state and Android back returns home",
+    "file": "package:flutter_test/src/widget_tester.dart",
+    "result": "success",
+    "skipped": false
+  },
+  {
+    "name": "legacy booking history opens canonical detail and requires explicit claim",
+    "file": "package:flutter_test/src/widget_tester.dart",
+    "result": "success",
+    "skipped": false
+  },
+  {
+    "name": "role 2 resume reloads fresh data without access confirmation",
+    "file": "package:flutter_test/src/widget_tester.dart",
+    "result": "success",
+    "skipped": false
+  },
+  {
+    "name": "status filter chip requests the status from the server",
+    "file": "package:flutter_test/src/widget_tester.dart",
+    "result": "success",
+    "skipped": false
+  },
+  {
+    "name": "monthly parser preserves all 28 dates and destination timezone",
+    "file": "file:///C:/laragon/www/pami-mobile/pami-wisata-daearahku/test/business_integration_calendar_test.dart",
+    "result": "success",
+    "skipped": false
+  },
+  {
+    "name": "monthly parser preserves all 29 dates and destination timezone",
+    "file": "file:///C:/laragon/www/pami-mobile/pami-wisata-daearahku/test/business_integration_calendar_test.dart",
+    "result": "success",
+    "skipped": false
+  },
+  {
+    "name": "monthly parser preserves all 30 dates and destination timezone",
+    "file": "file:///C:/laragon/www/pami-mobile/pami-wisata-daearahku/test/business_integration_calendar_test.dart",
+    "result": "success",
+    "skipped": false
+  },
+  {
+    "name": "monthly parser preserves all 31 dates and destination timezone",
+    "file": "file:///C:/laragon/www/pami-mobile/pami-wisata-daearahku/test/business_integration_calendar_test.dart",
+    "result": "success",
+    "skipped": false
+  },
+  {
+    "name": "unconfigured nulls remain missing, numeric doubles are accepted",
+    "file": "file:///C:/laragon/www/pami-mobile/pami-wisata-daearahku/test/business_integration_calendar_test.dart",
+    "result": "success",
+    "skipped": false
+  },
+  {
+    "name": "boundary levels are kept from server and do not gate bookability",
+    "file": "file:///C:/laragon/www/pami-mobile/pami-wisata-daearahku/test/business_integration_calendar_test.dart",
+    "result": "success",
+    "skipped": false
+  },
+  {
+    "name": "sold_out remains distinct and cannot authorize a booking",
+    "file": "file:///C:/laragon/www/pami-mobile/pami-wisata-daearahku/test/business_integration_calendar_test.dart",
+    "result": "success",
+    "skipped": false
+  },
+  {
+    "name": "closed remains distinct and cannot authorize a booking",
+    "file": "file:///C:/laragon/www/pami-mobile/pami-wisata-daearahku/test/business_integration_calendar_test.dart",
+    "result": "success",
+    "skipped": false
+  },
+  {
+    "name": "unconfigured remains distinct and cannot authorize a booking",
+    "file": "file:///C:/laragon/www/pami-mobile/pami-wisata-daearahku/test/business_integration_calendar_test.dart",
+    "result": "success",
+    "skipped": false
+  },
+  {
+    "name": "unavailable remains distinct and cannot authorize a booking",
+    "file": "file:///C:/laragon/www/pami-mobile/pami-wisata-daearahku/test/business_integration_calendar_test.dart",
+    "result": "success",
+    "skipped": false
+  },
+  {
+    "name": "insufficient_quantity remains distinct and cannot authorize a booking",
+    "file": "file:///C:/laragon/www/pami-mobile/pami-wisata-daearahku/test/business_integration_calendar_test.dart",
+    "result": "success",
+    "skipped": false
+  },
+  {
+    "name": "future_unknown_status remains distinct and cannot authorize a booking",
+    "file": "file:///C:/laragon/www/pami-mobile/pami-wisata-daearahku/test/business_integration_calendar_test.dart",
+    "result": "success",
+    "skipped": false
+  },
+  {
+    "name": "unknown status never becomes bookable even with inconsistent flag",
+    "file": "file:///C:/laragon/www/pami-mobile/pami-wisata-daearahku/test/business_integration_calendar_test.dart",
+    "result": "success",
+    "skipped": false
+  },
+  {
+    "name": "explicit server refusal wins over high remaining capacity",
+    "file": "file:///C:/laragon/www/pami-mobile/pami-wisata-daearahku/test/business_integration_calendar_test.dart",
+    "result": "success",
+    "skipped": false
+  },
+  {
+    "name": "accounts screen hides role/status actions on the own row",
+    "file": "package:flutter_test/src/widget_tester.dart",
+    "result": "success",
+    "skipped": false
+  },
+  {
+    "name": "deactivating a category in use shows the precise message",
+    "file": "package:flutter_test/src/widget_tester.dart",
+    "result": "success",
+    "skipped": false
+  },
+  {
+    "name": "category screen is closed for role 1 and sends no request",
+    "file": "package:flutter_test/src/widget_tester.dart",
+    "result": "success",
+    "skipped": false
+  },
+  {
+    "name": "V4 components preserve calendar status and navigation on compact layouts",
+    "file": "package:flutter_test/src/widget_tester.dart",
+    "result": "success",
+    "skipped": false
+  },
+  {
+    "name": "quota screen shows capacity, allocated and remaining separately",
+    "file": "package:flutter_test/src/widget_tester.dart",
+    "result": "success",
+    "skipped": false
+  },
+  {
+    "name": "badge belongs to bell glyph, clamps and hides at zero",
+    "file": "package:flutter_test/src/widget_tester.dart",
+    "result": "success",
+    "skipped": false
+  },
+  {
+    "name": "navigation respects gesture inset and large text at 320dp",
+    "file": "package:flutter_test/src/widget_tester.dart",
+    "result": "success",
+    "skipped": false
+  },
+  {
+    "name": "inbox uses real pagination count and authenticated mark-read contract",
+    "file": "file:///C:/laragon/www/pami-mobile/pami-wisata-daearahku/test/v4_navigation_notifications_test.dart",
+    "result": "success",
+    "skipped": false
+  },
+  {
+    "name": "late unread response cannot restore data after session change",
+    "file": "file:///C:/laragon/www/pami-mobile/pami-wisata-daearahku/test/v4_navigation_notifications_test.dart",
+    "result": "success",
+    "skipped": false
+  },
+  {
+    "name": "scanner drops stale preview after same-generation role downgrade",
+    "file": "file:///C:/laragon/www/pami-mobile/pami-wisata-daearahku/test/operations_scanner_scope_regression_test.dart",
+    "result": "failure",
+    "skipped": false
+  },
+  {
+    "name": "scanner drops stale preview after same-generation assignment revoke",
+    "file": "file:///C:/laragon/www/pami-mobile/pami-wisata-daearahku/test/operations_scanner_scope_regression_test.dart",
+    "result": "failure",
+    "skipped": false
+  },
+  {
+    "name": "quota form rejects a window that does not close after it opens",
+    "file": "package:flutter_test/src/widget_tester.dart",
+    "result": "success",
+    "skipped": false
+  },
+  {
+    "name": "role null navbar exposes actionable labeled tabs",
+    "file": "package:flutter_test/src/widget_tester.dart",
+    "result": "success",
+    "skipped": false
+  },
+  {
+    "name": "inbox filters unread and exposes errors without fake activity",
+    "file": "package:flutter_test/src/widget_tester.dart",
+    "result": "success",
+    "skipped": false
+  },
+  {
+    "name": "role 1 navbar exposes actionable labeled tabs",
+    "file": "package:flutter_test/src/widget_tester.dart",
+    "result": "success",
+    "skipped": false
+  },
+  {
+    "name": "role 2 navbar exposes actionable labeled tabs",
+    "file": "package:flutter_test/src/widget_tester.dart",
+    "result": "success",
+    "skipped": false
+  },
+  {
+    "name": "notification cards use event icons and readable compact layout",
+    "file": "package:flutter_test/src/widget_tester.dart",
+    "result": "success",
+    "skipped": false
+  },
+  {
+    "name": "role1 nested page and snackbar inherit Jakarta over Georgia",
+    "file": "package:flutter_test/src/widget_tester.dart",
+    "result": "success",
+    "skipped": false
+  },
+  {
+    "name": "create form submits category, integer price and timezone",
+    "file": "package:flutter_test/src/widget_tester.dart",
+    "result": "success",
+    "skipped": false
+  },
+  {
+    "name": "booking activity opens full-screen and restores unread filter",
+    "file": "package:flutter_test/src/widget_tester.dart",
+    "result": "success",
+    "skipped": false
+  },
+  {
+    "name": "Google exchange sends Firebase token and validates Laravel identity",
+    "file": "file:///C:/laragon/www/pami-mobile/pami-wisata-daearahku/test/google_exchange_regression_test.dart",
+    "result": "success",
+    "skipped": false
+  },
+  {
+    "name": "failed Google exchange preserves an existing Laravel session",
+    "file": "file:///C:/laragon/www/pami-mobile/pami-wisata-daearahku/test/google_exchange_regression_test.dart",
+    "result": "success",
+    "skipped": false
+  },
+  {
+    "name": "logout during Google exchange prevents a stale session",
+    "file": "file:///C:/laragon/www/pami-mobile/pami-wisata-daearahku/test/google_exchange_regression_test.dart",
+    "result": "success",
+    "skipped": false
+  },
+  {
+    "name": "role1 filters search paginated assigned options and reset query",
+    "file": "package:flutter_test/src/widget_tester.dart",
+    "result": "success",
+    "skipped": false
+  },
+  {
+    "name": "action center preserves server urgency order and guarded route",
+    "file": "package:flutter_test/src/widget_tester.dart",
+    "result": "success",
+    "skipped": false
+  },
+  {
+    "name": "OTP accepts six numeric digits, rejects invalid code and guards submission",
+    "file": "package:flutter_test/src/widget_tester.dart",
+    "result": "success",
+    "skipped": false
+  },
+  {
+    "name": "destination performance switches to management and quota route",
+    "file": "package:flutter_test/src/widget_tester.dart",
+    "result": "success",
+    "skipped": false
+  },
+  {
+    "name": "resend starts cooldown and clears entered code",
+    "file": "package:flutter_test/src/widget_tester.dart",
+    "result": "success",
+    "skipped": false
+  },
+  {
+    "name": "token refresh during mutation keeps repeated toggles locked",
+    "file": "file:///C:/laragon/www/pami-mobile/pami-wisata-daearahku/test/favorite_state_test.dart",
+    "result": "success",
+    "skipped": false
+  },
+  {
+    "name": "load errors can retry without inventing a favorite",
+    "file": "file:///C:/laragon/www/pami-mobile/pami-wisata-daearahku/test/favorite_state_test.dart",
+    "result": "success",
+    "skipped": false
+  },
+  {
+    "name": "old OTP screen cannot submit into a newer registration",
+    "file": "package:flutter_test/src/widget_tester.dart",
+    "result": "success",
+    "skipped": false
+  },
+  {
+    "name": "loads all pages and deduplicates destination GUIDs",
+    "file": "file:///C:/laragon/www/pami-mobile/pami-wisata-daearahku/test/favorite_state_test.dart",
+    "result": "success",
+    "skipped": false
+  },
+  {
+    "name": "rapid repeated toggles do not send duplicate mutations",
+    "file": "file:///C:/laragon/www/pami-mobile/pami-wisata-daearahku/test/favorite_state_test.dart",
+    "result": "success",
+    "skipped": false
+  },
+  {
+    "name": "late response from account A cannot replace account B favorites",
+    "file": "file:///C:/laragon/www/pami-mobile/pami-wisata-daearahku/test/favorite_state_test.dart",
+    "result": "success",
+    "skipped": false
+  },
+  {
+    "name": "role1 date picker follows its own UI branch",
+    "file": "package:flutter_test/src/widget_tester.dart",
+    "result": "success",
+    "skipped": false
+  },
+  {
+    "name": "register has grouped fields, independent eyes and nearby login",
+    "file": "package:flutter_test/src/widget_tester.dart",
+    "result": "success",
+    "skipped": false
+  },
+  {
+    "name": "admin profile logout clears the private shell",
+    "file": "package:flutter_test/src/widget_tester.dart",
+    "result": "success",
+    "skipped": false
+  },
+  {
+    "name": "revoked pending tokens after valid OTP fall back to login",
+    "file": "package:flutter_test/src/widget_tester.dart",
+    "result": "success",
+    "skipped": false
+  },
+  {
+    "name": "auth screens support small viewport keyboard and enlarged text",
+    "file": "package:flutter_test/src/widget_tester.dart",
+    "result": "success",
+    "skipped": false
+  },
+  {
+    "name": "OTP stays white, masks email, filters paste and honors Retry-After",
+    "file": "package:flutter_test/src/widget_tester.dart",
+    "result": "success",
+    "skipped": false
+  },
+  {
+    "name": "role2 date picker follows its own UI branch",
+    "file": "package:flutter_test/src/widget_tester.dart",
+    "result": "success",
+    "skipped": false
+  },
+  {
+    "name": "queue ownership filters use server claims across pages",
+    "file": "package:flutter_test/src/widget_tester.dart",
+    "result": "success",
+    "skipped": false
+  },
+  {
+    "name": "HTTP replay preserves original phone punctuation, payload and key",
+    "file": "file:///C:/laragon/www/pami-mobile/pami-wisata-daearahku/test/business_integration_regression_test.dart",
+    "result": "success",
+    "skipped": false
+  },
+  {
+    "name": "phone 422 preserves profile and removes only definitively refused intent",
+    "file": "file:///C:/laragon/www/pami-mobile/pami-wisata-daearahku/test/business_integration_regression_test.dart",
+    "result": "success",
+    "skipped": false
+  },
+  {
+    "name": "unknown reset outcome never shows success or loses ticket",
+    "file": "package:flutter_test/src/widget_tester.dart",
+    "result": "success",
+    "skipped": false
+  },
+  {
+    "name": "verification sends leading-zero OTP once and fails closed on malformed ticket",
+    "file": "package:flutter_test/src/widget_tester.dart",
+    "result": "success",
+    "skipped": false
+  },
+  {
+    "name": "queue empty and network error recover through pull-to-refresh",
+    "file": "package:flutter_test/src/widget_tester.dart",
+    "result": "success",
+    "skipped": false
+  },
+  {
+    "name": "finance demo disclosure rejects foreign scope=false",
+    "file": "package:flutter_test/src/widget_tester.dart",
+    "result": "success",
+    "skipped": false
+  },
+  {
+    "name": "finance demo disclosure rejects foreign scope=true",
+    "file": "package:flutter_test/src/widget_tester.dart",
+    "result": "success",
+    "skipped": false
+  },
+  {
+    "name": "expired ticket disables fields and recovers to editable email",
+    "file": "package:flutter_test/src/widget_tester.dart",
+    "result": "success",
+    "skipped": false
+  },
+  {
+    "name": "OTP slots fit a narrow screen and countdown enables resend",
+    "file": "package:flutter_test/src/widget_tester.dart",
+    "result": "success",
+    "skipped": false
+  },
+  {
+    "name": "custom calendar preset 7 returns calendar dates",
+    "file": "package:flutter_test/src/widget_tester.dart",
+    "result": "success",
+    "skipped": false
+  },
+  {
+    "name": "entry tickets only load after server verifies payment as paid",
+    "file": "package:flutter_test/src/widget_tester.dart",
+    "result": "success",
+    "skipped": false
+  },
+  {
+    "name": "full-bleed header keeps foreground safe and scaled keyboard CTA reachable",
+    "file": "package:flutter_test/src/widget_tester.dart",
+    "result": "success",
+    "skipped": false
+  },
+  {
+    "name": "master list keeps status, page, per_page and nullable icon",
+    "file": "file:///C:/laragon/www/pami-mobile/pami-wisata-daearahku/test/business_integration_contract_test.dart",
+    "result": "success",
+    "skipped": false
+  },
+  {
+    "name": "master CRUD uses exact methods and PATCH cannot mutate slug",
+    "file": "file:///C:/laragon/www/pami-mobile/pami-wisata-daearahku/test/business_integration_contract_test.dart",
+    "result": "success",
+    "skipped": false
+  },
+  {
+    "name": "active selector uses paginated authenticated role1 endpoint",
+    "file": "file:///C:/laragon/www/pami-mobile/pami-wisata-daearahku/test/business_integration_contract_test.dart",
+    "result": "success",
+    "skipped": false
+  },
+  {
+    "name": "assignment sends unique GUID array and explicit empty replacement",
+    "file": "file:///C:/laragon/www/pami-mobile/pami-wisata-daearahku/test/business_integration_contract_test.dart",
+    "result": "success",
+    "skipped": false
+  },
+  {
+    "name": "ordinary destination update does not emit assignment request",
+    "file": "file:///C:/laragon/www/pami-mobile/pami-wisata-daearahku/test/business_integration_contract_test.dart",
+    "result": "success",
+    "skipped": false
+  },
+  {
+    "name": "facility validation errors preserve server field messages",
+    "file": "file:///C:/laragon/www/pami-mobile/pami-wisata-daearahku/test/business_integration_contract_test.dart",
+    "result": "success",
+    "skipped": false
+  },
+  {
+    "name": "403 from master remains an access error without fallback",
+    "file": "file:///C:/laragon/www/pami-mobile/pami-wisata-daearahku/test/business_integration_contract_test.dart",
+    "result": "success",
+    "skipped": false
+  },
+  {
+    "name": "facility response arriving after logout is rejected",
+    "file": "file:///C:/laragon/www/pami-mobile/pami-wisata-daearahku/test/business_integration_contract_test.dart",
+    "result": "success",
+    "skipped": false
+  },
+  {
+    "name": "monthly query is an authenticated object request without legacy params",
+    "file": "file:///C:/laragon/www/pami-mobile/pami-wisata-daearahku/test/business_integration_contract_test.dart",
+    "result": "success",
+    "skipped": false
+  },
+  {
+    "name": "monthly endpoint refuses legacy list envelope",
+    "file": "file:///C:/laragon/www/pami-mobile/pami-wisata-daearahku/test/business_integration_contract_test.dart",
+    "result": "success",
+    "skipped": false
+  },
+  {
+    "name": "register displays field errors returned by server",
+    "file": "package:flutter_test/src/widget_tester.dart",
+    "result": "success",
+    "skipped": false
+  },
+  {
+    "name": "custom calendar preset 30 returns calendar dates",
+    "file": "package:flutter_test/src/widget_tester.dart",
+    "result": "success",
+    "skipped": false
+  },
+  {
+    "name": "valid OTP opens reset; matching passwords submit exact body without persistence",
+    "file": "package:flutter_test/src/widget_tester.dart",
+    "result": "success",
+    "skipped": false
+  },
+  {
+    "name": "resend clears stale input and starts cooldown",
+    "file": "package:flutter_test/src/widget_tester.dart",
+    "result": "success",
+    "skipped": false
+  },
+  {
+    "name": "detail maps server statuses and titles from issued ticket only",
+    "file": "package:flutter_test/src/widget_tester.dart",
+    "result": "success",
+    "skipped": false
+  },
+  {
+    "name": "successful registration opens OTP screen",
+    "file": "package:flutter_test/src/widget_tester.dart",
+    "result": "success",
+    "skipped": false
+  },
+  {
+    "name": "custom calendar preset 0 returns calendar dates",
+    "file": "package:flutter_test/src/widget_tester.dart",
+    "result": "success",
+    "skipped": false
+  },
+  {
+    "name": "failed document lookup does not imply ticket absence",
+    "file": "package:flutter_test/src/widget_tester.dart",
+    "result": "success",
+    "skipped": false
+  },
+  {
+    "name": "late verify response after disposal cannot navigate",
+    "file": "package:flutter_test/src/widget_tester.dart",
+    "result": "success",
+    "skipped": false
+  },
+  {
+    "name": "invalid OTP and resend throttle present retry feedback",
+    "file": "package:flutter_test/src/widget_tester.dart",
+    "result": "success",
+    "skipped": false
+  },
+  {
+    "name": "password validation preserves ticket; invalid ticket returns to request",
+    "file": "package:flutter_test/src/widget_tester.dart",
+    "result": "success",
+    "skipped": false
+  },
+  {
+    "name": "session generation change discards verify response",
+    "file": "package:flutter_test/src/widget_tester.dart",
+    "result": "success",
+    "skipped": false
+  },
+  {
+    "name": "calendar financial=false boundary allowed=true",
+    "file": "package:flutter_test/src/widget_tester.dart",
+    "result": "success",
+    "skipped": false
+  },
+  {
+    "name": "calendar financial=false boundary allowed=false",
+    "file": "package:flutter_test/src/widget_tester.dart",
+    "result": "success",
+    "skipped": false
+  },
+  {
+    "name": "calendar financial=true boundary allowed=true",
+    "file": "package:flutter_test/src/widget_tester.dart",
+    "result": "success",
+    "skipped": false
+  },
+  {
+    "name": "calendar financial=true boundary allowed=false",
+    "file": "package:flutter_test/src/widget_tester.dart",
+    "result": "success",
+    "skipped": false
+  },
+  {
+    "name": "calendar reverse selection spans leap day and reset disables apply",
+    "file": "package:flutter_test/src/widget_tester.dart",
+    "result": "success",
+    "skipped": false
+  },
+  {
+    "name": "role1 explicit claim then reject with blank optional reason",
+    "file": "package:flutter_test/src/widget_tester.dart",
+    "result": "success",
+    "skipped": false
+  },
+  {
+    "name": "role1 claim release stays in secondary menu",
+    "file": "package:flutter_test/src/widget_tester.dart",
+    "result": "success",
+    "skipped": false
+  },
+  {
+    "name": "resume with changed claim owner disables an open decision sheet",
+    "file": "package:flutter_test/src/widget_tester.dart",
+    "result": "success",
+    "skipped": false
+  },
+  {
+    "name": "role1 legacy history scrolls nine statuses and opens guarded detail",
+    "file": "package:flutter_test/src/widget_tester.dart",
+    "result": "success",
+    "skipped": false
+  },
+  {
+    "name": "hidden operations pages mute tickers after scanner returns",
+    "file": "package:flutter_test/src/widget_tester.dart",
+    "result": "success",
+    "skipped": false
+  }
+]

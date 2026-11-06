@@ -1,0 +1,14 @@
+{
+  "all": {
+    "PASS": 27,
+    "BLOCKED": 10,
+    "FAIL": 4,
+    "NOT_RUN": 4
+  },
+  "P0": {
+    "PASS": 18,
+    "BLOCKED": 5,
+    "FAIL": 3,
+    "NOT_RUN": 2
+  }
+}

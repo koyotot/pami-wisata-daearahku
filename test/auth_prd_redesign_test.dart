@@ -171,7 +171,7 @@ void main() {
     await tester.pumpWidget(const SizedBox());
   });
   testWidgets(
-      'scrolled header stays below status bar on narrow scaled viewport',
+      'full-bleed header keeps foreground safe and scaled keyboard CTA reachable',
       (tester) async {
     tester.view.physicalSize = const Size(360, 740);
     tester.view.devicePixelRatio = 1;
@@ -186,7 +186,9 @@ void main() {
             child: child!),
         home: UserRegisterScreen(session: session)));
     await tester.pumpAndSettle();
-    expect(tester.getRect(find.byType(CustomScrollView)).top, 44);
+    expect(tester.getRect(find.byType(CustomScrollView)).top, 0);
+    expect(tester.getRect(find.text('Wisata Daerahku')).top,
+        greaterThanOrEqualTo(44));
     final sheet = tester
         .widget<Container>(find.byKey(const ValueKey('auth-white-sheet')));
     expect((sheet.decoration as BoxDecoration).color, Colors.white);
@@ -194,7 +196,7 @@ void main() {
     await tester.ensureVisible(find.text('Daftar'));
     await tester.pumpAndSettle();
     expect(tester.getRect(find.text('Daftar')).bottom, lessThanOrEqualTo(480));
-    expect(tester.getRect(find.byType(CustomScrollView)).top, 44);
+    expect(tester.getRect(find.byType(CustomScrollView)).top, 0);
     expect(tester.takeException(), isNull);
     await tester.pumpWidget(const SizedBox());
   });

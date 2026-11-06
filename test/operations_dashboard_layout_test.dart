@@ -22,7 +22,8 @@ Future<void> _screenshot(
         boundary.currentContext!.findRenderObject()! as RenderRepaintBoundary;
     final image = await render.toImage();
     final bytes = await image.toByteData(format: ui.ImageByteFormat.png);
-    final file = File('artifacts/phase1a-visual/test-fixture-$name.png');
+    final file = File(
+        'qa/admin-role1-post-relayout/results/widget-renders/test-fixture-$name.png');
     await file.parent.create(recursive: true);
     await file.writeAsBytes(bytes!.buffer.asUint8List());
     image.dispose();
@@ -32,26 +33,23 @@ Future<void> _screenshot(
 void main() {
   setUpAll(() async {
     GoogleFonts.config.allowRuntimeFetching = false;
-    if (_capture) {
-      for (final weight in [
-        FontWeight.w400,
-        FontWeight.w500,
-        FontWeight.w600,
-        FontWeight.w700,
-        FontWeight.w800
-      ]) {
-        final variant =
-            weight == FontWeight.w400 ? 'regular' : '${weight.value}';
-        final font = FontLoader('PlusJakartaSans_$variant');
-        font.addFont(File('artifacts/phase1a-visual/font-${weight.value}.ttf')
-            .readAsBytes()
-            .then(ByteData.sublistView));
-        await font.load();
-      }
-      await (FontLoader('MaterialIcons')
-            ..addFont(rootBundle.load('fonts/MaterialIcons-Regular.otf')))
-          .load();
+    for (final weight in [
+      FontWeight.w400,
+      FontWeight.w500,
+      FontWeight.w600,
+      FontWeight.w700,
+      FontWeight.w800
+    ]) {
+      final variant = weight == FontWeight.w400 ? 'regular' : '${weight.value}';
+      final font = FontLoader('PlusJakartaSans_$variant');
+      font.addFont(File('artifacts/phase1a-visual/font-${weight.value}.ttf')
+          .readAsBytes()
+          .then(ByteData.sublistView));
+      await font.load();
     }
+    await (FontLoader('MaterialIcons')
+          ..addFont(rootBundle.load('fonts/MaterialIcons-Regular.otf')))
+        .load();
   });
 
   testWidgets('personal segment keeps API values and unavailable metrics',
@@ -75,8 +73,10 @@ void main() {
     await tester.pumpAndSettle();
     final metrics =
         tester.widget<OperationsMetrics>(find.byType(OperationsMetrics));
-    expect(metrics.values.map((v) => v.$2), ['2', '1', '—', '—', '—']);
-    expect(metrics.icons, hasLength(5));
+    expect(find.text('Keputusan pribadi'), findsOneWidget);
+    expect(find.text('2'), findsOneWidget);
+    expect(metrics.values.map((v) => v.$2), ['1', '—', '—', '—']);
+    expect(metrics.icons, isNull);
     expect(reads, 1);
     expect(tester.takeException(), isNull);
   });
@@ -158,31 +158,43 @@ void main() {
             expect(find.byType(OperationsTrend), findsNothing);
             expect(find.byType(SegmentedButton<bool>), findsNothing);
             await tester.scrollUntilVisible(
-                find.text('Periksa penugasan'), 150);
+                find.text('Tarik turun untuk memeriksa penugasan.'), 150);
             await tester.drag(
                 find.byType(ListView).first, const Offset(0, -300));
             await tester.pumpAndSettle();
-            expect(tester.getRect(find.text('Periksa penugasan')).bottom,
+            expect(
+                tester
+                    .getRect(
+                        find.text('Tarik turun untuk memeriksa penugasan.'))
+                    .bottom,
                 lessThan(tester.getRect(find.byType(FloatingBottomNav)).top));
-            await tester.tap(find.text('Periksa penugasan'));
+            await tester.drag(
+                find.byType(ListView).first, const Offset(0, 5000));
             await tester.pumpAndSettle();
-            expect(overviewReads, 2);
+            final readsBeforePull = overviewReads;
+            await tester.drag(
+                find.byType(ListView).first, const Offset(0, 400));
+            await tester.pumpAndSettle();
+            expect(overviewReads, readsBeforePull + 1);
           } else {
             final metrics = tester.widget<OperationsMetrics>(
                 find.byType(OperationsMetrics).first);
-            expect(metrics.values.map((v) => v.$2), ['3', '1', '2', '1']);
-            expect(metrics.icons, hasLength(4));
-            expect(metrics.metadata, hasLength(4));
+            expect(metrics.values.map((v) => v.$2),
+                role == 1 ? ['1', '1', '2', '—'] : ['3', '1', '2', '1']);
+            expect(metrics.icons, role == 1 ? isNull : hasLength(4));
+            expect(metrics.metadata, role == 1 ? isNull : hasLength(4));
             if (scale == 1) {
-              final pending = tester.getRect(find.text('Approval pending'));
-              final destination = tester.getRect(find.text('Destinasi').last);
+              final pending = tester.getRect(find
+                  .text(role == 1 ? 'Destinasi ditugaskan' : 'Pending global'));
+              final destination = tester.getRect(
+                  find.text(role == 1 ? 'Claim saya' : 'Destinasi global'));
               expect(pending.top, closeTo(destination.top, 1));
               expect(pending.left, lessThan(destination.left));
             }
             expect(find.byType(SegmentedButton<bool>),
                 role == 1 ? findsOneWidget : findsNothing);
-            final chartTitle = find.text(
-                role == 2 ? 'Keputusan & kinerja Admin' : 'Aktivitas booking');
+            final chartTitle = find
+                .text(role == 2 ? 'Tren Keputusan Tim' : 'Aktivitas booking');
             await tester.scrollUntilVisible(chartTitle, 200);
             await Scrollable.ensureVisible(tester.element(chartTitle),
                 alignment: .05);
@@ -197,7 +209,7 @@ void main() {
             await tester.drag(
                 find.byType(ListView).first, const Offset(0, -5000));
             await tester.pumpAndSettle();
-            expect(tester.getRect(find.text('Detail keuangan')).bottom,
+            expect(tester.getRect(find.text('Buka Financial Dashboard')).bottom,
                 lessThan(tester.getRect(find.byType(FloatingBottomNav)).top));
           }
           expect(tester.takeException(), isNull);

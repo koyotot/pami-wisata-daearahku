@@ -64,12 +64,11 @@ void main() {
         home: OperationsDashboard(
             repository: repositoryFor(session), session: session)));
     await tester.pumpAndSettle();
-    expect(find.textContaining('Belum ada destinasi yang ditugaskan'),
-        findsOneWidget);
+    expect(find.text('Belum ada destinasi'), findsOneWidget);
     expect(find.byType(OperationsMetrics), findsNothing);
     expect(find.byType(OperationsTrend), findsNothing);
     expect(find.text('Destinasi'), findsNothing);
-    expect(find.text('Periksa penugasan'), findsOneWidget);
+    expect(find.text('Tarik turun untuk memeriksa penugasan.'), findsOneWidget);
     expect(find.text('Rp0'), findsNothing);
     expect(tester.takeException(), isNull);
   });
@@ -126,8 +125,10 @@ void main() {
             session: session)));
     await tester.pumpAndSettle();
     expect(find.text('Pantai 1'), findsOneWidget);
-    expect(find.text('Okupansi alokasi: — · konfirmasi: —'), findsOneWidget);
+    expect(find.text('Okupansi: — · Belum tersedia'), findsOneWidget);
     await tester.scrollUntilVisible(find.text('Berikutnya'), 200);
+    await tester.ensureVisible(find.text('Berikutnya'));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('Berikutnya'));
     await tester.pumpAndSettle();
     expect(pages, ['1', '2']);
@@ -187,15 +188,17 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Destinasi Privat'), findsOneWidget);
     revoked = true;
-    await tester.tap(find.byTooltip('Perbarui data'));
+    expect(find.byTooltip('Perbarui data'), findsNothing);
+    await tester.drag(find.byType(ListView).first, const Offset(0, 400));
     await tester.pumpAndSettle();
     expect(find.text('Destinasi Privat'), findsNothing);
-    expect(find.text('Pilih ulang destinasi'), findsOneWidget);
+    expect(find.textContaining('Pilih ulang destinasi yang dapat diakses'),
+        findsOneWidget);
   });
   testWidgets('audit route presents honest backend gap', (tester) async {
     await tester.pumpWidget(
         const MaterialApp(home: OperationsUnavailableScreen(audit: true)));
-    expect(find.textContaining('API timeline audit global belum tersedia'),
+    expect(find.textContaining('Riwayat aktivitas global belum tersedia'),
         findsOneWidget);
   });
   testWidgets(
@@ -227,6 +230,7 @@ void main() {
   });
   testWidgets('same-session revalidation clears assigned filter choices',
       (tester) async {
+    Map<String, String>? applied;
     final session = await adminSession(
         (_) async => jsonResponse(pageEnvelope([
               {'guid': 'private-destination', 'name': 'Pilihan Privat'}
@@ -236,22 +240,33 @@ void main() {
         home: Builder(
             builder: (context) => Scaffold(
                 body: TextButton(
-                    onPressed: () => showOperationsFilters(context,
-                            repository: repositoryFor(session),
-                            session: session,
-                            initial: const {
-                              'destination_guid': 'private-destination'
-                            }),
+                    onPressed: () async {
+                      applied = await showOperationsFilters(context,
+                          repository: repositoryFor(session),
+                          session: session,
+                          initial: const {
+                            'destination_guid': 'private-destination'
+                          });
+                    },
                     child: const Text('Buka filter'))))));
     await tester.tap(find.text('Buka filter'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('1 destinasi dipilih'));
     await tester.pumpAndSettle();
     expect(find.text('Pilihan Privat'), findsOneWidget);
     await session.me();
     await tester.pumpAndSettle();
     expect(find.text('Pilihan Privat'), findsNothing);
-    expect(find.textContaining('Muat ulang pilihan destinasi'), findsOneWidget);
-    final apply = tester
-        .widget<FilledButton>(find.widgetWithText(FilledButton, 'Terapkan'));
-    expect(apply.onPressed, isNull);
+    expect(find.textContaining('Tarik ke bawah untuk mencoba kembali'),
+        findsOneWidget);
+    await tester.tap(find.byTooltip('Tutup').last);
+    await tester.pumpAndSettle();
+    final apply = tester.widget<FilledButton>(
+        find.byKey(const ValueKey('operations-apply-filters')));
+    expect(apply.onPressed, isNotNull);
+    await tester.tap(find.byKey(const ValueKey('operations-apply-filters')));
+    await tester.pumpAndSettle();
+    expect(find.text('Buka filter'), findsOneWidget);
+    expect(applied, isEmpty);
   });
 }

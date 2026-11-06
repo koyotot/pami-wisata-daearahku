@@ -29,7 +29,8 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Budi'), findsOneWidget);
     revoked = true;
-    await tester.tap(find.byKey(const ValueKey('chip-Ditolak')));
+    await tester.ensureVisible(find.widgetWithText(ChoiceChip, 'Ditolak'));
+    await tester.tap(find.widgetWithText(ChoiceChip, 'Ditolak'));
     await tester.pumpAndSettle();
     expect(find.text('Budi'), findsNothing);
     expect(find.textContaining('Akses destinasi berubah'), findsOneWidget);
@@ -67,14 +68,19 @@ void main() {
     expect(find.byKey(const ValueKey('approve-b1')), findsNothing);
     await tester.tap(find.byKey(const ValueKey('b1')));
     await tester.pumpAndSettle();
-    final approve = find.byKey(const ValueKey('approve-booking'));
-    expect(tester.widget<FilledButton>(approve).onPressed, isNull);
-    await tester.tap(find.byKey(const ValueKey('claim-booking')));
+    expect(find.byKey(const ValueKey('approve-booking')), findsNothing);
+    expect(log.where((request) => request.method == 'POST'), isEmpty);
+    final primary = find.byKey(const ValueKey('booking-primary-action'));
+    expect(find.text('Ambil Claim'), findsOneWidget);
+    await tester.tap(primary);
     await tester.pumpAndSettle();
-    expect(tester.widget<FilledButton>(approve).onPressed, isNotNull);
-    await tester.tap(approve);
+    expect(tester.widget<FilledButton>(primary).onPressed, isNotNull);
+    expect(find.text('Tinjau Keputusan'), findsOneWidget);
+    await tester.tap(primary);
     await tester.pumpAndSettle();
-    await tester.tap(find.widgetWithText(FilledButton, 'Setujui').last);
+    await tester.tap(find.text('Setujui'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('confirm-booking-decision')));
     await tester.pumpAndSettle();
     expect(
         log
@@ -104,7 +110,8 @@ void main() {
     await tester.pumpAndSettle();
     expect(log.last.url.queryParameters.containsKey('status'), isFalse);
 
-    await tester.tap(find.byKey(const ValueKey('chip-Ditolak')));
+    await tester.ensureVisible(find.widgetWithText(ChoiceChip, 'Ditolak'));
+    await tester.tap(find.widgetWithText(ChoiceChip, 'Ditolak'));
     await tester.pumpAndSettle();
     expect(log.last.url.queryParameters['status'], 'rejected');
     expect(find.byKey(const ValueKey('g-rejected')), findsOneWidget);

@@ -716,21 +716,6 @@ Widget _filterButton(Map<String, String> filters, VoidCallback action) =>
             ? 'Filter destinasi dan periode'
             : "${filters['from']} — ${filters['to'] ?? '—'} · Filter aktif",
         onTap: action);
-Widget _freshness(String? generated, VoidCallback refresh,
-        {required int? role}) =>
-    Row(children: [
-      Expanded(
-          child: Text(
-              generated == null
-                  ? 'Waktu snapshot belum tersedia'
-                  : 'Snapshot server: ${DateTime.tryParse(generated) == null ? generated : formatDateTime(DateTime.parse(generated))}',
-              style: const TextStyle(fontSize: 12, color: Color(0xFF526787)))),
-      if (role != 1)
-        IconButton(
-            tooltip: 'Perbarui data',
-            onPressed: refresh,
-            icon: const Icon(Icons.refresh, size: 20))
-    ]);
 Widget _errorBlock(Object error, VoidCallback retry, {required int? role}) =>
     _DashboardCard(
         child: Padding(

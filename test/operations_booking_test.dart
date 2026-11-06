@@ -122,12 +122,16 @@ void main() {
                     child: const Text('Buka booking'))))));
     await tester.tap(find.text('Buka booking'));
     await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const ValueKey('claim-booking')));
+    await tester.tap(find.byKey(const ValueKey('booking-primary-action')));
     await tester.pumpAndSettle();
     await tester.binding.handlePopRoute();
     await tester.pumpAndSettle();
     expect(find.text('Detail Booking'), findsOneWidget);
     expect(writes, 1);
+    await tester.pump(const Duration(seconds: 5));
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('Periksa ulang tindakan yang sama'));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('Periksa ulang tindakan yang sama'));
     await tester.pumpAndSettle();
     final posts = log.where((request) => request.method == 'POST').toList();

@@ -1,0 +1,22 @@
+{
+  "total": 182,
+  "counts": {
+    "success": 180,
+    "failure": 2
+  },
+  "failures": [
+    {
+      "name": "scanner drops stale preview after same-generation role downgrade",
+      "file": "file:///C:/laragon/www/pami-mobile/pami-wisata-daearahku/test/operations_scanner_scope_regression_test.dart",
+      "result": "failure",
+      "skipped": false
+    },
+    {
+      "name": "scanner drops stale preview after same-generation assignment revoke",
+      "file": "file:///C:/laragon/www/pami-mobile/pami-wisata-daearahku/test/operations_scanner_scope_regression_test.dart",
+      "result": "failure",
+      "skipped": false
+    }
+  ],
+  "duration_seconds": 25.105
+}

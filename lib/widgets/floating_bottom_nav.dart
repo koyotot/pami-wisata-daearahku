@@ -56,6 +56,7 @@ class FloatingBottomNav extends StatelessWidget {
     return Semantics(
       selected: selected,
       button: true,
+      onTap: () => onSelected(tab),
       label: operationsRole == null && tab == 3 && unreadCount > 0
           ? 'Notifikasi, $unreadCount belum dibaca'
           : labels[tab],

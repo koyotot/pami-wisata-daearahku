@@ -5,10 +5,15 @@ import '../data/business_repository.dart';
 import '../data/operational_models.dart';
 import '../services/api_client.dart';
 import '../services/auth_session.dart';
+import '../widgets/operations_chrome.dart' show OperationsFilterBar;
 import 'admin_common.dart';
 import 'operations_booking_screen.dart';
 import 'operations_dashboard.dart'
-    show OperationsPage, OperationsSkeleton, showOperationsFilters;
+    show
+        OperationsPage,
+        OperationsSkeleton,
+        showOperationsDestinationPicker,
+        showOperationsDateRangeCalendar;
 
 class OperationsQueueScreen extends StatefulWidget {
   const OperationsQueueScreen(
@@ -37,7 +42,7 @@ class _OperationsQueueScreenState extends State<OperationsQueueScreen>
   late final int? _role = _session.role;
   List<OperationalRow> _items = [];
   Map<String, String> _filters = {};
-  Json? _meta;
+  String? _destinationLabel;
   String? _error;
   bool _loading = false;
   bool _next = false;
@@ -72,7 +77,6 @@ class _OperationsQueueScreenState extends State<OperationsQueueScreen>
     if (mounted) {
       setState(() {
         _items = [];
-        _meta = null;
         _request++;
       });
     }
@@ -92,7 +96,6 @@ class _OperationsQueueScreenState extends State<OperationsQueueScreen>
       _error = null;
       if (!more) {
         _items = [];
-        _meta = null;
       }
     });
     try {
@@ -104,7 +107,6 @@ class _OperationsQueueScreenState extends State<OperationsQueueScreen>
           ...{for (final row in _items) row.bookingGuid: row},
           ...{for (final row in result.items) row.bookingGuid: row}
         }.values.toList();
-        _meta = result.meta;
         _page = page;
         _next = result.links?.containsKey('next') == true
             ? result.links!['next'] != null
@@ -116,8 +118,8 @@ class _OperationsQueueScreenState extends State<OperationsQueueScreen>
         _error = adminErrorMessage(e);
         if (e is ApiException && (e.status == 403 || e.status == 404)) {
           _items = [];
-          _meta = null;
           _filters = {};
+          _destinationLabel = null;
           _revoked = true;
           _error = 'Akses destinasi berubah. Kembali ke pilihan destinasi.';
         }
@@ -131,14 +133,37 @@ class _OperationsQueueScreenState extends State<OperationsQueueScreen>
     if (_valid && request == _request) setState(() => _loading = false);
   }
 
-  Future<void> _dateFilter() async {
-    final filters = await showOperationsFilters(context,
+  Future<void> _destinationFilter() async {
+    if (!_valid || _revoked) return;
+    String? label;
+    final destination = await showOperationsDestinationPicker(context,
         repository: _repository,
         session: _session,
-        initial: _filters,
+        initial: _filters['destination_guid'],
+        onLabelSelected: (value) => label = value);
+    if (!_valid || _revoked || destination == null) return;
+    setState(() {
+      _destinationLabel = destination.isEmpty ? null : label;
+      if (destination.isEmpty) {
+        _filters.remove('destination_guid');
+      } else {
+        _filters['destination_guid'] = destination;
+      }
+    });
+    await _load();
+  }
+
+  Future<void> _dateFilter() async {
+    if (!_valid || _revoked) return;
+    final range = await showOperationsDateRangeCalendar(context,
+        from: DateTime.tryParse(_filters['from'] ?? ''),
+        to: DateTime.tryParse(_filters['to'] ?? ''),
         utc: true);
-    if (!_valid || filters == null) return;
-    setState(() => _filters = filters);
+    if (!_valid || _revoked || range == null) return;
+    setState(() {
+      _filters['from'] = isoDay(range.start);
+      _filters['to'] = isoDay(range.end);
+    });
     await _load();
   }
 
@@ -180,56 +205,62 @@ class _OperationsQueueScreenState extends State<OperationsQueueScreen>
           ? 'Pengawasan antrean seluruh destinasi'
           : 'Permintaan kunjungan dalam penugasan Anda',
       onRefresh: _load,
-      actions: [
-        IconButton(
-            tooltip: 'Filter destinasi dan tanggal',
-            onPressed: _dateFilter,
-            icon: const Icon(Icons.tune_rounded))
-      ],
       children: [
-        if (_meta?['generated_at'] != null)
-          Padding(
-              padding: const EdgeInsets.only(bottom: 12),
-              child: Text('Snapshot server: ${_meta!['generated_at']}',
-                  style:
-                      const TextStyle(fontSize: 12, color: Color(0xFF526787)))),
+        OperationsFilterBar(
+            filters: _filters,
+            keyPrefix: 'queue',
+            destinationLabel: _destinationLabel,
+            dateTooltip: 'Filter tanggal pembuatan booking · UTC',
+            onDestinationPressed: _revoked ? null : _destinationFilter,
+            onDatePressed: _revoked ? null : _dateFilter),
+        const SizedBox(height: 12),
         Container(
             padding: const EdgeInsets.all(4),
             decoration: BoxDecoration(
                 color: AdminColors.tint,
-                borderRadius: BorderRadius.circular(14)),
-            child: Wrap(spacing: 4, runSpacing: 4, children: [
+                borderRadius: BorderRadius.circular(16)),
+            child: Row(children: [
               for (final item in [
                 ('all', 'Semua'),
                 ('unclaimed', 'Tersedia'),
                 if (_role == 1)
-                  ('mine', 'Claim Saya')
+                  ('mine', 'Claim saya')
                 else
                   ('active', 'Claim aktif')
               ])
-                ChoiceChip(
-                    showCheckmark: false,
-                    selectedColor: Colors.white,
-                    backgroundColor: Colors.transparent,
-                    side: BorderSide.none,
-                    labelStyle: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w700,
-                        color: _ownership == item.$1
-                            ? AdminColors.blue
-                            : const Color(0xFF526787)),
-                    label: Text(item.$2),
-                    selected: _ownership == item.$1,
-                    onSelected: (_) => setState(() => _ownership = item.$1)),
+                Expanded(
+                    child: Semantics(
+                        selected: _ownership == item.$1,
+                        child: TextButton(
+                            key: ValueKey('queue-ownership-${item.$1}'),
+                            style: TextButton.styleFrom(
+                                foregroundColor: _ownership == item.$1
+                                    ? AdminColors.blue
+                                    : AdminColors.textMuted,
+                                backgroundColor: _ownership == item.$1
+                                    ? AdminColors.card
+                                    : Colors.transparent,
+                                minimumSize: const Size(48, 48),
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 8, vertical: 12),
+                                shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(12))),
+                            onPressed: () =>
+                                setState(() => _ownership = item.$1),
+                            child: Text(item.$2,
+                                textAlign: TextAlign.center,
+                                style: const TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w700))))),
             ])),
-        const SizedBox(height: 12),
-        const Text('Berdasarkan tanggal pembuatan booking · UTC',
-            style: TextStyle(fontSize: 12, color: Color(0xFF526787))),
         const SizedBox(height: 12),
         if (_filters.isNotEmpty)
           TextButton(
               onPressed: () {
-                setState(() => _filters = {});
+                setState(() {
+                  _filters = {};
+                  _destinationLabel = null;
+                });
                 _load();
               },
               child: const Text('Reset filter')),
