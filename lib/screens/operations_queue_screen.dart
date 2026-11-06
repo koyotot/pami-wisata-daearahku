@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../data/admin_state.dart';
+import '../data/app_data.dart' show currentUser;
 import '../data/business_repository.dart';
 import '../data/operational_models.dart';
 import '../services/api_client.dart';
@@ -132,7 +133,10 @@ class _OperationsQueueScreenState extends State<OperationsQueueScreen>
 
   Future<void> _dateFilter() async {
     final filters = await showOperationsFilters(context,
-        repository: _repository, session: _session, initial: _filters);
+        repository: _repository,
+        session: _session,
+        initial: _filters,
+        utc: true);
     if (!_valid || filters == null) return;
     setState(() => _filters = filters);
     await _load();
@@ -163,9 +167,13 @@ class _OperationsQueueScreenState extends State<OperationsQueueScreen>
             _ownership == 'all' ||
             (_ownership == 'active'
                 ? row.claimState == 'active'
-                : row.claimState != 'active'))
+                : _ownership == 'mine'
+                    ? row.claimState == 'active' &&
+                        row.raw['owner_user_guid'] == currentUser?.id
+                    : row.claimState != 'active'))
         .toList();
     return OperationsPage(
+      role: _role,
       embedded: widget.embedded,
       title: 'Antrean Approval',
       subtitle: _role == 2
@@ -173,188 +181,210 @@ class _OperationsQueueScreenState extends State<OperationsQueueScreen>
           : 'Permintaan kunjungan dalam penugasan Anda',
       onRefresh: _load,
       actions: [
-            IconButton(
-                tooltip: 'Filter destinasi dan tanggal',
-                onPressed: _dateFilter,
-                icon: const Icon(Icons.tune_rounded))
+        IconButton(
+            tooltip: 'Filter destinasi dan tanggal',
+            onPressed: _dateFilter,
+            icon: const Icon(Icons.tune_rounded))
       ],
       children: [
-                if (_meta?['generated_at'] != null)
-                  Padding(
-                      padding: const EdgeInsets.only(bottom: 12),
-                      child: Text('Snapshot server: ${_meta!['generated_at']}',
-                          style: const TextStyle(
-                              fontSize: 12, color: Color(0xFF526787)))),
-                Container(
-                  padding: const EdgeInsets.all(4),
-                  decoration: BoxDecoration(
-                      color: AdminColors.tint,
-                      borderRadius: BorderRadius.circular(14)),
-                  child: Wrap(spacing: 4, runSpacing: 4, children: [
-                  for (final item in [
-                    ('all', 'Semua'),
-                    ('unclaimed', 'Tersedia'),
-                    ('active', 'Claim aktif')
-                  ])
-                    ChoiceChip(
-                        showCheckmark: false,
-                        selectedColor: Colors.white,
-                        backgroundColor: Colors.transparent,
-                        side: BorderSide.none,
-                        labelStyle: TextStyle(
+        if (_meta?['generated_at'] != null)
+          Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: Text('Snapshot server: ${_meta!['generated_at']}',
+                  style:
+                      const TextStyle(fontSize: 12, color: Color(0xFF526787)))),
+        Container(
+            padding: const EdgeInsets.all(4),
+            decoration: BoxDecoration(
+                color: AdminColors.tint,
+                borderRadius: BorderRadius.circular(14)),
+            child: Wrap(spacing: 4, runSpacing: 4, children: [
+              for (final item in [
+                ('all', 'Semua'),
+                ('unclaimed', 'Tersedia'),
+                if (_role == 1)
+                  ('mine', 'Claim Saya')
+                else
+                  ('active', 'Claim aktif')
+              ])
+                ChoiceChip(
+                    showCheckmark: false,
+                    selectedColor: Colors.white,
+                    backgroundColor: Colors.transparent,
+                    side: BorderSide.none,
+                    labelStyle: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        color: _ownership == item.$1
+                            ? AdminColors.blue
+                            : const Color(0xFF526787)),
+                    label: Text(item.$2),
+                    selected: _ownership == item.$1,
+                    onSelected: (_) => setState(() => _ownership = item.$1)),
+            ])),
+        const SizedBox(height: 12),
+        const Text('Berdasarkan tanggal pembuatan booking · UTC',
+            style: TextStyle(fontSize: 12, color: Color(0xFF526787))),
+        const SizedBox(height: 12),
+        if (_filters.isNotEmpty)
+          TextButton(
+              onPressed: () {
+                setState(() => _filters = {});
+                _load();
+              },
+              child: const Text('Reset filter')),
+        if (_loading)
+          _items.isEmpty
+              ? const OperationsSkeleton()
+              : const LinearProgressIndicator(),
+        if (_error != null)
+          Container(
+              padding: const EdgeInsets.all(18),
+              margin: const EdgeInsets.only(bottom: 12),
+              decoration: BoxDecoration(
+                  color: _revoked
+                      ? const Color(0xFFFFECEA)
+                      : const Color(0xFFFFF0D6),
+                  borderRadius: BorderRadius.circular(16)),
+              child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Icon(_revoked ? Icons.lock_outline : Icons.wifi_off,
+                        color: const Color(0xFF795018)),
+                    const SizedBox(height: 10),
+                    Text(
+                        _revoked
+                            ? 'Akses telah berubah'
+                            : 'Antrean belum dapat dimuat',
+                        style: const TextStyle(
+                            fontSize: 16, fontWeight: FontWeight.w700)),
+                    const SizedBox(height: 6),
+                    Text(_error!,
+                        style: const TextStyle(fontSize: 13, height: 1.5)),
+                  ])),
+        if (!_loading && _error == null && rows.isEmpty)
+          Container(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 32),
+              decoration: BoxDecoration(
+                  color: Colors.white,
+                  border: Border.all(color: AdminColors.border),
+                  borderRadius: BorderRadius.circular(20)),
+              child: Column(children: [
+                Icon(
+                    _filters.isNotEmpty || _ownership != 'all'
+                        ? Icons.search_off_rounded
+                        : Icons.task_alt_rounded,
+                    size: 40,
+                    color: _filters.isNotEmpty || _ownership != 'all'
+                        ? AdminColors.blue
+                        : const Color(0xFF16784C)),
+                const SizedBox(height: 16),
+                Text(
+                    _filters.isNotEmpty || _ownership != 'all'
+                        ? 'Tidak ada hasil'
+                        : 'Antrean sudah kosong',
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                        fontSize: 18, fontWeight: FontWeight.w800)),
+                const SizedBox(height: 8),
+                Text(
+                    _filters.isNotEmpty || _ownership != 'all'
+                        ? 'Tidak ada booking untuk filter ini. Reset filter atau muat halaman berikutnya.'
+                        : 'Semua tertangani. Tidak ada antrean persetujuan.',
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                        fontSize: 13, height: 1.6, color: Color(0xFF526787))),
+                if (_ownership != 'all')
+                  TextButton(
+                      onPressed: () => setState(() => _ownership = 'all'),
+                      child: const Text('Reset status claim')),
+              ])),
+        for (final row in rows)
+          Container(
+              key: ValueKey(row.bookingGuid),
+              margin: const EdgeInsets.only(bottom: 10),
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                  color: Colors.white,
+                  border: Border.all(color: AdminColors.border),
+                  borderRadius: BorderRadius.circular(16)),
+              child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Text(row.bookingGuid ?? 'Booking',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
                             fontSize: 12,
-                            fontWeight: FontWeight.w700,
-                            color: _ownership == item.$1
-                                ? AdminColors.blue
-                                : const Color(0xFF526787)),
-                        label: Text(item.$2),
-                        selected: _ownership == item.$1,
-                        onSelected: (_) =>
-                            setState(() => _ownership = item.$1)),
-                ])),
-                const SizedBox(height: 12),
-                const Text('Berdasarkan tanggal pembuatan booking · UTC',
-                    style: TextStyle(fontSize: 12, color: Color(0xFF526787))),
-                const SizedBox(height: 12),
-                if (_filters.isNotEmpty)
-                  TextButton(
-                      onPressed: () {
-                        setState(() => _filters = {});
-                        _load();
-                      },
-                      child: const Text('Reset filter')),
-                if (_loading)
-                  _items.isEmpty
-                      ? const OperationsSkeleton()
-                      : const LinearProgressIndicator(),
-                if (_error != null)
-                  Container(
-                      padding: const EdgeInsets.all(18),
-                      margin: const EdgeInsets.only(bottom: 12),
-                      decoration: BoxDecoration(
-                          color: _revoked
-                              ? const Color(0xFFFFECEA)
-                              : const Color(0xFFFFF0D6),
-                          borderRadius: BorderRadius.circular(16)),
-                      child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Icon(_revoked ? Icons.lock_outline : Icons.wifi_off,
-                                color: const Color(0xFF795018)),
-                            const SizedBox(height: 10),
-                            Text(_revoked ? 'Akses telah berubah' : 'Antrean belum dapat dimuat',
-                                style: const TextStyle(
-                                    fontSize: 16, fontWeight: FontWeight.w700)),
-                            const SizedBox(height: 6),
-                            Text(_error!,
-                                style: const TextStyle(fontSize: 13, height: 1.5)),
-                          ])),
-                if (!_loading && _error == null && rows.isEmpty)
-                  Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 32),
-                      decoration: BoxDecoration(
-                          color: Colors.white,
-                          border: Border.all(color: AdminColors.border),
-                          borderRadius: BorderRadius.circular(20)),
-                      child: Column(children: [
-                        Icon(_filters.isNotEmpty || _ownership != 'all'
-                            ? Icons.search_off_rounded
-                            : Icons.task_alt_rounded,
-                            size: 40,
-                            color: _filters.isNotEmpty || _ownership != 'all'
-                                ? AdminColors.blue
-                                : const Color(0xFF16784C)),
-                        const SizedBox(height: 16),
-                        Text(_filters.isNotEmpty || _ownership != 'all'
-                            ? 'Tidak ada hasil'
-                            : 'Antrean sudah kosong',
-                            textAlign: TextAlign.center,
-                            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800)),
-                        const SizedBox(height: 8),
-                        Text(_filters.isNotEmpty || _ownership != 'all'
-                          ? 'Tidak ada booking untuk filter ini. Reset filter atau muat halaman berikutnya.'
-                          : 'Semua tertangani. Tidak ada antrean persetujuan.',
-                            textAlign: TextAlign.center,
-                            style: const TextStyle(fontSize: 13, height: 1.6,
-                                color: Color(0xFF526787))),
-                        if (_ownership != 'all')
-                          TextButton(
-                              onPressed: () => setState(() => _ownership = 'all'),
-                              child: const Text('Reset status claim')),
-                      ])),
-                for (final row in rows)
-                  Container(
-                      key: ValueKey(row.bookingGuid),
-                      margin: const EdgeInsets.only(bottom: 10),
-                      padding: const EdgeInsets.all(14),
-                      decoration: BoxDecoration(
-                          color: Colors.white,
-                          border: Border.all(color: AdminColors.border),
-                          borderRadius: BorderRadius.circular(16)),
-                      child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            Text(row.bookingGuid ?? 'Booking',
-                                style: const TextStyle(fontSize: 12,
-                                    fontWeight: FontWeight.w600, color: Color(0xFF526787))),
-                            const SizedBox(height: 8),
-                            Text(row.name ?? 'Destinasi',
-                                style: const TextStyle(fontSize: 16,
-                                    fontWeight: FontWeight.w800, color: AdminColors.navy)),
-                            const SizedBox(height: 8),
-                            Align(
-                                alignment: Alignment.centerLeft,
-                                child: AdminBadge(
-                                    row.claimState == 'active' ? 'Claim aktif' : 'Tersedia untuk diambil',
-                                    row.claimState == 'active'
-                                        ? const Color(0xFF98621E)
-                                        : const Color(0xFF16784C))),
-                            if (row.claimState == 'active') ...[
-                              const SizedBox(height: 6),
-                              Text('Pemilik: ${row.raw['owner_user_guid'] ?? '—'}',
-                                  style: const TextStyle(fontSize: 12,
-                                      color: Color(0xFF526787))),
-                              Text('Claim hingga: ${row.raw['expires_at'] ?? '—'}',
-                                  style: const TextStyle(fontSize: 12,
-                                      color: Color(0xFF526787))),
-                            ],
-                            const SizedBox(height: 12),
-                            Container(
-                                padding: const EdgeInsets.all(10),
-                                decoration: BoxDecoration(
-                                    color: const Color(0xFFFFF0D6),
-                                    borderRadius: BorderRadius.circular(12)),
-                                child: Row(crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      const Icon(Icons.schedule_rounded,
-                                          size: 18, color: Color(0xFF795018)),
-                                      const SizedBox(width: 8),
-                                      Expanded(child: Text(
-                                          '${operationalActionLabel(row.action)}\nBatas: ${row.raw['approval_expires_at'] ?? '—'}',
-                                          style: const TextStyle(fontSize: 12,
-                                              height: 1.5, color: Color(0xFF795018)))),
-                                    ])),
-                            const SizedBox(height: 12),
-                            FilledButton(
-                                onPressed: () => _open(row),
-                                style: FilledButton.styleFrom(
-                                    backgroundColor: AdminColors.blue,
-                                    foregroundColor: Colors.white,
-                                    minimumSize: const Size(48, 48),
-                                    shape: RoundedRectangleBorder(
-                                        borderRadius: BorderRadius.circular(12))),
-                                child: Text(_role == 2 ? 'Tinjau & alihkan →' : 'Lihat & tinjau →')),
-                          ])),
-                if (_next)
-                  OutlinedButton(
-                      onPressed: _loading ? null : () => _load(more: true),
-                      child: const Text('Muat berikutnya')),
-                if (!_loading)
-                  TextButton(
-                      onPressed:
-                          _revoked ? () => Navigator.maybePop(context) : _load,
-                      child: Text(_revoked ? 'Kembali' : 'Muat ulang')),
-              ],
+                            fontWeight: FontWeight.w600,
+                            color: Color(0xFF526787))),
+                    const SizedBox(height: 8),
+                    Text(row.name ?? 'Destinasi',
+                        style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w800,
+                            color: AdminColors.navy)),
+                    const SizedBox(height: 8),
+                    Align(
+                        alignment: Alignment.centerLeft,
+                        child: AdminBadge(
+                            row.claimState == 'active'
+                                ? 'Claim aktif'
+                                : 'Tersedia untuk diambil',
+                            row.claimState == 'active'
+                                ? const Color(0xFF98621E)
+                                : const Color(0xFF16784C))),
+                    if (row.claimState == 'active') ...[
+                      const SizedBox(height: 6),
+                      Text('Pemilik: ${row.raw['owner_user_guid'] ?? '—'}',
+                          style: const TextStyle(
+                              fontSize: 12, color: Color(0xFF526787))),
+                      Text('Claim hingga: ${row.raw['expires_at'] ?? '—'}',
+                          style: const TextStyle(
+                              fontSize: 12, color: Color(0xFF526787))),
+                    ],
+                    const SizedBox(height: 12),
+                    Container(
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                            color: const Color(0xFFFFF0D6),
+                            borderRadius: BorderRadius.circular(12)),
+                        child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Icon(Icons.schedule_rounded,
+                                  size: 18, color: Color(0xFF795018)),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                  child: Text(
+                                      '${operationalActionLabel(row.action)}\nBatas: ${row.raw['approval_expires_at'] ?? '—'}',
+                                      style: const TextStyle(
+                                          fontSize: 12,
+                                          height: 1.5,
+                                          color: Color(0xFF795018)))),
+                            ])),
+                    const SizedBox(height: 12),
+                    FilledButton(
+                        onPressed: () => _open(row),
+                        style: FilledButton.styleFrom(
+                            backgroundColor: AdminColors.blue,
+                            foregroundColor: Colors.white,
+                            minimumSize: const Size(48, 48),
+                            shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12))),
+                        child: Text(_role == 2
+                            ? 'Tinjau & alihkan →'
+                            : 'Lihat & tinjau →')),
+                  ])),
+        if (_next)
+          OutlinedButton(
+              onPressed: _loading ? null : () => _load(more: true),
+              child: const Text('Muat berikutnya')),
+        if (!_loading && (_role != 1 || _revoked))
+          TextButton(
+              onPressed: _revoked ? () => Navigator.maybePop(context) : _load,
+              child: Text(_revoked ? 'Kembali' : 'Muat ulang')),
+      ],
     );
   }
 }

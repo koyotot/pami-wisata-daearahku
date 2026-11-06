@@ -175,6 +175,7 @@ class _OperationsFinancialState extends State<OperationsFinancialScreen>
     return Theme(
         data: AppColors.visitorTheme,
         child: OperationsPage(
+            role: _role,
             title: 'Ringkasan Keuangan',
             subtitle: _role == 2
                 ? 'Seluruh destinasi · scope global'
@@ -234,7 +235,8 @@ class _OperationsFinancialState extends State<OperationsFinancialScreen>
               const SizedBox(height: 16),
               if (_loading) const OperationsSkeleton(),
               if (_error != null)
-                _errorBlock(_error!, _scopeError(_error) ? _filter : _load),
+                _errorBlock(_error!, _scopeError(_error) ? _filter : _load,
+                    role: _role),
               if (!_loading && financial != null) ...[
                 if (!_available) ...[
                   _DashboardCard(
@@ -295,10 +297,11 @@ class _OperationsFinancialState extends State<OperationsFinancialScreen>
                         child: Text('Diterima: ${formatDateTime(_receivedAt!)}',
                             style: const TextStyle(
                                 fontSize: 12, color: Color(0xFF526787)))),
-                    IconButton(
-                        tooltip: 'Perbarui keuangan',
-                        onPressed: _load,
-                        icon: const Icon(Icons.refresh, size: 20)),
+                    if (_role != 1)
+                      IconButton(
+                          tooltip: 'Perbarui keuangan',
+                          onPressed: _load,
+                          icon: const Icon(Icons.refresh, size: 20)),
                   ]),
               ],
             ]));
@@ -337,8 +340,9 @@ class _OperationsFinancialState extends State<OperationsFinancialScreen>
         else if (_error != null) ...[
           Text(adminErrorMessage(_error!),
               style: const TextStyle(fontSize: 13, height: 1.5)),
-          TextButton(
-              onPressed: _load, child: const Text('Muat ulang keuangan')),
+          if (_role != 1)
+            TextButton(
+                onPressed: _load, child: const Text('Muat ulang keuangan')),
         ] else if (!_available)
           Text(_financialReason(_financial?['reason']),
               style: const TextStyle(

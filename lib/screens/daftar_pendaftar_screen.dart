@@ -5,6 +5,8 @@ import '../services/auth_session.dart';
 import '../services/api_client.dart';
 import 'admin_common.dart';
 import 'operations_booking_screen.dart';
+import 'operations_dashboard.dart' show OperationsPage;
+import '../theme/app_colors.dart';
 
 /// Legacy history entry point; decisions always open the explicit claim flow.
 class DaftarPendaftarScreen extends StatefulWidget {
@@ -25,6 +27,7 @@ class _DaftarPendaftarScreenState extends State<DaftarPendaftarScreen> {
   late final PagedListController<Booking> _list;
   String? _status;
   bool _accessRevoked = false;
+  final Map<String?, GlobalKey> _statusKeys = {};
   bool get _valid =>
       mounted &&
       _session.isCurrentGeneration(_generation) &&
@@ -85,6 +88,99 @@ class _DaftarPendaftarScreenState extends State<DaftarPendaftarScreen> {
   Widget build(BuildContext context) {
     if (!_valid) return const SizedBox.shrink();
     final rows = _list.error == null ? _list.items : <Booking>[];
+    if (_role == 1)
+      return OperationsPage(
+          role: _role,
+          title: 'Data Pendaftar',
+          subtitle: 'Riwayat booking destinasi yang ditugaskan',
+          embedded: false,
+          onRefresh: _load,
+          children: [
+            SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: Row(children: [
+                  for (final item in <(String, String?)>[
+                    ('Semua', null),
+                    for (final status in kBookingStatuses)
+                      (bookingStatusLabel(status), status),
+                  ])
+                    Padding(
+                        padding: const EdgeInsets.only(right: 8),
+                        child: ChoiceChip(
+                            key: _statusKeys.putIfAbsent(
+                                item.$2, () => GlobalKey()),
+                            label: Text(item.$1),
+                            selected: _status == item.$2,
+                            showCheckmark: false,
+                            onSelected: (_) {
+                              setState(() => _status = item.$2);
+                              WidgetsBinding.instance.addPostFrameCallback((_) {
+                                final chipContext =
+                                    _statusKeys[item.$2]?.currentContext;
+                                if (mounted && chipContext != null)
+                                  Scrollable.of(chipContext)
+                                      .position
+                                      .ensureVisible(
+                                          chipContext.findRenderObject()!,
+                                          alignment: .5,
+                                          duration:
+                                              MediaQuery.disableAnimationsOf(
+                                                      context)
+                                                  ? Duration.zero
+                                                  : const Duration(
+                                                      milliseconds: 200));
+                              });
+                              _load();
+                            })),
+                ])),
+            const SizedBox(height: 16),
+            if (_list.loading) const LinearProgressIndicator(),
+            if (_accessRevoked)
+              const Text(
+                  'Akses destinasi berubah. Kembali ke pilihan destinasi.')
+            else if (_list.error != null)
+              Text(
+                  '${adminErrorMessage(_list.error!)}\nTarik turun untuk menyinkronkan.')
+            else if (!_list.loading && rows.isEmpty)
+              const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 24),
+                  child: Text('Belum ada pendaftar untuk status ini.',
+                      textAlign: TextAlign.center)),
+            for (final booking in rows)
+              Card(
+                  key: ValueKey(booking.guid),
+                  elevation: 0,
+                  color: AppColors.surface,
+                  child: ListTile(
+                      contentPadding: const EdgeInsets.all(16),
+                      title: Text(booking.visitorName,
+                          style: const TextStyle(fontWeight: FontWeight.w700)),
+                      subtitle: Padding(
+                          padding: const EdgeInsets.only(top: 8),
+                          child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(booking.destinationName),
+                                Text(
+                                    '${visitDay(booking.visitDate)} · ${booking.quantity} orang'),
+                                const SizedBox(height: 8),
+                                Container(
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 8, vertical: 4),
+                                    decoration: BoxDecoration(
+                                        color: AdminColors.tint,
+                                        borderRadius:
+                                            BorderRadius.circular(12)),
+                                    child: Text(
+                                        bookingStatusLabel(booking.status),
+                                        style: const TextStyle(
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.w700,
+                                            color: AdminColors.blueDeep))),
+                              ])),
+                      trailing: const Icon(Icons.chevron_right),
+                      onTap: () => _open(booking))),
+          ]);
     return AdminPage(
         badge: 'DATA PENGUNJUNG',
         title: 'Data Pendaftar',

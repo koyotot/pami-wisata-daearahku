@@ -3,6 +3,7 @@ part of 'operations_dashboard.dart';
 class _DashboardHero extends StatelessWidget {
   const _DashboardHero({
     this.executive = false,
+    this.role,
     this.title,
     this.subtitle,
     this.onActions,
@@ -10,6 +11,7 @@ class _DashboardHero extends StatelessWidget {
     this.actions = const [],
   });
   final bool executive;
+  final int? role;
   final String? title;
   final String? subtitle;
   final VoidCallback? onActions;
@@ -17,74 +19,95 @@ class _DashboardHero extends StatelessWidget {
   final List<Widget> actions;
 
   @override
-  Widget build(BuildContext context) => ClipRect(
-      child: CustomPaint(
-          painter: const _DashboardScenery(),
-          child: SafeArea(
-              bottom: false,
-              child: Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 38),
-                  child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        Row(children: [
-                          if (onBack != null)
-                            BackButton(color: Colors.white, onPressed: onBack)
-                          else ...[
-                            const Icon(Icons.landscape_outlined,
-                                color: Colors.white, size: 22),
-                            const SizedBox(width: 8),
-                          ],
-                          Expanded(
-                              child: Text(
-                                  title != null
-                                      ? 'Wisata Daerahku · Operasional'
-                                      : executive
-                                      ? 'Wisata Daerahku · Superadmin'
-                                      : 'Wisata Daerahku · Admin',
-                                  style: const TextStyle(
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.w700,
-                                      color: Colors.white))),
-                          for (final action in actions)
-                            IconButtonTheme(
-                                data: IconButtonThemeData(
+  Widget build(BuildContext context) => (role ?? AuthSession.instance.role) == 1
+      ? OperationsScenicHeader(
+          title: title ?? 'Halo, Admin.',
+          subtitle: subtitle ?? 'Kegiatan destinasi dalam kendalimu',
+          onBack: onBack,
+          actions: [
+              ...actions,
+              if (onActions != null)
+                IconButton(
+                    tooltip: 'Pusat tindakan',
+                    onPressed: onActions,
+                    icon: const Icon(Icons.notifications_none_rounded)),
+            ])
+      : ClipRect(
+          child: CustomPaint(
+              painter: const _DashboardScenery(),
+              child: SafeArea(
+                  bottom: false,
+                  child: Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 8, 16, 38),
+                      child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            Row(children: [
+                              if (onBack != null)
+                                BackButton(
+                                    color: Colors.white, onPressed: onBack)
+                              else ...[
+                                const Icon(Icons.landscape_outlined,
+                                    color: Colors.white, size: 22),
+                                const SizedBox(width: 8),
+                              ],
+                              Expanded(
+                                  child: Text(
+                                      title != null
+                                          ? 'Wisata Daerahku · Operasional'
+                                          : executive
+                                              ? 'Wisata Daerahku · Superadmin'
+                                              : 'Wisata Daerahku · Admin',
+                                      style: const TextStyle(
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.w700,
+                                          color: Colors.white))),
+                              for (final action in actions)
+                                IconButtonTheme(
+                                    data: IconButtonThemeData(
+                                        style: IconButton.styleFrom(
+                                            foregroundColor: Colors.white,
+                                            minimumSize: const Size(48, 48))),
+                                    child: action),
+                              if (onActions != null)
+                                IconButton.filledTonal(
+                                    tooltip: 'Pusat tindakan',
+                                    onPressed: onActions,
                                     style: IconButton.styleFrom(
+                                        backgroundColor:
+                                            Colors.white.withValues(alpha: .14),
                                         foregroundColor: Colors.white,
-                                        minimumSize: const Size(48, 48))),
-                                child: action),
-                          if (onActions != null)
-                            IconButton.filledTonal(
-                                tooltip: 'Pusat tindakan',
-                                onPressed: onActions,
-                                style: IconButton.styleFrom(
-                                    backgroundColor:
-                                        Colors.white.withValues(alpha: .14),
-                                    foregroundColor: Colors.white,
-                                    minimumSize: const Size(48, 48),
-                                    shape: RoundedRectangleBorder(
-                                        borderRadius: BorderRadius.circular(12))),
-                                icon: const Icon(
-                                    Icons.notifications_none_rounded, size: 24))
-                        ]),
-                        const SizedBox(height: 10),
-                        Text(title ?? (executive
-                            ? 'Ringkasan Eksekutif' : 'Halo, Admin.'),
-                            style: const TextStyle(
-                                fontSize: 24,
-                                height: 1.2,
-                                fontWeight: FontWeight.w800,
-                                letterSpacing: -.6,
-                                color: Colors.white)),
-                        const SizedBox(height: 6),
-                        Text(subtitle ?? (executive
-                            ? 'Pengawasan operasional seluruh destinasi'
-                            : 'Pengelolaan destinasi & aktivitas pribadi'),
-                            style: const TextStyle(
-                                fontSize: 12,
-                                height: 1.5,
-                                color: Color(0xFFE6F1FF))),
-                      ])))));
+                                        minimumSize: const Size(48, 48),
+                                        shape: RoundedRectangleBorder(
+                                            borderRadius:
+                                                BorderRadius.circular(12))),
+                                    icon: const Icon(
+                                        Icons.notifications_none_rounded,
+                                        size: 24))
+                            ]),
+                            const SizedBox(height: 10),
+                            Text(
+                                title ??
+                                    (executive
+                                        ? 'Ringkasan Eksekutif'
+                                        : 'Halo, Admin.'),
+                                style: const TextStyle(
+                                    fontSize: 24,
+                                    height: 1.2,
+                                    fontWeight: FontWeight.w800,
+                                    letterSpacing: -.6,
+                                    color: Colors.white)),
+                            const SizedBox(height: 6),
+                            Text(
+                                subtitle ??
+                                    (executive
+                                        ? 'Pengawasan operasional seluruh destinasi'
+                                        : 'Pengelolaan destinasi & aktivitas pribadi'),
+                                style: const TextStyle(
+                                    fontSize: 12,
+                                    height: 1.5,
+                                    color: Color(0xFFE6F1FF))),
+                          ])))));
 }
 
 class _DashboardScenery extends CustomPainter {
@@ -93,13 +116,17 @@ class _DashboardScenery extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     final w = size.width;
     final h = size.height;
-    canvas.drawRect(Offset.zero & size, Paint()
-      ..shader = const LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [Color(0xFF2491EF), AppColors.blue, AppColors.blueDeep],
-          stops: [0, .52, 1]).createShader(Offset.zero & size));
-    canvas.drawCircle(Offset(w * .96, 0), 72,
+    canvas.drawRect(
+        Offset.zero & size,
+        Paint()
+          ..shader = const LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [Color(0xFF2491EF), AppColors.blue, AppColors.blueDeep],
+              stops: [0, .52, 1]).createShader(Offset.zero & size));
+    canvas.drawCircle(
+        Offset(w * .96, 0),
+        72,
         Paint()
           ..color = Colors.white.withValues(alpha: .15)
           ..style = PaintingStyle.stroke);
@@ -118,8 +145,8 @@ class _DashboardScenery extends CustomPainter {
       ..lineTo(w, h - 4)
       ..lineTo(w, h)
       ..close();
-    canvas.drawPath(back,
-        Paint()..color = const Color(0xFF76B3ED).withValues(alpha: .56));
+    canvas.drawPath(
+        back, Paint()..color = const Color(0xFF76B3ED).withValues(alpha: .56));
     final front = Path()
       ..moveTo(0, h)
       ..lineTo(w * .16, h - 3)
@@ -133,8 +160,8 @@ class _DashboardScenery extends CustomPainter {
       ..lineTo(w, h - 2)
       ..lineTo(w, h)
       ..close();
-    canvas.drawPath(front,
-        Paint()..color = const Color(0xFFAECDF2).withValues(alpha: .36));
+    canvas.drawPath(
+        front, Paint()..color = const Color(0xFFAECDF2).withValues(alpha: .36));
   }
 
   @override
@@ -142,8 +169,11 @@ class _DashboardScenery extends CustomPainter {
 }
 
 class _ScopeCard extends StatelessWidget {
-  const _ScopeCard({required this.label, required this.detail, this.onTap,
-    this.executive = false});
+  const _ScopeCard(
+      {required this.label,
+      required this.detail,
+      this.onTap,
+      this.executive = false});
   final String label;
   final String detail;
   final VoidCallback? onTap;
@@ -163,15 +193,21 @@ class _ScopeCard extends StatelessWidget {
                 Icon(executive ? Icons.business_outlined : Icons.place_outlined,
                     color: AppColors.blue, size: 22),
                 const SizedBox(width: 10),
-                Expanded(child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(label, style: const TextStyle(
-                          fontSize: 14, fontWeight: FontWeight.w700,
-                          color: AppColors.navy)),
+                Expanded(
+                    child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                      Text(label,
+                          style: const TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w700,
+                              color: AppColors.navy)),
                       const SizedBox(height: 3),
-                      Text(detail, style: const TextStyle(fontSize: 12,
-                          height: 1.4, color: Color(0xFF526787))),
+                      Text(detail,
+                          style: const TextStyle(
+                              fontSize: 12,
+                              height: 1.4,
+                              color: Color(0xFF526787))),
                     ])),
                 if (onTap != null) ...[
                   const SizedBox(width: 8),
@@ -216,23 +252,28 @@ class _DashboardActionCenter extends StatelessWidget {
                 const Icon(Icons.warning_amber_rounded,
                     color: Color(0xFF98621E), size: 26),
                 const SizedBox(width: 12),
-                Expanded(child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
+                Expanded(
+                    child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
                       Text(executive ? 'Perhatian eksekutif' : 'Perlu tindakan',
-                          style: const TextStyle(fontSize: 14,
+                          style: const TextStyle(
+                              fontSize: 14,
                               fontWeight: FontWeight.w700,
                               color: Color(0xFF795018))),
                       const SizedBox(height: 4),
                       Text('$pending persetujuan menunggu',
-                          style: const TextStyle(fontSize: 13,
-                              color: Color(0xFF795018))),
+                          style: const TextStyle(
+                              fontSize: 13, color: Color(0xFF795018))),
                       const SizedBox(height: 3),
-                      Text(hasActions
-                          ? 'Tinjau antrean & prioritas operasional'
-                          : 'Buka antrean persetujuan',
-                          style: const TextStyle(fontSize: 12,
-                              height: 1.4, color: Color(0xFF795018))),
+                      Text(
+                          hasActions
+                              ? 'Tinjau antrean & prioritas operasional'
+                              : 'Buka antrean persetujuan',
+                          style: const TextStyle(
+                              fontSize: 12,
+                              height: 1.4,
+                              color: Color(0xFF795018))),
                     ])),
                 const SizedBox(width: 8),
                 const Icon(Icons.chevron_right_rounded,
@@ -241,15 +282,15 @@ class _DashboardActionCenter extends StatelessWidget {
 }
 
 class _NoAssignmentState extends StatelessWidget {
-  const _NoAssignmentState({required this.onRefresh});
-  final VoidCallback onRefresh;
+  const _NoAssignmentState();
   @override
   Widget build(BuildContext context) => _DashboardCard(
         child: Padding(
             padding: const EdgeInsets.symmetric(vertical: 20),
             child: Column(children: [
               Container(
-                  width: 70, height: 70,
+                  width: 70,
+                  height: 70,
                   decoration: BoxDecoration(
                       color: const Color(0xFFE8F3FF),
                       borderRadius: BorderRadius.circular(22)),
@@ -270,17 +311,9 @@ class _NoAssignmentState extends StatelessWidget {
                   textAlign: TextAlign.center,
                   style: TextStyle(
                       fontSize: 14, height: 1.6, color: Color(0xFF526787))),
-              const SizedBox(height: 24),
-              SizedBox(
-                  width: double.infinity,
-                  child: FilledButton.icon(
-                      onPressed: onRefresh,
-                      icon: const Icon(Icons.refresh_rounded),
-                      style: FilledButton.styleFrom(
-                          backgroundColor: AppColors.blue,
-                          foregroundColor: Colors.white,
-                          minimumSize: const Size(48, 48)),
-                      label: const Text('Periksa penugasan'))),
+              const SizedBox(height: 16),
+              const Text('Tarik turun untuk memeriksa penugasan.',
+                  style: TextStyle(fontSize: 13)),
             ])),
       );
 }
@@ -290,72 +323,94 @@ class OperationsUnavailableScreen extends StatelessWidget {
   final bool audit;
   @override
   Widget build(BuildContext context) => OperationsPage(
-      title: audit ? 'Aktivitas Audit' : 'Keuangan',
-      subtitle: 'Ketersediaan data operasional',
-      embedded: false,
-      children: [
-        if (audit)
-          _DashboardCard(child: Padding(
-              padding: const EdgeInsets.symmetric(vertical: 20),
-              child: Column(children: [
-                Container(
-                    width: 70, height: 70,
-                    decoration: BoxDecoration(
-                        color: const Color(0xFFE8F3FF),
-                        borderRadius: BorderRadius.circular(22)),
-                    child: const Icon(Icons.history_rounded,
-                        color: AppColors.blue, size: 33)),
-                const SizedBox(height: 20),
-                const Text('Audit Timeline Belum Tersedia',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(fontSize: 20,
-                        fontWeight: FontWeight.w800, color: AppColors.navy)),
-                const SizedBox(height: 12),
-                const Text('Riwayat aktivitas global belum tersedia. '
-                    'Data audit akan tampil setelah layanan tersedia.',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(fontSize: 14, height: 1.6,
-                        color: Color(0xFF526787))),
-                const SizedBox(height: 20),
-                FilledButton(onPressed: () => Navigator.maybePop(context),
-                    child: const Text('Kembali')),
-              ])))
-        else
-          const FinancialUnavailablePanel(),
-      ]);
+          title: audit ? 'Aktivitas Audit' : 'Keuangan',
+          subtitle: 'Ketersediaan data operasional',
+          embedded: false,
+          children: [
+            if (audit)
+              _DashboardCard(
+                  child: Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 20),
+                      child: Column(children: [
+                        Container(
+                            width: 70,
+                            height: 70,
+                            decoration: BoxDecoration(
+                                color: const Color(0xFFE8F3FF),
+                                borderRadius: BorderRadius.circular(22)),
+                            child: const Icon(Icons.history_rounded,
+                                color: AppColors.blue, size: 33)),
+                        const SizedBox(height: 20),
+                        const Text('Audit Timeline Belum Tersedia',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                                fontSize: 20,
+                                fontWeight: FontWeight.w800,
+                                color: AppColors.navy)),
+                        const SizedBox(height: 12),
+                        const Text(
+                            'Riwayat aktivitas global belum tersedia. '
+                            'Data audit akan tampil setelah layanan tersedia.',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                                fontSize: 14,
+                                height: 1.6,
+                                color: Color(0xFF526787))),
+                        const SizedBox(height: 20),
+                        FilledButton(
+                            onPressed: () => Navigator.maybePop(context),
+                            child: const Text('Kembali')),
+                      ])))
+            else
+              const FinancialUnavailablePanel(),
+          ]);
 }
 
 class FinancialUnavailablePanel extends StatelessWidget {
   const FinancialUnavailablePanel({super.key});
   @override
   Widget build(BuildContext context) => _DashboardCard(
-      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          child:
+              Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
         const Row(children: [
           Icon(Icons.account_balance_wallet_outlined,
               color: AppColors.blue, size: 24),
           SizedBox(width: 10),
-          Expanded(child: Text('Keuangan Belum Tersedia',
-              style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16,
-                  color: AppColors.navy))),
+          Expanded(
+              child: Text('Keuangan Belum Tersedia',
+                  style: TextStyle(
+                      fontWeight: FontWeight.w700,
+                      fontSize: 16,
+                      color: AppColors.navy))),
         ]),
         const SizedBox(height: 12),
         const Text('DOKU belum terhubung',
             style: TextStyle(fontSize: 13, color: Color(0xFF526787))),
         const SizedBox(height: 12),
-        for (final label in ['Gross revenue', 'Net revenue', 'Gateway fees',
-            'Refund', 'Settlement'])
+        for (final label in [
+          'Gross revenue',
+          'Net revenue',
+          'Gateway fees',
+          'Refund',
+          'Settlement'
+        ])
           Padding(
               padding: const EdgeInsets.symmetric(vertical: 8),
               child: Row(children: [
-                Expanded(child: Text(label, style: const TextStyle(
-                    fontSize: 13, color: Color(0xFF526787)))),
-                const Text('—', style: TextStyle(fontSize: 16,
-                    fontWeight: FontWeight.w700, color: AppColors.textMuted)),
+                Expanded(
+                    child: Text(label,
+                        style: const TextStyle(
+                            fontSize: 13, color: Color(0xFF526787)))),
+                const Text('—',
+                    style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.textMuted)),
               ])),
         const SizedBox(height: 8),
         const Text('Belum tersedia · pembayaran belum terverifikasi',
-            style: TextStyle(fontSize: 12, height: 1.5,
-                color: Color(0xFF526787))),
+            style:
+                TextStyle(fontSize: 12, height: 1.5, color: Color(0xFF526787))),
       ]));
 }
 
@@ -365,34 +420,49 @@ class OperationsSkeleton extends StatelessWidget {
   Widget build(BuildContext context) => Semantics(
       label: 'Memuat data operasional',
       child: Column(children: [
-        Container(height: 52, margin: const EdgeInsets.only(bottom: 12),
-            decoration: BoxDecoration(color: AppColors.border,
+        Container(
+            height: 52,
+            margin: const EdgeInsets.only(bottom: 12),
+            decoration: BoxDecoration(
+                color: AppColors.border,
                 borderRadius: BorderRadius.circular(14))),
-        LayoutBuilder(builder: (context, constraints) => Wrap(
-            spacing: 12, runSpacing: 12,
-            children: [for (var i = 0; i < 4; i++)
-              Container(width: (constraints.maxWidth - 12) / 2, height: 120,
-                  padding: const EdgeInsets.all(14),
-                  decoration: BoxDecoration(color: Colors.white,
-                      border: Border.all(color: AppColors.border),
-                      borderRadius: BorderRadius.circular(16)),
-                  child: const Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        SizedBox(width: 24, height: 24,
-                            child: ColoredBox(color: AppColors.border)),
-                        SizedBox(height: 12),
-                        SizedBox(width: 64, height: 24,
-                            child: ColoredBox(color: AppColors.border)),
-                        SizedBox(height: 8),
-                        SizedBox(width: 88, height: 12,
-                            child: ColoredBox(color: AppColors.border)),
-                      ])),
-            ])),
+        LayoutBuilder(
+            builder: (context, constraints) =>
+                Wrap(spacing: 12, runSpacing: 12, children: [
+                  for (var i = 0; i < 4; i++)
+                    Container(
+                        width: (constraints.maxWidth - 12) / 2,
+                        height: 120,
+                        padding: const EdgeInsets.all(14),
+                        decoration: BoxDecoration(
+                            color: Colors.white,
+                            border: Border.all(color: AppColors.border),
+                            borderRadius: BorderRadius.circular(16)),
+                        child: const Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              SizedBox(
+                                  width: 24,
+                                  height: 24,
+                                  child: ColoredBox(color: AppColors.border)),
+                              SizedBox(height: 12),
+                              SizedBox(
+                                  width: 64,
+                                  height: 24,
+                                  child: ColoredBox(color: AppColors.border)),
+                              SizedBox(height: 8),
+                              SizedBox(
+                                  width: 88,
+                                  height: 12,
+                                  child: ColoredBox(color: AppColors.border)),
+                            ])),
+                ])),
         const SizedBox(height: 12),
-        Container(height: 140, decoration: BoxDecoration(
-            color: AppColors.border.withValues(alpha: .6),
-            borderRadius: BorderRadius.circular(17))),
+        Container(
+            height: 140,
+            decoration: BoxDecoration(
+                color: AppColors.border.withValues(alpha: .6),
+                borderRadius: BorderRadius.circular(17))),
       ]));
 }
 
@@ -415,9 +485,10 @@ class OperationsMetrics extends StatelessWidget {
         return Wrap(spacing: 12, runSpacing: 12, children: [
           for (var i = 0; i < values.length; i++)
             SizedBox(
-                width: stacked || (values.length.isOdd && i == values.length - 1)
-                    ? constraints.maxWidth
-                    : (constraints.maxWidth - 12) / 2,
+                width:
+                    stacked || (values.length.isOdd && i == values.length - 1)
+                        ? constraints.maxWidth
+                        : (constraints.maxWidth - 12) / 2,
                 child: Container(
                     padding: compact
                         ? const EdgeInsets.all(4)
@@ -442,8 +513,11 @@ class OperationsMetrics extends StatelessWidget {
                           if (icons == null) const SizedBox(height: 8),
                           Text(values[i].$2,
                               style: TextStyle(
-                                  fontSize: compact || values[i].$2 == '—' ? 20 : 26,
-                                  fontFeatures: const [FontFeature.tabularFigures()],
+                                  fontSize:
+                                      compact || values[i].$2 == '—' ? 20 : 26,
+                                  fontFeatures: const [
+                                    FontFeature.tabularFigures()
+                                  ],
                                   height: 1.2,
                                   fontWeight: FontWeight.w800,
                                   color: AppColors.navy)),
@@ -451,7 +525,8 @@ class OperationsMetrics extends StatelessWidget {
                             const SizedBox(height: 4),
                             Text(values[i].$1,
                                 style: const TextStyle(
-                                    fontSize: 13, fontWeight: FontWeight.w600,
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w600,
                                     color: AppColors.navy)),
                           ],
                           if (metadata != null) ...[
@@ -469,7 +544,10 @@ class OperationsMetrics extends StatelessWidget {
 
 class OperationsTrend extends StatelessWidget {
   const OperationsTrend(
-      {super.key, required this.rows, required this.valueKey, this.secondKey,
+      {super.key,
+      required this.rows,
+      required this.valueKey,
+      this.secondKey,
       this.bars = false});
   final List<Json> rows;
   final String valueKey;
@@ -487,7 +565,9 @@ class OperationsTrend extends StatelessWidget {
       return Padding(
           padding: const EdgeInsets.only(top: 16),
           child: Column(children: [
-            SizedBox(height: 112, width: double.infinity,
+            SizedBox(
+                height: 112,
+                width: double.infinity,
                 child: CustomPaint(painter: _TrendPainter(first, second))),
             const _Notice('Belum ada aktivitas pada periode ini.'),
           ]));
@@ -579,8 +659,8 @@ class _TrendPainter extends CustomPainter {
         final height = size.height * first[i] / maxValue;
         canvas.drawRRect(
             RRect.fromRectAndCorners(
-                Rect.fromLTWH(slot * i + slot * .15,
-                    size.height - height, slot * .7, height),
+                Rect.fromLTWH(slot * i + slot * .15, size.height - height,
+                    slot * .7, height),
                 topLeft: const Radius.circular(4),
                 topRight: const Radius.circular(4)),
             Paint()..color = AppColors.blue);
@@ -593,7 +673,8 @@ class _TrendPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(_TrendPainter oldDelegate) =>
-      first != oldDelegate.first || second != oldDelegate.second ||
+      first != oldDelegate.first ||
+      second != oldDelegate.second ||
       bars != oldDelegate.bars;
 }
 
@@ -629,49 +710,73 @@ Widget _routeLink(String label, VoidCallback action) => ListTile(
 Widget _filterButton(Map<String, String> filters, VoidCallback action) =>
     _ScopeCard(
         label: filters['destination_guid'] == null
-            ? 'Semua destinasi yang dapat diakses' : 'Destinasi terpilih',
+            ? 'Semua destinasi yang dapat diakses'
+            : 'Destinasi terpilih',
         detail: filters['from'] == null
             ? 'Filter destinasi dan periode'
             : "${filters['from']} — ${filters['to'] ?? '—'} · Filter aktif",
         onTap: action);
-Widget _freshness(String? generated, VoidCallback refresh) => Row(children: [
+Widget _freshness(String? generated, VoidCallback refresh,
+        {required int? role}) =>
+    Row(children: [
       Expanded(
           child: Text(
               generated == null
                   ? 'Waktu snapshot belum tersedia'
                   : 'Snapshot server: ${DateTime.tryParse(generated) == null ? generated : formatDateTime(DateTime.parse(generated))}',
-              style:
-                  const TextStyle(fontSize: 12, color: Color(0xFF526787)))),
-      IconButton(
-          tooltip: 'Perbarui data',
-          onPressed: refresh,
-          icon: const Icon(Icons.refresh, size: 20))
+              style: const TextStyle(fontSize: 12, color: Color(0xFF526787)))),
+      if (role != 1)
+        IconButton(
+            tooltip: 'Perbarui data',
+            onPressed: refresh,
+            icon: const Icon(Icons.refresh, size: 20))
     ]);
-Widget _errorBlock(Object error, VoidCallback retry) => _DashboardCard(
-    child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 12),
-        child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-          Icon(_scopeError(error) ? Icons.lock_outline : Icons.wifi_off_rounded,
-              size: 36, color: _scopeError(error)
-                  ? const Color(0xFFAF4B48) : const Color(0xFF98621E)),
-          const SizedBox(height: 16),
-          Text(_scopeError(error) ? 'Akses telah berubah' : 'Data belum dapat dimuat',
-              textAlign: TextAlign.center,
-              style: const TextStyle(fontSize: 18,
-                  fontWeight: FontWeight.w700, color: AppColors.navy)),
-          const SizedBox(height: 10),
-          Text(_scopeError(error)
-              ? 'Akses destinasi berubah. Data lama telah dibersihkan. Pilih ulang destinasi yang dapat diakses.'
-              : adminErrorMessage(error),
-              textAlign: TextAlign.center,
-              style: const TextStyle(fontSize: 13, height: 1.6,
-                  color: Color(0xFF526787))),
-          const SizedBox(height: 20),
-          FilledButton.icon(onPressed: retry,
-              icon: const Icon(Icons.refresh_rounded, size: 20),
-              label: Text(_scopeError(error)
-                  ? 'Pilih ulang destinasi' : 'Coba lagi')),
-        ])));
+Widget _errorBlock(Object error, VoidCallback retry, {required int? role}) =>
+    _DashboardCard(
+        child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 12),
+            child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Icon(
+                      _scopeError(error)
+                          ? Icons.lock_outline
+                          : Icons.wifi_off_rounded,
+                      size: 36,
+                      color: _scopeError(error)
+                          ? const Color(0xFFAF4B48)
+                          : const Color(0xFF98621E)),
+                  const SizedBox(height: 16),
+                  Text(
+                      _scopeError(error)
+                          ? 'Akses telah berubah'
+                          : 'Data belum dapat dimuat',
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.navy)),
+                  const SizedBox(height: 10),
+                  Text(
+                      _scopeError(error)
+                          ? 'Akses destinasi berubah. Data lama telah dibersihkan. Pilih ulang destinasi yang dapat diakses.'
+                          : adminErrorMessage(error),
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                          fontSize: 13, height: 1.6, color: Color(0xFF526787))),
+                  const SizedBox(height: 20),
+                  if (role != 1)
+                    FilledButton.icon(
+                        onPressed: retry,
+                        icon: const Icon(Icons.refresh_rounded, size: 20),
+                        label: Text(_scopeError(error)
+                            ? 'Pilih ulang destinasi'
+                            : 'Coba lagi')),
+                  if (role == 1)
+                    const Text('Tarik turun untuk menyinkronkan data.',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(fontSize: 13)),
+                ])));
 Widget _actionTile(OperationalRow row, VoidCallback open) => Padding(
     padding: const EdgeInsets.only(bottom: 8),
     child: Material(
@@ -681,22 +786,29 @@ Widget _actionTile(OperationalRow row, VoidCallback open) => Padding(
             side: const BorderSide(color: AppColors.border)),
         clipBehavior: Clip.antiAlias,
         child: ListTile(
-            contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-            leading: Icon(row.action == 'upcoming_visit'
-                ? Icons.event_available_outlined : Icons.schedule_rounded,
+            contentPadding:
+                const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+            leading: Icon(
+                row.action == 'upcoming_visit'
+                    ? Icons.event_available_outlined
+                    : Icons.schedule_rounded,
                 color: row.action == 'upcoming_visit'
-                    ? AppColors.blue : const Color(0xFF98621E)),
+                    ? AppColors.blue
+                    : const Color(0xFF98621E)),
             title: Text(operationalActionLabel(row.action),
-                style: const TextStyle(fontSize: 14,
-                    fontWeight: FontWeight.w700, color: AppColors.navy)),
-            subtitle: Text('${row.name ?? 'Destinasi'}\n'
+                style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.navy)),
+            subtitle: Text(
+                '${row.name ?? 'Destinasi'}\n'
                 "${row.raw['visit_date'] ?? 'Tanggal belum tersedia'} · "
                 "${row.claimState == 'active' ? 'Claim aktif' : 'Belum diambil'}",
-                style: const TextStyle(fontSize: 12, height: 1.5,
-                    color: Color(0xFF526787))),
+                style: const TextStyle(
+                    fontSize: 12, height: 1.5, color: Color(0xFF526787))),
             isThreeLine: true,
-            trailing: const Icon(Icons.chevron_right_rounded,
-                color: AppColors.blue),
+            trailing:
+                const Icon(Icons.chevron_right_rounded, color: AppColors.blue),
             onTap: row.bookingGuid == null ? null : open)));
 bool _scopeError(Object? e) =>
     e is ApiException && (e.status == 403 || e.status == 404);

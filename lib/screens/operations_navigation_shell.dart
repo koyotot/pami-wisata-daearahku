@@ -140,7 +140,7 @@ class _OperationsNavigationShellState extends State<OperationsNavigationShell>
               embedded: true,
               active: _index == 3)
           : _ManagementPage(repository: _repository, session: _session),
-      _ => _OperationsProfile(session: _session),
+      _ => _OperationsProfile(session: _session, onRefresh: _revalidateSession),
     };
   }
 
@@ -151,7 +151,7 @@ class _OperationsNavigationShellState extends State<OperationsNavigationShell>
     }
     if (!_accessChanged) _page(_index);
     return Theme(
-        data: AppColors.visitorTheme,
+        data: _role == 1 ? AppColors.operationsTheme : AppColors.visitorTheme,
         child: PopScope(
           canPop: _index == 0,
           onPopInvokedWithResult: (didPop, _) {
@@ -161,14 +161,17 @@ class _OperationsNavigationShellState extends State<OperationsNavigationShell>
             extendBody: true,
             body: _accessChanged
                 ? OperationsPage(
+                    role: _role,
+                    onRefresh: _role == 1 ? () => _select(_index) : null,
                     title: 'Akses diperbarui',
                     subtitle: 'Data operasional sebelumnya telah dibersihkan.',
                     children: [
                         const Text(
                             'Pilih ulang destinasi atau muat data sesuai akses terbaru.'),
-                        TextButton(
-                            onPressed: () => _select(_index),
-                            child: const Text('Muat sesuai akses terbaru')),
+                        if (_role != 1)
+                          TextButton(
+                              onPressed: () => _select(_index),
+                              child: const Text('Muat sesuai akses terbaru')),
                       ])
                 : IndexedStack(
                     index: _index,
@@ -254,19 +257,25 @@ class _ManagementPage extends StatelessWidget {
               side: const BorderSide(color: AppColors.border)),
           clipBehavior: Clip.antiAlias,
           child: ListTile(
-              contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-              title: Text(title, style: const TextStyle(fontSize: 14,
-                  fontWeight: FontWeight.w700, color: AppColors.navy)),
-              subtitle: Text(subtitle, style: const TextStyle(fontSize: 12,
-                  height: 1.5, color: Color(0xFF526787))),
+              contentPadding:
+                  const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+              title: Text(title,
+                  style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.navy)),
+              subtitle: Text(subtitle,
+                  style: const TextStyle(
+                      fontSize: 12, height: 1.5, color: Color(0xFF526787))),
               trailing: const Icon(Icons.chevron_right, color: AppColors.blue),
               onTap: () => Navigator.of(context)
                   .push(MaterialPageRoute<void>(builder: (_) => page))));
 }
 
 class _OperationsProfile extends StatefulWidget {
-  const _OperationsProfile({required this.session});
+  const _OperationsProfile({required this.session, required this.onRefresh});
   final AuthSession session;
+  final Future<void> Function() onRefresh;
   @override
   State<_OperationsProfile> createState() => _OperationsProfileState();
 }
@@ -275,19 +284,47 @@ class _OperationsProfileState extends State<_OperationsProfile> {
   bool _busy = false;
   @override
   Widget build(BuildContext context) => OperationsPage(
+          role: widget.session.role,
+          onRefresh: widget.session.role == 1 ? widget.onRefresh : null,
           title: 'Profil',
           subtitle: 'Akun operasional Wisata Daerahku',
           children: [
-            Text(currentUser?.namaLengkap ?? 'Akun operasional',
-                style:
-                    const TextStyle(fontSize: 24, fontWeight: FontWeight.w700)),
-            const SizedBox(height: 8),
-            Text(currentUser?.email ?? ''),
-            const SizedBox(height: 8),
-            Text(widget.session.role == 2
-                ? 'Superadmin · akses global'
-                : 'Admin · destinasi yang ditugaskan'),
-            const SizedBox(height: 32),
+            if (widget.session.role == 1)
+              Card(
+                  elevation: 0,
+                  color: AppColors.surface,
+                  child: Padding(
+                      padding: const EdgeInsets.all(20),
+                      child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Icon(Icons.person_outline,
+                                color: AppColors.blue, size: 32),
+                            const SizedBox(height: 16),
+                            Text(currentUser?.namaLengkap ?? 'Admin',
+                                style: const TextStyle(
+                                    fontSize: 22, fontWeight: FontWeight.w800)),
+                            const SizedBox(height: 8),
+                            Text(currentUser?.email ?? ''),
+                            const SizedBox(height: 16),
+                            const Text('Admin · Role 1',
+                                style: TextStyle(fontWeight: FontWeight.w700)),
+                            const SizedBox(height: 8),
+                            const Text(
+                                'Akses hanya untuk destinasi yang ditugaskan oleh Superadmin.'),
+                          ]))),
+            if (widget.session.role != 1) ...[
+              Text(currentUser?.namaLengkap ?? 'Akun operasional',
+                  style: const TextStyle(
+                      fontSize: 24, fontWeight: FontWeight.w700)),
+              const SizedBox(height: 8),
+              Text(currentUser?.email ?? ''),
+              const SizedBox(height: 8),
+              Text(widget.session.role == 2
+                  ? 'Superadmin · akses global'
+                  : 'Admin · destinasi yang ditugaskan'),
+            ],
+            SizedBox(height: widget.session.role == 1 ? 24 : 32),
             ElevatedButton.icon(
                 onPressed: _busy
                     ? null

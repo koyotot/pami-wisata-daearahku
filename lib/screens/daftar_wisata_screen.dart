@@ -10,6 +10,7 @@ import '../data/app_data.dart';
 import '../data/business_repository.dart';
 import '../services/auth_session.dart';
 import '../widgets/api_image.dart';
+import '../widgets/operations_chrome.dart';
 import 'admin_common.dart';
 import 'detail_wisata_screen.dart';
 import 'kelola_kuota_screen.dart';
@@ -149,8 +150,7 @@ class _DaftarWisataScreenState extends State<DaftarWisataScreen>
     _categories = PagedListController<Category>(
       session: _session,
       keyOf: (category) => category.guid,
-      fetchPage: (page, _) =>
-          _repository.categories(query: {'page': '$page'}),
+      fetchPage: (page, _) => _repository.categories(query: {'page': '$page'}),
     )..addListener(_update);
     _guard.addListener(_update);
     _session.sessionChanges.addListener(_sessionChanged);
@@ -189,78 +189,84 @@ class _DaftarWisataScreenState extends State<DaftarWisataScreen>
     final warna = nonaktifkan ? _C.danger : _C.teal;
     final ok = await showDialog<bool>(
       context: context,
-      builder: (ctx) => Dialog(
-        backgroundColor: _C.card,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-        child: Padding(
-          padding: const EdgeInsets.all(28),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                padding: const EdgeInsets.all(18),
-                decoration: BoxDecoration(
-                  color: warna.withValues(alpha: 0.12),
-                  shape: BoxShape.circle,
-                  border: Border.all(color: warna.withValues(alpha: 0.3)),
-                ),
-                child: Icon(
-                    nonaktifkan ? Icons.delete_rounded : Icons.restore_rounded,
-                    color: warna,
-                    size: 36),
-              ),
-              const SizedBox(height: 20),
-              Text(nonaktifkan ? 'Hapus Wisata?' : 'Aktifkan Kembali?',
-                  style: const TextStyle(
-                    color: _C.text,
-                    fontWeight: FontWeight.w800,
-                    fontSize: 20,
-                  )),
-              const SizedBox(height: 10),
-              Text(
-                nonaktifkan
-                    ? '"${w.nama}" akan dinonaktifkan dari katalog.'
-                    : '"${w.nama}" akan ditampilkan kembali di katalog.',
-                textAlign: TextAlign.center,
-                style: const TextStyle(
-                    color: _C.textMuted, fontSize: 13, height: 1.5),
-              ),
-              const SizedBox(height: 28),
-              Row(children: [
-                Expanded(
-                  child: OutlinedButton(
-                    onPressed: () => Navigator.pop(ctx, false),
-                    style: OutlinedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(vertical: 14),
-                      shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(14)),
-                      side: const BorderSide(color: _C.border),
-                      foregroundColor: _C.textMuted,
+      builder: (ctx) => OperationsTheme(
+          role: _session.role,
+          child: Dialog(
+            backgroundColor: _C.card,
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+            child: Padding(
+              padding: const EdgeInsets.all(28),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(18),
+                    decoration: BoxDecoration(
+                      color: warna.withValues(alpha: 0.12),
+                      shape: BoxShape.circle,
+                      border: Border.all(color: warna.withValues(alpha: 0.3)),
                     ),
-                    child: const Text('Batal'),
+                    child: Icon(
+                        nonaktifkan
+                            ? Icons.delete_rounded
+                            : Icons.restore_rounded,
+                        color: warna,
+                        size: 36),
                   ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: ElevatedButton(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: warna,
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(vertical: 14),
-                      elevation: 0,
-                      shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(14)),
+                  const SizedBox(height: 20),
+                  Text(nonaktifkan ? 'Hapus Wisata?' : 'Aktifkan Kembali?',
+                      style: const TextStyle(
+                        color: _C.text,
+                        fontWeight: FontWeight.w800,
+                        fontSize: 20,
+                      )),
+                  const SizedBox(height: 10),
+                  Text(
+                    nonaktifkan
+                        ? '"${w.nama}" akan dinonaktifkan dari katalog.'
+                        : '"${w.nama}" akan ditampilkan kembali di katalog.',
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                        color: _C.textMuted, fontSize: 13, height: 1.5),
+                  ),
+                  const SizedBox(height: 28),
+                  Row(children: [
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: () => Navigator.pop(ctx, false),
+                        style: OutlinedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(14)),
+                          side: const BorderSide(color: _C.border),
+                          foregroundColor: _C.textMuted,
+                        ),
+                        child: const Text('Batal'),
+                      ),
                     ),
-                    onPressed: () => Navigator.pop(ctx, true),
-                    child: Text(nonaktifkan ? 'Hapus' : 'Aktifkan',
-                        style: const TextStyle(fontWeight: FontWeight.w700)),
-                  ),
-                ),
-              ]),
-            ],
-          ),
-        ),
-      ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: warna,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          elevation: 0,
+                          shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(14)),
+                        ),
+                        onPressed: () => Navigator.pop(ctx, true),
+                        child: Text(nonaktifkan ? 'Hapus' : 'Aktifkan',
+                            style:
+                                const TextStyle(fontWeight: FontWeight.w700)),
+                      ),
+                    ),
+                  ]),
+                ],
+              ),
+            ),
+          )),
     );
     return ok == true;
   }
@@ -279,11 +285,8 @@ class _DaftarWisataScreenState extends State<DaftarWisataScreen>
           await _repository.reactivateDestination(w.id);
         }
         if (!mounted || !_session.isCurrentGeneration(generation)) return;
-        showAdminSnack(
-            context,
-            nonaktifkan
-                ? 'Wisata dinonaktifkan'
-                : 'Wisata diaktifkan kembali');
+        showAdminSnack(context,
+            nonaktifkan ? 'Wisata dinonaktifkan' : 'Wisata diaktifkan kembali');
       } catch (e) {
         if (!mounted || !_session.isCurrentGeneration(generation)) return;
         showAdminSnack(context, adminErrorMessage(e), error: true);
@@ -316,472 +319,500 @@ class _DaftarWisataScreenState extends State<DaftarWisataScreen>
 
     final total = _catalog.total ?? filtered.length;
 
-    return Scaffold(
-      backgroundColor: _C.bg,
-      body: RefreshIndicator(
-        onRefresh: _refreshView,
-        child: CustomScrollView(
-          physics: const BouncingScrollPhysics(),
-          slivers: [
-            // ── SliverAppBar ────────────────────────────────────
-            SliverAppBar(
-              expandedHeight: 210,
-              floating: false,
-              pinned: true,
-              snap: false,
-              backgroundColor: const Color(0xFF1558B0),
-              elevation: 0,
-              leading: GestureDetector(
-                onTap: () => Navigator.pop(context),
-                child: Container(
-                  margin: const EdgeInsets.all(10),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.22),
-                    borderRadius: BorderRadius.circular(12),
-                    border:
-                        Border.all(color: Colors.white.withValues(alpha: 0.35)),
-                  ),
-                  child: const Icon(Icons.arrow_back_ios_new_rounded,
-                      size: 16, color: Colors.white),
-                ),
-              ),
-              actions: widget.mode == 'view'
-                  ? [
-                      Container(
-                        margin:
-                            const EdgeInsets.only(right: 12, top: 8, bottom: 8),
-                        padding: const EdgeInsets.symmetric(horizontal: 12),
+    return OperationsTheme(
+        role: _session.role,
+        child: Scaffold(
+          backgroundColor: _C.bg,
+          body: RefreshIndicator(
+            onRefresh: _refreshView,
+            child: CustomScrollView(
+              physics: _session.role == 1
+                  ? const AlwaysScrollableScrollPhysics()
+                  : const BouncingScrollPhysics(),
+              slivers: [
+                // ── SliverAppBar ────────────────────────────────────
+                if (_session.role == 1)
+                  SliverToBoxAdapter(
+                      child: OperationsScenicHeader(
+                          title: _judul,
+                          subtitle: widget.mode == 'kuota'
+                              ? 'Pilih destinasi untuk mengatur kuota'
+                              : '$total destinasi dalam penugasan',
+                          onBack: () => Navigator.maybePop(context)))
+                else
+                  SliverAppBar(
+                    expandedHeight: 210,
+                    floating: false,
+                    pinned: true,
+                    snap: false,
+                    backgroundColor: const Color(0xFF1558B0),
+                    elevation: 0,
+                    leading: GestureDetector(
+                      onTap: () => Navigator.pop(context),
+                      child: Container(
+                        margin: const EdgeInsets.all(10),
                         decoration: BoxDecoration(
                           color: Colors.white.withValues(alpha: 0.22),
-                          borderRadius: BorderRadius.circular(10),
+                          borderRadius: BorderRadius.circular(12),
                           border: Border.all(
                               color: Colors.white.withValues(alpha: 0.35)),
                         ),
-                        child: Row(
+                        child: const Icon(Icons.arrow_back_ios_new_rounded,
+                            size: 16, color: Colors.white),
+                      ),
+                    ),
+                    actions: widget.mode == 'view'
+                        ? [
+                            Container(
+                              margin: const EdgeInsets.only(
+                                  right: 12, top: 8, bottom: 8),
+                              padding:
+                                  const EdgeInsets.symmetric(horizontal: 12),
+                              decoration: BoxDecoration(
+                                color: Colors.white.withValues(alpha: 0.22),
+                                borderRadius: BorderRadius.circular(10),
+                                border: Border.all(
+                                    color:
+                                        Colors.white.withValues(alpha: 0.35)),
+                              ),
+                              child: Row(
+                                children: [
+                                  const Icon(Icons.landscape_rounded,
+                                      color: Colors.white, size: 13),
+                                  const SizedBox(width: 5),
+                                  Text('$total',
+                                      style: const TextStyle(
+                                          color: Colors.white,
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.w800)),
+                                ],
+                              ),
+                            ),
+                          ]
+                        : null,
+                    flexibleSpace: FlexibleSpaceBar(
+                      collapseMode: CollapseMode.parallax,
+                      background: Container(
+                        decoration: const BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                            colors: [
+                              Color(0xFF2A93F0),
+                              Color(0xFF1976D2),
+                              Color(0xFF1558B0)
+                            ],
+                            stops: [0.0, 0.5, 1.0],
+                          ),
+                        ),
+                        child: Stack(
                           children: [
-                            const Icon(Icons.landscape_rounded,
-                                color: Colors.white, size: 13),
-                            const SizedBox(width: 5),
-                            Text('$total',
-                                style: const TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w800)),
+                            // Teks header
+                            Positioned(
+                              left: 20,
+                              right: 20,
+                              bottom: 46,
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 10, vertical: 5),
+                                    decoration: BoxDecoration(
+                                      color:
+                                          Colors.white.withValues(alpha: 0.16),
+                                      borderRadius: BorderRadius.circular(20),
+                                      border: Border.all(
+                                          color: Colors.white
+                                              .withValues(alpha: 0.28)),
+                                    ),
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Container(
+                                          width: 6,
+                                          height: 6,
+                                          decoration: BoxDecoration(
+                                            color: accent,
+                                            shape: BoxShape.circle,
+                                          ),
+                                        ),
+                                        const SizedBox(width: 7),
+                                        Text(
+                                          widget.mode == 'edit'
+                                              ? 'UBAH DESTINASI'
+                                              : widget.mode == 'hapus'
+                                                  ? 'HAPUS DESTINASI'
+                                                  : 'DESTINASI NUSANTARA',
+                                          style: const TextStyle(
+                                            color: Colors.white,
+                                            fontSize: 10,
+                                            fontWeight: FontWeight.w800,
+                                            letterSpacing: 1.8,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  const SizedBox(height: 12),
+                                  Text(
+                                    _judul,
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 32,
+                                      fontWeight: FontWeight.w800,
+                                      letterSpacing: -0.8,
+                                      height: 1.1,
+                                      shadows: [
+                                        Shadow(
+                                          color: Color(0x33000000),
+                                          blurRadius: 12,
+                                          offset: Offset(0, 3),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  const SizedBox(height: 6),
+                                  Text(
+                                    widget.mode == 'edit'
+                                        ? 'Pilih wisata yang ingin diubah'
+                                        : widget.mode == 'hapus'
+                                            ? 'Nonaktifkan atau aktifkan kembali wisata'
+                                            : widget.mode == 'kuota'
+                                                ? 'Pilih wisata untuk mengatur kuota'
+                                                : '$total destinasi ditemukan',
+                                    style: TextStyle(
+                                      color:
+                                          Colors.white.withValues(alpha: 0.88),
+                                      fontSize: 12.5,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            // Tepi bawah melengkung menyatu dengan konten
+                            Positioned(
+                              left: 0,
+                              right: 0,
+                              bottom: -1,
+                              child: Container(
+                                height: 26,
+                                decoration: BoxDecoration(
+                                  color: _C.bg,
+                                  borderRadius: const BorderRadius.vertical(
+                                      top: Radius.circular(26)),
+                                ),
+                              ),
+                            ),
                           ],
                         ),
                       ),
-                    ]
-                  : null,
-              flexibleSpace: FlexibleSpaceBar(
-                collapseMode: CollapseMode.parallax,
-                background: Container(
-                  decoration: const BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                      colors: [
-                        Color(0xFF2A93F0),
-                        Color(0xFF1976D2),
-                        Color(0xFF1558B0)
-                      ],
-                      stops: [0.0, 0.5, 1.0],
                     ),
                   ),
-                  child: Stack(
-                    children: [
-                      // Teks header
-                      Positioned(
-                        left: 20,
-                        right: 20,
-                        bottom: 46,
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Container(
+
+                // ── Search bar ──────────────────────────────────────
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 14, 16, 0),
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: _C.surface,
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: _C.border),
+                        boxShadow: [
+                          BoxShadow(
+                            color: _C.blue.withValues(alpha: 0.08),
+                            blurRadius: 16,
+                            offset: const Offset(0, 6),
+                          ),
+                        ],
+                      ),
+                      child: TextField(
+                        controller: _searchController,
+                        style: const TextStyle(color: _C.text, fontSize: 14),
+                        decoration: InputDecoration(
+                          hintText: widget.mode == 'view'
+                              ? 'Cari nama wisata...'
+                              : 'Cari nama, lokasi, atau kategori...',
+                          hintStyle:
+                              const TextStyle(color: _C.textDim, fontSize: 13),
+                          prefixIcon: const Icon(Icons.search_rounded,
+                              color: _C.teal, size: 20),
+                          suffixIcon: _cari.isNotEmpty
+                              ? IconButton(
+                                  icon: const Icon(Icons.close_rounded,
+                                      color: _C.textMuted, size: 18),
+                                  onPressed: () {
+                                    _searchController.clear();
+                                    _onSearch('');
+                                  },
+                                )
+                              : null,
+                          filled: true,
+                          fillColor: Colors.transparent,
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(16),
+                            borderSide: BorderSide.none,
+                          ),
+                          contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 16, vertical: 14),
+                        ),
+                        onChanged: _onSearch,
+                      ),
+                    ),
+                  ),
+                ),
+
+                // ── Filter status: aktif / nonaktif / semua ──────────
+                SliverToBoxAdapter(
+                  child: AdminFilterChips<String>(
+                    options: const [
+                      ('Aktif', 'active'),
+                      ('Nonaktif', 'inactive'),
+                      ('Semua', 'all'),
+                    ],
+                    selected: _status,
+                    onSelected: (value) {
+                      if (value == _status) return;
+                      setState(() => _status = value);
+                      _loadCatalog();
+                    },
+                  ),
+                ),
+
+                // ── Filter kategori (mode view) ─────────────────────
+                if (widget.mode == 'view')
+                  SliverToBoxAdapter(
+                    child: SizedBox(
+                      height: 56,
+                      child: ListView.builder(
+                        scrollDirection: Axis.horizontal,
+                        physics: const BouncingScrollPhysics(),
+                        padding: const EdgeInsets.fromLTRB(16, 14, 16, 0),
+                        itemCount: 1 + _categories.items.length,
+                        itemBuilder: (_, i) {
+                          final category =
+                              i == 0 ? null : _categories.items[i - 1];
+                          final k = category?.name ?? 'Semua';
+                          final sel = _categoryGuid == category?.guid;
+                          final col = _kColor[k] ?? _C.teal;
+                          return GestureDetector(
+                            onTap: () {
+                              setState(() => _categoryGuid = category?.guid);
+                              _loadCatalog();
+                            },
+                            child: AnimatedContainer(
+                              duration: const Duration(milliseconds: 200),
+                              margin: const EdgeInsets.only(right: 8),
                               padding: const EdgeInsets.symmetric(
-                                  horizontal: 10, vertical: 5),
+                                  horizontal: 14, vertical: 6),
                               decoration: BoxDecoration(
-                                color: Colors.white.withValues(alpha: 0.16),
+                                color: sel ? col : _C.surface,
                                 borderRadius: BorderRadius.circular(20),
                                 border: Border.all(
-                                    color:
-                                        Colors.white.withValues(alpha: 0.28)),
+                                  color: sel ? col : _C.border,
+                                  width: 1,
+                                ),
+                                boxShadow: sel
+                                    ? [
+                                        BoxShadow(
+                                            color: col.withValues(alpha: 0.40),
+                                            blurRadius: 10,
+                                            offset: const Offset(0, 3))
+                                      ]
+                                    : [],
                               ),
                               child: Row(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
-                                  Container(
-                                    width: 6,
-                                    height: 6,
-                                    decoration: BoxDecoration(
-                                      color: accent,
-                                      shape: BoxShape.circle,
-                                    ),
-                                  ),
-                                  const SizedBox(width: 7),
-                                  Text(
-                                    widget.mode == 'edit'
-                                        ? 'UBAH DESTINASI'
-                                        : widget.mode == 'hapus'
-                                            ? 'HAPUS DESTINASI'
-                                            : 'DESTINASI NUSANTARA',
-                                    style: const TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 10,
-                                      fontWeight: FontWeight.w800,
-                                      letterSpacing: 1.8,
-                                    ),
-                                  ),
+                                  Icon(_kIcon[k] ?? Icons.place_rounded,
+                                      size: 13,
+                                      color: sel ? Colors.white : _C.textDim),
+                                  const SizedBox(width: 5),
+                                  Text(k,
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w700,
+                                        color:
+                                            sel ? Colors.white : _C.textMuted,
+                                      )),
                                 ],
                               ),
                             ),
-                            const SizedBox(height: 12),
-                            Text(
-                              _judul,
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 32,
-                                fontWeight: FontWeight.w800,
-                                letterSpacing: -0.8,
-                                height: 1.1,
-                                shadows: [
-                                  Shadow(
-                                    color: Color(0x33000000),
-                                    blurRadius: 12,
-                                    offset: Offset(0, 3),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            const SizedBox(height: 6),
-                            Text(
-                              widget.mode == 'edit'
-                                  ? 'Pilih wisata yang ingin diubah'
-                                  : widget.mode == 'hapus'
-                                      ? 'Nonaktifkan atau aktifkan kembali wisata'
-                                      : widget.mode == 'kuota'
-                                          ? 'Pilih wisata untuk mengatur kuota'
-                                          : '$total destinasi ditemukan',
-                              style: TextStyle(
-                                color: Colors.white.withValues(alpha: 0.88),
-                                fontSize: 12.5,
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      // Tepi bawah melengkung menyatu dengan konten
-                      Positioned(
-                        left: 0,
-                        right: 0,
-                        bottom: -1,
-                        child: Container(
-                          height: 26,
-                          decoration: BoxDecoration(
-                            color: _C.bg,
-                            borderRadius: const BorderRadius.vertical(
-                                top: Radius.circular(26)),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-
-            // ── Search bar ──────────────────────────────────────
-            SliverToBoxAdapter(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(16, 14, 16, 0),
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: _C.surface,
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: _C.border),
-                    boxShadow: [
-                      BoxShadow(
-                        color: _C.blue.withValues(alpha: 0.08),
-                        blurRadius: 16,
-                        offset: const Offset(0, 6),
-                      ),
-                    ],
-                  ),
-                  child: TextField(
-                    controller: _searchController,
-                    style: const TextStyle(color: _C.text, fontSize: 14),
-                    decoration: InputDecoration(
-                      hintText: widget.mode == 'view'
-                          ? 'Cari nama wisata...'
-                          : 'Cari nama, lokasi, atau kategori...',
-                      hintStyle:
-                          const TextStyle(color: _C.textDim, fontSize: 13),
-                      prefixIcon: const Icon(Icons.search_rounded,
-                          color: _C.teal, size: 20),
-                      suffixIcon: _cari.isNotEmpty
-                          ? IconButton(
-                              icon: const Icon(Icons.close_rounded,
-                                  color: _C.textMuted, size: 18),
-                              onPressed: () {
-                                _searchController.clear();
-                                _onSearch('');
-                              },
-                            )
-                          : null,
-                      filled: true,
-                      fillColor: Colors.transparent,
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(16),
-                        borderSide: BorderSide.none,
-                      ),
-                      contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 16, vertical: 14),
-                    ),
-                    onChanged: _onSearch,
-                  ),
-                ),
-              ),
-            ),
-
-            // ── Filter status: aktif / nonaktif / semua ──────────
-            SliverToBoxAdapter(
-              child: AdminFilterChips<String>(
-                options: const [
-                  ('Aktif', 'active'),
-                  ('Nonaktif', 'inactive'),
-                  ('Semua', 'all'),
-                ],
-                selected: _status,
-                onSelected: (value) {
-                  if (value == _status) return;
-                  setState(() => _status = value);
-                  _loadCatalog();
-                },
-              ),
-            ),
-
-            // ── Filter kategori (mode view) ─────────────────────
-            if (widget.mode == 'view')
-              SliverToBoxAdapter(
-                child: SizedBox(
-                  height: 56,
-                  child: ListView.builder(
-                    scrollDirection: Axis.horizontal,
-                    physics: const BouncingScrollPhysics(),
-                    padding: const EdgeInsets.fromLTRB(16, 14, 16, 0),
-                    itemCount: 1 + _categories.items.length,
-                    itemBuilder: (_, i) {
-                      final category = i == 0 ? null : _categories.items[i - 1];
-                      final k = category?.name ?? 'Semua';
-                      final sel = _categoryGuid == category?.guid;
-                      final col = _kColor[k] ?? _C.teal;
-                      return GestureDetector(
-                        onTap: () {
-                          setState(() => _categoryGuid = category?.guid);
-                          _loadCatalog();
+                          );
                         },
-                        child: AnimatedContainer(
-                          duration: const Duration(milliseconds: 200),
-                          margin: const EdgeInsets.only(right: 8),
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 14, vertical: 6),
+                      ),
+                    ),
+                  ),
+
+                // ── Counter ─────────────────────────────────────────
+                if (widget.mode == 'view' && _categories.loading)
+                  const SliverToBoxAdapter(
+                      child: Center(child: CircularProgressIndicator())),
+                if (widget.mode == 'view' &&
+                    _categories.error != null &&
+                    _session.role != 1)
+                  SliverToBoxAdapter(
+                      child: TextButton(
+                    onPressed: _loadCategories,
+                    child: const Text('Gagal memuat kategori. Coba lagi'),
+                  )),
+
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(20, 18, 20, 4),
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 3,
+                          height: 12,
                           decoration: BoxDecoration(
-                            color: sel ? col : _C.surface,
-                            borderRadius: BorderRadius.circular(20),
-                            border: Border.all(
-                              color: sel ? col : _C.border,
-                              width: 1,
-                            ),
-                            boxShadow: sel
-                                ? [
-                                    BoxShadow(
-                                        color: col.withValues(alpha: 0.40),
-                                        blurRadius: 10,
-                                        offset: const Offset(0, 3))
-                                  ]
-                                : [],
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(_kIcon[k] ?? Icons.place_rounded,
-                                  size: 13,
-                                  color: sel ? Colors.white : _C.textDim),
-                              const SizedBox(width: 5),
-                              Text(k,
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w700,
-                                    color: sel ? Colors.white : _C.textMuted,
-                                  )),
-                            ],
+                              color: accent,
+                              borderRadius: BorderRadius.circular(4)),
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          '${filtered.length} wisata ditemukan',
+                          style: const TextStyle(
+                            color: _C.textMuted,
+                            fontSize: 11.5,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: 0.5,
                           ),
                         ),
-                      );
-                    },
+                      ],
+                    ),
                   ),
                 ),
-              ),
 
-            // ── Counter ─────────────────────────────────────────
-            if (widget.mode == 'view' && _categories.loading)
-              const SliverToBoxAdapter(
-                  child: Center(child: CircularProgressIndicator())),
-            if (widget.mode == 'view' && _categories.error != null)
-              SliverToBoxAdapter(
-                  child: TextButton(
-                onPressed: _loadCategories,
-                child: const Text('Gagal memuat kategori. Coba lagi'),
-              )),
-
-            SliverToBoxAdapter(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(20, 18, 20, 4),
-                child: Row(
-                  children: [
-                    Container(
-                      width: 3,
-                      height: 12,
-                      decoration: BoxDecoration(
-                          color: accent,
-                          borderRadius: BorderRadius.circular(4)),
-                    ),
-                    const SizedBox(width: 8),
-                    Text(
-                      '${filtered.length} wisata ditemukan',
-                      style: const TextStyle(
-                        color: _C.textMuted,
-                        fontSize: 11.5,
-                        fontWeight: FontWeight.w700,
-                        letterSpacing: 0.5,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-
-            // ── Kosong ──────────────────────────────────────────
-            if (!_catalog.hasLoaded && _catalog.error == null)
-              const SliverFillRemaining(
-                  child: Center(child: CircularProgressIndicator()))
-            else if (_catalog.error != null && filtered.isEmpty)
-              SliverFillRemaining(
-                  child: Center(
+                // ── Kosong ──────────────────────────────────────────
+                if (!_catalog.hasLoaded && _catalog.error == null)
+                  const SliverFillRemaining(
+                      child: Center(child: CircularProgressIndicator()))
+                else if (_catalog.error != null && filtered.isEmpty)
+                  SliverFillRemaining(
+                      child: Center(
+                          child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                        Text(adminErrorMessage(_catalog.error!),
+                            textAlign: TextAlign.center),
+                        if (_session.role == 1)
+                          const Text('Tarik turun untuk menyinkronkan data.'),
+                        if (_session.role != 1)
+                          TextButton(
+                            onPressed: _loadCatalog,
+                            child: const Text('Gagal memuat wisata. Coba lagi'),
+                          ),
+                      ])))
+                else if (filtered.isEmpty)
+                  SliverFillRemaining(
+                    child: Center(
                       child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                    Text(adminErrorMessage(_catalog.error!),
-                        textAlign: TextAlign.center),
-                    TextButton(
-                      onPressed: _loadCatalog,
-                      child: const Text('Gagal memuat wisata. Coba lagi'),
-                    ),
-                  ])))
-            else if (filtered.isEmpty)
-              SliverFillRemaining(
-                child: Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(28),
-                        decoration: BoxDecoration(
-                          color: _C.teal.withValues(alpha: 0.07),
-                          shape: BoxShape.circle,
-                          border: Border.all(
-                              color: _C.teal.withValues(alpha: 0.15),
-                              width: 1.5),
-                        ),
-                        child: Icon(Icons.search_off_rounded,
-                            size: 44, color: _C.teal.withValues(alpha: 0.5)),
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(28),
+                            decoration: BoxDecoration(
+                              color: _C.teal.withValues(alpha: 0.07),
+                              shape: BoxShape.circle,
+                              border: Border.all(
+                                  color: _C.teal.withValues(alpha: 0.15),
+                                  width: 1.5),
+                            ),
+                            child: Icon(Icons.search_off_rounded,
+                                size: 44,
+                                color: _C.teal.withValues(alpha: 0.5)),
+                          ),
+                          const SizedBox(height: 20),
+                          const Text('Tidak ada wisata ditemukan',
+                              style: TextStyle(
+                                color: _C.text,
+                                fontSize: 16,
+                                fontWeight: FontWeight.w800,
+                              )),
+                          const SizedBox(height: 6),
+                          const Text('Coba kata kunci atau filter lain.',
+                              style:
+                                  TextStyle(color: _C.textMuted, fontSize: 13)),
+                        ],
                       ),
-                      const SizedBox(height: 20),
-                      const Text('Tidak ada wisata ditemukan',
-                          style: TextStyle(
-                            color: _C.text,
-                            fontSize: 16,
-                            fontWeight: FontWeight.w800,
-                          )),
-                      const SizedBox(height: 6),
-                      const Text('Coba kata kunci atau filter lain.',
-                          style: TextStyle(color: _C.textMuted, fontSize: 13)),
-                    ],
-                  ),
-                ),
-              )
-            else
-              SliverPadding(
-                padding: const EdgeInsets.fromLTRB(16, 10, 16, 110),
-                sliver: SliverList(
-                  delegate: SliverChildBuilderDelegate(
-                    (_, i) => _WisataCard(
-                      key: ValueKey(filtered[i].id),
-                      wisata: filtered[i],
-                      mode: widget.mode,
-                      accent: accent,
-                      busy: _guard.isBusy(filtered[i].id),
-                      onKuota: () => _bukaKuota(filtered[i]),
-                      onTap: () => widget.mode == 'kuota'
-                          ? _bukaKuota(filtered[i])
-                          : Navigator.push(
+                    ),
+                  )
+                else
+                  SliverPadding(
+                    padding: const EdgeInsets.fromLTRB(16, 10, 16, 110),
+                    sliver: SliverList(
+                      delegate: SliverChildBuilderDelegate(
+                        (_, i) => _WisataCard(
+                          key: ValueKey(filtered[i].id),
+                          wisata: filtered[i],
+                          mode: widget.mode,
+                          accent: accent,
+                          busy: _guard.isBusy(filtered[i].id),
+                          onKuota: () => _bukaKuota(filtered[i]),
+                          onTap: () => widget.mode == 'kuota'
+                              ? _bukaKuota(filtered[i])
+                              : Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) => OperationsTheme(
+                                        role: _session.role,
+                                        child: DetailWisataScreen(
+                                            wisata: filtered[i])),
+                                  ),
+                                ),
+                          onEdit: () async {
+                            final ok = await Navigator.push<bool>(
                               context,
                               MaterialPageRoute(
                                 builder: (_) =>
-                                    DetailWisataScreen(wisata: filtered[i]),
+                                    TambahWisataScreen(wisataEdit: filtered[i]),
                               ),
-                            ),
-                      onEdit: () async {
-                        final ok = await Navigator.push<bool>(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) =>
-                                TambahWisataScreen(wisataEdit: filtered[i]),
-                          ),
-                        );
-                        if (ok == true) await _muatData();
-                      },
-                      onHapus: () => _toggleActive(filtered[i]),
+                            );
+                            if (ok == true) await _muatData();
+                          },
+                          onHapus: () => _toggleActive(filtered[i]),
+                        ),
+                        childCount: filtered.length,
+                      ),
                     ),
-                    childCount: filtered.length,
                   ),
-                ),
-              ),
-          ],
-        ),
-      ),
+              ],
+            ),
+          ),
 
-      // ── FAB ─────────────────────────────────────────────────
-      floatingActionButton: widget.mode == 'view'
-          ? ScaleTransition(
-              scale:
-                  CurvedAnimation(parent: _fabCtrl, curve: Curves.elasticOut),
-              child: FloatingActionButton.extended(
-                backgroundColor: _C.blue,
-                elevation: 6,
-                shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(18)),
-                icon: const Icon(Icons.add_rounded,
-                    color: Colors.white, size: 22),
-                label: const Text('Tambah Wisata',
-                    style: TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.w800,
-                        fontSize: 14)),
-                onPressed: () async {
-                  final ok = await Navigator.push<bool>(
-                    context,
-                    MaterialPageRoute(
-                        builder: (_) => const TambahWisataScreen()),
-                  );
-                  if (ok == true) await _muatData();
-                },
-              ),
-            )
-          : null,
-    );
+          // ── FAB ─────────────────────────────────────────────────
+          floatingActionButton: widget.mode == 'view'
+              ? ScaleTransition(
+                  scale: CurvedAnimation(
+                      parent: _fabCtrl, curve: Curves.elasticOut),
+                  child: FloatingActionButton.extended(
+                    backgroundColor: _C.blue,
+                    elevation: 6,
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(18)),
+                    icon: const Icon(Icons.add_rounded,
+                        color: Colors.white, size: 22),
+                    label: const Text('Tambah Wisata',
+                        style: TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w800,
+                            fontSize: 14)),
+                    onPressed: () async {
+                      final ok = await Navigator.push<bool>(
+                        context,
+                        MaterialPageRoute(
+                            builder: (_) => const TambahWisataScreen()),
+                      );
+                      if (ok == true) await _muatData();
+                    },
+                  ),
+                )
+              : null,
+        ));
   }
 }
 

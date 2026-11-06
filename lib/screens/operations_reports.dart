@@ -40,6 +40,7 @@ class _OperationsReportScreenState extends State<OperationsReportScreen>
   Object? _error;
   bool _loading = true;
   int _page = 1;
+  bool _manage = false;
   int _accountPage = 0;
   int _request = 0;
   bool get _valid =>
@@ -189,7 +190,10 @@ class _OperationsReportScreenState extends State<OperationsReportScreen>
 
   Future<void> _filter() async {
     final filters = await showOperationsFilters(context,
-        repository: _repository, session: _session, initial: _filters);
+        repository: _repository,
+        session: _session,
+        initial: _filters,
+        utc: widget.section != 'destinations' && widget.section != 'visitors');
     if (filters != null && _valid) {
       _filters = filters;
       _page = 1;
@@ -212,7 +216,8 @@ class _OperationsReportScreenState extends State<OperationsReportScreen>
     if (!_valid) return const SizedBox.shrink();
     final title = widget.adminName ??
         switch (widget.section) {
-          'destinations' => _role == 2 ? 'Perbandingan Destinasi' : 'Kinerja Destinasi',
+          'destinations' =>
+            _role == 2 ? 'Perbandingan Destinasi' : 'Kinerja Destinasi',
           'approvals' => widget.personal ? 'Kinerja Saya' : 'Kinerja Admin',
           'visitors' => 'Kunjungan',
           _ => 'Pusat Tindakan'
@@ -224,6 +229,7 @@ class _OperationsReportScreenState extends State<OperationsReportScreen>
             ? data?.personal ?? {}
             : data?.raw['team_operational_totals'] as Json? ?? {};
     return OperationsPage(
+        role: _role,
         title: title,
         subtitle:
             widget.section == 'destinations' || widget.section == 'visitors'
@@ -234,109 +240,166 @@ class _OperationsReportScreenState extends State<OperationsReportScreen>
         embedded: widget.embedded,
         onRefresh: _load,
         children: [
-          _filterButton(_filters, _filter),
-          const SizedBox(height: 16),
-          if (_loading) const OperationsSkeleton(),
-          if (_error != null)
-            _errorBlock(_error!, _scopeError(_error) ? _filter : _load),
-          if (!_loading && _rows != null) ...[
-            _freshness(_rows!.meta?['generated_at'] as String?, _load),
-            if (_rows!.items.isEmpty)
-              _Notice(_filters.isEmpty
-                  ? 'Tidak ada data operasional pada rentang ini.'
-                  : 'Tidak ada hasil untuk filter tanggal atau destinasi ini. Atur ulang filter untuk mencoba lagi.'),
-            for (final row in _rows!.items)
-              widget.section == 'destinations'
-                  ? _destination(row)
-                  : _actionTile(row, () => _booking(row)),
-            _pagination(_rows!.meta, _rows!.links),
-          ],
-          if (!_loading && data != null) ...[
-            _freshness(data.generatedAt, _load),
-            Text('Periode: ${_period(data.period)}',
-                style:
-                    const TextStyle(fontSize: 12, color: AppColors.textMuted)),
+          if (_role == 1 && widget.section == 'destinations') ...[
+            SegmentedButton<bool>(
+                showSelectedIcon: false,
+                segments: const [
+                  ButtonSegment(value: false, label: Text('Kinerja')),
+                  ButtonSegment(value: true, label: Text('Kelola'))
+                ],
+                selected: {_manage},
+                onSelectionChanged: (value) =>
+                    setState(() => _manage = value.first)),
             const SizedBox(height: 16),
-            if (widget.section == 'visitors') ...[
-              if (_role == 1) ...[
-                _DashboardCard(child: Column(children: [
-                  Container(width: 70, height: 70,
-                      decoration: BoxDecoration(
-                          color: const Color(0xFFE8F3FF),
-                          borderRadius: BorderRadius.circular(22)),
-                      child: const Icon(Icons.qr_code_scanner_rounded,
-                          color: AppColors.blue, size: 33)),
-                  const SizedBox(height: 16),
-                  const Text('Verifikasi Tiket QR',
-                      style: TextStyle(fontSize: 18,
-                          fontWeight: FontWeight.w800, color: AppColors.navy)),
-                  const SizedBox(height: 8),
-                  const Text('Scan → Preview → Konfirmasi',
-                      style: TextStyle(fontSize: 13, color: Color(0xFF526787))),
-                  const SizedBox(height: 16),
-                  SizedBox(width: double.infinity,
-                      child: FilledButton.icon(
-                          onPressed: () => Navigator.of(context).push(
-                              MaterialPageRoute<void>(builder: (_) =>
-                                  const AdminTicketScannerScreen())),
-                          icon: const Icon(Icons.qr_code_scanner_rounded),
-                          label: const Text('Buka Scan QR'))),
-                ])),
-                const SizedBox(height: 16),
-              ],
-              const _SectionTitle('Kunjungan teramati'),
-              OperationsMetrics(icons: const [
-                Icons.qr_code_scanner_rounded, Icons.confirmation_number_outlined,
-                Icons.percent_rounded, Icons.person_off_outlined,
-              ], values: [
-                ('Tiket check-in', _value(data.metrics['checked_in_tickets'])),
-                (
-                  'Booking check-in',
-                  _value(data.metrics['checked_in_bookings'])
-                ),
-                (
-                  'Tingkat kehadiran',
-                  _percent(data.metrics['attendance_rate'])
-                ),
-                ('Tidak hadir', _value(data.metrics['no_show_count']))
-              ]),
-              const SizedBox(height: 12),
-              const _Notice(
-                  'Tingkat kehadiran dan no-show belum tersedia karena data kelayakan tiket belum terverifikasi.'),
-
-            ] else ...[
-              OperationsMetrics(values: _decisionValues(values), icons: const [
-                Icons.task_alt_rounded, Icons.cancel_outlined,
-                Icons.percent_rounded, Icons.timer_outlined,
-                Icons.verified_outlined,
-              ]),
-              const SizedBox(height: 20),
-              if (widget.personal || _role == 1)
-                const _Notice(
-                    'Grafik menunjukkan keputusan tim pada destinasi yang dapat diakses. Metrik pribadi ditampilkan di atas.'),
-              _DashboardCard(child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    const _SectionTitle('Tren keputusan'),
-                    Text('Periode: ${_period(data.period)} · UTC',
-                        style: const TextStyle(fontSize: 12,
-                            color: Color(0xFF526787))),
-                    OperationsTrend(rows: data.series,
-                        valueKey: 'approved_decisions',
-                        secondKey: 'rejected_decisions'),
-                    const Text('Disetujui: biru · Ditolak: abu-abu',
-                        style: TextStyle(fontSize: 12,
-                            color: Color(0xFF526787))),
+          ],
+          if (!_manage) ...[
+            _filterButton(_filters, _filter),
+            const SizedBox(height: 16),
+            if (_loading) const OperationsSkeleton(),
+            if (_error != null)
+              _errorBlock(_error!, _scopeError(_error) ? _filter : _load,
+                  role: _role),
+            if (!_loading && _rows != null) ...[
+              _freshness(_rows!.meta?['generated_at'] as String?, _load,
+                  role: _role),
+              if (_rows!.items.isEmpty)
+                _Notice(_filters.isEmpty
+                    ? 'Tidak ada data operasional pada rentang ini.'
+                    : 'Tidak ada hasil untuk filter tanggal atau destinasi ini. Atur ulang filter untuk mencoba lagi.'),
+              for (final row in _rows!.items)
+                widget.section == 'destinations'
+                    ? _destination(row)
+                    : _actionTile(row, () => _booking(row)),
+              _pagination(_rows!.meta, _rows!.links),
+            ],
+            if (!_loading && data != null) ...[
+              _freshness(data.generatedAt, _load, role: _role),
+              Text('Periode: ${_period(data.period)}',
+                  style: const TextStyle(
+                      fontSize: 12, color: AppColors.textMuted)),
+              const SizedBox(height: 16),
+              if (widget.section == 'visitors') ...[
+                if (_role == 1) ...[
+                  _DashboardCard(
+                      child: Column(children: [
+                    Container(
+                        width: 70,
+                        height: 70,
+                        decoration: BoxDecoration(
+                            color: const Color(0xFFE8F3FF),
+                            borderRadius: BorderRadius.circular(22)),
+                        child: const Icon(Icons.qr_code_scanner_rounded,
+                            color: AppColors.blue, size: 33)),
+                    const SizedBox(height: 16),
+                    const Text('Verifikasi Tiket QR',
+                        style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w800,
+                            color: AppColors.navy)),
+                    const SizedBox(height: 8),
+                    const Text('Scan → Preview → Konfirmasi',
+                        style:
+                            TextStyle(fontSize: 13, color: Color(0xFF526787))),
+                    const SizedBox(height: 16),
+                    SizedBox(
+                        width: double.infinity,
+                        child: FilledButton.icon(
+                            onPressed: () => Navigator.of(context).push(
+                                MaterialPageRoute<void>(
+                                    builder: (_) =>
+                                        const AdminTicketScannerScreen())),
+                            icon: const Icon(Icons.qr_code_scanner_rounded),
+                            label: const Text('Buka Scan QR'))),
                   ])),
-              if (widget.personal || _role == 1)
+                  const SizedBox(height: 16),
+                ],
+                const _SectionTitle('Kunjungan teramati'),
+                OperationsMetrics(icons: const [
+                  Icons.qr_code_scanner_rounded,
+                  Icons.confirmation_number_outlined,
+                  Icons.percent_rounded,
+                  Icons.person_off_outlined,
+                ], values: [
+                  (
+                    'Tiket check-in',
+                    _value(data.metrics['checked_in_tickets'])
+                  ),
+                  (
+                    'Booking check-in',
+                    _value(data.metrics['checked_in_bookings'])
+                  ),
+                  (
+                    'Tingkat kehadiran',
+                    _percent(data.metrics['attendance_rate'])
+                  ),
+                  ('Tidak hadir', _value(data.metrics['no_show_count']))
+                ]),
+                const SizedBox(height: 12),
                 const _Notice(
-                    'Riwayat pribadi mencakup keputusan Anda pada penugasan sebelumnya.'),
-              if (_role == 2 && widget.adminGuid == null && !widget.personal)
-                ..._staff(data),
+                    'Tingkat kehadiran dan no-show belum tersedia karena data kelayakan tiket belum terverifikasi.'),
+              ] else ...[
+                if (_role == 1) ...[
+                  _DashboardCard(
+                      child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                        const _SectionTitle('Keputusan pribadi'),
+                        Text(_value(values['approved_decisions']),
+                            style: const TextStyle(
+                                fontSize: 32, fontWeight: FontWeight.w800)),
+                        const Text('Booking disetujui pada periode ini'),
+                      ])),
+                  const SizedBox(height: 12),
+                ],
+                OperationsMetrics(
+                    values: _role == 1
+                        ? _decisionValues(values).skip(1).toList()
+                        : _decisionValues(values),
+                    icons: _role == 1
+                        ? null
+                        : const [
+                            Icons.task_alt_rounded,
+                            Icons.cancel_outlined,
+                            Icons.percent_rounded,
+                            Icons.timer_outlined,
+                            Icons.verified_outlined,
+                          ]),
+                const SizedBox(height: 20),
+                if (widget.personal || _role == 1)
+                  const _Notice(
+                      'Grafik menunjukkan keputusan tim pada destinasi yang dapat diakses. Metrik pribadi ditampilkan di atas.'),
+                _DashboardCard(
+                    child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                      const _SectionTitle('Tren keputusan'),
+                      Text('Periode: ${_period(data.period)} · UTC',
+                          style: const TextStyle(
+                              fontSize: 12, color: Color(0xFF526787))),
+                      OperationsTrend(
+                          rows: data.series,
+                          valueKey: 'approved_decisions',
+                          secondKey: 'rejected_decisions'),
+                      const Text('Disetujui: biru · Ditolak: abu-abu',
+                          style: TextStyle(
+                              fontSize: 12, color: Color(0xFF526787))),
+                    ])),
+                if (widget.personal || _role == 1)
+                  const _Notice(
+                      'Riwayat pribadi mencakup keputusan Anda pada penugasan sebelumnya.'),
+                if (_role == 2 && widget.adminGuid == null && !widget.personal)
+                  ..._staff(data),
+              ],
             ],
           ],
-          if (widget.section == 'destinations') ...[
-            const SizedBox(height: 20),
+          if (widget.section == 'destinations' && (_role != 1 || _manage)) ...[
+            const SizedBox(height: 16),
+            if (_role == 1)
+              _routeLink(
+                  'Tambah destinasi',
+                  () => Navigator.of(context).push(MaterialPageRoute<void>(
+                      builder: (_) => OperationsTheme(
+                          role: _role, child: const TambahWisataScreen())))),
             _routeLink(
                 'Kelola destinasi dan kuota',
                 () => Navigator.of(context).push(MaterialPageRoute<void>(
@@ -375,32 +438,37 @@ class _OperationsReportScreenState extends State<OperationsReportScreen>
         const _Notice(
             'Belum ada keputusan atau claim aktif untuk ditampilkan.'),
       for (final guid in guids)
-        Padding(padding: const EdgeInsets.only(bottom: 8),
-          child: Material(
-            color: Colors.white,
-            shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(14),
-                side: const BorderSide(color: AppColors.border)),
-            clipBehavior: Clip.antiAlias,
-            child: ListTile(
-            contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-            leading: const CircleAvatar(
-                backgroundColor: Color(0xFFEAF3FF),
-                child: Icon(Icons.person_outline_rounded, color: AppColors.blue)),
-            title: Text(_names[guid] ?? 'Admin · $guid',
-                style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700)),
-            subtitle: Text(
-                'Keputusan: ${_value(decisions[guid])} · claim aktif: ${_value(workload[guid])}\nSLA individu tersedia di detail.'),
-            isThreeLine: true,
-            trailing: const Icon(Icons.chevron_right),
-            onTap: () => Navigator.of(context).push(MaterialPageRoute<void>(
-                builder: (_) => OperationsReportScreen(
-                    section: 'approvals',
-                    adminGuid: guid,
-                    adminName: _names[guid] ?? 'Detail Admin',
-                    repository: _repository,
-                    session: _session,
-                    initialFilters: _filters)))))),
+        Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: Material(
+                color: Colors.white,
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14),
+                    side: const BorderSide(color: AppColors.border)),
+                clipBehavior: Clip.antiAlias,
+                child: ListTile(
+                    contentPadding:
+                        const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                    leading: const CircleAvatar(
+                        backgroundColor: Color(0xFFEAF3FF),
+                        child: Icon(Icons.person_outline_rounded,
+                            color: AppColors.blue)),
+                    title: Text(_names[guid] ?? 'Admin · $guid',
+                        style: const TextStyle(
+                            fontSize: 14, fontWeight: FontWeight.w700)),
+                    subtitle: Text(
+                        'Keputusan: ${_value(decisions[guid])} · claim aktif: ${_value(workload[guid])}\nSLA individu tersedia di detail.'),
+                    isThreeLine: true,
+                    trailing: const Icon(Icons.chevron_right),
+                    onTap: () => Navigator.of(context).push(
+                        MaterialPageRoute<void>(
+                            builder: (_) => OperationsReportScreen(
+                                section: 'approvals',
+                                adminGuid: guid,
+                                adminName: _names[guid] ?? 'Detail Admin',
+                                repository: _repository,
+                                session: _session,
+                                initialFilters: _filters)))))),
       if (_accounts?.links?['next'] != null ||
           (_accountPage < (_number(_accounts?.meta?['last_page']) ?? 0)))
         TextButton(
@@ -422,9 +490,12 @@ class _OperationsReportScreenState extends State<OperationsReportScreen>
           Row(children: [
             const Icon(Icons.place_outlined, color: AppColors.blue, size: 22),
             const SizedBox(width: 8),
-            Expanded(child: Text(row.name ?? 'Destinasi',
-                style: const TextStyle(fontSize: 16,
-                    fontWeight: FontWeight.w700, color: AppColors.navy))),
+            Expanded(
+                child: Text(row.name ?? 'Destinasi',
+                    style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.navy))),
           ]),
           const SizedBox(height: 12),
           OperationsMetrics(values: [
@@ -434,13 +505,16 @@ class _OperationsReportScreenState extends State<OperationsReportScreen>
             ('Sisa kapasitas', _value(raw['remaining']))
           ], compact: true),
           const SizedBox(height: 14),
-          if (_number(raw['reserved_occupancy_percent']) != null) ...[
-            Text('Alokasi terhadap kapasitas · ${_percent(raw['reserved_occupancy_percent'])}',
+          if ((_role != 1 || (_number(raw['capacity']) ?? 0) > 0) &&
+              _number(raw['reserved_occupancy_percent']) != null) ...[
+            Text(
+                'Alokasi terhadap kapasitas · ${_percent(raw['reserved_occupancy_percent'])}',
                 style: const TextStyle(fontSize: 12, color: Color(0xFF526787))),
             const SizedBox(height: 8),
             LinearProgressIndicator(
                 value: (_number(raw['reserved_occupancy_percent'])! / 100)
-                    .clamp(0.0, 1.0).toDouble(),
+                    .clamp(0.0, 1.0)
+                    .toDouble(),
                 minHeight: 8,
                 borderRadius: BorderRadius.circular(99),
                 backgroundColor: const Color(0xFFEDF2F9),
@@ -452,7 +526,9 @@ class _OperationsReportScreenState extends State<OperationsReportScreen>
               style: const TextStyle(fontSize: 12)),
           const SizedBox(height: 6),
           Text(
-              'Okupansi alokasi: ${_percent(raw['reserved_occupancy_percent'])} · konfirmasi: ${_percent(raw['confirmed_occupancy_percent'])}',
+              _role == 1 && (_number(raw['capacity']) ?? 0) <= 0
+                  ? 'Okupansi: — · Belum tersedia'
+                  : 'Okupansi alokasi: ${_percent(raw['reserved_occupancy_percent'])} · konfirmasi: ${_percent(raw['confirmed_occupancy_percent'])}',
               style: const TextStyle(fontSize: 12, color: AppColors.textMuted)),
           const SizedBox(height: 6),
           const Text('Tiket layak hadir: — · Belum tersedia',

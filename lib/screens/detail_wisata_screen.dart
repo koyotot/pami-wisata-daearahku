@@ -11,6 +11,7 @@ import '../widgets/destination_hero_gallery.dart';
 import '../widgets/reviews_sheet.dart';
 import '../widgets/visit_format.dart';
 import '../widgets/destination_location_map_preview.dart';
+import '../widgets/operations_chrome.dart';
 import 'daftar_kunjungan_screen.dart';
 import 'destination_map_screen.dart';
 
@@ -157,12 +158,36 @@ class _DetailWisataScreenState extends State<DetailWisataScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final roleOne = _repository.api.session.role == 1;
     final destination = _detail.data;
     if (_detail.loading ||
         _detail.error != null ||
         destination == null ||
         destination.guid != widget.wisata.id) {
       final error = _detail.error;
+      if (roleOne)
+        return OperationsTheme(
+            role: 1,
+            child: Scaffold(
+                backgroundColor: _C.bg,
+                body: RefreshIndicator(
+                    onRefresh: _loadDetail,
+                    child: ListView(
+                        padding: EdgeInsets.zero,
+                        physics: const AlwaysScrollableScrollPhysics(),
+                        children: [
+                          OperationsScenicHeader(
+                              title: 'Detail Destinasi',
+                              subtitle: widget.wisata.nama,
+                              onBack: () => Navigator.maybePop(context)),
+                          Padding(
+                              padding: const EdgeInsets.all(24),
+                              child: _detail.loading
+                                  ? const LinearProgressIndicator()
+                                  : Text(
+                                      '${error ?? 'Destinasi belum tersedia.'}\nTarik turun untuk menyinkronkan.',
+                                      textAlign: TextAlign.center)),
+                        ]))));
       return Scaffold(
         backgroundColor: _C.bg,
         appBar: AppBar(title: const Text('Detail Destinasi')),
@@ -213,6 +238,25 @@ class _DetailWisataScreenState extends State<DetailWisataScreen> {
           child: CustomScrollView(
               physics: const AlwaysScrollableScrollPhysics(),
               slivers: [
+                if (roleOne)
+                  SliverToBoxAdapter(
+                      child: OperationsScenicHeader(
+                          title: 'Detail Destinasi',
+                          subtitle: destination.name,
+                          onBack: () => Navigator.maybePop(context),
+                          actions: [
+                        IconButton(
+                            tooltip: _isSaved
+                                ? 'Hapus dari favorit'
+                                : 'Simpan favorit',
+                            onPressed:
+                                _loadingSave || _favorites.favorites.loading
+                                    ? null
+                                    : _toggleSave,
+                            icon: Icon(_isSaved
+                                ? Icons.favorite
+                                : Icons.favorite_border)),
+                      ])),
                 SliverToBoxAdapter(
                     child: SizedBox(
                         height: heroHeight,
@@ -238,34 +282,35 @@ class _DetailWisataScreenState extends State<DetailWisataScreen> {
                                     Color(0x99000000),
                                     Colors.transparent
                                   ]))))),
-                          Positioned(
-                              top: MediaQuery.paddingOf(context).top + 10,
-                              left: 16,
-                              right: 16,
-                              child: Row(
-                                  mainAxisAlignment:
-                                      MainAxisAlignment.spaceBetween,
-                                  children: [
-                                    _topAction(
-                                        'Kembali',
-                                        Icons.arrow_back_rounded,
-                                        () => Navigator.pop(context)),
-                                    _topAction(
-                                        knownFavorite
-                                            ? (_isSaved
-                                                ? 'Hapus dari favorit'
-                                                : 'Simpan favorit')
-                                            : 'Periksa favorit',
-                                        knownFavorite && _isSaved
-                                            ? Icons.favorite_rounded
-                                            : Icons.favorite_border_rounded,
-                                        _loadingSave ||
-                                                _favorites.favorites.loading
-                                            ? null
-                                            : _toggleSave,
-                                        busy: _loadingSave ||
-                                            _favorites.favorites.loading),
-                                  ])),
+                          if (!roleOne)
+                            Positioned(
+                                top: MediaQuery.paddingOf(context).top + 10,
+                                left: 16,
+                                right: 16,
+                                child: Row(
+                                    mainAxisAlignment:
+                                        MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      _topAction(
+                                          'Kembali',
+                                          Icons.arrow_back_rounded,
+                                          () => Navigator.pop(context)),
+                                      _topAction(
+                                          knownFavorite
+                                              ? (_isSaved
+                                                  ? 'Hapus dari favorit'
+                                                  : 'Simpan favorit')
+                                              : 'Periksa favorit',
+                                          knownFavorite && _isSaved
+                                              ? Icons.favorite_rounded
+                                              : Icons.favorite_border_rounded,
+                                          _loadingSave ||
+                                                  _favorites.favorites.loading
+                                              ? null
+                                              : _toggleSave,
+                                          busy: _loadingSave ||
+                                              _favorites.favorites.loading),
+                                    ])),
                         ]))),
                 SliverToBoxAdapter(
                     child: Transform.translate(

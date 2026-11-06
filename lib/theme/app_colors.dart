@@ -13,6 +13,29 @@ class AppColors {
   static const textMuted = Color(0xFF728099);
   static const orange = Color(0xFFFF9800);
 
+  static ThemeData get operationsTheme => visitorTheme.copyWith(
+        splashFactory: NoSplash.splashFactory,
+        highlightColor: Colors.transparent,
+        textTheme: GoogleFonts.plusJakartaSansTextTheme()
+            .apply(bodyColor: navy, displayColor: navy),
+        filledButtonTheme: FilledButtonThemeData(
+            style: FilledButton.styleFrom(
+                minimumSize: const Size(
+                    kMinInteractiveDimension, kMinInteractiveDimension))),
+        outlinedButtonTheme: OutlinedButtonThemeData(
+            style: OutlinedButton.styleFrom(
+                minimumSize: const Size(
+                    kMinInteractiveDimension, kMinInteractiveDimension))),
+        textButtonTheme: TextButtonThemeData(
+            style: TextButton.styleFrom(
+                minimumSize: const Size(
+                    kMinInteractiveDimension, kMinInteractiveDimension))),
+        iconButtonTheme: IconButtonThemeData(
+            style: IconButton.styleFrom(
+                minimumSize: const Size(
+                    kMinInteractiveDimension, kMinInteractiveDimension))),
+      );
+
   static ThemeData get visitorTheme => ThemeData(
         useMaterial3: true,
         colorScheme: ColorScheme.fromSeed(seedColor: blue)

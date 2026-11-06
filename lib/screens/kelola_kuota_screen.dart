@@ -10,6 +10,8 @@ import '../data/business_repository.dart';
 import '../services/api_client.dart';
 import '../services/auth_session.dart';
 import 'admin_common.dart';
+import '../widgets/operations_chrome.dart';
+import 'operations_dashboard.dart' show showOperationsDateRangeCalendar;
 
 class KelolaKuotaScreen extends StatefulWidget {
   final String destinationGuid;
@@ -81,18 +83,21 @@ class _KelolaKuotaScreenState extends State<KelolaKuotaScreen> {
   Future<void> _form([QuotaEntry? entry]) async {
     final saved = await showDialog<bool>(
       context: context,
-      builder: (_) => _QuotaFormDialog(
-        entry: entry,
-        timezone: widget.timezone,
-        onSubmit: (payload) async {
-          try {
-            await _repository.saveQuota(widget.destinationGuid, payload);
-            return null;
-          } catch (e) {
-            return adminErrorMessage(e);
-          }
-        },
-      ),
+      builder: (_) => OperationsTheme(
+          role: _session.role,
+          child: _QuotaFormDialog(
+            role: _session.role,
+            entry: entry,
+            timezone: widget.timezone,
+            onSubmit: (payload) async {
+              try {
+                await _repository.saveQuota(widget.destinationGuid, payload);
+                return null;
+              } catch (e) {
+                return adminErrorMessage(e);
+              }
+            },
+          )),
     );
     if (saved == true && mounted) {
       showAdminSnack(context, 'Kuota disimpan');
@@ -105,6 +110,7 @@ class _KelolaKuotaScreenState extends State<KelolaKuotaScreen> {
     final items = _sorted;
     final allowed = canManageQuota(_session.role);
     return AdminPage(
+      role: _session.role,
       badge: 'KUOTA KUNJUNGAN',
       title: 'Kelola Kuota',
       subtitle: widget.destinationName,
@@ -127,7 +133,8 @@ class _KelolaKuotaScreenState extends State<KelolaKuotaScreen> {
         else if (!_list.hasLoaded && _list.error == null)
           adminLoadingSliver()
         else if (_list.error != null && items.isEmpty)
-          adminErrorSliver(adminErrorMessage(_list.error!), _muat)
+          adminErrorSliver(adminErrorMessage(_list.error!), _muat,
+              role: _session.role)
         else if (items.isEmpty)
           adminEmptySliver(Icons.event_busy_rounded, 'Belum ada kuota',
               'Tambahkan tanggal kunjungan beserta kapasitasnya.')
@@ -243,19 +250,20 @@ class _QuotaCard extends StatelessWidget {
 
 /// Create / update one date. [onSubmit] returns an error message, null on success.
 class _QuotaFormDialog extends StatefulWidget {
+  final int? role;
   final QuotaEntry? entry;
   final String? timezone;
   final Future<String?> Function(Json payload) onSubmit;
   const _QuotaFormDialog(
-      {this.entry, this.timezone, required this.onSubmit});
+      {this.entry, this.timezone, this.role, required this.onSubmit});
 
   @override
   State<_QuotaFormDialog> createState() => _QuotaFormDialogState();
 }
 
 class _QuotaFormDialogState extends State<_QuotaFormDialog> {
-  late final _capacity =
-      TextEditingController(text: widget.entry == null ? '' : '${widget.entry!.capacity}');
+  late final _capacity = TextEditingController(
+      text: widget.entry == null ? '' : '${widget.entry!.capacity}');
   DateTime? _visitDate;
   DateTime? _opens;
   DateTime? _closes;
@@ -282,14 +290,29 @@ class _QuotaFormDialogState extends State<_QuotaFormDialog> {
     super.dispose();
   }
 
-  Future<DateTime?> _pickDateTime(DateTime? current) async {
+  Future<DateTime?> _pickCalendarDate(DateTime? current) async {
     final now = DateTime.now();
-    final date = await showDatePicker(
+    if (widget.role == 1) {
+      final initial = current ?? now;
+      final range = await showOperationsDateRangeCalendar(context,
+          from: initial,
+          to: initial,
+          singleDay: true,
+          firstDate: DateTime(now.year - 1),
+          lastDate: DateTime(now.year + 5));
+      return range?.start;
+    }
+    return showDatePicker(
       context: context,
       initialDate: current ?? now,
       firstDate: DateTime(now.year - 1),
       lastDate: DateTime(now.year + 5),
     );
+  }
+
+  Future<DateTime?> _pickDateTime(DateTime? current) async {
+    final now = DateTime.now();
+    final date = await _pickCalendarDate(current);
     if (date == null || !mounted) return null;
     final time = await showTimePicker(
       context: context,
@@ -300,13 +323,7 @@ class _QuotaFormDialogState extends State<_QuotaFormDialog> {
   }
 
   Future<void> _pickVisitDate() async {
-    final now = DateTime.now();
-    final date = await showDatePicker(
-      context: context,
-      initialDate: _visitDate ?? now,
-      firstDate: DateTime(now.year - 1),
-      lastDate: DateTime(now.year + 5),
-    );
+    final date = await _pickCalendarDate(_visitDate);
     if (date != null && mounted) setState(() => _visitDate = date);
   }
 

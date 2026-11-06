@@ -12,6 +12,8 @@ import '../data/facility_state.dart';
 import '../data/app_data.dart';
 import '../data/business_repository.dart';
 import '../services/auth_session.dart';
+import '../widgets/operations_chrome.dart';
+import '../theme/app_colors.dart';
 import '../data/gallery_draft.dart';
 import '../widgets/admin_destination_gallery_editor.dart';
 import '../data/favorite_state.dart';
@@ -246,7 +248,9 @@ class _TambahWisataScreenState extends State<TambahWisataScreen> {
     if (!_dirty) return true;
     return await showDialog<bool>(
             context: context,
-            builder: (context) => AlertDialog(
+            builder: (context) => OperationsTheme(
+                role: _session.role,
+                child: AlertDialog(
                     title: const Text('Buang perubahan?'),
                     content: const Text('Draft foto dan form belum disimpan.'),
                     actions: [
@@ -256,7 +260,7 @@ class _TambahWisataScreenState extends State<TambahWisataScreen> {
                       TextButton(
                           onPressed: () => Navigator.pop(context, true),
                           child: const Text('Buang'))
-                    ])) ??
+                    ]))) ??
         false;
   }
 
@@ -420,7 +424,9 @@ class _TambahWisataScreenState extends State<TambahWisataScreen> {
       if (e is ApiException && e.status == 409) {
         final refresh = await showDialog<bool>(
             context: context,
-            builder: (context) => AlertDialog(
+            builder: (context) => OperationsTheme(
+                role: _session.role,
+                child: AlertDialog(
                     title: const Text('Galeri telah berubah'),
                     content: const Text(
                         'Admin lain telah menyimpan perubahan. Draft lokal tetap ada. Muat ulang untuk mengganti draft foto dengan galeri terbaru, lalu susun kembali perubahan Anda.'),
@@ -428,10 +434,11 @@ class _TambahWisataScreenState extends State<TambahWisataScreen> {
                       TextButton(
                           onPressed: () => Navigator.pop(context, false),
                           child: const Text('Pertahankan draft')),
-                      TextButton(
-                          onPressed: () => Navigator.pop(context, true),
-                          child: const Text('Muat ulang'))
-                    ]));
+                      if (_session.role != 1)
+                        TextButton(
+                            onPressed: () => Navigator.pop(context, true),
+                            child: const Text('Muat ulang'))
+                    ])));
         if (refresh == true && mounted) await _loadGallery();
       } else {
         _snack(e is ApiException && e.outcomeUnknown
@@ -448,10 +455,12 @@ class _TambahWisataScreenState extends State<TambahWisataScreen> {
   Widget build(BuildContext context) {
     return Theme(
       // Font Plus Jakarta Sans untuk seluruh halaman
-      data: Theme.of(context).copyWith(
-        textTheme:
-            GoogleFonts.plusJakartaSansTextTheme(Theme.of(context).textTheme),
-      ),
+      data: _session.role == 1
+          ? AppColors.operationsTheme
+          : Theme.of(context).copyWith(
+              textTheme: GoogleFonts.plusJakartaSansTextTheme(
+                  Theme.of(context).textTheme),
+            ),
       child: AnnotatedRegion<SystemUiOverlayStyle>(
         value: const SystemUiOverlayStyle(
           statusBarColor: Colors.transparent,
@@ -473,6 +482,14 @@ class _TambahWisataScreenState extends State<TambahWisataScreen> {
     );
   }
 
+  Future<void> _refreshFormData() async {
+    if (_isSaving || _picking || _galleryLoading) return;
+    await _load();
+    if (!mounted || !_session.isCurrentGeneration(_sessionGeneration)) return;
+    if (!_facilities.changed) await _facilities.load(_savedDestinationGuid);
+    if (mounted && _savedDestinationGuid != null) await _reloadGallery();
+  }
+
   Widget _buildScaffold(BuildContext context) {
     final isEdit = widget.wisataEdit != null || _savedDestinationGuid != null;
 
@@ -485,282 +502,303 @@ class _TambahWisataScreenState extends State<TambahWisataScreen> {
     }
     return Scaffold(
       backgroundColor: _C.bg,
-      body: Form(
-        key: _formKey,
-        child: CustomScrollView(
-          physics: const BouncingScrollPhysics(),
-          slivers: [
-            // ── SliverAppBar ─────────────────────────────────
-            SliverAppBar(
-              expandedHeight: 210,
-              floating: false,
-              pinned: true,
-              snap: false,
-              backgroundColor: const Color(0xFF1558B0),
-              elevation: 0,
-              leading: GestureDetector(
-                onTap: () async {
-                  if (await _confirmDiscard() && context.mounted) {
-                    Navigator.pop(context);
-                  }
-                },
-                child: Container(
-                  margin: const EdgeInsets.all(10),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.22),
-                    borderRadius: BorderRadius.circular(12),
-                    border:
-                        Border.all(color: Colors.white.withValues(alpha: 0.35)),
-                  ),
-                  child: const Icon(Icons.arrow_back_ios_new_rounded,
-                      size: 16, color: Colors.white),
-                ),
-              ),
-              flexibleSpace: FlexibleSpaceBar(
-                collapseMode: CollapseMode.parallax,
-                background: Container(
-                  decoration: const BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                      colors: [
-                        Color(0xFF2A93F0),
-                        Color(0xFF1976D2),
-                        Color(0xFF1558B0)
-                      ],
-                      stops: [0.0, 0.5, 1.0],
+      body: RefreshIndicator(
+          onRefresh: _session.role == 1 ? _refreshFormData : () async {},
+          notificationPredicate: (_) => _session.role == 1,
+          child: Form(
+            key: _formKey,
+            child: CustomScrollView(
+              physics: _session.role == 1
+                  ? const AlwaysScrollableScrollPhysics()
+                  : const BouncingScrollPhysics(),
+              slivers: [
+                // ── SliverAppBar ─────────────────────────────────
+                if (_session.role == 1)
+                  SliverToBoxAdapter(
+                      child: OperationsScenicHeader(
+                          title: isEdit ? 'Ubah Destinasi' : 'Tambah Destinasi',
+                          subtitle:
+                              'Informasi, galeri, dan fasilitas destinasi',
+                          onBack: () => Navigator.maybePop(context)))
+                else
+                  SliverAppBar(
+                    expandedHeight: 210,
+                    floating: false,
+                    pinned: true,
+                    snap: false,
+                    backgroundColor: const Color(0xFF1558B0),
+                    elevation: 0,
+                    leading: GestureDetector(
+                      onTap: () async {
+                        if (await _confirmDiscard() && context.mounted) {
+                          Navigator.pop(context);
+                        }
+                      },
+                      child: Container(
+                        margin: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.22),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                              color: Colors.white.withValues(alpha: 0.35)),
+                        ),
+                        child: const Icon(Icons.arrow_back_ios_new_rounded,
+                            size: 16, color: Colors.white),
+                      ),
                     ),
-                  ),
-                  child: Stack(
-                    children: [
-                      // Teks header
-                      Positioned(
-                        left: 20,
-                        right: 20,
-                        bottom: 46,
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          mainAxisSize: MainAxisSize.min,
+                    flexibleSpace: FlexibleSpaceBar(
+                      collapseMode: CollapseMode.parallax,
+                      background: Container(
+                        decoration: const BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                            colors: [
+                              Color(0xFF2A93F0),
+                              Color(0xFF1976D2),
+                              Color(0xFF1558B0)
+                            ],
+                            stops: [0.0, 0.5, 1.0],
+                          ),
+                        ),
+                        child: Stack(
                           children: [
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 10, vertical: 5),
-                              decoration: BoxDecoration(
-                                color: Colors.white.withValues(alpha: 0.16),
-                                borderRadius: BorderRadius.circular(20),
-                                border: Border.all(
-                                    color:
-                                        Colors.white.withValues(alpha: 0.28)),
-                              ),
-                              child: Row(
+                            // Teks header
+                            Positioned(
+                              left: 20,
+                              right: 20,
+                              bottom: 46,
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
                                   Container(
-                                    width: 6,
-                                    height: 6,
-                                    decoration: const BoxDecoration(
-                                      color: _C.gold,
-                                      shape: BoxShape.circle,
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 10, vertical: 5),
+                                    decoration: BoxDecoration(
+                                      color:
+                                          Colors.white.withValues(alpha: 0.16),
+                                      borderRadius: BorderRadius.circular(20),
+                                      border: Border.all(
+                                          color: Colors.white
+                                              .withValues(alpha: 0.28)),
+                                    ),
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Container(
+                                          width: 6,
+                                          height: 6,
+                                          decoration: const BoxDecoration(
+                                            color: _C.gold,
+                                            shape: BoxShape.circle,
+                                          ),
+                                        ),
+                                        const SizedBox(width: 7),
+                                        Text(
+                                          isEdit
+                                              ? 'UBAH DESTINASI'
+                                              : 'DESTINASI BARU',
+                                          style: const TextStyle(
+                                            color: Colors.white,
+                                            fontSize: 10,
+                                            fontWeight: FontWeight.w800,
+                                            letterSpacing: 1.8,
+                                          ),
+                                        ),
+                                      ],
                                     ),
                                   ),
-                                  const SizedBox(width: 7),
+                                  const SizedBox(height: 12),
                                   Text(
-                                    isEdit
-                                        ? 'UBAH DESTINASI'
-                                        : 'DESTINASI BARU',
+                                    isEdit ? 'Edit Wisata' : 'Tambah Wisata',
                                     style: const TextStyle(
                                       color: Colors.white,
-                                      fontSize: 10,
+                                      fontSize: 32,
                                       fontWeight: FontWeight.w800,
-                                      letterSpacing: 1.8,
+                                      letterSpacing: -0.8,
+                                      height: 1.1,
+                                      shadows: [
+                                        Shadow(
+                                          color: Color(0x33000000),
+                                          blurRadius: 12,
+                                          offset: Offset(0, 3),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  const SizedBox(height: 6),
+                                  Text(
+                                    isEdit
+                                        ? 'Perbarui informasi destinasi'
+                                        : 'Tambah destinasi nusantara baru',
+                                    style: TextStyle(
+                                      color:
+                                          Colors.white.withValues(alpha: 0.88),
+                                      fontSize: 12.5,
+                                      fontWeight: FontWeight.w500,
                                     ),
                                   ),
                                 ],
                               ),
                             ),
-                            const SizedBox(height: 12),
-                            Text(
-                              isEdit ? 'Edit Wisata' : 'Tambah Wisata',
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 32,
-                                fontWeight: FontWeight.w800,
-                                letterSpacing: -0.8,
-                                height: 1.1,
-                                shadows: [
-                                  Shadow(
-                                    color: Color(0x33000000),
-                                    blurRadius: 12,
-                                    offset: Offset(0, 3),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            const SizedBox(height: 6),
-                            Text(
-                              isEdit
-                                  ? 'Perbarui informasi destinasi'
-                                  : 'Tambah destinasi nusantara baru',
-                              style: TextStyle(
-                                color: Colors.white.withValues(alpha: 0.88),
-                                fontSize: 12.5,
-                                fontWeight: FontWeight.w500,
+                            // Tepi bawah melengkung menyatu dengan form
+                            Positioned(
+                              left: 0,
+                              right: 0,
+                              bottom: -1,
+                              child: Container(
+                                height: 26,
+                                decoration: const BoxDecoration(
+                                  color: _C.bg,
+                                  borderRadius: BorderRadius.vertical(
+                                      top: Radius.circular(26)),
+                                ),
                               ),
                             ),
                           ],
                         ),
                       ),
-                      // Tepi bawah melengkung menyatu dengan form
-                      Positioned(
-                        left: 0,
-                        right: 0,
-                        bottom: -1,
-                        child: Container(
-                          height: 26,
-                          decoration: const BoxDecoration(
-                            color: _C.bg,
-                            borderRadius:
-                                BorderRadius.vertical(top: Radius.circular(26)),
-                          ),
-                        ),
-                      ),
-                    ],
+                    ),
                   ),
-                ),
-              ),
-            ),
 
-            // ── Konten Form ──────────────────────────────────
-            SliverToBoxAdapter(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(16, 20, 16, 120),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // ── Upload Foto ──────────────────────────────
-                    _sectionLabel('Foto Destinasi'),
-                    const SizedBox(height: 12),
-                    if (_galleryLoading) const LinearProgressIndicator(),
-                    if (_galleryReady &&
-                        widget.wisataEdit?.imageUrl != null &&
-                        _gallery.isEmpty)
-                      const Text(
-                          'Foto lama belum dapat diedit di galeri. Tambahkan foto untuk menyimpan.'),
-                    AdminDestinationGalleryEditor(
-                        items: _gallery,
-                        enabled: !_isSaving && !_galleryLoading && !_picking,
-                        destinationGuid: _savedDestinationGuid,
-                        repository: _repository,
-                        onAdd: _pickImages,
-                        onRemove: (index) {
-                          if (_gallery.length == 1) {
-                            _snack('Minimal satu foto harus dipertahankan.');
-                            return;
-                          }
-                          setState(() {
-                            _gallery.removeAt(index);
-                            _dirty = true;
-                          });
-                        },
-                        onReorder: (from, to) => setState(() {
-                              final item = _gallery.removeAt(from);
-                              _gallery.insert(to, item);
-                              _dirty = true;
-                            })),
-                    if (_failedSave)
-                      TextButton(
-                          onPressed:
-                              _isSaving || !_galleryReady || _gallery.isEmpty
+                // ── Konten Form ──────────────────────────────────
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 20, 16, 120),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // ── Upload Foto ──────────────────────────────
+                        _sectionLabel('Foto Destinasi'),
+                        const SizedBox(height: 12),
+                        if (_galleryLoading) const LinearProgressIndicator(),
+                        if (_galleryReady &&
+                            widget.wisataEdit?.imageUrl != null &&
+                            _gallery.isEmpty)
+                          const Text(
+                              'Foto lama belum dapat diedit di galeri. Tambahkan foto untuk menyimpan.'),
+                        AdminDestinationGalleryEditor(
+                            items: _gallery,
+                            enabled:
+                                !_isSaving && !_galleryLoading && !_picking,
+                            destinationGuid: _savedDestinationGuid,
+                            repository: _repository,
+                            onAdd: _pickImages,
+                            onRemove: (index) {
+                              if (_gallery.length == 1) {
+                                _snack(
+                                    'Minimal satu foto harus dipertahankan.');
+                                return;
+                              }
+                              setState(() {
+                                _gallery.removeAt(index);
+                                _dirty = true;
+                              });
+                            },
+                            onReorder: (from, to) => setState(() {
+                                  final item = _gallery.removeAt(from);
+                                  _gallery.insert(to, item);
+                                  _dirty = true;
+                                })),
+                        if (_failedSave)
+                          TextButton(
+                              onPressed: _isSaving ||
+                                      !_galleryReady ||
+                                      _gallery.isEmpty
                                   ? null
                                   : _simpan,
-                          child: const Text('Coba Lagi')),
-                    if (widget.wisataEdit != null)
-                      TextButton(
-                          onPressed: _isSaving ? null : _reloadGallery,
-                          child: const Text('Muat ulang galeri')),
-                    const SizedBox(height: 24),
+                              child: const Text('Coba Lagi')),
+                        if (widget.wisataEdit != null && _session.role != 1)
+                          TextButton(
+                              onPressed: _isSaving ? null : _reloadGallery,
+                              child: const Text('Muat ulang galeri')),
+                        const SizedBox(height: 24),
 
-                    // ── Info Dasar ───────────────────────────────
-                    _sectionLabel('Informasi Dasar'),
-                    const SizedBox(height: 14),
-                    _field(
-                      ctrl: namaCtrl,
-                      label: 'Nama Wisata',
-                      hint: 'Contoh: Pantai Parangtritis',
-                      icon: Icons.landscape_rounded,
-                      validator: (v) => (v == null || v.trim().isEmpty)
-                          ? 'Nama wisata wajib diisi'
-                          : null,
-                    ),
-                    const SizedBox(height: 12),
-                    _locationSection(),
-                    const SizedBox(height: 12),
-                    _kategoriPicker(),
-                    const SizedBox(height: 12),
-                    _timezonePicker(),
-                    const SizedBox(height: 24),
-
-                    // ── Detail ───────────────────────────────────
-                    _sectionLabel('Detail & Harga'),
-                    const SizedBox(height: 14),
-                    _field(
-                      ctrl: deskCtrl,
-                      label: 'Deskripsi',
-                      hint: 'Ceritakan keunikan tempat wisata ini...',
-                      icon: Icons.description_rounded,
-                      maxLines: 4,
-                      validator: (v) => (v == null || v.trim().isEmpty)
-                          ? 'Deskripsi wajib diisi'
-                          : null,
-                    ),
-                    const SizedBox(height: 12),
-                    Row(
-                      children: [
-                        Expanded(
-                            child: _field(
-                          ctrl: hargaCtrl,
-                          label: 'Harga Tiket',
-                          hint: 'Rupiah, 0 = gratis',
-                          icon: Icons.local_activity_rounded,
-                          keyboardType: TextInputType.number,
-                          formatters: [FilteringTextInputFormatter.digitsOnly],
-                          validator: (v) {
-                            final text = v?.trim() ?? '';
-                            if (text.isEmpty) return 'Wajib diisi';
-                            final price = int.tryParse(text);
-                            return price == null || price < 0
-                                ? 'Bilangan bulat ≥ 0'
-                                : null;
-                          },
-                        )),
-                        const SizedBox(width: 12),
-                        Expanded(
-                            child: _field(
-                          ctrl: jamCtrl,
-                          label: 'Jam Buka',
-                          hint: '08.00 – 17.00',
-                          icon: Icons.schedule_rounded,
+                        // ── Info Dasar ───────────────────────────────
+                        _sectionLabel('Informasi Dasar'),
+                        const SizedBox(height: 14),
+                        _field(
+                          ctrl: namaCtrl,
+                          label: 'Nama Wisata',
+                          hint: 'Contoh: Pantai Parangtritis',
+                          icon: Icons.landscape_rounded,
                           validator: (v) => (v == null || v.trim().isEmpty)
-                              ? 'Wajib diisi'
+                              ? 'Nama wisata wajib diisi'
                               : null,
-                        )),
+                        ),
+                        const SizedBox(height: 12),
+                        _locationSection(),
+                        const SizedBox(height: 12),
+                        _kategoriPicker(),
+                        const SizedBox(height: 12),
+                        _timezonePicker(),
+                        const SizedBox(height: 24),
+
+                        // ── Detail ───────────────────────────────────
+                        _sectionLabel('Detail & Harga'),
+                        const SizedBox(height: 14),
+                        _field(
+                          ctrl: deskCtrl,
+                          label: 'Deskripsi',
+                          hint: 'Ceritakan keunikan tempat wisata ini...',
+                          icon: Icons.description_rounded,
+                          maxLines: 4,
+                          validator: (v) => (v == null || v.trim().isEmpty)
+                              ? 'Deskripsi wajib diisi'
+                              : null,
+                        ),
+                        const SizedBox(height: 12),
+                        Row(
+                          children: [
+                            Expanded(
+                                child: _field(
+                              ctrl: hargaCtrl,
+                              label: 'Harga Tiket',
+                              hint: 'Rupiah, 0 = gratis',
+                              icon: Icons.local_activity_rounded,
+                              keyboardType: TextInputType.number,
+                              formatters: [
+                                FilteringTextInputFormatter.digitsOnly
+                              ],
+                              validator: (v) {
+                                final text = v?.trim() ?? '';
+                                if (text.isEmpty) return 'Wajib diisi';
+                                final price = int.tryParse(text);
+                                return price == null || price < 0
+                                    ? 'Bilangan bulat ≥ 0'
+                                    : null;
+                              },
+                            )),
+                            const SizedBox(width: 12),
+                            Expanded(
+                                child: _field(
+                              ctrl: jamCtrl,
+                              label: 'Jam Buka',
+                              hint: '08.00 – 17.00',
+                              icon: Icons.schedule_rounded,
+                              validator: (v) => (v == null || v.trim().isEmpty)
+                                  ? 'Wajib diisi'
+                                  : null,
+                            )),
+                          ],
+                        ),
+                        const SizedBox(height: 24),
+
+                        // ── Rating ───────────────────────────────────
+                        _fasilitasPicker(),
+                        const SizedBox(height: 24),
+                        _sectionLabel(
+                            isEdit ? 'Rating Destinasi' : 'Rating Awal'),
+                        const SizedBox(height: 14),
+                        _ratingPicker(),
                       ],
                     ),
-                    const SizedBox(height: 24),
-
-                    // ── Rating ───────────────────────────────────
-                    _fasilitasPicker(),
-                    const SizedBox(height: 24),
-                    _sectionLabel(isEdit ? 'Rating Destinasi' : 'Rating Awal'),
-                    const SizedBox(height: 14),
-                    _ratingPicker(),
-                  ],
+                  ),
                 ),
-              ),
+              ],
             ),
-          ],
-        ),
-      ),
+          )),
       // ── Tombol Simpan fixed di bawah ──────────────────────
       bottomNavigationBar: Container(
         padding: EdgeInsets.fromLTRB(
@@ -1168,11 +1206,12 @@ class _TambahWisataScreenState extends State<TambahWisataScreen> {
           if (_facilities.error != null) ...[
             Text(adminErrorMessage(_facilities.error!),
                 style: const TextStyle(color: _C.danger)),
-            TextButton(
-                onPressed: _isSaving
-                    ? null
-                    : () => _facilities.load(_savedDestinationGuid),
-                child: const Text('Muat ulang fasilitas')),
+            if (_session.role != 1)
+              TextButton(
+                  onPressed: _isSaving
+                      ? null
+                      : () => _facilities.load(_savedDestinationGuid),
+                  child: const Text('Muat ulang fasilitas')),
           ],
           if (_facilities.ready && _facilities.items.isEmpty)
             const Text(
@@ -1209,7 +1248,7 @@ class _TambahWisataScreenState extends State<TambahWisataScreen> {
                 color: _C.text, fontSize: 12.5, fontWeight: FontWeight.w700)),
         const SizedBox(height: 10),
         if (_categories.loading) const CircularProgressIndicator(),
-        if (_categories.error != null)
+        if (_categories.error != null && _session.role != 1)
           TextButton(
               onPressed: _load,
               child: const Text('Gagal memuat kategori. Coba lagi')),

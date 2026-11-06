@@ -4,6 +4,7 @@ import 'package:mobile_scanner/mobile_scanner.dart';
 import '../data/business_repository.dart';
 import '../data/ticket_scanner_state.dart';
 import '../theme/app_colors.dart';
+import 'auth_presentation.dart';
 
 class AdminTicketScannerScreen extends StatefulWidget {
   const AdminTicketScannerScreen({super.key});
@@ -111,20 +112,27 @@ class _AdminTicketScannerScreenState extends State<AdminTicketScannerScreen>
     return Theme(
         data: AppColors.visitorTheme,
         child: Scaffold(
-          appBar: AppBar(title: const Text('Scan Tiket'), actions: [
-            ValueListenableBuilder<MobileScannerState>(
-                valueListenable: _camera,
-                builder: (_, value, __) => IconButton(
-                      tooltip: 'Lampu kamera',
-                      onPressed: value.isRunning &&
-                              value.torchState != TorchState.unavailable
-                          ? _camera.toggleTorch
-                          : null,
-                      icon: Icon(value.torchState == TorchState.on
-                          ? Icons.flash_on
-                          : Icons.flash_off),
-                    )),
-          ]),
+          appBar: AppBar(
+              foregroundColor:
+                  _state.repository.api.session.role == 1 ? Colors.white : null,
+              flexibleSpace: _state.repository.api.session.role == 1
+                  ? const TimeBasedScenicBackground(child: SizedBox.expand())
+                  : null,
+              title: const Text('Scan Tiket'),
+              actions: [
+                ValueListenableBuilder<MobileScannerState>(
+                    valueListenable: _camera,
+                    builder: (_, value, __) => IconButton(
+                          tooltip: 'Lampu kamera',
+                          onPressed: value.isRunning &&
+                                  value.torchState != TorchState.unavailable
+                              ? _camera.toggleTorch
+                              : null,
+                          icon: Icon(value.torchState == TorchState.on
+                              ? Icons.flash_on
+                              : Icons.flash_off),
+                        )),
+              ]),
           body: SafeArea(
               child: !_state.valid
                   ? const Center(
@@ -135,28 +143,45 @@ class _AdminTicketScannerScreenState extends State<AdminTicketScannerScreen>
 
   Widget _body() {
     if (_state.scope == null) {
-      return Center(
-          child: Column(mainAxisSize: MainAxisSize.min, children: [
+      final content = Column(mainAxisSize: MainAxisSize.min, children: [
         if (_state.loading) const CircularProgressIndicator(),
         if (_state.error != null)
           Padding(
               padding: const EdgeInsets.all(20),
               child: Text(_state.error!, textAlign: TextAlign.center)),
-        if (!_state.loading)
+        if (!_state.loading && _state.repository.api.session.role != 1)
           TextButton(
               onPressed: _state.loadScope, child: const Text('Coba lagi')),
-      ]));
+      ]);
+      if (_state.repository.api.session.role != 1)
+        return Center(child: content);
+      return RefreshIndicator(
+          onRefresh: _state.loadScope,
+          child: ListView(
+              physics: const AlwaysScrollableScrollPhysics(),
+              padding: const EdgeInsets.all(16),
+              children: [
+                content,
+                const Text('Tarik turun untuk menyinkronkan penugasan.',
+                    textAlign: TextAlign.center)
+              ]));
     }
     if (!_state.canScan &&
         !_state.loading &&
         (_state.scope!['destinations'] as List? ?? []).isEmpty &&
         _state.scope!['global'] != true) {
-      return const Center(
+      final empty = const Center(
           child: Padding(
               padding: EdgeInsets.all(24),
               child: Text(
                   'Belum ditugaskan ke destinasi. Hubungi Superadmin untuk penugasan scanner.',
                   textAlign: TextAlign.center)));
+      if (_state.repository.api.session.role != 1) return empty;
+      return RefreshIndicator(
+          onRefresh: _state.loadScope,
+          child: ListView(
+              physics: const AlwaysScrollableScrollPhysics(),
+              children: [empty]));
     }
     final preview = _state.preview;
     final result = _state.result;
