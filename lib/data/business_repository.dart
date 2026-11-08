@@ -384,6 +384,20 @@ class BusinessRepository {
   Future<Json> initiateDemoPayment(String guid, String key) =>
       api.object('POST', 'bookings/${_id(guid)}/demo-payment',
           authenticated: true, body: {}, headers: {'Idempotency-Key': key});
+  Future<Json> initiateEwalletPayment(
+          String guid, String key, String channel) =>
+      api.object('POST', 'bookings/${_id(guid)}/payment-attempts',
+          authenticated: true,
+          body: {'method_code': 'ewallet', 'channel': channel},
+          headers: {'Idempotency-Key': key});
+
+  /// Asks the server to run its authenticated provider status inquiry for [attemptGuid].
+  /// Never proves payment on its own: read the returned snapshot.
+  Future<PaymentSnapshot> refreshPaymentAttempt(
+          String guid, String attemptGuid) async =>
+      PaymentSnapshot(await api.object('POST',
+          'bookings/${_id(guid)}/payment-attempts/${_id(attemptGuid)}/refresh',
+          authenticated: true));
   Future<Json> simulateDemoPayment(
           String guid, String key, String attemptGuid, String outcome) =>
       api.object('POST', 'bookings/${_id(guid)}/demo-payment/simulate',

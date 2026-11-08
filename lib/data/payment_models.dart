@@ -38,6 +38,48 @@ class PaymentSnapshot {
           method['code'] == 'demo' &&
           method['available'] == true);
   String get reason => paymentReason(json['reason'] as String?);
+
+  bool get isDoku => json['provider'] == 'doku';
+  String get bookingStatus => json['booking_status'] as String? ?? '';
+  String get paymentStatus => json['payment_status'] as String? ?? 'unverified';
+  String? get attemptMethod => lastAttempt?['method'] as String?;
+  String? get attemptChannel => lastAttempt?['channel'] as String?;
+  Json? get instruction =>
+      json['instruction'] is Json ? json['instruction'] as Json : null;
+
+  /// HTTPS wallet URL the server still considers usable for the pending attempt.
+  Uri? get redirectUrl {
+    final instruction = this.instruction;
+    if (instruction?['presentation_type'] != 'ewallet_redirect') return null;
+    final value = instruction?['redirect_url'];
+    final uri = value is String ? Uri.tryParse(value) : null;
+    return uri != null && uri.scheme == 'https' && uri.host.isNotEmpty
+        ? uri
+        : null;
+  }
+
+  /// E-wallet channels the server currently marks payable (`methods[ewallet].channels`).
+  List<String> get availableEwalletChannels {
+    if (!isDoku || json['can_pay'] != true || json['methods'] is! List) {
+      return const [];
+    }
+    for (final method in json['methods'] as List) {
+      if (method is Map &&
+          method['code'] == 'ewallet' &&
+          method['available'] == true &&
+          method['channels'] is List) {
+        return [
+          for (final channel in method['channels'] as List)
+            if (channel is Map &&
+                channel['available'] == true &&
+                channel['channel'] is String &&
+                const ['dana', 'shopeepay'].contains(channel['channel']))
+              channel['channel'] as String
+        ];
+      }
+    }
+    return const [];
+  }
 }
 
 String paymentReason(String? reason) => switch (reason) {
@@ -53,6 +95,9 @@ String paymentReason(String? reason) => switch (reason) {
         'Waktu pembayaran untuk kunjungan ini telah berakhir.',
       'payment_provider_conflict' =>
         'Booking terhubung ke sumber pembayaran lain. Hubungi pengelola.',
+      'doku_disabled' => 'Pembayaran online sedang dinonaktifkan.',
+      'payment_needs_review' =>
+        'Pembayaran sedang diperiksa pengelola. Tidak perlu membayar ulang.',
       null => 'Pembayaran DEMO tersedia; tidak ada transfer uang nyata.',
       _ => 'Pembayaran belum tersedia ($reason).',
     };

@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import '../data/business_repository.dart';
+import '../core/config/app_config.dart';
 import '../data/payment_models.dart';
 import '../screens/demo_checkout_screen.dart';
 import '../theme/app_colors.dart';
+import 'ewallet_payment_section.dart';
 
 /// Read-only capabilities beside the existing booking detail; one checkout route for all entries.
 class BookingPaymentSection extends StatefulWidget {
@@ -25,6 +27,9 @@ class _BookingPaymentSectionState extends State<BookingPaymentSection>
   String? _error;
   bool _loading = false;
   bool _opening = false;
+
+  /// Remembered across reloads so the wallet section is not unmounted while a refresh is running.
+  bool _dokuSeen = false;
   late final _generation = widget.repository.api.session.sessionGeneration;
   int _request = 0;
   bool get _valid =>
@@ -77,6 +82,7 @@ class _BookingPaymentSectionState extends State<BookingPaymentSection>
       setState(() {
         _methods = methods;
         _intent = intent;
+        _dokuSeen = methods.isDoku;
       });
     } catch (e) {
       if (_valid && request == _request) {
@@ -111,43 +117,69 @@ class _BookingPaymentSectionState extends State<BookingPaymentSection>
   }
 
   @override
-  Widget build(BuildContext context) => Padding(
-      padding: const EdgeInsets.only(top: 14),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-        const Text('Pembayaran DEMO / TEST_ONLY',
-            style: TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w800,
-                color: AppColors.blueDeep)),
-        const SizedBox(height: 8),
-        if (_loading) const LinearProgressIndicator(),
-        Text(
-            _error ??
-                _methods?.reason ??
-                'Memeriksa metode pembayaran dari server…',
-            style: const TextStyle(
-                fontSize: 12, height: 1.5, color: Color(0xFF526787))),
-        const SizedBox(height: 8),
-        if (_intent?.attemptStatus != null)
-          Text('Attempt terakhir: ${_intent!.attemptStatus}',
+  Widget build(BuildContext context) {
+    final doku = _dokuSeen;
+    final demo = !doku && AppConfig.demoPaymentEnabled;
+    final dokuReason = _methods?.json['reason'] == null
+        ? 'Pembayaran online tersedia.'
+        : _methods?.reason;
+    // With DEMO off, a server still in demo mode is shown as unavailable, never as a simulator.
+    final String? statusText = _error ??
+        (doku
+            ? dokuReason
+            : demo
+                ? _methods?.reason
+                : (_methods == null
+                    ? null
+                    : 'Pembayaran online belum tersedia saat ini.'));
+    return Padding(
+        padding: const EdgeInsets.only(top: 14),
+        child:
+            Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          Text(demo ? 'Pembayaran DEMO / TEST_ONLY' : 'Pembayaran',
+              style: const TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w800,
+                  color: AppColors.blueDeep)),
+          const SizedBox(height: 8),
+          if (_loading) const LinearProgressIndicator(),
+          Text(statusText ?? 'Memeriksa metode pembayaran dari server…',
               style: const TextStyle(
                   fontSize: 12, height: 1.5, color: Color(0xFF526787))),
-        ElevatedButton(
-            onPressed: _loading ||
-                    _opening ||
-                    !_valid ||
-                    _methods?.demoAvailable != true ||
-                    _intent?.demoAvailable != true ||
-                    _intent?.attemptStatus == 'unknown'
-                ? null
-                : _open,
-            child: const Text('Lanjutkan Pembayaran DEMO')),
-        TextButton(
-            onPressed: _opening || !_valid ? null : _open,
-            child: const Text('Cek Status / Pulihkan Pembayaran')),
-        if (_error != null)
-          TextButton(
-              onPressed: _loading ? null : _load,
-              child: const Text('Periksa metode lagi')),
-      ]));
+          const SizedBox(height: 8),
+          if (_intent?.attemptStatus != null && (doku || demo))
+            Text('Attempt terakhir: ${_intent!.attemptStatus}',
+                style: const TextStyle(
+                    fontSize: 12, height: 1.5, color: Color(0xFF526787))),
+          // DOKU wallets: a separate, always-mounted section owns start/return/resume (a reload here
+          // must not dispose it mid-refresh). The DEMO controls stay for demo mode.
+          if (doku)
+            EwalletPaymentSection(
+                booking: widget.booking,
+                repository: widget.repository,
+                onChanged: () async {
+                  await widget.onReturned();
+                  if (_valid) await _load();
+                })
+          else if (demo) ...[
+            ElevatedButton(
+                onPressed: _loading ||
+                        _opening ||
+                        !_valid ||
+                        _methods?.demoAvailable != true ||
+                        _intent?.demoAvailable != true ||
+                        _intent?.attemptStatus == 'unknown'
+                    ? null
+                    : _open,
+                child: const Text('Lanjutkan Pembayaran DEMO')),
+            TextButton(
+                onPressed: _opening || !_valid ? null : _open,
+                child: const Text('Cek Status / Pulihkan Pembayaran')),
+          ],
+          if (_error != null)
+            TextButton(
+                onPressed: _loading ? null : _load,
+                child: const Text('Periksa metode lagi')),
+        ]));
+  }
 }
