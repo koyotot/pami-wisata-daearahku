@@ -5,6 +5,7 @@ import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:wisata_daerahku/data/admin_state.dart' show isoDay;
 import 'package:wisata_daerahku/screens/operations_dashboard.dart';
 import 'package:wisata_daerahku/screens/operations_queue_screen.dart';
 import 'package:wisata_daerahku/screens/daftar_pendaftar_screen.dart';
@@ -26,6 +27,10 @@ void main() {
     }
     await (FontLoader('MaterialIcons')
           ..addFont(rootBundle.load('fonts/MaterialIcons-Regular.otf')))
+        .load();
+    await (FontLoader('packages/phosphor_icons/PhosphorRegular')
+          ..addFont(rootBundle
+              .load('packages/phosphor_icons/lib/fonts/Phosphor.ttf')))
         .load();
   });
 
@@ -195,6 +200,65 @@ void main() {
         {'destination_guid': 'd1', 'from': '2026-11-01', 'to': '2026-11-05'});
     expect(tester.takeException(), isNull);
   });
+
+  for (final role in [1, 2]) {
+    for (final scale in [1.0, 2.0]) {
+      testWidgets('action center filters for role $role at text scale $scale',
+          (tester) async {
+        final queries = <Map<String, String>>[];
+        final session = await adminSession((request) async {
+          if (request.url.path.endsWith('/action-center')) {
+            queries.add(request.url.queryParameters);
+          }
+          return jsonResponse(pageEnvelope([]));
+        }, role: role);
+        tester.view.devicePixelRatio = 1;
+        tester.view.physicalSize = const Size(360, 800);
+        addTearDown(tester.view.reset);
+        final boundary = GlobalKey();
+        await tester.pumpWidget(MaterialApp(
+            theme: AppColors.operationsTheme,
+            home: MediaQuery(
+                data: MediaQueryData(
+                    size: const Size(360, 800),
+                    textScaler: TextScaler.linear(scale)),
+                child: RepaintBoundary(
+                    key: boundary,
+                    child: OperationsReportScreen(
+                        section: 'action-center',
+                        repository: repositoryFor(session),
+                        session: session)))));
+        await tester.pumpAndSettle();
+        if (role == 1) {
+          final bar = tester
+              .widget<OperationsFilterBar>(find.byType(OperationsFilterBar));
+          final now = DateTime.now().toUtc();
+          expect(bar.filters['from'], isoDay(DateTime(now.year, now.month)));
+          expect(
+              bar.filters['to'], isoDay(DateTime(now.year, now.month + 1, 0)));
+          expect(queries.last['from'], bar.filters['from']);
+          expect(queries.last['to'], bar.filters['to']);
+          await capture(tester, boundary, 'action-center-$scale');
+          for (final control in ['destination', 'date']) {
+            await tester
+                .tap(find.byKey(ValueKey('action-center-$control-filter')));
+            await tester.pumpAndSettle();
+            expect(find.text('Filter Destinasi'), findsOneWidget);
+            await tester.ensureVisible(
+                find.byKey(const ValueKey('operations-apply-filters')));
+            await tester
+                .tap(find.byKey(const ValueKey('operations-apply-filters')));
+            await tester.pumpAndSettle();
+          }
+        } else {
+          expect(find.byType(OperationsFilterBar), findsNothing);
+          expect(queries.last.containsKey('from'), isFalse);
+          expect(queries.last.containsKey('to'), isFalse);
+        }
+        expect(tester.takeException(), isNull);
+      });
+    }
+  }
 
   for (final title in [
     'Antrean approval',
