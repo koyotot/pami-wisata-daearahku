@@ -1,5 +1,6 @@
 import 'dart:ui' show FontFeature;
 import 'package:flutter/material.dart';
+import 'package:phosphor_icons/phosphor_icons.dart';
 import '../data/booking_state.dart';
 import '../data/business_repository.dart';
 import '../data/demo_payment_state.dart';
@@ -245,7 +246,7 @@ class _DemoCheckoutScreenState extends State<DemoCheckoutScreen>
                                           ]),
                                         ] else if (p.paid) ...[
                                           _statePanel(
-                                              Icons.check_circle_outline,
+                                              PhosphorIconsRegular.checkCircle,
                                               'Pembayaran DEMO Berhasil!',
                                               'Pembayaran simulasi telah dicatat Laravel. Booking dikonfirmasi.',
                                               const Color(0xFF16784C)),
@@ -274,8 +275,9 @@ class _DemoCheckoutScreenState extends State<DemoCheckoutScreen>
                                           _statePanel(
                                               p.intent?.attemptStatus ==
                                                       'expired'
-                                                  ? Icons.timer_off_outlined
-                                                  : Icons.error_outline,
+                                                  ? PhosphorIconsRegular.timer
+                                                  : PhosphorIconsRegular
+                                                      .warningCircle,
                                               p.intent?.attemptStatus ==
                                                       'expired'
                                                   ? 'Attempt DEMO Kedaluwarsa'
@@ -385,7 +387,8 @@ class _DemoCheckoutScreenState extends State<DemoCheckoutScreen>
                                           ]),
                                           if (p.needsRecovery) ...[
                                             _statePanel(
-                                                Icons.sync_outlined,
+                                                PhosphorIconsRegular
+                                                    .arrowsClockwise,
                                                 'Status pembayaran belum pasti',
                                                 'Pulihkan status sebelum melanjutkan. Tidak ada pembayaran yang diulang otomatis.',
                                                 AppColors.blueDeep),
@@ -395,8 +398,8 @@ class _DemoCheckoutScreenState extends State<DemoCheckoutScreen>
                                                   contentPadding:
                                                       EdgeInsets.zero,
                                                   leading: Icon(
-                                                      Icons
-                                                          .account_balance_wallet_outlined,
+                                                      PhosphorIconsRegular
+                                                          .wallet,
                                                       color: AppColors.blue),
                                                   title: Text(
                                                       'Dompet Digital · DEMO',
@@ -406,11 +409,40 @@ class _DemoCheckoutScreenState extends State<DemoCheckoutScreen>
                                                               FontWeight.w700)),
                                                   subtitle: Text(
                                                       'Simulator Laravel · tanpa uang nyata'),
-                                                  trailing: Icon(Icons
-                                                      .check_circle_outline)),
+                                                  trailing: Icon(
+                                                      PhosphorIconsRegular
+                                                          .checkCircle)),
                                             ]),
                                             _panel([
                                               ExpansionTile(
+                                                  trailing: Builder(
+                                                      builder: (context) {
+                                                    final controller =
+                                                        ExpansibleController.of(
+                                                            context);
+                                                    final animation =
+                                                        ExpansionTileTheme.of(
+                                                                context)
+                                                            .expansionAnimationStyle;
+                                                    return ListenableBuilder(
+                                                        listenable: controller,
+                                                        builder: (context, _) => AnimatedRotation(
+                                                            turns: controller
+                                                                    .isExpanded
+                                                                ? .5
+                                                                : 0,
+                                                            duration: animation
+                                                                    ?.duration ??
+                                                                const Duration(
+                                                                    milliseconds:
+                                                                        200),
+                                                            curve: animation
+                                                                    ?.curve ??
+                                                                Curves.easeIn,
+                                                            child: const Icon(
+                                                                PhosphorIconsRegular
+                                                                    .caretDown)));
+                                                  }),
                                                   title: const Text(
                                                       'Skenario Simulasi',
                                                       style: TextStyle(
@@ -447,7 +479,8 @@ class _DemoCheckoutScreenState extends State<DemoCheckoutScreen>
                                             ]),
                                             if (p.pending)
                                               _statePanel(
-                                                  Icons.hourglass_top,
+                                                  PhosphorIconsRegular
+                                                      .hourglassHigh,
                                                   'Attempt DEMO siap diproses',
                                                   'Lanjutkan simulasi dengan attempt yang sama dari server.',
                                                   AppColors.blueDeep),
@@ -472,7 +505,7 @@ class _DemoCheckoutScreenState extends State<DemoCheckoutScreen>
                                                       }),
                                           ] else ...[
                                             _statePanel(
-                                                Icons.lock_outline,
+                                                PhosphorIconsRegular.lock,
                                                 'Pembayaran Belum Tersedia',
                                                 p.methods?.reason ??
                                                     'Status pembayaran perlu diperiksa kembali.',

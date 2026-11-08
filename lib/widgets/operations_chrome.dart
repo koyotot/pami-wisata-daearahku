@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:phosphor_icons/phosphor_icons.dart';
 import '../data/admin_state.dart' show formatDate;
 import '../screens/auth_presentation.dart';
 import '../theme/app_colors.dart';
@@ -55,7 +56,7 @@ class OperationsFilterBar extends StatelessWidget {
                     shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12))),
                 child: Row(children: [
-                  const Icon(Icons.place_outlined,
+                  const Icon(PhosphorIconsRegular.mapPin,
                       size: 16, color: AppColors.blue),
                   const SizedBox(width: 8),
                   Expanded(
@@ -67,7 +68,7 @@ class OperationsFilterBar extends StatelessWidget {
                           style: const TextStyle(
                               fontSize: 12, fontWeight: FontWeight.w600))),
                   const SizedBox(width: 8),
-                  const Icon(Icons.keyboard_arrow_down_rounded,
+                  const Icon(PhosphorIconsRegular.caretDown,
                       size: 16, color: AppColors.blue),
                 ]))),
         const SizedBox(width: 8),
@@ -83,7 +84,7 @@ class OperationsFilterBar extends StatelessWidget {
                         padding: const EdgeInsets.symmetric(
                             horizontal: 8, vertical: 12)),
                     child: Row(children: [
-                      const Icon(Icons.calendar_today_outlined,
+                      const Icon(PhosphorIconsRegular.calendarBlank,
                           size: 16, color: AppColors.blue),
                       const SizedBox(width: 8),
                       Expanded(
@@ -132,7 +133,7 @@ class OperationsScenicHeader extends StatelessWidget {
                         else
                           const SizedBox(
                               height: 48,
-                              child: Icon(Icons.landscape_outlined,
+                              child: Icon(PhosphorIconsRegular.mountains,
                                   color: Colors.white)),
                         const SizedBox(width: 8),
                         const Expanded(

@@ -60,7 +60,9 @@ class _OperationsReportScreenState extends State<OperationsReportScreen>
       widget.section == 'destinations' || widget.section == 'action-center';
   bool get _usesHomeFilters =>
       _role == 1 &&
-      (widget.section == 'destinations' || widget.section == 'visitors');
+      (widget.section == 'destinations' ||
+          widget.section == 'visitors' ||
+          widget.section == 'action-center');
   @override
   void initState() {
     super.initState();
@@ -228,7 +230,9 @@ class _OperationsReportScreenState extends State<OperationsReportScreen>
       filters: _filters,
       keyPrefix: widget.section,
       destinationLabel: _destinationLabel,
-      dateTooltip: 'Tanggal kunjungan · kalender lokal destinasi',
+      dateTooltip: widget.section == 'action-center'
+          ? 'Periode aktivitas operasional (UTC)'
+          : 'Tanggal kunjungan · kalender lokal destinasi',
       onDestinationPressed: _filter,
       onDatePressed: _filter);
 
@@ -317,7 +321,9 @@ class _OperationsReportScreenState extends State<OperationsReportScreen>
             const SizedBox(height: 16),
           ],
           if (!_manage) ...[
-            if (_role == 1 && widget.section == 'visitors') ...[
+            if (_role == 1 &&
+                (widget.section == 'visitors' ||
+                    widget.section == 'action-center')) ...[
               _reportFilterBar(),
               const SizedBox(height: AppSpacing.lg),
             ] else if (!_usesHomeFilters) ...[
@@ -354,7 +360,7 @@ class _OperationsReportScreenState extends State<OperationsReportScreen>
                         decoration: BoxDecoration(
                             color: const Color(0xFFE8F3FF),
                             borderRadius: BorderRadius.circular(22)),
-                        child: const Icon(Icons.qr_code_scanner_rounded,
+                        child: const Icon(PhosphorIconsRegular.qrCode,
                             color: AppColors.blue, size: 33)),
                     const SizedBox(height: 16),
                     const Text('Verifikasi Tiket QR',
@@ -373,17 +379,17 @@ class _OperationsReportScreenState extends State<OperationsReportScreen>
                             onPressed: () => showAdminTicketScannerSheet(
                                 context,
                                 repository: _repository),
-                            icon: const Icon(Icons.qr_code_scanner_rounded),
+                            icon: const Icon(PhosphorIconsRegular.qrCode),
                             label: const Text('Buka Scan QR'))),
                   ])),
                   const SizedBox(height: 16),
                 ],
                 const _SectionTitle('Kunjungan teramati'),
                 OperationsMetrics(icons: const [
-                  Icons.qr_code_scanner_rounded,
-                  Icons.confirmation_number_outlined,
-                  Icons.percent_rounded,
-                  Icons.person_off_outlined,
+                  PhosphorIconsRegular.qrCode,
+                  PhosphorIconsRegular.ticket,
+                  PhosphorIconsRegular.percent,
+                  PhosphorIconsRegular.userMinus,
                 ], values: [
                   (
                     'Tiket check-in',
@@ -423,11 +429,11 @@ class _OperationsReportScreenState extends State<OperationsReportScreen>
                     icons: _role == 1
                         ? null
                         : const [
-                            Icons.task_alt_rounded,
-                            Icons.cancel_outlined,
-                            Icons.percent_rounded,
-                            Icons.timer_outlined,
-                            Icons.verified_outlined,
+                            PhosphorIconsRegular.checkCircle,
+                            PhosphorIconsRegular.xCircle,
+                            PhosphorIconsRegular.percent,
+                            PhosphorIconsRegular.timer,
+                            PhosphorIconsRegular.sealCheck,
                           ]),
                 const SizedBox(height: 20),
                 if (widget.personal || _role == 1)
@@ -521,7 +527,7 @@ class _OperationsReportScreenState extends State<OperationsReportScreen>
                         const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                     leading: const CircleAvatar(
                         backgroundColor: Color(0xFFEAF3FF),
-                        child: Icon(Icons.person_outline_rounded,
+                        child: Icon(PhosphorIconsRegular.userCircle,
                             color: AppColors.blue)),
                     title: Text(_names[guid] ?? 'Admin · $guid',
                         style: const TextStyle(
@@ -529,7 +535,7 @@ class _OperationsReportScreenState extends State<OperationsReportScreen>
                     subtitle: Text(
                         'Keputusan: ${_value(decisions[guid])} · claim aktif: ${_value(workload[guid])}\nSLA individu tersedia di detail.'),
                     isThreeLine: true,
-                    trailing: const Icon(Icons.chevron_right),
+                    trailing: const Icon(PhosphorIconsRegular.caretRight),
                     onTap: () => Navigator.of(context).push(
                         MaterialPageRoute<void>(
                             builder: (_) => OperationsReportScreen(
@@ -558,7 +564,8 @@ class _OperationsReportScreenState extends State<OperationsReportScreen>
             borderRadius: BorderRadius.circular(17)),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Row(children: [
-            const Icon(Icons.place_outlined, color: AppColors.blue, size: 22),
+            const Icon(PhosphorIconsRegular.mapPin,
+                color: AppColors.blue, size: 22),
             const SizedBox(width: 8),
             Expanded(
                 child: Text(row.name ?? 'Destinasi',

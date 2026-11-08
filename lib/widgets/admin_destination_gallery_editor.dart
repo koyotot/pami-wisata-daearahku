@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:phosphor_icons/phosphor_icons.dart';
 import '../data/gallery_draft.dart';
 import '../data/business_repository.dart';
 import 'api_image.dart';
@@ -21,18 +22,18 @@ class AdminDestinationGalleryEditor extends StatelessWidget {
       required this.repository,
       this.destinationGuid});
 
-  Widget _image(GalleryDraftItem item, {BoxFit fit = BoxFit.cover}) => item
-              .bytes !=
-          null
-      ? Image.memory(item.bytes!,
-          fit: fit,
-          errorBuilder: (_, __, ___) => const Icon(Icons.broken_image_outlined))
-      : ApiImage(
-          imageUrl:
-              item.image!.url(fit == BoxFit.cover ? 'thumbnail' : 'display'),
-          adminGuid: destinationGuid,
-          repository: repository,
-          fit: fit);
+  Widget _image(GalleryDraftItem item, {BoxFit fit = BoxFit.cover}) =>
+      item.bytes != null
+          ? Image.memory(item.bytes!,
+              fit: fit,
+              errorBuilder: (_, __, ___) =>
+                  const Icon(PhosphorIconsRegular.imageBroken))
+          : ApiImage(
+              imageUrl: item.image!
+                  .url(fit == BoxFit.cover ? 'thumbnail' : 'display'),
+              adminGuid: destinationGuid,
+              repository: repository,
+              fit: fit);
 
   @override
   Widget build(BuildContext context) =>
@@ -43,7 +44,7 @@ class AdminDestinationGalleryEditor extends StatelessWidget {
                   style: Theme.of(context).textTheme.titleSmall)),
           TextButton.icon(
               onPressed: enabled && items.length < 10 ? onAdd : null,
-              icon: const Icon(Icons.add_photo_alternate_outlined),
+              icon: const Icon(PhosphorIconsRegular.imageSquare),
               label: const Text('Tambah Foto'))
         ]),
         const Text(
@@ -72,7 +73,8 @@ class AdminDestinationGalleryEditor extends StatelessWidget {
                                       alignment: Alignment.topRight,
                                       child: IconButton(
                                           tooltip: 'Tutup preview',
-                                          icon: const Icon(Icons.close),
+                                          icon: const Icon(
+                                              PhosphorIconsRegular.x),
                                           onPressed: () =>
                                               Navigator.pop(context)))
                                 ]))),
@@ -96,7 +98,7 @@ class AdminDestinationGalleryEditor extends StatelessWidget {
                                 backgroundColor: Colors.white),
                             iconSize: 18,
                             onPressed: enabled ? () => onRemove(index) : null,
-                            icon: const Icon(Icons.close))),
+                            icon: const Icon(PhosphorIconsRegular.x))),
                   ]));
               return DragTarget<int>(
                   onWillAcceptWithDetails: (d) => enabled && d.data != index,

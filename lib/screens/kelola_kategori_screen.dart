@@ -5,6 +5,7 @@
 // nonaktifkan, aktifkan kembali.
 // ============================================================
 import 'package:flutter/material.dart';
+import 'package:phosphor_icons/phosphor_icons.dart';
 import '../data/admin_state.dart';
 import '../data/business_repository.dart';
 import '../services/api_client.dart';
@@ -143,7 +144,7 @@ class _KelolaKategoriScreenState extends State<KelolaKategoriScreen> {
           ? FloatingActionButton.extended(
               key: const ValueKey('add-category'),
               backgroundColor: AdminColors.blue,
-              icon: const Icon(Icons.add_rounded, color: Colors.white),
+              icon: const Icon(PhosphorIconsRegular.plus, color: Colors.white),
               label: const Text('Tambah Kategori',
                   style: TextStyle(
                       color: Colors.white, fontWeight: FontWeight.w800)),
@@ -152,14 +153,16 @@ class _KelolaKategoriScreenState extends State<KelolaKategoriScreen> {
           : null,
       slivers: [
         if (!allowed)
-          adminEmptySliver(Icons.lock_outline_rounded, 'Akses ditolak',
+          adminEmptySliver(PhosphorIconsRegular.lock, 'Akses ditolak',
               'Kelola Kategori hanya untuk Super Administrator.')
         else if (!_list.hasLoaded && _list.error == null)
           adminLoadingSliver()
         else if (_list.error != null && items.isEmpty)
           adminErrorSliver(adminErrorMessage(_list.error!), _muat)
         else if (items.isEmpty)
-          adminEmptySliver(Icons.category_outlined, 'Belum ada kategori',
+          adminEmptySliver(
+              PhosphorIconsRegular.squaresFour,
+              'Belum ada kategori',
               'Tambahkan kategori untuk mengelompokkan destinasi.')
         else ...[
           if (_list.error != null)
@@ -220,7 +223,7 @@ class _CategoryCard extends StatelessWidget {
               color: AdminColors.blue.withValues(alpha: 0.10),
               borderRadius: BorderRadius.circular(12),
             ),
-            child: const Icon(Icons.category_rounded,
+            child: const Icon(PhosphorIconsRegular.squaresFour,
                 color: AdminColors.blue, size: 21),
           ),
           const SizedBox(width: 12),
@@ -260,7 +263,7 @@ class _CategoryCard extends StatelessWidget {
               key: ValueKey('edit-${category.guid}'),
               tooltip: 'Ubah',
               onPressed: onEdit,
-              icon: const Icon(Icons.edit_rounded,
+              icon: const Icon(PhosphorIconsRegular.pencilSimple,
                   color: Color(0xFFA78BFA), size: 20),
             ),
             IconButton(
@@ -268,7 +271,9 @@ class _CategoryCard extends StatelessWidget {
               tooltip: active ? 'Nonaktifkan' : 'Aktifkan kembali',
               onPressed: onToggle,
               icon: Icon(
-                  active ? Icons.visibility_off_rounded : Icons.restore_rounded,
+                  active
+                      ? PhosphorIconsRegular.eyeSlash
+                      : PhosphorIconsRegular.arrowCounterClockwise,
                   color: active ? AdminColors.danger : AdminColors.success,
                   size: 20),
             ),
@@ -352,22 +357,22 @@ class _CategoryFormDialogState extends State<_CategoryFormDialog> {
                 controller: _name,
                 enabled: !_saving,
                 textInputAction: TextInputAction.next,
-                decoration: adminInputDecoration('Nama', hint: 'Contoh: Pantai'),
+                decoration:
+                    adminInputDecoration('Nama', hint: 'Contoh: Pantai'),
                 onChanged: _nameChanged,
-                validator: (v) => (v == null || v.trim().isEmpty)
-                    ? 'Nama wajib diisi'
-                    : null,
+                validator: (v) =>
+                    (v == null || v.trim().isEmpty) ? 'Nama wajib diisi' : null,
               ),
               const SizedBox(height: 12),
               TextFormField(
                 key: const ValueKey('category-slug'),
                 controller: _slug,
                 enabled: !_saving,
-                decoration: adminInputDecoration('Slug', hint: 'contoh: pantai'),
+                decoration:
+                    adminInputDecoration('Slug', hint: 'contoh: pantai'),
                 onChanged: (_) => _slugEdited = true,
-                validator: (v) => (v == null || v.trim().isEmpty)
-                    ? 'Slug wajib diisi'
-                    : null,
+                validator: (v) =>
+                    (v == null || v.trim().isEmpty) ? 'Slug wajib diisi' : null,
               ),
               if (_error != null) ...[
                 const SizedBox(height: 12),

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:phosphor_icons/phosphor_icons.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import '../data/business_repository.dart';
@@ -125,12 +126,11 @@ class _AdminTicketScannerScreenState extends State<AdminTicketScannerScreen>
     }
   }
 
-  Future<void> _rescan() async {
+  void _rescan() {
     if (_state.loading || _state.confirmUncertain) return;
-    _state.reset();
-    if (_state.confirmUncertain) return;
     _captured = false;
-    await _start();
+    // _changed restarts the camera after MobileScanner is mounted again.
+    _state.reset();
   }
 
   @override
@@ -179,7 +179,8 @@ class _AdminTicketScannerScreenState extends State<AdminTicketScannerScreen>
                                     shape: RoundedRectangleBorder(
                                         borderRadius:
                                             BorderRadius.circular(12))),
-                                icon: const Icon(Icons.close, size: 20)),
+                                icon: const Icon(PhosphorIconsRegular.x,
+                                    size: 20)),
                           ]),
                           const SizedBox(height: 8),
                           const Text(
@@ -234,7 +235,7 @@ class _AdminTicketScannerScreenState extends State<AdminTicketScannerScreen>
               Semantics(
                   liveRegion: true,
                   child: const Column(children: [
-                    Icon(Icons.check_circle_outline_rounded,
+                    Icon(PhosphorIconsRegular.checkCircle,
                         size: 48, color: AppColors.success),
                     SizedBox(height: 16),
                     Text('Check-in berhasil',
@@ -265,7 +266,7 @@ class _AdminTicketScannerScreenState extends State<AdminTicketScannerScreen>
                               color: AppColors.success.withValues(alpha: .2)),
                           borderRadius: BorderRadius.circular(12)),
                       child: Row(children: [
-                        const Icon(Icons.verified_user_outlined,
+                        const Icon(PhosphorIconsRegular.shieldCheck,
                             size: 20, color: AppColors.blue),
                         const SizedBox(width: 8),
                         Expanded(
@@ -289,13 +290,18 @@ class _AdminTicketScannerScreenState extends State<AdminTicketScannerScreen>
                             style: const TextStyle(
                                 fontSize: 16, fontWeight: FontWeight.w800)),
                         for (final detail in [
-                          ('Pemegang tiket', '${preview['booker_name'] ?? '—'}'),
-                          ('Jadwal', '${preview['visit_date'] ?? '—'} (${preview['timezone'] ?? '—'})'),
+                          (
+                            'Pemegang tiket',
+                            '${preview['booker_name'] ?? '—'}'
+                          ),
+                          (
+                            'Jadwal',
+                            '${preview['visit_date'] ?? '—'} (${preview['timezone'] ?? '—'})'
+                          ),
                           ('Nomor tiket', '${preview['ticket_guid'] ?? '—'}'),
                         ]) ...[
                           Padding(
-                              padding:
-                                  const EdgeInsets.symmetric(vertical: 12),
+                              padding: const EdgeInsets.symmetric(vertical: 12),
                               child: Row(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
@@ -324,9 +330,8 @@ class _AdminTicketScannerScreenState extends State<AdminTicketScannerScreen>
             if (_state.error != null)
               Padding(
                   padding: const EdgeInsets.symmetric(vertical: 16),
-                  child: Semantics(
-                      liveRegion: true,
-                      child: Text(_state.error!))),
+                  child:
+                      Semantics(liveRegion: true, child: Text(_state.error!))),
             if (preview != null && result == null) ...[
               const SizedBox(height: 12),
               FilledButton(
@@ -371,11 +376,11 @@ class _AdminTicketScannerScreenState extends State<AdminTicketScannerScreen>
                                 decoration: BoxDecoration(
                                     border: Border.all(
                                         color: AppColors.surface, width: 2),
-                                    borderRadius:
-                                        BorderRadius.circular(16))))),
+                                    borderRadius: BorderRadius.circular(16))))),
                   ]))),
           const SizedBox(height: 12),
-          const Text('Posisikan QR di dalam bingkai. Internet diperlukan untuk verifikasi.',
+          const Text(
+              'Posisikan QR di dalam bingkai. Internet diperlukan untuk verifikasi.',
               textAlign: TextAlign.center,
               style: TextStyle(
                   fontSize: 12, height: 1.5, color: AppColors.textMuted)),
@@ -387,8 +392,7 @@ class _AdminTicketScannerScreenState extends State<AdminTicketScannerScreen>
           Row(children: [
             Expanded(
                 child: OutlinedButton(
-                    onPressed: _start,
-                    child: const Text('Aktifkan kamera'))),
+                    onPressed: _start, child: const Text('Aktifkan kamera'))),
             const SizedBox(width: 8),
             ValueListenableBuilder<MobileScannerState>(
                 valueListenable: _camera,
@@ -399,8 +403,8 @@ class _AdminTicketScannerScreenState extends State<AdminTicketScannerScreen>
                         ? _camera.toggleTorch
                         : null,
                     icon: Icon(value.torchState == TorchState.on
-                        ? Icons.flash_on
-                        : Icons.flash_off))),
+                        ? PhosphorIconsFill.flashlight
+                        : PhosphorIconsRegular.lightningSlash))),
           ]),
         ]);
   }

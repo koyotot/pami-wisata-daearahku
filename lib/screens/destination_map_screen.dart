@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:phosphor_icons/phosphor_icons.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:geolocator/geolocator.dart';
@@ -215,7 +216,8 @@ class _DestinationMapScreenState extends State<DestinationMapScreen>
                                                 child:
                                                     CircularProgressIndicator(
                                                         strokeWidth: 2))
-                                            : const Icon(Icons.my_location)),
+                                            : const Icon(PhosphorIconsRegular
+                                                .crosshair)),
                                     const SizedBox(height: 12),
                                     FloatingActionButton(
                                         heroTag: null,
@@ -224,7 +226,7 @@ class _DestinationMapScreenState extends State<DestinationMapScreen>
                                         backgroundColor: AppColors.surface,
                                         foregroundColor: AppColors.blue,
                                         child: const Icon(
-                                            Icons.location_on_outlined)),
+                                            PhosphorIconsRegular.mapPin)),
                                   ])),
                         ])))));
   }

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:phosphor_icons/phosphor_icons.dart';
 import 'package:flutter/services.dart';
 import '../data/business_repository.dart';
 import 'api_image.dart';
@@ -61,7 +62,7 @@ class _DestinationHeroGalleryState extends State<DestinationHeroGallery> {
     if (widget.images.isEmpty) {
       return const ColoredBox(
           color: Color(0xFFE5EDF5),
-          child: Center(child: Icon(Icons.landscape_outlined, size: 64)));
+          child: Center(child: Icon(PhosphorIconsRegular.mountains, size: 64)));
     }
     return Stack(children: [
       Positioned.fill(
@@ -295,7 +296,7 @@ class _FullscreenDestinationGalleryState
                                         tooltip: 'Tutup galeri',
                                         onPressed: () =>
                                             Navigator.pop(context, _index),
-                                        icon: const Icon(Icons.close,
+                                        icon: const Icon(PhosphorIconsRegular.x,
                                             color: Colors.white),
                                       ),
                                     ),

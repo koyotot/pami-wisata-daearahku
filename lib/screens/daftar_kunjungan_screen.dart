@@ -4,6 +4,7 @@
 // ============================================================
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:phosphor_icons/phosphor_icons.dart';
 import 'package:flutter/services.dart';
 import '../data/booking_errors.dart';
 import '../data/booking_intent.dart';
@@ -713,7 +714,7 @@ class _DaftarKunjunganScreenState extends State<DaftarKunjunganScreen>
           leading: IconButton(
               tooltip: 'Kembali',
               onPressed: () => Navigator.pop(context),
-              icon: const Icon(Icons.arrow_back_rounded)),
+              icon: const Icon(PhosphorIconsRegular.arrowLeft)),
           title: const Text('Daftar Kunjungan',
               style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800)),
           centerTitle: true),
@@ -861,7 +862,7 @@ class _DaftarKunjunganScreenState extends State<DaftarKunjunganScreen>
                           controller: _namaCtrl,
                           label: 'Nama Lengkap',
                           hint: 'Masukkan nama lengkap',
-                          icon: Icons.person_outline_rounded,
+                          icon: PhosphorIconsRegular.userCircle,
                           enabled: !_busy,
                           error: _fieldErrors['visitor_name'],
                           onChanged: () => setState(
@@ -901,7 +902,7 @@ class _DaftarKunjunganScreenState extends State<DaftarKunjunganScreen>
                           controller: _emailCtrl,
                           label: 'Email',
                           hint: 'nama@email.com',
-                          icon: Icons.mail_outline_rounded,
+                          icon: PhosphorIconsRegular.envelope,
                           keyboardType: TextInputType.emailAddress,
                           enabled: !_busy,
                           error: _fieldErrors['visitor_email'],
@@ -975,7 +976,7 @@ class _DaftarKunjunganScreenState extends State<DaftarKunjunganScreen>
                         final counter =
                             Row(mainAxisSize: MainAxisSize.min, children: [
                           _CounterBtn(
-                              icon: Icons.remove_rounded,
+                              icon: PhosphorIconsRegular.minus,
                               onTap: !_busy && _jumlahOrang > 1
                                   ? () => _changeQuantity(_jumlahOrang - 1)
                                   : null),
@@ -988,7 +989,7 @@ class _DaftarKunjunganScreenState extends State<DaftarKunjunganScreen>
                                       fontSize: 18,
                                       fontWeight: FontWeight.w800))),
                           _CounterBtn(
-                              icon: Icons.add_rounded,
+                              icon: PhosphorIconsRegular.plus,
                               onTap: !_busy &&
                                       _jumlahOrang < 1000000 &&
                                       (remaining == null ||
@@ -1021,7 +1022,7 @@ class _DaftarKunjunganScreenState extends State<DaftarKunjunganScreen>
                           label: 'Catatan (opsional)',
                           hint:
                               'Kebutuhan aksesibilitas atau informasi untuk pengelola',
-                          icon: Icons.notes_rounded,
+                          icon: PhosphorIconsRegular.note,
                           maxLines: 3,
                           enabled: !_busy,
                           error: _fieldErrors['notes'],
@@ -1239,8 +1240,8 @@ class _DestinasiCard extends StatelessWidget {
   Widget _placeholder() => Container(
         color: const Color(0xFFE6F0FC),
         child: const Center(
-          child:
-              Icon(Icons.landscape_rounded, color: Color(0xFF1976D2), size: 28),
+          child: Icon(PhosphorIconsRegular.mountains,
+              color: Color(0xFF1976D2), size: 28),
         ),
       );
 
@@ -1390,7 +1391,7 @@ class _CounterBtn extends StatelessWidget {
     return Semantics(
       button: true,
       enabled: active,
-      label: icon == Icons.add_rounded
+      label: icon == PhosphorIconsRegular.plus
           ? 'Tambah pengunjung'
           : 'Kurangi pengunjung',
       child: GestureDetector(

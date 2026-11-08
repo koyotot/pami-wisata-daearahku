@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:phosphor_icons/phosphor_icons.dart';
 import 'package:flutter/services.dart';
 import 'package:latlong2/latlong.dart';
 import '../data/app_data.dart';
@@ -316,8 +317,8 @@ class _DetailWisataScreenState extends State<DetailWisataScreen> {
                                       ? null
                                       : _toggleSave,
                               icon: Icon(_isSaved
-                                  ? Icons.favorite
-                                  : Icons.favorite_border)),
+                                  ? PhosphorIconsFill.heart
+                                  : PhosphorIconsRegular.heart)),
                       ])),
                 if (widget.adminPreview)
                   const SliverToBoxAdapter(
@@ -368,7 +369,7 @@ class _DetailWisataScreenState extends State<DetailWisataScreen> {
                                     children: [
                                       _topAction(
                                           'Kembali',
-                                          Icons.arrow_back_rounded,
+                                          PhosphorIconsRegular.arrowLeft,
                                           () => Navigator.pop(context)),
                                       _topAction(
                                           knownFavorite
@@ -377,8 +378,8 @@ class _DetailWisataScreenState extends State<DetailWisataScreen> {
                                                   : 'Simpan favorit')
                                               : 'Periksa favorit',
                                           knownFavorite && _isSaved
-                                              ? Icons.favorite_rounded
-                                              : Icons.favorite_border_rounded,
+                                              ? PhosphorIconsFill.heart
+                                              : PhosphorIconsRegular.heart,
                                           _loadingSave ||
                                                   _favorites.favorites.loading
                                               ? null
@@ -409,7 +410,7 @@ class _DetailWisataScreenState extends State<DetailWisataScreen> {
                                           letterSpacing: -.8));
                                   final score = TextButton.icon(
                                       onPressed: _openReviews,
-                                      icon: const Icon(Icons.star_rounded,
+                                      icon: const Icon(PhosphorIconsFill.star,
                                           color: Color(0xFFE08600), size: 20),
                                       label: Text(rating,
                                           style: const TextStyle(
@@ -437,10 +438,10 @@ class _DetailWisataScreenState extends State<DetailWisataScreen> {
                                 const SizedBox(height: 18),
                                 Wrap(spacing: 10, runSpacing: 10, children: [
                                   if (destination.category != null)
-                                    _meta(Icons.category_outlined,
+                                    _meta(PhosphorIconsRegular.squaresFour,
                                         destination.category!.name),
                                   if (destination.openingHours.isNotEmpty)
-                                    _meta(Icons.schedule_rounded,
+                                    _meta(PhosphorIconsRegular.clock,
                                         destination.openingHours),
                                 ]),
                                 if (!(destination.isActive &&
@@ -579,7 +580,7 @@ class _DetailWisataScreenState extends State<DetailWisataScreen> {
                                                                             mainAxisSize:
                                                                                 MainAxisSize.min,
                                                                             children: [
-                                                                              Icon(Icons.fullscreen_rounded, color: _C.blue),
+                                                                              Icon(PhosphorIconsRegular.arrowsOut, color: _C.blue),
                                                                               SizedBox(width: 4),
                                                                               Text('Lihat peta', style: TextStyle(color: _C.navy))
                                                                             ],
@@ -596,7 +597,8 @@ class _DetailWisataScreenState extends State<DetailWisataScreen> {
                                                     : () =>
                                                         _openMap(destination),
                                                 icon: const Icon(
-                                                    Icons.directions_outlined),
+                                                    PhosphorIconsRegular
+                                                        .navigationArrow),
                                                 label: const Text(
                                                     'Buka Google Maps')),
                                           ] else
@@ -753,7 +755,7 @@ class _DetailWisataScreenState extends State<DetailWisataScreen> {
           color: _C.navy, fontSize: 17, fontWeight: FontWeight.w800));
   Widget _location(String text) =>
       Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        const Icon(Icons.location_on_outlined, color: _C.blue, size: 18),
+        const Icon(PhosphorIconsRegular.mapPin, color: _C.blue, size: 18),
         const SizedBox(width: 6),
         Expanded(
             child: Text(text.isEmpty ? 'Lokasi belum dicantumkan.' : text,
@@ -775,12 +777,12 @@ class _DetailWisataScreenState extends State<DetailWisataScreen> {
                     color: _C.navy, fontSize: 12, fontWeight: FontWeight.w600)))
       ]));
   IconData _facilityIcon(String? key) => switch (key) {
-        'parking' || 'local_parking' => Icons.local_parking_outlined,
-        'toilet' || 'wc' => Icons.wc_outlined,
-        'wifi' => Icons.wifi_rounded,
-        'restaurant' || 'food' => Icons.restaurant_outlined,
-        'prayer_room' || 'mosque' => Icons.mosque_outlined,
-        'accessible' || 'wheelchair' => Icons.accessible_rounded,
-        _ => Icons.check_circle_outline_rounded,
+        'parking' || 'local_parking' => PhosphorIconsRegular.car,
+        'toilet' || 'wc' => PhosphorIconsRegular.toilet,
+        'wifi' => PhosphorIconsRegular.wifiHigh,
+        'restaurant' || 'food' => PhosphorIconsRegular.forkKnife,
+        'prayer_room' || 'mosque' => PhosphorIconsRegular.mosque,
+        'accessible' || 'wheelchair' => PhosphorIconsRegular.wheelchair,
+        _ => PhosphorIconsRegular.checkCircle,
       };
 }

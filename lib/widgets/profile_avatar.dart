@@ -2,6 +2,7 @@ import 'dart:math' as math;
 import 'dart:typed_data';
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
+import 'package:phosphor_icons/phosphor_icons.dart';
 import 'package:image_picker/image_picker.dart';
 import '../data/app_data.dart';
 import '../services/auth_session.dart';
@@ -57,7 +58,7 @@ class ProfileAvatar extends StatelessWidget {
                         color: const Color(0xFF1976D2),
                         shape: BoxShape.circle,
                         border: Border.all(color: Colors.white, width: 2)),
-                    child: const Icon(Icons.camera_alt_outlined,
+                    child: const Icon(PhosphorIconsRegular.camera,
                         size: 14, color: Colors.white),
                   ),
                 ),
@@ -89,7 +90,8 @@ class AvatarImage extends StatelessWidget {
       radius: size / 2,
       backgroundColor: const Color(0xFF1976D2),
       child: initials.isEmpty
-          ? Icon(Icons.person_outline, color: Colors.white, size: size * .45)
+          ? Icon(PhosphorIconsRegular.userCircle,
+              color: Colors.white, size: size * .45)
           : Text(initials,
               style: TextStyle(
                   fontSize: size * .32,
@@ -208,7 +210,7 @@ Future<void> showAvatarPreview(BuildContext context) async {
                           onPressed: valid && !session.avatarBusy.value
                               ? () => Navigator.pop(dialogContext, true)
                               : null,
-                          icon: const Icon(Icons.edit_outlined),
+                          icon: const Icon(PhosphorIconsRegular.pencilSimple),
                         ),
                       ),
                     ]),
@@ -314,7 +316,8 @@ class _AvatarPhotoPickerSheet extends StatefulWidget {
   });
 
   @override
-  State<_AvatarPhotoPickerSheet> createState() => _AvatarPhotoPickerSheetState();
+  State<_AvatarPhotoPickerSheet> createState() =>
+      _AvatarPhotoPickerSheetState();
 }
 
 class _AvatarPhotoPickerSheetState extends State<_AvatarPhotoPickerSheet> {
@@ -377,15 +380,16 @@ class _AvatarPhotoPickerSheetState extends State<_AvatarPhotoPickerSheet> {
                   foregroundColor: AppColors.textMuted,
                   minimumSize: const Size(48, 48),
                   shape: const CircleBorder()),
-              icon: const Icon(Icons.close, size: 20),
+              icon: const Icon(PhosphorIconsRegular.x, size: 20),
             ),
           ]),
           const SizedBox(height: 24),
           IntrinsicHeight(
-            child: Row(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+            child:
+                Row(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
               Expanded(
                 child: _AvatarPhotoActionCard(
-                  icon: Icons.photo_library_outlined,
+                  icon: PhosphorIconsRegular.images,
                   label: 'Galeri',
                   subtitle: 'Pilih dari perangkat',
                   onTap: () => _select('gallery'),
@@ -394,7 +398,7 @@ class _AvatarPhotoPickerSheetState extends State<_AvatarPhotoPickerSheet> {
               const SizedBox(width: 12),
               Expanded(
                 child: _AvatarPhotoActionCard(
-                  icon: Icons.camera_alt_outlined,
+                  icon: PhosphorIconsRegular.camera,
                   label: 'Kamera',
                   subtitle: 'Ambil foto baru',
                   onTap: () => _select('camera'),
@@ -410,7 +414,8 @@ class _AvatarPhotoPickerSheetState extends State<_AvatarPhotoPickerSheet> {
               TextButton.icon(
                 style: secondaryStyle,
                 onPressed: () => _select('google'),
-                icon: const Icon(Icons.restore, size: 20),
+                icon: const Icon(PhosphorIconsRegular.arrowCounterClockwise,
+                    size: 20),
                 label: const Text('Kembalikan Foto Google',
                     textAlign: TextAlign.center),
               ),
@@ -418,7 +423,8 @@ class _AvatarPhotoPickerSheetState extends State<_AvatarPhotoPickerSheet> {
               TextButton.icon(
                 style: secondaryStyle,
                 onPressed: () => _select('default'),
-                icon: const Icon(Icons.restart_alt, size: 20),
+                icon: const Icon(PhosphorIconsRegular.arrowCounterClockwise,
+                    size: 20),
                 label: const Text('Gunakan Avatar Default',
                     textAlign: TextAlign.center),
               ),
@@ -594,7 +600,7 @@ class _AvatarCropScreenState extends State<AvatarCropScreen> {
               leading: IconButton(
                   tooltip: 'Batal',
                   onPressed: _saving ? null : () => Navigator.pop(context),
-                  icon: const Icon(Icons.close))),
+                  icon: const Icon(PhosphorIconsRegular.x))),
           body: SafeArea(
               child: Column(children: [
             const Padding(

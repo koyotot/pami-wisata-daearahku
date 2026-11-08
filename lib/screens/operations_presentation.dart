@@ -30,7 +30,7 @@ class _DashboardHero extends StatelessWidget {
                 IconButton(
                     tooltip: 'Pusat tindakan',
                     onPressed: onActions,
-                    icon: const Icon(Icons.notifications_none_rounded)),
+                    icon: const Icon(PhosphorIconsRegular.bell)),
             ])
       : ClipRect(
           child: CustomPaint(
@@ -47,7 +47,7 @@ class _DashboardHero extends StatelessWidget {
                                 BackButton(
                                     color: Colors.white, onPressed: onBack)
                               else ...[
-                                const Icon(Icons.landscape_outlined,
+                                const Icon(PhosphorIconsRegular.mountains,
                                     color: Colors.white, size: 22),
                                 const SizedBox(width: 8),
                               ],
@@ -81,8 +81,7 @@ class _DashboardHero extends StatelessWidget {
                                         shape: RoundedRectangleBorder(
                                             borderRadius:
                                                 BorderRadius.circular(12))),
-                                    icon: const Icon(
-                                        Icons.notifications_none_rounded,
+                                    icon: const Icon(PhosphorIconsRegular.bell,
                                         size: 24))
                             ]),
                             const SizedBox(height: 10),
@@ -190,8 +189,12 @@ class _ScopeCard extends StatelessWidget {
           child: Padding(
               padding: const EdgeInsets.all(12),
               child: Row(children: [
-                Icon(executive ? Icons.business_outlined : Icons.place_outlined,
-                    color: AppColors.blue, size: 22),
+                Icon(
+                    executive
+                        ? PhosphorIconsRegular.buildings
+                        : PhosphorIconsRegular.mapPin,
+                    color: AppColors.blue,
+                    size: 22),
                 const SizedBox(width: 10),
                 Expanded(
                     child: Column(
@@ -211,7 +214,7 @@ class _ScopeCard extends StatelessWidget {
                     ])),
                 if (onTap != null) ...[
                   const SizedBox(width: 8),
-                  const Icon(Icons.keyboard_arrow_down_rounded,
+                  const Icon(PhosphorIconsRegular.caretDown,
                       color: AppColors.blue, size: 22),
                 ]
               ]))));
@@ -249,7 +252,7 @@ class _DashboardActionCenter extends StatelessWidget {
           child: Padding(
               padding: const EdgeInsets.all(14),
               child: Row(children: [
-                const Icon(Icons.warning_amber_rounded,
+                const Icon(PhosphorIconsRegular.warningCircle,
                     color: Color(0xFF98621E), size: 26),
                 const SizedBox(width: 12),
                 Expanded(
@@ -276,7 +279,7 @@ class _DashboardActionCenter extends StatelessWidget {
                               color: Color(0xFF795018))),
                     ])),
                 const SizedBox(width: 8),
-                const Icon(Icons.chevron_right_rounded,
+                const Icon(PhosphorIconsRegular.caretRight,
                     color: Color(0xFF98621E), size: 22),
               ]))));
 }
@@ -294,7 +297,7 @@ class _NoAssignmentState extends StatelessWidget {
                   decoration: BoxDecoration(
                       color: const Color(0xFFE8F3FF),
                       borderRadius: BorderRadius.circular(22)),
-                  child: const Icon(Icons.location_off_outlined,
+                  child: const Icon(PhosphorIconsRegular.mapPinLine,
                       color: AppColors.blue, size: 33)),
               const SizedBox(height: 20),
               const Text('Belum ada destinasi',
@@ -338,8 +341,10 @@ class OperationsUnavailableScreen extends StatelessWidget {
                             decoration: BoxDecoration(
                                 color: const Color(0xFFE8F3FF),
                                 borderRadius: BorderRadius.circular(22)),
-                            child: const Icon(Icons.history_rounded,
-                                color: AppColors.blue, size: 33)),
+                            child: const Icon(
+                                PhosphorIconsRegular.clockCounterClockwise,
+                                color: AppColors.blue,
+                                size: 33)),
                         const SizedBox(height: 20),
                         const Text('Audit Timeline Belum Tersedia',
                             textAlign: TextAlign.center,
@@ -373,8 +378,7 @@ class FinancialUnavailablePanel extends StatelessWidget {
           child:
               Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
         const Row(children: [
-          Icon(Icons.account_balance_wallet_outlined,
-              color: AppColors.blue, size: 24),
+          Icon(PhosphorIconsRegular.wallet, color: AppColors.blue, size: 24),
           SizedBox(width: 10),
           Expanded(
               child: Text('Keuangan Belum Tersedia',
@@ -708,7 +712,7 @@ class _SectionTitle extends StatelessWidget {
 Widget _routeLink(String label, VoidCallback action) => ListTile(
     contentPadding: EdgeInsets.zero,
     title: Text(label, style: const TextStyle(fontSize: 14)),
-    trailing: const Icon(Icons.chevron_right, size: 20),
+    trailing: const Icon(PhosphorIconsRegular.caretRight, size: 20),
     onTap: action);
 Widget _filterButton(Map<String, String> filters, VoidCallback action) =>
     _ScopeCard(
@@ -728,8 +732,8 @@ Widget _errorBlock(Object error, VoidCallback retry, {required int? role}) =>
                 children: [
                   Icon(
                       _scopeError(error)
-                          ? Icons.lock_outline
-                          : Icons.wifi_off_rounded,
+                          ? PhosphorIconsRegular.lock
+                          : PhosphorIconsRegular.wifiSlash,
                       size: 36,
                       color: _scopeError(error)
                           ? const Color(0xFFAF4B48)
@@ -756,7 +760,8 @@ Widget _errorBlock(Object error, VoidCallback retry, {required int? role}) =>
                   if (role != 1)
                     FilledButton.icon(
                         onPressed: retry,
-                        icon: const Icon(Icons.refresh_rounded, size: 20),
+                        icon: const Icon(PhosphorIconsRegular.arrowsClockwise,
+                            size: 20),
                         label: Text(_scopeError(error)
                             ? 'Pilih ulang destinasi'
                             : 'Coba lagi')),
@@ -778,8 +783,8 @@ Widget _actionTile(OperationalRow row, VoidCallback open) => Padding(
                 const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
             leading: Icon(
                 row.action == 'upcoming_visit'
-                    ? Icons.event_available_outlined
-                    : Icons.schedule_rounded,
+                    ? PhosphorIconsRegular.calendarCheck
+                    : PhosphorIconsRegular.clock,
                 color: row.action == 'upcoming_visit'
                     ? AppColors.blue
                     : const Color(0xFF98621E)),
@@ -795,8 +800,8 @@ Widget _actionTile(OperationalRow row, VoidCallback open) => Padding(
                 style: const TextStyle(
                     fontSize: 12, height: 1.5, color: Color(0xFF526787))),
             isThreeLine: true,
-            trailing:
-                const Icon(Icons.chevron_right_rounded, color: AppColors.blue),
+            trailing: const Icon(PhosphorIconsRegular.caretRight,
+                color: AppColors.blue),
             onTap: row.bookingGuid == null ? null : open)));
 bool _scopeError(Object? e) =>
     e is ApiException && (e.status == 403 || e.status == 404);

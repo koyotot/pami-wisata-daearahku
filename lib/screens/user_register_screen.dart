@@ -5,6 +5,7 @@ import 'auth_presentation.dart';
 // ============================================================
 
 import 'package:flutter/material.dart';
+import 'package:phosphor_icons/phosphor_icons.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../services/auth_session.dart';
 import 'session_destination.dart';
@@ -193,7 +194,7 @@ class _UserRegisterScreenState extends State<UserRegisterScreen>
               controller: _namaCtrl,
               label: 'Nama lengkap',
               hint: 'Masukkan nama lengkap',
-              icon: Icons.person_rounded,
+              icon: PhosphorIconsRegular.userCircle,
               enabled: !_isLoading,
               textCapitalization: TextCapitalization.words,
               autofillHints: const [AutofillHints.name],
@@ -211,7 +212,7 @@ class _UserRegisterScreenState extends State<UserRegisterScreen>
               controller: _emailCtrl,
               label: 'Email',
               hint: 'nama@email.com',
-              icon: Icons.email_rounded,
+              icon: PhosphorIconsRegular.envelope,
               enabled: !_isLoading,
               keyboardType: TextInputType.emailAddress,
               autofillHints: const [
@@ -243,7 +244,7 @@ class _UserRegisterScreenState extends State<UserRegisterScreen>
               controller: _passwordCtrl,
               label: 'Password',
               hint: 'Minimal 8 karakter',
-              icon: Icons.lock_rounded,
+              icon: PhosphorIconsRegular.lockKey,
               enabled: !_isLoading,
               obscure: _obscurePass,
               autofillHints: const [AutofillHints.newPassword],
@@ -264,7 +265,7 @@ class _UserRegisterScreenState extends State<UserRegisterScreen>
               controller: _konfirmasiCtrl,
               label: 'Konfirmasi password',
               hint: 'Ulangi password',
-              icon: Icons.lock_outline_rounded,
+              icon: PhosphorIconsRegular.lockKey,
               enabled: !_isLoading,
               obscure: _obscureKonfirmasi,
               textInputAction: TextInputAction.done,
@@ -410,8 +411,8 @@ class _RegField extends StatelessWidget {
                     onPressed: enabled ? onToggleObscure : null,
                     icon: Icon(
                       obscure
-                          ? Icons.visibility_outlined
-                          : Icons.visibility_off_outlined,
+                          ? PhosphorIconsRegular.eye
+                          : PhosphorIconsRegular.eyeSlash,
                       color: _C.textMuted,
                       size: 20,
                     ),
@@ -463,7 +464,7 @@ class _ErrorBanner extends StatelessWidget {
       child: Row(
         children: [
           const Icon(
-            Icons.error_outline_rounded,
+            PhosphorIconsRegular.warningCircle,
             color: _C.danger,
             size: 19,
           ),

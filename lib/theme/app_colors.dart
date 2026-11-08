@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'app_icons.dart';
 
 /// Visitor V4 tokens; other roles keep their local presentation.
 class AppColors {
@@ -44,6 +45,7 @@ class AppColors {
       );
 
   static ThemeData get visitorTheme => ThemeData(
+        actionIconTheme: AppIcons.actionTheme,
         useMaterial3: true,
         colorScheme: ColorScheme.fromSeed(seedColor: blue)
             .copyWith(primary: blue, secondary: blueDeep, surface: surface),

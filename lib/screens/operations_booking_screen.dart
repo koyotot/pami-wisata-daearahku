@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:phosphor_icons/phosphor_icons.dart';
 import 'package:flutter/services.dart';
 import '../data/admin_state.dart';
 import '../data/approval_queue_state.dart';
@@ -284,7 +285,7 @@ class _OperationsBookingScreenState extends State<OperationsBookingScreen>
                     IconButton(
                         tooltip: 'Pilihan claim',
                         onPressed: _claimOptions,
-                        icon: const Icon(Icons.more_horiz)),
+                        icon: const Icon(PhosphorIconsRegular.dotsThree)),
                 ]))));
   }
 
@@ -349,6 +350,8 @@ class _OperationsBookingScreenState extends State<OperationsBookingScreen>
                                       const Text(
                                           'Tidak ada Admin aktif yang ditugaskan ke destinasi ini.'),
                                     DropdownButtonFormField<String>(
+                                        icon: const Icon(
+                                            PhosphorIconsRegular.caretDown),
                                         isExpanded: true,
                                         decoration:
                                             adminInputDecoration('Admin tujuan')
@@ -477,7 +480,7 @@ class _OperationsBookingScreenState extends State<OperationsBookingScreen>
               IconButton(
                   tooltip: 'Muat status terbaru',
                   onPressed: _detail.busy ? null : _detail.refresh,
-                  icon: const Icon(Icons.refresh))
+                  icon: const Icon(PhosphorIconsRegular.arrowsClockwise))
           ],
           children: [
             if (_detail.busy)
@@ -494,7 +497,7 @@ class _OperationsBookingScreenState extends State<OperationsBookingScreen>
                   child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Icon(Icons.info_outline_rounded,
+                        const Icon(PhosphorIconsRegular.info,
                             color: Color(0xFF795018)),
                         const SizedBox(height: 8),
                         Text(_detail.message!,
@@ -506,7 +509,9 @@ class _OperationsBookingScreenState extends State<OperationsBookingScreen>
                         if (_session.role != 1)
                           TextButton.icon(
                               onPressed: _detail.busy ? null : _detail.refresh,
-                              icon: const Icon(Icons.refresh, size: 18),
+                              icon: const Icon(
+                                  PhosphorIconsRegular.arrowsClockwise,
+                                  size: 18),
                               label: const Text('Muat status terbaru')),
                       ])),
             if (booking != null) ...[
@@ -543,7 +548,8 @@ class _OperationsBookingScreenState extends State<OperationsBookingScreen>
                             tooltip: 'Salin nomor booking',
                             onPressed: () => Clipboard.setData(
                                 ClipboardData(text: booking.bookingNumber)),
-                            icon: const Icon(Icons.copy_outlined, size: 20)),
+                            icon: const Icon(PhosphorIconsRegular.copy,
+                                size: 20)),
                       ])
                     else
                       Text(booking.bookingNumber,
@@ -607,10 +613,10 @@ class _OperationsBookingScreenState extends State<OperationsBookingScreen>
                       children: [
                         Icon(
                             _detail.mine
-                                ? Icons.verified_user_outlined
+                                ? PhosphorIconsRegular.shieldCheck
                                 : claim?.active == true
-                                    ? Icons.lock_outline
-                                    : Icons.info_outline,
+                                    ? PhosphorIconsRegular.lock
+                                    : PhosphorIconsRegular.info,
                             color: AdminColors.blueDeep),
                         const SizedBox(height: 10),
                         Text(claimLabel,

@@ -1,5 +1,6 @@
 import 'auth_presentation.dart';
 import 'package:flutter/material.dart';
+import 'package:phosphor_icons/phosphor_icons.dart';
 import '../services/auth_session.dart';
 import 'verify_reset_otp_screen.dart';
 
@@ -97,7 +98,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
             decoration: InputDecoration(
                 labelText: 'Email',
                 hintText: 'nama@email.com',
-                prefixIcon: const Icon(Icons.mail_outline_rounded),
+                prefixIcon: const Icon(PhosphorIconsRegular.envelope),
                 errorText: _error)),
         const SizedBox(height: 24),
         AuthPrimaryButton(

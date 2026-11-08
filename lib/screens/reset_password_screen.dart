@@ -1,6 +1,7 @@
 import 'auth_presentation.dart';
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:phosphor_icons/phosphor_icons.dart';
 import '../services/auth_session.dart';
 import 'forgot_password_screen.dart';
 import 'user_login_screen.dart';
@@ -159,7 +160,7 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
               decoration: InputDecoration(
                   labelText: 'Password baru',
                   hintText: 'Minimal 8 karakter',
-                  prefixIcon: const Icon(Icons.lock_outline_rounded),
+                  prefixIcon: const Icon(PhosphorIconsRegular.lockKey),
                   errorText: _passwordError,
                   suffixIcon: IconButton(
                       tooltip: _showPassword
@@ -170,8 +171,8 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
                           : () =>
                               setState(() => _showPassword = !_showPassword),
                       icon: Icon(_showPassword
-                          ? Icons.visibility_off_outlined
-                          : Icons.visibility_outlined)))),
+                          ? PhosphorIconsRegular.eyeSlash
+                          : PhosphorIconsRegular.eye)))),
           const SizedBox(height: 20),
           TextField(
               controller: _confirmation,
@@ -184,7 +185,7 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
               decoration: InputDecoration(
                   labelText: 'Konfirmasi password',
                   hintText: 'Ulangi password',
-                  prefixIcon: const Icon(Icons.lock_outline_rounded),
+                  prefixIcon: const Icon(PhosphorIconsRegular.lockKey),
                   errorText: _confirmationError,
                   suffixIcon: IconButton(
                       tooltip: _showConfirmation
@@ -195,8 +196,8 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
                           : () => setState(
                               () => _showConfirmation = !_showConfirmation),
                       icon: Icon(_showConfirmation
-                          ? Icons.visibility_off_outlined
-                          : Icons.visibility_outlined)))),
+                          ? PhosphorIconsRegular.eyeSlash
+                          : PhosphorIconsRegular.eye)))),
           if (_message != null)
             Padding(
                 padding: const EdgeInsets.only(top: 12),
@@ -225,7 +226,7 @@ class ResetPasswordSuccessScreen extends StatelessWidget {
                     color: Color(0xFFE8F3FF), shape: BoxShape.circle),
                 child: Padding(
                     padding: EdgeInsets.all(24),
-                    child: Icon(Icons.check_rounded,
+                    child: Icon(PhosphorIconsRegular.check,
                         size: 48, color: AuthTheme.blue)))),
         const SizedBox(height: 28),
         const AuthHeading(

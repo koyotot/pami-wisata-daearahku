@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:phosphor_icons/phosphor_icons.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 
@@ -86,7 +87,7 @@ class _DestinationLocationMapState extends State<DestinationLocationMap> {
                                         style: const TextStyle(
                                             color: Color(0xFF102D59),
                                             fontSize: 12)))),
-                          const Icon(Icons.location_on,
+                          const Icon(PhosphorIconsRegular.mapPin,
                               color: Color(0xFF1976D2), size: 44),
                         ]),
                   ),

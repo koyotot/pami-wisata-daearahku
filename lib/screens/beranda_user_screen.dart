@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:phosphor_icons/phosphor_icons.dart';
 import '../data/app_data.dart';
 import '../data/booking_state.dart';
 import '../data/business_repository.dart';
@@ -309,7 +310,7 @@ class _BerandaUserScreenState extends State<BerandaUserScreen>
                           IconButton(
                               onPressed: widget.onBukaMenu,
                               tooltip: 'Buka menu',
-                              icon: const Icon(Icons.menu_rounded,
+                              icon: const Icon(PhosphorIconsRegular.list,
                                   color: Colors.white)),
                       ]),
                       const SizedBox(height: 30),
@@ -386,7 +387,7 @@ class _BerandaUserScreenState extends State<BerandaUserScreen>
     if (booking == null) {
       return _journeyPanel(
           Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-            const Icon(Icons.explore_outlined,
+            const Icon(PhosphorIconsRegular.compass,
                 color: AppColors.orange, size: 32),
             const SizedBox(height: 12),
             Text('Petualangan pertamamu menanti',
@@ -487,10 +488,9 @@ class _BerandaUserScreenState extends State<BerandaUserScreen>
           Text(booking.destinationName,
               style: _text(18, weight: FontWeight.w800)),
           const SizedBox(height: 10),
-          _meta(Icons.calendar_today_outlined, dateLabel),
+          _meta(PhosphorIconsRegular.calendarBlank, dateLabel),
           const SizedBox(height: 6),
-          _meta(
-              Icons.confirmation_number_outlined, '${booking.quantity} tiket'),
+          _meta(PhosphorIconsRegular.ticket, '${booking.quantity} tiket'),
         ])),
       ]),
       const SizedBox(height: 16),
@@ -502,7 +502,7 @@ class _BerandaUserScreenState extends State<BerandaUserScreen>
       ],
       const SizedBox(height: 12),
       _journeyAction(action, () => _openBooking(booking),
-          icon: Icons.confirmation_number_outlined),
+          icon: PhosphorIconsRegular.ticket),
     ]));
   }
 
@@ -535,7 +535,7 @@ class _BerandaUserScreenState extends State<BerandaUserScreen>
                     style: _text(12,
                         weight: FontWeight.w800, color: Colors.white))),
             const SizedBox(width: 8),
-            const Icon(Icons.arrow_forward_rounded, size: 16),
+            const Icon(PhosphorIconsRegular.arrowRight, size: 16),
           ]));
 
   Widget _meta(IconData icon, String label) =>
@@ -557,7 +557,7 @@ class _BerandaUserScreenState extends State<BerandaUserScreen>
         placeholder: (_) => const ColoredBox(
             color: AppColors.border,
             child: Center(
-                child: Icon(Icons.landscape_outlined,
+                child: Icon(PhosphorIconsRegular.mountains,
                     color: AppColors.textMuted, size: 30))));
   }
 
@@ -604,7 +604,7 @@ class _BerandaUserScreenState extends State<BerandaUserScreen>
                           style: _text(14, weight: FontWeight.w800)),
                       const SizedBox(height: 4),
                       Row(children: [
-                        const Icon(Icons.place_rounded,
+                        const Icon(PhosphorIconsRegular.mapPin,
                             size: 12, color: Color(0xFFF45B83)),
                         const SizedBox(width: 4),
                         Expanded(
@@ -633,7 +633,7 @@ class _BerandaUserScreenState extends State<BerandaUserScreen>
                     child: const CircleAvatar(
                         radius: 14,
                         backgroundColor: Color(0xFFFFF0F4),
-                        child: Icon(Icons.favorite_rounded,
+                        child: Icon(PhosphorIconsFill.heart,
                             size: 14, color: Color(0xFFF45B83)))),
               ]))));
 
@@ -695,8 +695,10 @@ class _BerandaUserScreenState extends State<BerandaUserScreen>
                                       child: Row(
                                           mainAxisSize: MainAxisSize.min,
                                           children: [
-                                            const Icon(Icons.auto_awesome,
-                                                size: 12, color: Colors.white),
+                                            const Icon(
+                                                PhosphorIconsRegular.sparkle,
+                                                size: 12,
+                                                color: Colors.white),
                                             const SizedBox(width: 4),
                                             Flexible(
                                                 child: Text('Destinasi pilihan',
@@ -713,7 +715,7 @@ class _BerandaUserScreenState extends State<BerandaUserScreen>
                                           color: Colors.white)),
                                   const SizedBox(height: 4),
                                   Row(children: [
-                                    const Icon(Icons.place_rounded,
+                                    const Icon(PhosphorIconsRegular.mapPin,
                                         color: Color(0xFFF45B83), size: 14),
                                     const SizedBox(width: 4),
                                     Expanded(
@@ -731,8 +733,10 @@ class _BerandaUserScreenState extends State<BerandaUserScreen>
                                     const CircleAvatar(
                                         radius: 16,
                                         backgroundColor: Colors.white,
-                                        child: Icon(Icons.north_east_rounded,
-                                            size: 16, color: AppColors.blue)),
+                                        child: Icon(
+                                            PhosphorIconsRegular.arrowUpRight,
+                                            size: 16,
+                                            color: AppColors.blue)),
                                   ]),
                                 ]))),
                   ]))));
@@ -799,7 +803,7 @@ class _BerandaUserScreenState extends State<BerandaUserScreen>
                 const CircleAvatar(
                     radius: 22,
                     backgroundColor: Colors.white,
-                    child: Icon(Icons.arrow_forward_rounded,
+                    child: Icon(PhosphorIconsRegular.arrowRight,
                         color: AppColors.blue)),
               ]))));
 }

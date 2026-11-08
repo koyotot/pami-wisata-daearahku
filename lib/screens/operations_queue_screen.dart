@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:phosphor_icons/phosphor_icons.dart';
 import '../data/admin_state.dart';
 import '../data/app_data.dart' show currentUser;
 import '../data/business_repository.dart';
@@ -323,7 +324,10 @@ class _OperationsQueueScreenState extends State<OperationsQueueScreen>
               child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Icon(_revoked ? Icons.lock_outline : Icons.wifi_off,
+                    Icon(
+                        _revoked
+                            ? PhosphorIconsRegular.lock
+                            : PhosphorIconsRegular.wifiSlash,
                         color: const Color(0xFF795018)),
                     const SizedBox(height: 10),
                     Text(
@@ -346,8 +350,8 @@ class _OperationsQueueScreenState extends State<OperationsQueueScreen>
               child: Column(children: [
                 Icon(
                     _filters.isNotEmpty || _ownership != 'all'
-                        ? Icons.search_off_rounded
-                        : Icons.task_alt_rounded,
+                        ? PhosphorIconsRegular.magnifyingGlassMinus
+                        : PhosphorIconsRegular.checkCircle,
                     size: 40,
                     color: _filters.isNotEmpty || _ownership != 'all'
                         ? AdminColors.blue
@@ -368,7 +372,7 @@ class _OperationsQueueScreenState extends State<OperationsQueueScreen>
                     textAlign: TextAlign.center,
                     style: const TextStyle(
                         fontSize: 13, height: 1.6, color: Color(0xFF526787))),
-                if (_ownership != 'all')
+                if (_role != 1 && _ownership != 'all')
                   TextButton(
                       onPressed: () => setState(() => _ownership = 'all'),
                       child: const Text('Reset status claim')),
@@ -426,7 +430,7 @@ class _OperationsQueueScreenState extends State<OperationsQueueScreen>
                         child: Row(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              const Icon(Icons.schedule_rounded,
+                              const Icon(PhosphorIconsRegular.clock,
                                   size: 18, color: Color(0xFF795018)),
                               const SizedBox(width: 8),
                               Expanded(

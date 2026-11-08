@@ -4,6 +4,7 @@
 // existing admin pages): page shell, filter chips, status views, dialogs.
 // ============================================================
 import 'package:flutter/material.dart';
+import 'package:phosphor_icons/phosphor_icons.dart';
 import '../services/auth_session.dart';
 import '../widgets/operations_chrome.dart';
 
@@ -86,7 +87,7 @@ class AdminPage extends StatelessWidget {
                           border: Border.all(
                               color: Colors.white.withValues(alpha: 0.35)),
                         ),
-                        child: const Icon(Icons.arrow_back_ios_new_rounded,
+                        child: const Icon(PhosphorIconsRegular.caretLeft,
                             size: 16, color: Colors.white),
                       ),
                     ),

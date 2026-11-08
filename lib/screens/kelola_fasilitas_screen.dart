@@ -5,6 +5,7 @@
 // nonaktifkan, aktifkan kembali.
 // ============================================================
 import 'package:flutter/material.dart';
+import 'package:phosphor_icons/phosphor_icons.dart';
 import '../data/admin_state.dart';
 import '../data/facility_state.dart';
 import '../data/business_repository.dart';
@@ -164,7 +165,7 @@ class _KelolaFasilitasScreenState extends State<KelolaFasilitasScreen> {
           ? FloatingActionButton.extended(
               key: const ValueKey('add-facility'),
               backgroundColor: AdminColors.blue,
-              icon: const Icon(Icons.add_rounded, color: Colors.white),
+              icon: const Icon(PhosphorIconsRegular.plus, color: Colors.white),
               label: const Text('Tambah Fasilitas',
                   style: TextStyle(
                       color: Colors.white, fontWeight: FontWeight.w800)),
@@ -192,14 +193,16 @@ class _KelolaFasilitasScreenState extends State<KelolaFasilitasScreen> {
             ]),
           )),
         if (!allowed)
-          adminEmptySliver(Icons.lock_outline_rounded, 'Akses ditolak',
+          adminEmptySliver(PhosphorIconsRegular.lock, 'Akses ditolak',
               'Kelola Fasilitas hanya untuk Super Administrator.')
         else if (!_list.hasLoaded && _list.error == null)
           adminLoadingSliver()
         else if (_list.error != null && items.isEmpty)
           adminErrorSliver(adminErrorMessage(_list.error!), _muat)
         else if (items.isEmpty)
-          adminEmptySliver(Icons.room_service_outlined, 'Belum ada fasilitas',
+          adminEmptySliver(
+              PhosphorIconsRegular.bellSimple,
+              'Belum ada fasilitas',
               'Tambahkan fasilitas pertama untuk dipilih pada destinasi.')
         else ...[
           if (_list.error != null)
@@ -260,7 +263,7 @@ class _FacilityCard extends StatelessWidget {
               color: AdminColors.blue.withValues(alpha: 0.10),
               borderRadius: BorderRadius.circular(12),
             ),
-            child: const Icon(Icons.room_service_rounded,
+            child: const Icon(PhosphorIconsRegular.bellSimple,
                 color: AdminColors.blue, size: 21),
           ),
           const SizedBox(width: 12),
@@ -300,7 +303,7 @@ class _FacilityCard extends StatelessWidget {
               key: ValueKey('edit-${facility.guid}'),
               tooltip: 'Ubah',
               onPressed: onEdit,
-              icon: const Icon(Icons.edit_rounded,
+              icon: const Icon(PhosphorIconsRegular.pencilSimple,
                   color: Color(0xFFA78BFA), size: 20),
             ),
             IconButton(
@@ -308,7 +311,9 @@ class _FacilityCard extends StatelessWidget {
               tooltip: active ? 'Nonaktifkan' : 'Aktifkan kembali',
               onPressed: onToggle,
               icon: Icon(
-                  active ? Icons.visibility_off_rounded : Icons.restore_rounded,
+                  active
+                      ? PhosphorIconsRegular.eyeSlash
+                      : PhosphorIconsRegular.arrowCounterClockwise,
                   color: active ? AdminColors.danger : AdminColors.success,
                   size: 20),
             ),

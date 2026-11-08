@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 import 'dart:ui' show FontFeature;
 import 'package:flutter/material.dart';
+import 'package:phosphor_icons/phosphor_icons.dart';
 import 'package:flutter/services.dart';
 import '../data/admin_state.dart';
 import '../data/approval_queue_state.dart';
@@ -271,6 +272,7 @@ class _OperationsDashboardState extends State<OperationsDashboard>
       onOpen: () => _open(OperationsReportScreen(
           section: 'action-center',
           initialFilters: _filters,
+          initialDestinationLabel: _destinationLabel,
           repository: _repository,
           session: _session)));
 
@@ -307,10 +309,10 @@ class _OperationsDashboardState extends State<OperationsDashboard>
             ),
           ],
           icons: const [
-            Icons.check_rounded,
-            Icons.close_rounded,
-            Icons.schedule_outlined,
-            Icons.verified_user_outlined
+            PhosphorIconsRegular.check,
+            PhosphorIconsRegular.x,
+            PhosphorIconsRegular.clock,
+            PhosphorIconsRegular.shieldCheck
           ],
           labelStyle: const TextStyle(
               fontSize: 11,
@@ -324,7 +326,7 @@ class _OperationsDashboardState extends State<OperationsDashboard>
       _AdminHomeShortcut(
           title: 'Lihat antrean kerja',
           subtitle: 'Kembali ke permintaan yang tersedia',
-          icon: Icons.inbox_outlined,
+          icon: PhosphorIconsRegular.tray,
           onTap: widget.onOpenQueue),
     ];
   }
@@ -348,10 +350,10 @@ class _OperationsDashboardState extends State<OperationsDashboard>
               ('Ditolak', _value(data.metrics['rejected_decisions'])),
             ],
             icons: const [
-              Icons.schedule_outlined,
-              Icons.place_outlined,
-              Icons.check_rounded,
-              Icons.warning_amber_rounded
+              PhosphorIconsRegular.clock,
+              PhosphorIconsRegular.mapPin,
+              PhosphorIconsRegular.check,
+              PhosphorIconsRegular.warningCircle
             ],
             labelStyle: const TextStyle(
                 fontSize: 11,
@@ -377,19 +379,19 @@ class _OperationsDashboardState extends State<OperationsDashboard>
           (
             'Antrean approval',
             'Kelola dan ambil tugas',
-            Icons.inbox_outlined,
+            PhosphorIconsRegular.tray,
             widget.onOpenQueue
           ),
           (
             'Kinerja destinasi',
             'Kapasitas dan okupansi',
-            Icons.show_chart_rounded,
+            PhosphorIconsRegular.chartLine,
             widget.onOpenDestinations
           ),
           (
             'Kunjungan & check-in',
             'Tiket dan tingkat kehadiran',
-            Icons.qr_code_rounded,
+            PhosphorIconsRegular.qrCode,
             () => _open(OperationsReportScreen(
                 section: 'visitors',
                 repository: _repository,
@@ -400,7 +402,7 @@ class _OperationsDashboardState extends State<OperationsDashboard>
           (
             'Data pendaftar',
             'Lihat status booking',
-            Icons.people_outline_rounded,
+            PhosphorIconsRegular.users,
             () => _open(DaftarPendaftarScreen(
                 repository: _repository, session: _session))
           ),
@@ -643,17 +645,19 @@ class _OperationsDashboardState extends State<OperationsDashboard>
                                           ? null
                                           : _personal
                                               ? const [
-                                                  Icons.task_alt_rounded,
-                                                  Icons.cancel_outlined,
-                                                  Icons.percent_rounded,
-                                                  Icons.timer_outlined,
-                                                  Icons.verified_outlined
+                                                  PhosphorIconsRegular
+                                                      .checkCircle,
+                                                  PhosphorIconsRegular.xCircle,
+                                                  PhosphorIconsRegular.percent,
+                                                  PhosphorIconsRegular.timer,
+                                                  PhosphorIconsRegular.sealCheck
                                                 ]
                                               : const [
-                                                  Icons.schedule_rounded,
-                                                  Icons.place_outlined,
-                                                  Icons.task_alt_rounded,
-                                                  Icons.cancel_outlined,
+                                                  PhosphorIconsRegular.clock,
+                                                  PhosphorIconsRegular.mapPin,
+                                                  PhosphorIconsRegular
+                                                      .checkCircle,
+                                                  PhosphorIconsRegular.xCircle,
                                                 ],
                                       metadata: _role == 1
                                           ? null
@@ -763,7 +767,7 @@ class _OperationsDashboardState extends State<OperationsDashboard>
                                                   session: _session,
                                                   filters: _filters)),
                                           icon: const Icon(
-                                              Icons.arrow_forward_rounded),
+                                              PhosphorIconsRegular.arrowRight),
                                           iconAlignment: IconAlignment.end,
                                           label: Text(_role == 2
                                               ? 'Buka Antrean Global'
@@ -874,7 +878,7 @@ class OperationsAnalyticsHub extends StatelessWidget {
                               fontSize: 12,
                               height: 1.5,
                               color: Color(0xFF526787))),
-                      trailing: const Icon(Icons.chevron_right,
+                      trailing: const Icon(PhosphorIconsRegular.caretRight,
                           color: AppColors.blue),
                       onTap: () => Navigator.of(context).push(
                           MaterialPageRoute<void>(

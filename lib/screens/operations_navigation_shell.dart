@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:phosphor_icons/phosphor_icons.dart';
 import '../data/app_data.dart';
 import '../data/admin_state.dart';
 import '../data/approval_queue_state.dart';
@@ -30,7 +31,10 @@ class OperationsNavigationShell extends StatefulWidget {
 }
 
 class _OperationsNavigationShellState extends State<OperationsNavigationShell>
-    with WidgetsBindingObserver {
+    with WidgetsBindingObserver, SingleTickerProviderStateMixin {
+  late final AnimationController _tabTransition;
+  late final Animation<double> _tabOpacity;
+  late final Animation<Offset> _tabOffset;
   late final AuthSession _session = widget.session ?? AuthSession.instance;
   late final BusinessRepository _repository =
       widget.repository ?? BusinessRepository(ApiClient(_session));
@@ -51,6 +55,11 @@ class _OperationsNavigationShellState extends State<OperationsNavigationShell>
   @override
   void initState() {
     super.initState();
+    _tabTransition = AnimationController(
+        vsync: this, duration: const Duration(milliseconds: 300), value: 1);
+    _tabOpacity = _tabTransition.drive(CurveTween(curve: Curves.easeOut));
+    _tabOffset = _tabOpacity
+        .drive(Tween<Offset>(begin: const Offset(0, .04), end: Offset.zero));
     WidgetsBinding.instance.addObserver(this);
     _session.sessionChanges.addListener(_sessionChanged);
   }
@@ -103,6 +112,7 @@ class _OperationsNavigationShellState extends State<OperationsNavigationShell>
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _session.sessionChanges.removeListener(_sessionChanged);
+    _tabTransition.dispose();
     super.dispose();
   }
 
@@ -114,6 +124,13 @@ class _OperationsNavigationShellState extends State<OperationsNavigationShell>
           repository: _repository, builder: widget.scannerBuilder);
       if (mounted && _valid) operationsDataChanges.value++;
       return;
+    }
+    if (index != _index) {
+      if (MediaQuery.disableAnimationsOf(context)) {
+        _tabTransition.value = 1;
+      } else {
+        _tabTransition.forward(from: 0);
+      }
     }
     setState(() {
       _index = index;
@@ -181,17 +198,22 @@ class _OperationsNavigationShellState extends State<OperationsNavigationShell>
                               onPressed: () => _select(_index),
                               child: const Text('Muat sesuai akses terbaru')),
                       ])
-                : IndexedStack(
-                    index: _index,
-                    children: List.generate(
-                        5,
-                        (i) => TickerMode(
-                            enabled: _index == i,
-                            child: KeyedSubtree(
-                                key: ValueKey('operations-$_revision-$i'),
-                                child: _pages.contains(i)
-                                    ? _page(i)
-                                    : const SizedBox.shrink())))),
+                : FadeTransition(
+                    opacity: _tabOpacity,
+                    child: SlideTransition(
+                        position: _tabOffset,
+                        child: IndexedStack(
+                            index: _index,
+                            children: List.generate(
+                                5,
+                                (i) => TickerMode(
+                                    enabled: _index == i,
+                                    child: KeyedSubtree(
+                                        key: ValueKey(
+                                            'operations-$_revision-$i'),
+                                        child: _pages.contains(i)
+                                            ? _page(i)
+                                            : const SizedBox.shrink())))))),
             bottomNavigationBar: MediaQuery.viewInsetsOf(context).bottom > 0
                 ? null
                 : FloatingBottomNav(
@@ -277,7 +299,8 @@ class _ManagementPage extends StatelessWidget {
               subtitle: Text(subtitle,
                   style: const TextStyle(
                       fontSize: 12, height: 1.5, color: Color(0xFF526787))),
-              trailing: const Icon(Icons.chevron_right, color: AppColors.blue),
+              trailing: const Icon(PhosphorIconsRegular.caretRight,
+                  color: AppColors.blue),
               onTap: () => Navigator.of(context)
                   .push(MaterialPageRoute<void>(builder: (_) => page))));
 }
@@ -296,6 +319,7 @@ class _OperationsProfile extends StatefulWidget {
 
 class _OperationsProfileState extends State<_OperationsProfile> {
   bool _busy = false;
+  bool _logoutDialogOpen = false;
   late final PagedListController<Destination> _destinations;
 
   @override
@@ -330,6 +354,41 @@ class _OperationsProfileState extends State<_OperationsProfile> {
   }
 
   Future<void> _logout() async {
+    if (_busy || _logoutDialogOpen) return;
+    final generation = widget.session.sessionGeneration;
+    _logoutDialogOpen = true;
+    final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+              backgroundColor: AppColors.surface,
+              surfaceTintColor: Colors.transparent,
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(AppSpacing.lg),
+                  side: const BorderSide(color: AppColors.border)),
+              title: const Text('Keluar dari akun?',
+                  style: TextStyle(
+                      color: AppColors.navy, fontWeight: FontWeight.w700)),
+              content: const Text(
+                  'Anda perlu masuk kembali untuk mengakses akun ini.',
+                  style:
+                      TextStyle(color: AppColors.textSecondary, height: 1.5)),
+              actions: [
+                TextButton(
+                    key: const ValueKey('operations-logout-cancel'),
+                    onPressed: () => Navigator.pop(dialogContext, false),
+                    child: const Text('Batal')),
+                TextButton(
+                    key: const ValueKey('operations-logout-confirm'),
+                    onPressed: () => Navigator.pop(dialogContext, true),
+                    child: const Text('Keluar',
+                        style: TextStyle(fontWeight: FontWeight.w700))),
+              ],
+            ));
+    _logoutDialogOpen = false;
+    if (confirmed != true ||
+        !mounted ||
+        !widget.session.isCurrentGeneration(generation) ||
+        !widget.session.authenticated.value) return;
     setState(() => _busy = true);
     await widget.session.logout();
     if (mounted) setState(() => _busy = false);
@@ -367,7 +426,7 @@ class _OperationsProfileState extends State<_OperationsProfile> {
                         decoration: BoxDecoration(
                             color: AppColors.blue.withValues(alpha: .1),
                             borderRadius: BorderRadius.circular(16)),
-                        child: const Icon(Icons.person_outline_rounded,
+                        child: const Icon(PhosphorIconsRegular.userCircle,
                             size: 24, color: AppColors.blue)),
                     const SizedBox(width: 12),
                     Expanded(
@@ -448,7 +507,7 @@ class _OperationsProfileState extends State<_OperationsProfile> {
                       side: const BorderSide(color: AppColors.border),
                       shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(12))),
-                  icon: const Icon(Icons.logout_rounded, size: 16),
+                  icon: const Icon(PhosphorIconsRegular.signOut, size: 16),
                   label: Text(_busy ? 'Keluar…' : 'Keluar akun',
                       style: const TextStyle(
                           fontSize: 12, fontWeight: FontWeight.bold))),
@@ -468,7 +527,7 @@ class _OperationsProfileState extends State<_OperationsProfile> {
               const SizedBox(height: 32),
               ElevatedButton.icon(
                   onPressed: _busy ? null : _logout,
-                  icon: const Icon(Icons.logout),
+                  icon: const Icon(PhosphorIconsRegular.signOut),
                   label: Text(_busy ? 'Keluar…' : 'Keluar akun')),
             ],
           ]);

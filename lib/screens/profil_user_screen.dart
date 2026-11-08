@@ -8,6 +8,7 @@ import '../services/auth_session.dart';
 // Package: google_fonts, firebase_auth
 // ============================================================
 import 'package:flutter/material.dart';
+import 'package:phosphor_icons/phosphor_icons.dart';
 import 'package:flutter/services.dart';
 import 'package:firebase_auth/firebase_auth.dart' as fb_auth;
 import 'package:google_fonts/google_fonts.dart';
@@ -386,7 +387,8 @@ class _ProfilUserScreenState extends State<ProfilUserScreen>
                                                 onPressed:
                                                     _loadJumlahPendaftaran,
                                                 icon: const Icon(
-                                                    Icons.refresh_rounded),
+                                                    PhosphorIconsRegular
+                                                        .arrowsClockwise),
                                                 label: Text(
                                                     '$_jumlahError Coba lagi'),
                                               ),
@@ -395,7 +397,8 @@ class _ProfilUserScreenState extends State<ProfilUserScreen>
                                             const SizedBox(height: 12),
                                             _buildMenuGroup([
                                               _MenuItemData(
-                                                icon: Icons.rate_review_rounded,
+                                                icon: PhosphorIconsRegular
+                                                    .chatText,
                                                 iconColor:
                                                     const Color(0xFF1E88E5),
                                                 title: 'Riwayat Ulasan',
@@ -413,7 +416,8 @@ class _ProfilUserScreenState extends State<ProfilUserScreen>
                                             const SizedBox(height: 12),
                                             _buildMenuGroup([
                                               _MenuItemData(
-                                                icon: Icons.language_rounded,
+                                                icon:
+                                                    PhosphorIconsRegular.globe,
                                                 iconColor:
                                                     const Color(0xFF7E57C2),
                                                 title: 'Bahasa',
@@ -423,7 +427,7 @@ class _ProfilUserScreenState extends State<ProfilUserScreen>
                                                     _bukaPilihBahasa(context),
                                               ),
                                               _MenuItemData(
-                                                icon: Icons.lock_reset_rounded,
+                                                icon: PhosphorIconsRegular.key,
                                                 iconColor:
                                                     const Color(0xFF26A69A),
                                                 title: 'Ubah Password',
@@ -438,8 +442,7 @@ class _ProfilUserScreenState extends State<ProfilUserScreen>
                                             const SizedBox(height: 12),
                                             _buildMenuGroup([
                                               _MenuItemData(
-                                                icon:
-                                                    Icons.info_outline_rounded,
+                                                icon: PhosphorIconsRegular.info,
                                                 iconColor: _C.blue,
                                                 title: 'Tentang Aplikasi',
                                                 subtitle:
@@ -453,8 +456,8 @@ class _ProfilUserScreenState extends State<ProfilUserScreen>
                                             const SizedBox(height: 12),
                                             _buildMenuGroup([
                                               _MenuItemData(
-                                                icon: Icons
-                                                    .delete_outline_rounded,
+                                                icon:
+                                                    PhosphorIconsRegular.trash,
                                                 iconColor: _C.danger,
                                                 title: 'Hapus Akun',
                                                 subtitle:
@@ -511,7 +514,7 @@ class _ProfilUserScreenState extends State<ProfilUserScreen>
           // supaya judul tetap berada di tengah)
           if (widget.onBukaMenu != null)
             _topButton(
-              icon: Icons.menu_rounded,
+              icon: PhosphorIconsRegular.list,
               iconSize: 22,
               tooltip: 'Menu',
               onTap: widget.onBukaMenu!,
@@ -613,7 +616,8 @@ class _ProfilUserScreenState extends State<ProfilUserScreen>
                 color: const Color(0xFFECF4FF),
                 borderRadius: BorderRadius.circular(12),
               ),
-              child: const Icon(Icons.edit_outlined, size: 16, color: _C.blue),
+              child: const Icon(PhosphorIconsRegular.pencilSimple,
+                  size: 16, color: _C.blue),
             ),
           ),
         ]),
@@ -638,7 +642,7 @@ class _ProfilUserScreenState extends State<ProfilUserScreen>
           child: Divider(height: 1, color: _C.border),
         ),
         Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-          const Icon(Icons.calendar_month_outlined,
+          const Icon(PhosphorIconsRegular.calendarBlank,
               size: 13, color: _C.textMuted),
           const SizedBox(width: 6),
           Flexible(
@@ -693,7 +697,7 @@ class _ProfilUserScreenState extends State<ProfilUserScreen>
                     color: _C.blue.withValues(alpha: 0.13),
                     borderRadius: BorderRadius.circular(11),
                   ),
-                  child: const Icon(Icons.bookmark_rounded,
+                  child: const Icon(PhosphorIconsRegular.bookmark,
                       color: _C.blue, size: 18),
                 ),
                 const SizedBox(width: 14),
@@ -871,7 +875,7 @@ class _ProfilUserScreenState extends State<ProfilUserScreen>
                               ],
                             ),
                           ),
-                          Icon(Icons.arrow_forward_ios_rounded,
+                          Icon(PhosphorIconsRegular.caretRight,
                               color: _C.textDim, size: 13),
                         ],
                       ),
@@ -915,7 +919,7 @@ class _ProfilUserScreenState extends State<ProfilUserScreen>
           child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(Icons.logout_rounded, color: _C.danger, size: 18),
+              Icon(PhosphorIconsRegular.signOut, color: _C.danger, size: 18),
               const SizedBox(width: 8),
               Text(
                 'Keluar',
@@ -940,7 +944,7 @@ class _ProfilUserScreenState extends State<ProfilUserScreen>
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: Row(
           children: [
-            Icon(Icons.travel_explore_rounded, color: _C.teal),
+            Icon(PhosphorIconsRegular.globeHemisphereWest, color: _C.teal),
             const SizedBox(width: 10),
             Text('Wisata Daerahku',
                 style: TextStyle(color: _C.text, fontWeight: FontWeight.w800)),
@@ -1221,7 +1225,7 @@ class _EditProfilScreenState extends State<_EditProfilScreen> {
                                           tooltip: 'Kembali',
                                           onPressed: _isLoading ? null : _close,
                                           icon: const Icon(
-                                              Icons.arrow_back_rounded,
+                                              PhosphorIconsRegular.arrowLeft,
                                               color: Colors.white)),
                                       Expanded(
                                           child: Text('Edit Profil',
@@ -1302,8 +1306,8 @@ class _EditProfilScreenState extends State<_EditProfilScreen> {
                                       decoration: InputDecoration(
                                           labelText: 'Email',
                                           border: border,
-                                          suffixIcon:
-                                              const Icon(Icons.lock_outline)),
+                                          suffixIcon: const Icon(
+                                              PhosphorIconsRegular.lock)),
                                       style: _font(
                                           14, FontWeight.w500, _C.textMuted),
                                     ),
@@ -1474,7 +1478,7 @@ class SavedDestinationsSheet extends StatelessWidget {
                           color: _C.teal.withValues(alpha: 0.12),
                           borderRadius: BorderRadius.circular(12),
                         ),
-                        child: Icon(Icons.bookmark_rounded,
+                        child: Icon(PhosphorIconsRegular.bookmark,
                             color: _C.teal, size: 18),
                       ),
                       title: Text(nama,
@@ -1487,7 +1491,7 @@ class SavedDestinationsSheet extends StatelessWidget {
                               style:
                                   TextStyle(color: _C.textMuted, fontSize: 12))
                           : null,
-                      trailing: Icon(Icons.arrow_forward_ios_rounded,
+                      trailing: Icon(PhosphorIconsRegular.caretRight,
                           color: _C.textDim, size: 13),
                     );
                   },
@@ -1515,7 +1519,8 @@ class _ErrorBanner extends StatelessWidget {
         ),
         child: Row(
           children: [
-            Icon(Icons.warning_amber_rounded, color: _C.danger, size: 18),
+            Icon(PhosphorIconsRegular.warningCircle,
+                color: _C.danger, size: 18),
             const SizedBox(width: 10),
             Expanded(
               child: Text(

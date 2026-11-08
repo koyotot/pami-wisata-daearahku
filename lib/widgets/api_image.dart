@@ -1,6 +1,7 @@
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
+import 'package:phosphor_icons/phosphor_icons.dart';
 
 import '../data/business_repository.dart';
 import '../services/auth_session.dart';
@@ -170,6 +171,6 @@ class _ApiImageState extends State<ApiImage> {
           SizedBox(
               width: widget.width,
               height: widget.height,
-              child: const Center(
-                  child: Icon(Icons.image_not_supported_outlined))));
+              child:
+                  const Center(child: Icon(PhosphorIconsRegular.imageBroken))));
 }

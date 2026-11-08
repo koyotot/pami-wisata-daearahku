@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:phosphor_icons/phosphor_icons.dart';
 import '../data/admin_state.dart';
 import '../data/business_repository.dart';
 import '../services/auth_session.dart';
@@ -245,7 +246,7 @@ class _DaftarPendaftarScreenState extends State<DaftarPendaftarScreen> {
                               decoration: BoxDecoration(
                                   color: AppColors.blueTint,
                                   borderRadius: BorderRadius.circular(12)),
-                              child: const Icon(Icons.people_outline_rounded,
+                              child: const Icon(PhosphorIconsRegular.users,
                                   color: AppColors.blue, size: 20)),
                           title: Text(booking.visitorName,
                               style: const TextStyle(
@@ -262,7 +263,7 @@ class _DaftarPendaftarScreenState extends State<DaftarPendaftarScreen> {
                                       fontSize: 11,
                                       height: 1.8,
                                       color: AppColors.textSecondary))),
-                          trailing: const Icon(Icons.chevron_right_rounded,
+                          trailing: const Icon(PhosphorIconsRegular.caretRight,
                               color: AppColors.navy, size: 20),
                           onTap: () => _open(booking)))),
           ]);
@@ -295,7 +296,7 @@ class _DaftarPendaftarScreenState extends State<DaftarPendaftarScreen> {
           else if (_list.error != null)
             adminErrorSliver(adminErrorMessage(_list.error!), _load)
           else if (rows.isEmpty)
-            adminEmptySliver(Icons.people_outline, 'Belum Ada Pendaftar',
+            adminEmptySliver(PhosphorIconsRegular.users, 'Belum Ada Pendaftar',
                 'Tidak ada pendaftar dengan status ini.')
           else
             SliverPadding(
@@ -312,7 +313,8 @@ class _DaftarPendaftarScreenState extends State<DaftarPendaftarScreen> {
                               subtitle: Text(
                                   '${booking.destinationName}\n${visitDay(booking.visitDate)} ? ${booking.quantity} orang\n${bookingStatusLabel(booking.status)}'),
                               isThreeLine: true,
-                              trailing: const Icon(Icons.chevron_right),
+                              trailing:
+                                  const Icon(PhosphorIconsRegular.caretRight),
                               onTap: () => _open(booking)));
                     })),
         ]);

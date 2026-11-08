@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:phosphor_icons/phosphor_icons.dart';
 import '../data/admin_state.dart';
 import '../data/business_repository.dart';
 import '../theme/app_colors.dart';
@@ -65,11 +66,8 @@ class _DestinationAdminAssignmentsScreenState
         if (page >= (data.meta?['last_page'] as int? ?? 1)) break;
       }
       for (var page = 1;; page++) {
-        final data = await _repository.adminAccounts(query: {
-          'role': '1',
-          'per_page': '100',
-          'page': '$page'
-        });
+        final data = await _repository.adminAccounts(
+            query: {'role': '1', 'per_page': '100', 'page': '$page'});
         if (!_valid) return;
         admins.addAll(data.items);
         if (page >= (data.meta?['last_page'] as int? ?? 1)) break;
@@ -157,6 +155,7 @@ class _DestinationAdminAssignmentsScreenState
                       const Text('Belum ada destinasi.')
                     else if (_destinations.isNotEmpty)
                       DropdownButtonFormField<String>(
+                        icon: const Icon(PhosphorIconsRegular.caretDown),
                         initialValue: _destination,
                         isExpanded: true,
                         decoration:

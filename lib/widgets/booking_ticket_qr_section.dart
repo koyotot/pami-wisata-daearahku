@@ -1,5 +1,6 @@
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
+import 'package:phosphor_icons/phosphor_icons.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import '../data/business_repository.dart';
 import '../data/ticket_models.dart';
@@ -170,7 +171,8 @@ class _BookingTicketQrSectionState extends State<BookingTicketQrSection>
                       _load();
                       widget.onRefreshed?.call();
                     },
-              icon: const Icon(Icons.refresh, color: AppColors.blue)),
+              icon: const Icon(PhosphorIconsRegular.arrowsClockwise,
+                  color: AppColors.blue)),
         ]),
         if (_loading) const LinearProgressIndicator(),
         if (data != null) ...[

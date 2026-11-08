@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:phosphor_icons/phosphor_icons.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -174,7 +175,8 @@ class _DestinationLocationPickerScreenState
                     right: 12,
                     child: FilledButton.tonalIcon(
                         onPressed: _findingGps ? null : _locate,
-                        icon: const Icon(Icons.my_location, size: 20),
+                        icon: const Icon(PhosphorIconsRegular.crosshair,
+                            size: 20),
                         label: Text(
                             _findingGps ? 'Mencari GPS...' : 'Lokasi Saya'))),
               ])),

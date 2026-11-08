@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:phosphor_icons/phosphor_icons.dart';
 import '../data/booking_state.dart';
 import '../data/business_repository.dart';
 import 'visit_format.dart';
@@ -70,7 +71,7 @@ class AvailabilityCalendar extends StatelessWidget {
         IconButton(
             tooltip: 'Bulan sebelumnya',
             onPressed: canPrevious ? () => onMonthChanged(previous) : null,
-            icon: const Icon(Icons.chevron_left)),
+            icon: const Icon(PhosphorIconsRegular.caretLeft)),
         Expanded(
             child: Text(visitMonth(month),
                 textAlign: TextAlign.center,
@@ -83,7 +84,7 @@ class AvailabilityCalendar extends StatelessWidget {
             onPressed: navigationEnabled
                 ? () => onMonthChanged(DateTime(month.year, month.month + 1))
                 : null,
-            icon: const Icon(Icons.chevron_right)),
+            icon: const Icon(PhosphorIconsRegular.caretRight)),
       ]),
       const SizedBox(height: 8),
       Row(children: [
@@ -161,7 +162,7 @@ class AvailabilityCalendar extends StatelessWidget {
                                   fontWeight: FontWeight.w800)),
                           const SizedBox(height: 3),
                           if (day?.status == 'closed')
-                            const Icon(Icons.lock_outline_rounded,
+                            const Icon(PhosphorIconsRegular.lock,
                                 size: 12, color: Color(0xFF64748B))
                           else
                             Text(day?.remaining?.toString() ?? '\u2014',

@@ -5,6 +5,7 @@
 // ============================================================
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:phosphor_icons/phosphor_icons.dart';
 import '../data/admin_state.dart';
 import '../data/app_data.dart';
 import '../data/business_repository.dart';
@@ -53,14 +54,14 @@ const _kColor = {
 };
 
 const _kIcon = {
-  'Semua': Icons.explore_rounded,
-  'Pantai': Icons.beach_access_rounded,
-  'Budaya': Icons.account_balance_rounded,
-  'Alam': Icons.forest_rounded,
-  'Bahari': Icons.sailing_rounded,
-  'Kuliner': Icons.restaurant_rounded,
-  'Kota': Icons.location_city_rounded,
-  'Lainnya': Icons.explore_rounded,
+  'Semua': PhosphorIconsRegular.compass,
+  'Pantai': PhosphorIconsRegular.umbrella,
+  'Budaya': PhosphorIconsRegular.bank,
+  'Alam': PhosphorIconsRegular.tree,
+  'Bahari': PhosphorIconsRegular.sailboat,
+  'Kuliner': PhosphorIconsRegular.forkKnife,
+  'Kota': PhosphorIconsRegular.buildings,
+  'Lainnya': PhosphorIconsRegular.compass,
 };
 
 class DaftarWisataScreen extends StatefulWidget {
@@ -249,8 +250,9 @@ class DaftarWisataScreenState extends State<DaftarWisataScreen>
                             ),
                             child: Icon(
                                 nonaktifkan
-                                    ? Icons.delete_rounded
-                                    : Icons.restore_rounded,
+                                    ? PhosphorIconsRegular.trash
+                                    : PhosphorIconsRegular
+                                        .arrowCounterClockwise,
                                 color: warna,
                                 size: 36),
                           ),
@@ -404,7 +406,7 @@ class DaftarWisataScreenState extends State<DaftarWisataScreen>
                                       tooltip: 'Tutup',
                                       onPressed: () =>
                                           Navigator.pop(sheetContext),
-                                      icon: const Icon(Icons.close))
+                                      icon: const Icon(PhosphorIconsRegular.x))
                                 ]),
                                 const SizedBox(height: 8),
                                 if (!_current(generation, revision))
@@ -420,22 +422,22 @@ class DaftarWisataScreenState extends State<DaftarWisataScreen>
                                     (
                                       'preview',
                                       'Preview Pengunjung',
-                                      Icons.visibility_outlined
+                                      PhosphorIconsRegular.eye
                                     ),
                                     (
                                       'edit',
                                       'Ubah Informasi',
-                                      Icons.edit_outlined
+                                      PhosphorIconsRegular.pencilSimple
                                     ),
                                     (
                                       'gallery',
                                       'Kelola Galeri',
-                                      Icons.photo_library_outlined
+                                      PhosphorIconsRegular.images
                                     ),
                                     (
                                       'quota',
                                       'Kelola Kuota',
-                                      Icons.calendar_today_outlined
+                                      PhosphorIconsRegular.calendarBlank
                                     ),
                                     (
                                       'status',
@@ -443,8 +445,9 @@ class DaftarWisataScreenState extends State<DaftarWisataScreen>
                                           ? 'Nonaktifkan'
                                           : 'Aktifkan Kembali',
                                       w.isActive
-                                          ? Icons.block_outlined
-                                          : Icons.restore_rounded
+                                          ? PhosphorIconsRegular.prohibit
+                                          : PhosphorIconsRegular
+                                              .arrowCounterClockwise
                                     ),
                                   ]) ...[
                                     if (item.$1 == 'status')
@@ -524,7 +527,7 @@ class DaftarWisataScreenState extends State<DaftarWisataScreen>
                   shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12))),
               onPressed: () => _editor(),
-              icon: const Icon(Icons.add, size: 18),
+              icon: const Icon(PhosphorIconsRegular.plus, size: 18),
               label: const Text('Tambah')),
         ]),
         const SizedBox(height: 16),
@@ -539,8 +542,8 @@ class DaftarWisataScreenState extends State<DaftarWisataScreen>
                     color: AppColors.textSecondary, fontSize: 12),
                 contentPadding:
                     const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-                prefixIcon:
-                    const Icon(Icons.search, color: AppColors.blue, size: 20),
+                prefixIcon: const Icon(PhosphorIconsRegular.magnifyingGlass,
+                    color: AppColors.blue, size: 20),
                 suffixIcon: _cari.isEmpty
                     ? null
                     : IconButton(
@@ -549,7 +552,7 @@ class DaftarWisataScreenState extends State<DaftarWisataScreen>
                           _searchController.clear();
                           _onSearch('');
                         },
-                        icon: const Icon(Icons.close)))),
+                        icon: const Icon(PhosphorIconsRegular.x)))),
         const SizedBox(height: 12),
         Wrap(spacing: 8, runSpacing: 8, children: [
           for (final status in const [
@@ -635,7 +638,7 @@ class DaftarWisataScreenState extends State<DaftarWisataScreen>
                       repository: _repository,
                       placeholder: (_) => const ColoredBox(
                           color: AppColors.bg,
-                          child: Icon(Icons.landscape_outlined,
+                          child: Icon(PhosphorIconsRegular.mountains,
                               color: AppColors.blue))))),
           const SizedBox(width: 12),
           Expanded(
@@ -651,7 +654,7 @@ class DaftarWisataScreenState extends State<DaftarWisataScreen>
                         fontSize: 14)),
                 const SizedBox(height: 4),
                 Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  const Icon(Icons.location_on_outlined,
+                  const Icon(PhosphorIconsRegular.mapPin,
                       size: 14, color: AppColors.blue),
                   const SizedBox(width: 4),
                   Expanded(
@@ -682,7 +685,7 @@ class DaftarWisataScreenState extends State<DaftarWisataScreen>
             runSpacing: 8,
             children: [
               Row(mainAxisSize: MainAxisSize.min, children: [
-                Icon(Icons.circle,
+                Icon(PhosphorIconsFill.circle,
                     size: 8,
                     color: w.isActive
                         ? AppColors.success
@@ -711,7 +714,7 @@ class DaftarWisataScreenState extends State<DaftarWisataScreen>
                         shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(12))),
                     onPressed: _guard.isBusy(w.id) ? null : () => _preview(w),
-                    icon: const Icon(Icons.visibility_outlined, size: 16),
+                    icon: const Icon(PhosphorIconsRegular.eye, size: 16),
                     label: const Text('Preview')),
                 FilledButton.icon(
                     key: ValueKey('v3-manage-${w.id}'),
@@ -729,7 +732,8 @@ class DaftarWisataScreenState extends State<DaftarWisataScreen>
                         ? null
                         : () => _manageDestination(w),
                     iconAlignment: IconAlignment.end,
-                    icon: const Icon(Icons.tune_rounded, size: 16),
+                    icon: const Icon(PhosphorIconsRegular.slidersHorizontal,
+                        size: 16),
                     label: const Text('Kelola')),
               ]),
             ]),
@@ -800,7 +804,7 @@ class DaftarWisataScreenState extends State<DaftarWisataScreen>
                           border: Border.all(
                               color: Colors.white.withValues(alpha: 0.35)),
                         ),
-                        child: const Icon(Icons.arrow_back_ios_new_rounded,
+                        child: const Icon(PhosphorIconsRegular.caretLeft,
                             size: 16, color: Colors.white),
                       ),
                     ),
@@ -820,7 +824,7 @@ class DaftarWisataScreenState extends State<DaftarWisataScreen>
                               ),
                               child: Row(
                                 children: [
-                                  const Icon(Icons.landscape_rounded,
+                                  const Icon(PhosphorIconsRegular.mountains,
                                       color: Colors.white, size: 13),
                                   const SizedBox(width: 5),
                                   Text('$total',
@@ -981,11 +985,13 @@ class DaftarWisataScreenState extends State<DaftarWisataScreen>
                               : 'Cari nama, lokasi, atau kategori...',
                           hintStyle:
                               const TextStyle(color: _C.textDim, fontSize: 13),
-                          prefixIcon: const Icon(Icons.search_rounded,
-                              color: _C.teal, size: 20),
+                          prefixIcon: const Icon(
+                              PhosphorIconsRegular.magnifyingGlass,
+                              color: _C.teal,
+                              size: 20),
                           suffixIcon: _cari.isNotEmpty
                               ? IconButton(
-                                  icon: const Icon(Icons.close_rounded,
+                                  icon: const Icon(PhosphorIconsRegular.x,
                                       color: _C.textMuted, size: 18),
                                   onPressed: () {
                                     _searchController.clear();
@@ -1070,7 +1076,7 @@ class DaftarWisataScreenState extends State<DaftarWisataScreen>
                               child: Row(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
-                                  Icon(_kIcon[k] ?? Icons.place_rounded,
+                                  Icon(_kIcon[k] ?? PhosphorIconsRegular.mapPin,
                                       size: 13,
                                       color: sel ? Colors.white : _C.textDim),
                                   const SizedBox(width: 5),
@@ -1165,7 +1171,8 @@ class DaftarWisataScreenState extends State<DaftarWisataScreen>
                                   color: _C.teal.withValues(alpha: 0.15),
                                   width: 1.5),
                             ),
-                            child: Icon(Icons.search_off_rounded,
+                            child: Icon(
+                                PhosphorIconsRegular.magnifyingGlassMinus,
                                 size: 44,
                                 color: _C.teal.withValues(alpha: 0.5)),
                           ),
@@ -1237,7 +1244,7 @@ class DaftarWisataScreenState extends State<DaftarWisataScreen>
                     elevation: 6,
                     shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(18)),
-                    icon: const Icon(Icons.add_rounded,
+                    icon: const Icon(PhosphorIconsRegular.plus,
                         color: Colors.white, size: 22),
                     label: const Text('Tambah Wisata',
                         style: TextStyle(
@@ -1355,7 +1362,8 @@ class _WisataCard extends StatelessWidget {
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             Icon(
-                              _kIcon[wisata.kategori] ?? Icons.place_rounded,
+                              _kIcon[wisata.kategori] ??
+                                  PhosphorIconsRegular.mapPin,
                               size: 11,
                               color: Colors.white,
                             ),
@@ -1409,7 +1417,7 @@ class _WisataCard extends StatelessWidget {
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            const Icon(Icons.local_offer_rounded,
+                            const Icon(PhosphorIconsRegular.tag,
                                 color: _C.gold, size: 11),
                             const SizedBox(width: 4),
                             Text(
@@ -1455,13 +1463,13 @@ class _WisataCard extends StatelessWidget {
                         child: Row(
                           children: [
                             _overlayBtn(
-                              icon: Icons.event_available_rounded,
+                              icon: PhosphorIconsRegular.calendarCheck,
                               color: const Color(0xFF26A69A),
                               onTap: onKuota,
                             ),
                             const SizedBox(width: 8),
                             _overlayBtn(
-                              icon: Icons.edit_rounded,
+                              icon: PhosphorIconsRegular.pencilSimple,
                               color: const Color(0xFFA78BFA),
                               onTap: onEdit,
                             ),
@@ -1484,8 +1492,9 @@ class _WisataCard extends StatelessWidget {
                               )
                             : _overlayBtn(
                                 icon: wisata.isActive
-                                    ? Icons.delete_rounded
-                                    : Icons.restore_rounded,
+                                    ? PhosphorIconsRegular.trash
+                                    : PhosphorIconsRegular
+                                        .arrowCounterClockwise,
                                 color: wisata.isActive ? _C.danger : _C.teal,
                                 onTap: onHapus,
                               ),
@@ -1495,7 +1504,7 @@ class _WisataCard extends StatelessWidget {
                         bottom: 10,
                         right: 10,
                         child: _overlayBtn(
-                          icon: Icons.event_available_rounded,
+                          icon: PhosphorIconsRegular.calendarCheck,
                           color: const Color(0xFF26A69A),
                           onTap: onKuota,
                         ),
@@ -1518,7 +1527,7 @@ class _WisataCard extends StatelessWidget {
                                 color: _C.tint,
                                 borderRadius: BorderRadius.circular(10),
                               ),
-                              child: const Icon(Icons.location_on_rounded,
+                              child: const Icon(PhosphorIconsRegular.mapPin,
                                   color: _C.teal, size: 13),
                             ),
                             const SizedBox(width: 8),
@@ -1548,7 +1557,7 @@ class _WisataCard extends StatelessWidget {
                           border: Border.all(color: _C.border),
                         ),
                         child: Row(children: [
-                          const Icon(Icons.access_time_rounded,
+                          const Icon(PhosphorIconsRegular.clock,
                               size: 12, color: _C.textDim),
                           const SizedBox(width: 4),
                           Text(wisata.jamBuka,
@@ -1577,7 +1586,7 @@ class _WisataCard extends StatelessWidget {
                               ),
                             ],
                           ),
-                          child: const Icon(Icons.arrow_forward_rounded,
+                          child: const Icon(PhosphorIconsRegular.arrowRight,
                               size: 14, color: Colors.white),
                         ),
                       ],
@@ -1623,8 +1632,10 @@ class _WisataCard extends StatelessWidget {
     Widget placeholder(BuildContext context) => Container(
           color: col.withValues(alpha: 0.08),
           child: Center(
-            child: Icon(_kIcon[wisata.kategori] ?? Icons.landscape_rounded,
-                color: col.withValues(alpha: 0.3), size: 52),
+            child: Icon(
+                _kIcon[wisata.kategori] ?? PhosphorIconsRegular.mountains,
+                color: col.withValues(alpha: 0.3),
+                size: 52),
           ),
         );
     return ApiImage(

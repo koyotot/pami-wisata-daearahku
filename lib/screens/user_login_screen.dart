@@ -5,6 +5,7 @@ import 'auth_presentation.dart';
 // ============================================================
 
 import 'package:flutter/material.dart';
+import 'package:phosphor_icons/phosphor_icons.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:firebase_auth/firebase_auth.dart' as fb_auth;
 import 'package:flutter/foundation.dart';
@@ -338,7 +339,7 @@ class _UserLoginScreenState extends State<UserLoginScreen>
             onSubmitted: (_) => _passwordFocus.requestFocus(),
             decoration: _inputDecoration(
               hint: 'nama@email.com',
-              icon: Icons.email_rounded,
+              icon: PhosphorIconsRegular.envelope,
             ),
           ),
           const SizedBox(height: 16),
@@ -382,7 +383,7 @@ class _UserLoginScreenState extends State<UserLoginScreen>
             onSubmitted: (_) => _login(),
             decoration: _inputDecoration(
               hint: 'Masukkan password',
-              icon: Icons.lock_rounded,
+              icon: PhosphorIconsRegular.lockKey,
               suffix: IconButton(
                 tooltip:
                     _obscure ? 'Tampilkan password' : 'Sembunyikan password',
@@ -391,8 +392,8 @@ class _UserLoginScreenState extends State<UserLoginScreen>
                     : () => setState(() => _obscure = !_obscure),
                 icon: Icon(
                   _obscure
-                      ? Icons.visibility_outlined
-                      : Icons.visibility_off_outlined,
+                      ? PhosphorIconsRegular.eye
+                      : PhosphorIconsRegular.eyeSlash,
                   color: _C.textMuted,
                   size: 20,
                 ),
@@ -520,7 +521,8 @@ class _ErrorBanner extends StatelessWidget {
       ),
       child: Row(
         children: [
-          const Icon(Icons.error_outline_rounded, color: _C.danger, size: 19),
+          const Icon(PhosphorIconsRegular.warningCircle,
+              color: _C.danger, size: 19),
           const SizedBox(width: 10),
           Expanded(
             child: Text(

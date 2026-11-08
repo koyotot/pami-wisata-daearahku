@@ -4,6 +4,7 @@
 // Dependency: image_picker (tambah ke pubspec.yaml)
 // ============================================================
 import 'package:flutter/material.dart';
+import 'package:phosphor_icons/phosphor_icons.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -282,8 +283,12 @@ class _TambahWisataScreenState extends State<TambahWisataScreen> {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Row(children: [
-          Icon(error ? Icons.error_rounded : Icons.check_circle_rounded,
-              color: Colors.white, size: 18),
+          Icon(
+              error
+                  ? PhosphorIconsFill.warningCircle
+                  : PhosphorIconsFill.checkCircle,
+              color: Colors.white,
+              size: 18),
           const SizedBox(width: 10),
           Expanded(child: Text(message)),
         ]),
@@ -556,7 +561,7 @@ class _TambahWisataScreenState extends State<TambahWisataScreen> {
                           border: Border.all(
                               color: Colors.white.withValues(alpha: 0.35)),
                         ),
-                        child: const Icon(Icons.arrow_back_ios_new_rounded,
+                        child: const Icon(PhosphorIconsRegular.caretLeft,
                             size: 16, color: Colors.white),
                       ),
                     ),
@@ -738,7 +743,7 @@ class _TambahWisataScreenState extends State<TambahWisataScreen> {
                           ctrl: namaCtrl,
                           label: 'Nama Wisata',
                           hint: 'Contoh: Pantai Parangtritis',
-                          icon: Icons.landscape_rounded,
+                          icon: PhosphorIconsRegular.mountains,
                           validator: (v) => (v == null || v.trim().isEmpty)
                               ? 'Nama wisata wajib diisi'
                               : null,
@@ -758,7 +763,7 @@ class _TambahWisataScreenState extends State<TambahWisataScreen> {
                           ctrl: deskCtrl,
                           label: 'Deskripsi',
                           hint: 'Ceritakan keunikan tempat wisata ini...',
-                          icon: Icons.description_rounded,
+                          icon: PhosphorIconsRegular.fileText,
                           maxLines: 4,
                           validator: (v) => (v == null || v.trim().isEmpty)
                               ? 'Deskripsi wajib diisi'
@@ -772,7 +777,7 @@ class _TambahWisataScreenState extends State<TambahWisataScreen> {
                               ctrl: hargaCtrl,
                               label: 'Harga Tiket',
                               hint: 'Rupiah, 0 = gratis',
-                              icon: Icons.local_activity_rounded,
+                              icon: PhosphorIconsRegular.ticket,
                               keyboardType: TextInputType.number,
                               formatters: [
                                 FilteringTextInputFormatter.digitsOnly
@@ -792,7 +797,7 @@ class _TambahWisataScreenState extends State<TambahWisataScreen> {
                               ctrl: jamCtrl,
                               label: 'Jam Buka',
                               hint: '08.00 – 17.00',
-                              icon: Icons.schedule_rounded,
+                              icon: PhosphorIconsRegular.clock,
                               validator: (v) => (v == null || v.trim().isEmpty)
                                   ? 'Wajib diisi'
                                   : null,
@@ -867,8 +872,8 @@ class _TambahWisataScreenState extends State<TambahWisataScreen> {
                         children: [
                           Icon(
                             isEdit
-                                ? Icons.save_rounded
-                                : Icons.add_location_alt_rounded,
+                                ? PhosphorIconsRegular.floppyDisk
+                                : PhosphorIconsRegular.mapPinPlus,
                             size: 20,
                           ),
                           const SizedBox(width: 10),
@@ -900,6 +905,7 @@ class _TambahWisataScreenState extends State<TambahWisataScreen> {
                 color: _C.text, fontSize: 12.5, fontWeight: FontWeight.w700)),
         const SizedBox(height: 7),
         DropdownButtonFormField<String>(
+          icon: const Icon(PhosphorIconsRegular.caretDown),
           key: const ValueKey('timezone-field'),
           initialValue: _timezone,
           isExpanded: true,
@@ -920,7 +926,7 @@ class _TambahWisataScreenState extends State<TambahWisataScreen> {
           decoration: InputDecoration(
             prefixIcon: const Padding(
               padding: EdgeInsets.only(left: 14, right: 10),
-              child: Icon(Icons.public_rounded, color: _C.teal, size: 18),
+              child: Icon(PhosphorIconsRegular.globe, color: _C.teal, size: 18),
             ),
             prefixIconConstraints:
                 const BoxConstraints(minWidth: 0, minHeight: 0),
@@ -1004,7 +1010,7 @@ class _TambahWisataScreenState extends State<TambahWisataScreen> {
             onPressed: _isSaving || !_galleryReady || _galleryLoading
                 ? null
                 : _pickLocation,
-            icon: const Icon(Icons.pin_drop_outlined, size: 20),
+            icon: const Icon(PhosphorIconsRegular.mapPin, size: 20),
             label: Text(_locationPoint == null
                 ? 'Pilih Titik Lokasi'
                 : 'Ubah Titik Lokasi')),
@@ -1013,7 +1019,7 @@ class _TambahWisataScreenState extends State<TambahWisataScreen> {
             ctrl: lokasiCtrl,
             label: 'Alamat Lengkap',
             hint: 'Contoh: Yogyakarta, DIY',
-            icon: Icons.location_on_rounded,
+            icon: PhosphorIconsRegular.mapPin,
             maxLines: 3,
             maxLength: 255,
             errorText: _locationErrors['location'],
@@ -1090,7 +1096,8 @@ class _TambahWisataScreenState extends State<TambahWisataScreen> {
                 ),
                 child: Row(
                   children: [
-                    const Icon(Icons.star_rounded, color: _C.gold, size: 14),
+                    const Icon(PhosphorIconsFill.star,
+                        color: _C.gold, size: 14),
                     const SizedBox(width: 4),
                     Text(
                       _rating == 0 ? '-' : _rating.toStringAsFixed(1),
@@ -1114,10 +1121,10 @@ class _TambahWisataScreenState extends State<TambahWisataScreen> {
                 final halfVal = i + 0.5;
                 final star = Icon(
                   _rating >= starVal
-                      ? Icons.star_rounded
+                      ? PhosphorIconsFill.star
                       : _rating >= halfVal
-                          ? Icons.star_half_rounded
-                          : Icons.star_outline_rounded,
+                          ? PhosphorIconsFill.starHalf
+                          : PhosphorIconsRegular.star,
                   color: _C.gold,
                   size: 36,
                 );
@@ -1129,7 +1136,7 @@ class _TambahWisataScreenState extends State<TambahWisataScreen> {
           ...[
             const Row(
               children: [
-                Icon(Icons.lock_outline_rounded, size: 13, color: _C.textDim),
+                Icon(PhosphorIconsRegular.lock, size: 13, color: _C.textDim),
                 SizedBox(width: 6),
                 Expanded(
                   child: Text(
@@ -1281,7 +1288,10 @@ class _TambahWisataScreenState extends State<TambahWisataScreen> {
           spacing: 8,
           runSpacing: 8,
           children: _categories.items.map((category) {
-            final k = {'label': category.name, 'icon': Icons.explore_rounded};
+            final k = {
+              'label': category.name,
+              'icon': PhosphorIconsRegular.compass
+            };
             final selected = _categoryGuid == category.guid;
             return GestureDetector(
               onTap: () => setState(() {

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:phosphor_icons/phosphor_icons.dart';
 import 'package:flutter/services.dart';
 import 'package:phone_numbers_parser/phone_numbers_parser.dart';
 import 'package:phone_numbers_parser/metadata.dart';
@@ -100,7 +101,7 @@ class InternationalPhoneField extends StatelessWidget {
             Flexible(child: Text('+${_dialCode(country)}'))
           else
             Text('+${_dialCode(country)}'),
-          const Icon(Icons.arrow_drop_down, size: 18),
+          const Icon(PhosphorIconsRegular.caretDown, size: 18),
         ]),
       ),
     );
@@ -198,7 +199,7 @@ class _CountryPickerState extends State<_CountryPicker> {
               key: const ValueKey('countrySearch'),
               decoration: const InputDecoration(
                   hintText: 'Cari negara atau kode telepon',
-                  prefixIcon: Icon(Icons.search)),
+                  prefixIcon: Icon(PhosphorIconsRegular.magnifyingGlass)),
               onChanged: (value) => setState(() => _query = value),
             ),
           ),
@@ -218,7 +219,8 @@ class _CountryPickerState extends State<_CountryPicker> {
                             Text('${country.name} +${_dialCode(country)}'),
                         selected: country == widget.selected,
                         trailing: country == widget.selected
-                            ? const Icon(Icons.check, color: Color(0xFF1976D2))
+                            ? const Icon(PhosphorIconsRegular.check,
+                                color: Color(0xFF1976D2))
                             : null,
                         onTap: () => Navigator.pop(context, country),
                       );

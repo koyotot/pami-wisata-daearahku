@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:phosphor_icons/phosphor_icons.dart';
 import 'package:flutter/services.dart';
 
 import '../data/booking_state.dart';
@@ -109,7 +110,7 @@ class _PermintaanTerkirimScreenState extends State<PermintaanTerkirimScreen> {
                           shape: BoxShape.circle, color: Color(0xFFE4F5EB)),
                       child: Padding(
                         padding: EdgeInsets.all(22),
-                        child: Icon(Icons.check_rounded,
+                        child: Icon(PhosphorIconsRegular.check,
                             size: 48, color: Color(0xFF238653)),
                       ),
                     ),
@@ -187,7 +188,7 @@ class _PermintaanTerkirimScreenState extends State<PermintaanTerkirimScreen> {
                       spacing: 10,
                       children: [
                         Text('Lihat Riwayat'),
-                        Icon(Icons.arrow_forward_rounded, size: 20),
+                        Icon(PhosphorIconsRegular.arrowRight, size: 20),
                       ],
                     ),
                   ),

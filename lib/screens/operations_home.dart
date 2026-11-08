@@ -236,7 +236,9 @@ class _AdminAttentionTile extends StatelessWidget {
             contentPadding: const EdgeInsets.symmetric(
                 horizontal: AppSpacing.lg, vertical: AppSpacing.xs),
             leading: Icon(
-                upcoming ? Icons.calendar_today_outlined : Icons.schedule,
+                upcoming
+                    ? PhosphorIconsRegular.calendarBlank
+                    : PhosphorIconsRegular.clock,
                 color: AppColors.warningText,
                 size: 20),
             title: Text(operationalActionLabel(row.action),
@@ -250,7 +252,7 @@ class _AdminAttentionTile extends StatelessWidget {
                 '${upcoming ? '' : row.claimState == 'active' ? ' · Claim aktif' : ' · Belum diambil'}',
                 style: const TextStyle(
                     fontSize: 11, height: 1.5, color: AppColors.warningText)),
-            trailing: const Icon(Icons.chevron_right_rounded,
+            trailing: const Icon(PhosphorIconsRegular.caretRight,
                 color: AppColors.warningText),
             onTap: row.bookingGuid == null ? null : onTap));
   }
@@ -294,7 +296,7 @@ class _AdminHomeShortcut extends StatelessWidget {
               child: Text(subtitle,
                   style: const TextStyle(
                       fontSize: 11, color: AppColors.textSecondary))),
-          trailing: const Icon(Icons.chevron_right_rounded,
+          trailing: const Icon(PhosphorIconsRegular.caretRight,
               color: AppColors.navy, size: 20),
           onTap: onTap));
 }

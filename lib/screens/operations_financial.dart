@@ -277,7 +277,8 @@ class _OperationsFinancialState extends State<OperationsFinancialScreen>
                             color: Color(0xFF526787)))),
                 OutlinedButton.icon(
                     onPressed: _filter,
-                    icon: const Icon(Icons.tune_rounded, size: 18),
+                    icon: const Icon(PhosphorIconsRegular.slidersHorizontal,
+                        size: 18),
                     label: const Text('Filter')),
               ]),
               const SizedBox(height: 12),
@@ -364,7 +365,8 @@ class _OperationsFinancialState extends State<OperationsFinancialScreen>
                       IconButton(
                           tooltip: 'Perbarui keuangan',
                           onPressed: _load,
-                          icon: const Icon(Icons.refresh, size: 20)),
+                          icon: const Icon(PhosphorIconsRegular.arrowsClockwise,
+                              size: 20)),
                   ]),
               ],
             ]));
@@ -400,7 +402,7 @@ class _OperationsFinancialState extends State<OperationsFinancialScreen>
               runSpacing: AppSpacing.xs,
               children: [
                 Row(mainAxisSize: MainAxisSize.min, children: [
-                  Icon(Icons.circle,
+                  Icon(PhosphorIconsFill.circle,
                       size: AppSpacing.sm,
                       color: _receivedAt == null
                           ? AppColors.textMuted
@@ -487,8 +489,8 @@ class _OperationsFinancialState extends State<OperationsFinancialScreen>
                   ('Tiket terkait booking', _metric('tickets_sold')),
                 ],
                 icons: const [
-                  Icons.payments_outlined,
-                  Icons.confirmation_number_outlined
+                  PhosphorIconsRegular.money,
+                  PhosphorIconsRegular.ticket
                 ],
                 labelStyle: const TextStyle(
                     fontSize: 11,
@@ -616,7 +618,7 @@ class _OperationsFinancialState extends State<OperationsFinancialScreen>
               message: 'Ringkasan DEMO bulan ini (UTC), seluruh penugasan. '
                   'Filter keuangan tersedia di dashboard. '
                   'Sumber: ${_financial?['source'] ?? 'belum tersedia'}',
-              child: const Icon(Icons.payments_outlined,
+              child: const Icon(PhosphorIconsRegular.money,
                   size: 20, color: AppColors.navy)),
         ]),
         const SizedBox(height: AppSpacing.xs),
@@ -654,7 +656,7 @@ class _OperationsFinancialState extends State<OperationsFinancialScreen>
                     padding: EdgeInsets.zero,
                     foregroundColor: AppColors.blueDeep),
                 iconAlignment: IconAlignment.end,
-                icon: const Icon(Icons.arrow_forward_rounded, size: 20),
+                icon: const Icon(PhosphorIconsRegular.arrowRight, size: 20),
                 label: const Text('Buka dashboard keuangan',
                     style:
                         TextStyle(fontSize: 12, fontWeight: FontWeight.w700)))),

@@ -8,6 +8,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'firebase_options.dart';
 import 'screens/user_login_screen.dart';
 import 'theme/app_colors.dart';
+import 'theme/app_icons.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -105,6 +106,7 @@ class _WisataDaerahkuAppState extends State<WisataDaerahkuApp> {
         },
       ),
       theme: ThemeData(
+        actionIconTheme: AppIcons.actionTheme,
         colorScheme: ColorScheme.fromSeed(
           seedColor: const Color(0xFF0A6E5E),
           brightness: Brightness.light,

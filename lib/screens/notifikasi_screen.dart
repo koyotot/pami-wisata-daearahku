@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:phosphor_icons/phosphor_icons.dart';
 import 'package:flutter/services.dart';
 import '../data/notification_state.dart';
 import '../data/business_repository.dart';
@@ -205,7 +206,7 @@ class _NotifikasiScreenState extends State<NotifikasiScreen> {
       return SliverFillRemaining(
         hasScrollBody: false,
         child: _emptyMessage(
-          icon: Icons.cloud_off_outlined,
+          icon: PhosphorIconsRegular.cloudSlash,
           title: 'Aktivitas belum dapat dimuat.',
           detail: 'Periksa koneksi lalu coba lagi.',
           action:
@@ -217,7 +218,7 @@ class _NotifikasiScreenState extends State<NotifikasiScreen> {
       return SliverFillRemaining(
         hasScrollBody: false,
         child: _emptyMessage(
-          icon: Icons.notifications_none_rounded,
+          icon: PhosphorIconsRegular.bell,
           title: 'Aktivitas belum dimuat.',
           detail: 'Muat ulang untuk melihat pembaruan pendaftaran.',
           action:
@@ -235,8 +236,8 @@ class _NotifikasiScreenState extends State<NotifikasiScreen> {
         hasScrollBody: false,
         child: _emptyMessage(
           icon: noneExist
-              ? Icons.notifications_none_rounded
-              : Icons.done_all_rounded,
+              ? PhosphorIconsRegular.bell
+              : PhosphorIconsRegular.checks,
           title: noneExist
               ? 'Belum ada aktivitas.'
               : 'Semua aktivitas sudah dibaca.',
@@ -269,32 +270,32 @@ class _NotifikasiScreenState extends State<NotifikasiScreen> {
           final date = item.createdAt?.toLocal();
           final (icon, tint, iconBackground) = switch (item.json['type']) {
             'booking.demo_paid' => (
-                Icons.account_balance_wallet_outlined,
+                PhosphorIconsRegular.wallet,
                 AppColors.blueDeep,
                 const Color(0xFFECF4FF)
               ),
             'booking.rejected' => (
-                Icons.close_rounded,
+                PhosphorIconsRegular.x,
                 const Color(0xFFFF5252),
                 const Color(0xFFFFECEC)
               ),
             'booking.approved' => (
-                Icons.check_rounded,
+                PhosphorIconsRegular.check,
                 const Color(0xFF16A36D),
                 const Color(0xFFE9F8F0)
               ),
             'booking.expired' => (
-                Icons.access_time_rounded,
+                PhosphorIconsRegular.clock,
                 const Color(0xFFF58A00),
                 const Color(0xFFFFF4E2)
               ),
             'booking.payment_review' => (
-                Icons.notifications_none_rounded,
+                PhosphorIconsRegular.bell,
                 const Color(0xFFF58A00),
                 const Color(0xFFFFF4E2)
               ),
             _ => (
-                Icons.notifications_none_rounded,
+                PhosphorIconsRegular.bell,
                 AppColors.blue,
                 const Color(0xFFECF4FF)
               ),
@@ -377,7 +378,7 @@ class _NotifikasiScreenState extends State<NotifikasiScreen> {
                         ),
                         if (item.bookingGuid != null) ...[
                           const SizedBox(height: 5),
-                          const Icon(Icons.chevron_right_rounded,
+                          const Icon(PhosphorIconsRegular.caretRight,
                               color: Color(0xFF9AAEC9), size: 18),
                         ],
                       ]),

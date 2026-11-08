@@ -4,6 +4,7 @@
 // teralokasi dan sisa adalah tiga nilai berbeda dari server.
 // ============================================================
 import 'package:flutter/material.dart';
+import 'package:phosphor_icons/phosphor_icons.dart';
 import 'package:flutter/services.dart';
 import '../data/admin_state.dart';
 import '../data/business_repository.dart';
@@ -119,7 +120,7 @@ class _KelolaKuotaScreenState extends State<KelolaKuotaScreen> {
           ? FloatingActionButton.extended(
               key: const ValueKey('add-quota'),
               backgroundColor: AdminColors.blue,
-              icon: const Icon(Icons.add_rounded, color: Colors.white),
+              icon: const Icon(PhosphorIconsRegular.plus, color: Colors.white),
               label: const Text('Tambah Tanggal',
                   style: TextStyle(
                       color: Colors.white, fontWeight: FontWeight.w800)),
@@ -128,7 +129,7 @@ class _KelolaKuotaScreenState extends State<KelolaKuotaScreen> {
           : null,
       slivers: [
         if (!allowed)
-          adminEmptySliver(Icons.lock_outline_rounded, 'Akses ditolak',
+          adminEmptySliver(PhosphorIconsRegular.lock, 'Akses ditolak',
               'Kuota hanya dapat dikelola oleh admin.')
         else if (!_list.hasLoaded && _list.error == null)
           adminLoadingSliver()
@@ -136,7 +137,7 @@ class _KelolaKuotaScreenState extends State<KelolaKuotaScreen> {
           adminErrorSliver(adminErrorMessage(_list.error!), _muat,
               role: _session.role)
         else if (items.isEmpty)
-          adminEmptySliver(Icons.event_busy_rounded, 'Belum ada kuota',
+          adminEmptySliver(PhosphorIconsRegular.calendarX, 'Belum ada kuota',
               'Tambahkan tanggal kunjungan beserta kapasitasnya.')
         else ...[
           if (_list.error != null)
@@ -205,7 +206,7 @@ class _QuotaCard extends StatelessWidget {
         children: [
           Row(
             children: [
-              const Icon(Icons.event_rounded,
+              const Icon(PhosphorIconsRegular.calendarBlank,
                   color: AdminColors.blue, size: 18),
               const SizedBox(width: 8),
               Expanded(
@@ -219,7 +220,7 @@ class _QuotaCard extends StatelessWidget {
                 key: ValueKey('edit-${entry.visitDate}'),
                 tooltip: 'Ubah kuota',
                 onPressed: onEdit,
-                icon: const Icon(Icons.edit_rounded,
+                icon: const Icon(PhosphorIconsRegular.pencilSimple,
                     color: Color(0xFFA78BFA), size: 20),
               ),
             ],
@@ -304,6 +305,9 @@ class _QuotaFormDialogState extends State<_QuotaFormDialog> {
     }
     return showDatePicker(
       context: context,
+      switchToInputEntryModeIcon: const Icon(PhosphorIconsRegular.pencilSimple),
+      switchToCalendarEntryModeIcon:
+          const Icon(PhosphorIconsRegular.calendarBlank),
       initialDate: current ?? now,
       firstDate: DateTime(now.year - 1),
       lastDate: DateTime(now.year + 5),
@@ -316,6 +320,8 @@ class _QuotaFormDialogState extends State<_QuotaFormDialog> {
     if (date == null || !mounted) return null;
     final time = await showTimePicker(
       context: context,
+      switchToInputEntryModeIcon: const Icon(PhosphorIconsRegular.keyboard),
+      switchToTimerEntryModeIcon: const Icon(PhosphorIconsRegular.clock),
       initialTime: TimeOfDay.fromDateTime(current ?? now),
     );
     if (time == null) return null;

@@ -7,6 +7,7 @@
 // Butuh package: google_fonts
 // ============================================================
 import 'package:flutter/material.dart';
+import 'package:phosphor_icons/phosphor_icons.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../data/app_data.dart';
@@ -61,33 +62,33 @@ _StatusStyle _styleFor(String status) {
     case 'confirmed':
     case 'disetujui':
       return const _StatusStyle(
-          _green, _greenDeep, 'Disetujui', Icons.check_circle_rounded);
+          _green, _greenDeep, 'Disetujui', PhosphorIconsFill.checkCircle);
     case 'rejected':
     case 'ditolak':
       return const _StatusStyle(
-          _red, Color(0xFFC53030), 'Ditolak', Icons.cancel_rounded);
+          _red, Color(0xFFC53030), 'Ditolak', PhosphorIconsFill.xCircle);
     case 'pending_approval':
       return _StatusStyle(_blue, _blueDeep, bookingStatusLabel(status),
-          Icons.hourglass_top_rounded);
+          PhosphorIconsRegular.hourglassHigh);
     case 'menunggu':
       return const _StatusStyle(
-          _blue, _blueDeep, 'Menunggu', Icons.hourglass_top_rounded);
+          _blue, _blueDeep, 'Menunggu', PhosphorIconsRegular.hourglassHigh);
     case 'awaiting_payment':
-      return const _StatusStyle(
-          _blue, _blueDeep, 'Menunggu pembayaran', Icons.hourglass_top_rounded);
+      return const _StatusStyle(_blue, _blueDeep, 'Menunggu pembayaran',
+          PhosphorIconsRegular.hourglassHigh);
     case 'payment_verification':
     case 'payment_review':
       return _StatusStyle(_amber, const Color(0xFFD97706),
-          bookingStatusLabel(status), Icons.hourglass_top_rounded);
+          bookingStatusLabel(status), PhosphorIconsRegular.hourglassHigh);
     case 'cancelled':
-      return const _StatusStyle(
-          _textMuted, Color(0xFF5B6B85), 'Dibatalkan', Icons.block_rounded);
+      return const _StatusStyle(_textMuted, Color(0xFF5B6B85), 'Dibatalkan',
+          PhosphorIconsRegular.prohibit);
     case 'expired':
       return const _StatusStyle(_textMuted, Color(0xFF5B6B85), 'Kedaluwarsa',
-          Icons.timer_off_rounded);
+          PhosphorIconsRegular.timer);
     default:
       return _StatusStyle(_textMuted, const Color(0xFF5B6B85),
-          bookingStatusLabel(status), Icons.info_outline_rounded);
+          bookingStatusLabel(status), PhosphorIconsRegular.info);
   }
 }
 
@@ -382,7 +383,8 @@ class _BuktiPendaftaranScreenState extends State<BuktiPendaftaranScreen> {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.bookmark_rounded, size: 14, color: Colors.white),
+            const Icon(PhosphorIconsRegular.bookmark,
+                size: 14, color: Colors.white),
             const SizedBox(width: 5),
             Text(
               '$total pendaftaran',
@@ -395,7 +397,7 @@ class _BuktiPendaftaranScreenState extends State<BuktiPendaftaranScreen> {
       actions: [
         if (widget.onBukaMenu != null)
           _headerButton(
-            icon: Icons.menu_rounded,
+            icon: PhosphorIconsRegular.list,
             iconSize: 22,
             margin: const EdgeInsets.fromLTRB(0, 8, 20, 8),
             onTap: widget.onBukaMenu!,
@@ -584,8 +586,8 @@ class _BuktiPendaftaranScreenState extends State<BuktiPendaftaranScreen> {
                 ],
               ),
             ),
-            child: const Icon(Icons.confirmation_number_rounded,
-                size: 48, color: _blue),
+            child:
+                const Icon(PhosphorIconsRegular.ticket, size: 48, color: _blue),
           ),
           const SizedBox(height: 22),
           Text('Belum ada riwayat pendaftaran',
@@ -616,7 +618,7 @@ class _BuktiPendaftaranScreenState extends State<BuktiPendaftaranScreen> {
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  const Icon(Icons.explore_rounded,
+                  const Icon(PhosphorIconsRegular.compass,
                       color: Colors.white, size: 20),
                   const SizedBox(width: 8),
                   Text('Jelajahi Wisata',
@@ -646,7 +648,8 @@ class _BuktiPendaftaranScreenState extends State<BuktiPendaftaranScreen> {
               color: Colors.white,
               border: Border.all(color: _border, width: 1.4),
             ),
-            child: const Icon(Icons.inbox_rounded, size: 42, color: _textMuted),
+            child: const Icon(PhosphorIconsRegular.tray,
+                size: 42, color: _textMuted),
           ),
           const SizedBox(height: 20),
           Text('Tidak ada tiket $label',
@@ -852,7 +855,7 @@ class _TicketCardState extends State<_TicketCard> {
       if (statusBaru == 'disetujui') {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
           content: Row(children: [
-            const Icon(Icons.check_circle_rounded, color: _green, size: 18),
+            const Icon(PhosphorIconsFill.checkCircle, color: _green, size: 18),
             const SizedBox(width: 8),
             Expanded(
               child: Text(
@@ -870,7 +873,8 @@ class _TicketCardState extends State<_TicketCard> {
       } else if (statusBaru == 'ditolak') {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
           content: Row(children: [
-            const Icon(Icons.cancel_rounded, color: Colors.white, size: 18),
+            const Icon(PhosphorIconsFill.xCircle,
+                color: Colors.white, size: 18),
             const SizedBox(width: 8),
             Expanded(
               child: Text(
@@ -912,7 +916,7 @@ class _TicketCardState extends State<_TicketCard> {
       SnackBar(
         content: Row(
           children: [
-            const Icon(Icons.check_circle_rounded, color: _green, size: 18),
+            const Icon(PhosphorIconsFill.checkCircle, color: _green, size: 18),
             const SizedBox(width: 8),
             Text('Nomor bukti disalin!',
                 style: _font(13, FontWeight.w600, Colors.white)),
@@ -1008,7 +1012,7 @@ class _TicketCardState extends State<_TicketCard> {
                   alignment: Alignment.centerLeft,
                   minimumSize: const Size(48, 44)),
               child: Row(children: [
-                const Icon(Icons.copy_outlined, size: 16),
+                const Icon(PhosphorIconsRegular.copy, size: 16),
                 const SizedBox(width: 8),
                 Expanded(
                     child: Text(p.nomorBukti,
@@ -1060,19 +1064,19 @@ class _TicketCardState extends State<_TicketCard> {
         builder: (context, constraints) {
           final fields = [
             _InfoItem(
-                icon: Icons.person_rounded,
+                icon: PhosphorIconsRegular.userCircle,
                 label: 'Nama',
                 value: p.namaPengunjung),
             _InfoItem(
-                icon: Icons.calendar_today_rounded,
+                icon: PhosphorIconsRegular.calendarBlank,
                 label: 'Tanggal',
                 value: _formatBookingDate(p.tanggal)),
             _InfoItem(
-                icon: Icons.group_rounded,
+                icon: PhosphorIconsRegular.users,
                 label: 'Jumlah',
                 value: '${p.jumlahOrang} orang'),
             _InfoItem(
-                icon: Icons.phone_rounded,
+                icon: PhosphorIconsRegular.phone,
                 label: 'Telepon',
                 value: p.noTelepon),
           ];
@@ -1166,8 +1170,7 @@ class _TicketCardState extends State<_TicketCard> {
       duration: MediaQuery.disableAnimationsOf(context)
           ? Duration.zero
           : const Duration(milliseconds: 200),
-      child:
-          const Icon(Icons.keyboard_arrow_down_rounded, color: _blue, size: 18),
+      child: const Icon(PhosphorIconsRegular.caretDown, color: _blue, size: 18),
     );
     final expandedContent = _expanded
         ? Container(
@@ -1178,14 +1181,14 @@ class _TicketCardState extends State<_TicketCard> {
               children: [
                 if (p.email.isNotEmpty) ...[
                   _InfoItem(
-                      icon: Icons.email_rounded,
+                      icon: PhosphorIconsRegular.envelope,
                       label: 'Email',
                       value: p.email),
                   const SizedBox(height: 10),
                 ],
                 if (p.catatan.isNotEmpty)
                   _InfoItem(
-                      icon: Icons.notes_rounded,
+                      icon: PhosphorIconsRegular.note,
                       label: 'Catatan',
                       value: p.catatan),
                 if (c != null) ..._buildServerDetail(c),
@@ -1252,7 +1255,7 @@ class _TicketCardState extends State<_TicketCard> {
     return [
       const SizedBox(height: 10),
       _InfoItem(
-        icon: Icons.payments_rounded,
+        icon: PhosphorIconsRegular.money,
         label: 'Total',
         value: _formatBookingTotal(b),
       ),
@@ -1428,8 +1431,8 @@ class _TicketCardState extends State<_TicketCard> {
               children: [
                 Icon(
                   _sudahUlasan
-                      ? Icons.check_circle_rounded
-                      : Icons.rate_review_rounded,
+                      ? PhosphorIconsFill.checkCircle
+                      : PhosphorIconsRegular.chatText,
                   color: _sudahUlasan ? _greenDeep : const Color(0xFFE08600),
                   size: 17,
                 ),
@@ -1578,7 +1581,7 @@ class _FormUlasanSheetState extends State<_FormUlasanSheet> {
                       color: _orange.withValues(alpha: 0.14),
                       borderRadius: BorderRadius.circular(14),
                     ),
-                    child: const Icon(Icons.rate_review_rounded,
+                    child: const Icon(PhosphorIconsRegular.chatText,
                         color: Color(0xFFE08600), size: 22),
                   ),
                   const SizedBox(width: 12),
@@ -1613,8 +1616,8 @@ class _FormUlasanSheetState extends State<_FormUlasanSheet> {
                           duration: const Duration(milliseconds: 180),
                           child: Icon(
                             filled
-                                ? Icons.star_rounded
-                                : Icons.star_border_rounded,
+                                ? PhosphorIconsFill.star
+                                : PhosphorIconsRegular.star,
                             key: ValueKey(filled),
                             color: filled ? _orange : _border,
                             size: 38,
@@ -1661,7 +1664,7 @@ class _FormUlasanSheetState extends State<_FormUlasanSheet> {
                 const SizedBox(height: 10),
                 Row(
                   children: [
-                    const Icon(Icons.warning_amber_rounded,
+                    const Icon(PhosphorIconsRegular.warningCircle,
                         color: _red, size: 16),
                     const SizedBox(width: 6),
                     Expanded(
@@ -1705,7 +1708,7 @@ class _FormUlasanSheetState extends State<_FormUlasanSheet> {
                         : Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              const Icon(Icons.send_rounded,
+                              const Icon(PhosphorIconsRegular.paperPlaneTilt,
                                   color: Colors.white, size: 17),
                               const SizedBox(width: 8),
                               Text('Kirim Ulasan',

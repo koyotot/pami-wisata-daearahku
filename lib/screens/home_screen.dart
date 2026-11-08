@@ -3,6 +3,7 @@
 // Butuh package: flutter pub add google_fonts
 // ============================================================
 import 'package:flutter/material.dart';
+import 'package:phosphor_icons/phosphor_icons.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 
@@ -74,7 +75,7 @@ class HomeScreen extends StatelessWidget {
                       Expanded(child: _buildHero()),
                       const SizedBox(height: 22),
                       _ActionButton(
-                        icon: Icons.explore_rounded,
+                        icon: PhosphorIconsRegular.compass,
                         label: 'Masuk',
                         filled: true,
                         onTap: () => _open(context, const UserLoginScreen()),
@@ -115,7 +116,7 @@ class HomeScreen extends StatelessWidget {
             borderRadius: BorderRadius.circular(13),
           ),
           child: const Icon(
-            Icons.travel_explore_rounded,
+            PhosphorIconsRegular.globeHemisphereWest,
             color: Colors.white,
             size: 23,
           ),

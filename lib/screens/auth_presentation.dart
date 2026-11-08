@@ -1,8 +1,10 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:phosphor_icons/phosphor_icons.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
+import '../theme/app_icons.dart';
 
 /// Auth uses the blue/Jakarta identity documented in DESIGN.md's local screens.
 class AuthTheme extends StatelessWidget {
@@ -25,6 +27,7 @@ class AuthTheme extends StatelessWidget {
     );
     return Theme(
       data: ThemeData(
+        actionIconTheme: AppIcons.actionTheme,
         useMaterial3: true,
         colorScheme: ColorScheme.fromSeed(seedColor: blue).copyWith(
           primary: blue,
@@ -139,8 +142,8 @@ class AuthScenicShell extends StatelessWidget {
                                                         MainAxisSize.min,
                                                     children: [
                                                       const Icon(
-                                                          Icons
-                                                              .travel_explore_rounded,
+                                                          PhosphorIconsRegular
+                                                              .globeHemisphereWest,
                                                           size: 16,
                                                           color: Colors.white),
                                                       const SizedBox(width: 6),
@@ -226,7 +229,7 @@ class AuthPrimaryButton extends StatelessWidget {
           : Row(mainAxisAlignment: MainAxisAlignment.center, children: [
               Flexible(child: Text(label, textAlign: TextAlign.center)),
               const SizedBox(width: 10),
-              const Icon(Icons.arrow_forward_rounded, size: 20)
+              const Icon(PhosphorIconsRegular.arrowRight, size: 20)
             ]));
 }
 
@@ -240,7 +243,7 @@ class AuthBackLink extends StatelessWidget {
       child: TextButton.icon(
           onPressed: onPressed,
           style: TextButton.styleFrom(padding: EdgeInsets.zero),
-          icon: const Icon(Icons.arrow_back_rounded, size: 18),
+          icon: const Icon(PhosphorIconsRegular.arrowLeft, size: 18),
           label: Text(label)));
 }
 
@@ -543,8 +546,8 @@ class _TimeBasedScenicBackgroundState extends State<TimeBasedScenicBackground>
           child: widget.child,
           builder: (context, scene, child) => ClipRect(
             child: CustomPaint(
-                painter: AuthMountainPainter._(
-                    scene, widget.topInset ?? MediaQuery.paddingOf(context).top),
+                painter: AuthMountainPainter._(scene,
+                    widget.topInset ?? MediaQuery.paddingOf(context).top),
                 child: child),
           ),
         ),

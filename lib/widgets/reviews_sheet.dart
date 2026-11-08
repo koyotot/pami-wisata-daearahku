@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:phosphor_icons/phosphor_icons.dart';
 
 import '../data/business_repository.dart';
 import '../data/review_state.dart';
@@ -131,7 +132,7 @@ class _ReviewsSheetState extends State<ReviewsSheet> {
                                         CrossAxisAlignment.start,
                                     children: [
                                       Row(children: [
-                                        const Icon(Icons.place_rounded,
+                                        const Icon(PhosphorIconsRegular.mapPin,
                                             color: Color(0xFF1976D2), size: 14),
                                         const SizedBox(width: 4),
                                         Expanded(
@@ -143,7 +144,8 @@ class _ReviewsSheetState extends State<ReviewsSheet> {
                                         Row(
                                             children: List.generate(
                                                 5,
-                                                (s) => Icon(Icons.star_rounded,
+                                                (s) => Icon(
+                                                    PhosphorIconsFill.star,
                                                     size: 13,
                                                     color: s < review.rating
                                                         ? const Color(

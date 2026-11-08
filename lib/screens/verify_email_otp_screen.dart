@@ -1,6 +1,7 @@
 import 'auth_presentation.dart';
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:phosphor_icons/phosphor_icons.dart';
 import '../services/auth_session.dart';
 import 'user_login_screen.dart';
 import 'session_destination.dart';
@@ -164,8 +165,10 @@ class _VerifyEmailOtpScreenState extends State<VerifyEmailOtpScreen> {
                                       CrossAxisAlignment.stretch,
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
-                                    const Icon(Icons.mark_email_unread_outlined,
-                                        size: 48, color: Color(0xFF1976D2)),
+                                    const Icon(
+                                        PhosphorIconsRegular.envelopeSimpleOpen,
+                                        size: 48,
+                                        color: Color(0xFF1976D2)),
                                     const SizedBox(height: 20),
                                     const Text('Verifikasi email',
                                         style: TextStyle(

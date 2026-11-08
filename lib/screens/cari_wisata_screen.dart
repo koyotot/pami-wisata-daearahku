@@ -10,6 +10,7 @@
 // ============================================================
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:phosphor_icons/phosphor_icons.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../data/app_data.dart';
@@ -53,13 +54,13 @@ const _kColor = {
 };
 
 const _kIcon = {
-  'Pantai': Icons.beach_access_rounded,
-  'Budaya': Icons.account_balance_rounded,
-  'Alam': Icons.forest_rounded,
-  'Bahari': Icons.sailing_rounded,
-  'Kuliner': Icons.restaurant_rounded,
-  'Kota': Icons.location_city_rounded,
-  'Lainnya': Icons.explore_rounded,
+  'Pantai': PhosphorIconsRegular.umbrella,
+  'Budaya': PhosphorIconsRegular.bank,
+  'Alam': PhosphorIconsRegular.tree,
+  'Bahari': PhosphorIconsRegular.sailboat,
+  'Kuliner': PhosphorIconsRegular.forkKnife,
+  'Kota': PhosphorIconsRegular.buildings,
+  'Lainnya': PhosphorIconsRegular.compass,
 };
 
 void _bukaDetail(BuildContext context, Wisata w) {
@@ -286,7 +287,8 @@ class _CariWisataScreenState extends State<CariWisataScreen> {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.place_rounded, size: 14, color: Colors.white),
+            const Icon(PhosphorIconsRegular.mapPin,
+                size: 14, color: Colors.white),
             const SizedBox(width: 5),
             Text(
               '${_hasil.length} destinasi tersedia',
@@ -299,7 +301,7 @@ class _CariWisataScreenState extends State<CariWisataScreen> {
       actions: [
         if (widget.onBukaMenu != null)
           _headerButton(
-            icon: Icons.menu_rounded,
+            icon: PhosphorIconsRegular.list,
             iconSize: 22,
             margin: const EdgeInsets.fromLTRB(0, 8, 20, 8),
             onTap: () {
@@ -322,7 +324,8 @@ class _CariWisataScreenState extends State<CariWisataScreen> {
                   height: 32,
                   decoration: const BoxDecoration(
                     color: _background,
-                    borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
+                    borderRadius:
+                        BorderRadius.vertical(top: Radius.circular(32)),
                   ),
                 ),
               ),
@@ -386,11 +389,11 @@ class _CariWisataScreenState extends State<CariWisataScreen> {
               decoration: InputDecoration(
                 hintText: 'Cari nama wisata...',
                 hintStyle: _font(13, FontWeight.w500, _textMuted),
-                prefixIcon:
-                    const Icon(Icons.search_rounded, color: _blue, size: 22),
+                prefixIcon: const Icon(PhosphorIconsRegular.magnifyingGlass,
+                    color: _blue, size: 22),
                 suffixIcon: _query.isNotEmpty
                     ? IconButton(
-                        icon: const Icon(Icons.close_rounded,
+                        icon: const Icon(PhosphorIconsRegular.x,
                             color: _textMuted, size: 18),
                         onPressed: () {
                           setState(() {
@@ -464,7 +467,7 @@ class _CariWisataScreenState extends State<CariWisataScreen> {
           final guid = i == 0 ? _semua : kategori[i - 1].guid;
           final aktif = guid == _kategori;
           final warna = _kColor[k] ?? _blue;
-          final ikon = _kIcon[k] ?? Icons.apps_rounded;
+          final ikon = _kIcon[k] ?? PhosphorIconsRegular.squaresFour;
 
           return GestureDetector(
             onTap: () {
@@ -575,8 +578,8 @@ class _CariWisataScreenState extends State<CariWisataScreen> {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          tombol(Icons.dashboard_rounded, true),
-          tombol(Icons.view_agenda_rounded, false),
+          tombol(PhosphorIconsRegular.squaresFour, true),
+          tombol(PhosphorIconsRegular.rows, false),
         ],
       ),
     );
@@ -596,7 +599,7 @@ class _CariWisataScreenState extends State<CariWisataScreen> {
               color: Colors.white,
               border: Border.all(color: _border, width: 1.4),
             ),
-            child: const Icon(Icons.search_off_rounded,
+            child: const Icon(PhosphorIconsRegular.magnifyingGlassMinus,
                 size: 42, color: _textMuted),
           ),
           const SizedBox(height: 20),
@@ -657,7 +660,7 @@ class _Thumb extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final katColor = _kColor[wisata.kategori] ?? _blue;
-    final katIcon = _kIcon[wisata.kategori] ?? Icons.explore_rounded;
+    final katIcon = _kIcon[wisata.kategori] ?? PhosphorIconsRegular.compass;
     final path = wisata.imagePath;
 
     Widget placeholder() => Container(
@@ -680,8 +683,8 @@ class _Thumb extends StatelessWidget {
     Widget broken() => Container(
           color: katColor.withValues(alpha: 0.10),
           child: const Center(
-            child:
-                Icon(Icons.broken_image_rounded, color: _textMuted, size: 30),
+            child: Icon(PhosphorIconsRegular.imageBroken,
+                color: _textMuted, size: 30),
           ),
         );
 
@@ -722,7 +725,7 @@ class _KategoriBadge extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final warna = _kColor[kategori] ?? _blue;
-    final ikon = _kIcon[kategori] ?? Icons.explore_rounded;
+    final ikon = _kIcon[kategori] ?? PhosphorIconsRegular.compass;
     return Container(
       padding: EdgeInsets.symmetric(
           horizontal: kecil ? 8 : 10, vertical: kecil ? 4 : 5),
@@ -806,7 +809,7 @@ class _HeroCard extends StatelessWidget {
                           ),
                           const SizedBox(height: 6),
                           Row(children: [
-                            Icon(Icons.location_on_rounded,
+                            Icon(PhosphorIconsRegular.mapPin,
                                 size: 14,
                                 color: Colors.white.withValues(alpha: 0.9)),
                             const SizedBox(width: 3),
@@ -834,7 +837,7 @@ class _HeroCard extends StatelessWidget {
                             child: Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                const Icon(Icons.local_offer_rounded,
+                                const Icon(PhosphorIconsRegular.tag,
                                     size: 12, color: Colors.white),
                                 const SizedBox(width: 5),
                                 Text(
@@ -858,7 +861,7 @@ class _HeroCard extends StatelessWidget {
                         color: Colors.white,
                         borderRadius: BorderRadius.circular(15),
                       ),
-                      child: const Icon(Icons.arrow_forward_rounded,
+                      child: const Icon(PhosphorIconsRegular.arrowRight,
                           size: 22, color: _blue),
                     ),
                   ],
@@ -949,7 +952,7 @@ class _GridCard extends StatelessWidget {
                         ),
                         const SizedBox(height: 3),
                         Row(children: [
-                          const Icon(Icons.location_on_rounded,
+                          const Icon(PhosphorIconsRegular.mapPin,
                               size: 12, color: _blue),
                           const SizedBox(width: 2),
                           Expanded(
@@ -981,7 +984,7 @@ class _GridCard extends StatelessWidget {
                                 ),
                                 borderRadius: BorderRadius.circular(10),
                               ),
-                              child: const Icon(Icons.arrow_forward_rounded,
+                              child: const Icon(PhosphorIconsRegular.arrowRight,
                                   size: 15, color: Colors.white),
                             ),
                           ],
@@ -1007,7 +1010,7 @@ class _ListCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final katColor = _kColor[wisata.kategori] ?? _blue;
-    final katIcon = _kIcon[wisata.kategori] ?? Icons.explore_rounded;
+    final katIcon = _kIcon[wisata.kategori] ?? PhosphorIconsRegular.compass;
     final radius = BorderRadius.circular(20);
 
     return Container(
@@ -1076,7 +1079,7 @@ class _ListCard extends StatelessWidget {
                         ),
                         const SizedBox(height: 4),
                         Row(children: [
-                          const Icon(Icons.location_on_rounded,
+                          const Icon(PhosphorIconsRegular.mapPin,
                               size: 12, color: _blue),
                           const SizedBox(width: 3),
                           Expanded(
@@ -1091,7 +1094,7 @@ class _ListCard extends StatelessWidget {
                         const SizedBox(height: 8),
                         Row(
                           children: [
-                            const Icon(Icons.local_offer_rounded,
+                            const Icon(PhosphorIconsRegular.tag,
                                 size: 12, color: _orange),
                             const SizedBox(width: 4),
                             Expanded(
@@ -1110,7 +1113,7 @@ class _ListCard extends StatelessWidget {
                                 ),
                                 borderRadius: BorderRadius.circular(9),
                               ),
-                              child: const Icon(Icons.arrow_forward_ios_rounded,
+                              child: const Icon(PhosphorIconsRegular.caretRight,
                                   size: 11, color: Colors.white),
                             ),
                           ],

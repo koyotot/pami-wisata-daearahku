@@ -4,6 +4,7 @@
 // Sumber akun adalah database Laravel, bukan Firebase.
 // ============================================================
 import 'package:flutter/material.dart';
+import 'package:phosphor_icons/phosphor_icons.dart';
 import '../data/admin_state.dart';
 import '../data/app_data.dart';
 import '../data/business_repository.dart';
@@ -115,8 +116,7 @@ class _KelolaAdminScreenState extends State<KelolaAdminScreen> {
   }
 
   Future<void> _toggleStatus(AdminAccount account) async {
-    if (_guard.isBusy(account.guid) ||
-        !canModifyAccount(account, _ownGuid)) {
+    if (_guard.isBusy(account.guid) || !canModifyAccount(account, _ownGuid)) {
       return;
     }
     final suspend = account.isActive;
@@ -130,15 +130,12 @@ class _KelolaAdminScreenState extends State<KelolaAdminScreen> {
       danger: suspend,
     );
     if (!ok || !mounted) return;
-    await _update(
-        account,
-        {'status': suspend ? 'suspended' : 'active'},
+    await _update(account, {'status': suspend ? 'suspended' : 'active'},
         suspend ? 'Akun ditangguhkan' : 'Akun diaktifkan');
   }
 
   Future<void> _changeRole(AdminAccount account) async {
-    if (_guard.isBusy(account.guid) ||
-        !canModifyAccount(account, _ownGuid)) {
+    if (_guard.isBusy(account.guid) || !canModifyAccount(account, _ownGuid)) {
       return;
     }
     final role = await showDialog<int>(
@@ -159,8 +156,8 @@ class _KelolaAdminScreenState extends State<KelolaAdminScreen> {
               child: Row(children: [
                 Icon(
                     value == account.role
-                        ? Icons.radio_button_checked_rounded
-                        : Icons.radio_button_unchecked_rounded,
+                        ? PhosphorIconsRegular.radioButton
+                        : PhosphorIconsRegular.circle,
                     color: AdminColors.blue,
                     size: 20),
                 const SizedBox(width: 10),
@@ -198,7 +195,7 @@ class _KelolaAdminScreenState extends State<KelolaAdminScreen> {
           ? FloatingActionButton.extended(
               key: const ValueKey('add-admin'),
               backgroundColor: AdminColors.blue,
-              icon: const Icon(Icons.person_add_alt_1_rounded,
+              icon: const Icon(PhosphorIconsRegular.userPlus,
                   color: Colors.white),
               label: const Text('Tambah Admin',
                   style: TextStyle(
@@ -241,14 +238,14 @@ class _KelolaAdminScreenState extends State<KelolaAdminScreen> {
           ),
         ],
         if (!allowed)
-          adminEmptySliver(Icons.lock_outline_rounded, 'Akses ditolak',
+          adminEmptySliver(PhosphorIconsRegular.lock, 'Akses ditolak',
               'Kelola Admin hanya untuk Super Administrator.')
         else if (!_list.hasLoaded && _list.error == null)
           adminLoadingSliver()
         else if (_list.error != null && items.isEmpty)
           adminErrorSliver(adminErrorMessage(_list.error!), _muat)
         else if (items.isEmpty)
-          adminEmptySliver(Icons.group_off_rounded, 'Tidak ada akun',
+          adminEmptySliver(PhosphorIconsRegular.users, 'Tidak ada akun',
               'Tidak ada akun yang cocok dengan filter ini.')
         else ...[
           if (_list.error != null)
@@ -358,7 +355,7 @@ class _AccountCard extends StatelessWidget {
           const SizedBox(height: 10),
           Wrap(spacing: 8, runSpacing: 6, children: [
             AdminBadge(adminRoleLabel(a.role), AdminColors.blue,
-                icon: Icons.shield_rounded),
+                icon: PhosphorIconsRegular.shield),
             AdminBadge(
               a.isActive ? 'Aktif' : 'Ditangguhkan',
               a.isActive ? AdminColors.success : AdminColors.danger,
@@ -381,7 +378,8 @@ class _AccountCard extends StatelessWidget {
                   child: OutlinedButton.icon(
                     key: ValueKey('role-${a.guid}'),
                     onPressed: onRole,
-                    icon: const Icon(Icons.swap_horiz_rounded, size: 16),
+                    icon: const Icon(PhosphorIconsRegular.arrowsLeftRight,
+                        size: 16),
                     label: const Text('Ubah Peran'),
                     style: OutlinedButton.styleFrom(
                       foregroundColor: AdminColors.blue,
@@ -397,8 +395,8 @@ class _AccountCard extends StatelessWidget {
                     onPressed: onStatus,
                     icon: Icon(
                         a.isActive
-                            ? Icons.block_rounded
-                            : Icons.check_circle_outline_rounded,
+                            ? PhosphorIconsRegular.prohibit
+                            : PhosphorIconsRegular.checkCircle,
                         size: 16),
                     label: Text(a.isActive ? 'Tangguhkan' : 'Aktifkan'),
                     style: OutlinedButton.styleFrom(
@@ -488,9 +486,8 @@ class _CreateAdminDialogState extends State<_CreateAdminDialog> {
                 controller: _name,
                 enabled: !_saving,
                 decoration: adminInputDecoration('Nama'),
-                validator: (v) => (v == null || v.trim().isEmpty)
-                    ? 'Nama wajib diisi'
-                    : null,
+                validator: (v) =>
+                    (v == null || v.trim().isEmpty) ? 'Nama wajib diisi' : null,
               ),
               const SizedBox(height: 12),
               TextFormField(
@@ -510,9 +507,8 @@ class _CreateAdminDialogState extends State<_CreateAdminDialog> {
                 enabled: !_saving,
                 obscureText: true,
                 decoration: adminInputDecoration('Password'),
-                validator: (v) => (v == null || v.length < 8)
-                    ? 'Minimal 8 karakter'
-                    : null,
+                validator: (v) =>
+                    (v == null || v.length < 8) ? 'Minimal 8 karakter' : null,
               ),
               const SizedBox(height: 12),
               TextFormField(

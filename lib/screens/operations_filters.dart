@@ -166,6 +166,10 @@ class _OperationsFiltersState extends State<_OperationsFilters> {
             home: widget.home)
         : await showDateRangePicker(
             context: context,
+            switchToInputEntryModeIcon:
+                const Icon(PhosphorIconsRegular.pencilSimple),
+            switchToCalendarEntryModeIcon:
+                const Icon(PhosphorIconsRegular.calendarBlank),
             firstDate: DateTime(2020),
             lastDate: DateTime(now.year + 3, 12, 31),
             initialDateRange: _from != null && _to != null
@@ -223,12 +227,13 @@ class _OperationsFiltersState extends State<_OperationsFilters> {
                         color: AppColors.navy)),
                 const SizedBox(height: 8),
                 DropdownButtonFormField<String>(
+                    icon: const Icon(PhosphorIconsRegular.caretDown),
                     key: widget.financial
                         ? ValueKey(
                             '$_destination-${_destinations.containsKey(_destination)}')
                         : null,
                     decoration: InputDecoration(
-                        prefixIcon: const Icon(Icons.place_outlined,
+                        prefixIcon: const Icon(PhosphorIconsRegular.mapPin,
                             color: AppColors.blue),
                         filled: true,
                         fillColor: Colors.white,
@@ -282,6 +287,7 @@ class _OperationsFiltersState extends State<_OperationsFilters> {
                 const SizedBox(height: 8),
                 if (widget.financial) ...[
                   DropdownButtonFormField<String>(
+                      icon: const Icon(PhosphorIconsRegular.caretDown),
                       key: ValueKey(_financePeriod),
                       initialValue: _financePeriod,
                       decoration:
@@ -322,7 +328,7 @@ class _OperationsFiltersState extends State<_OperationsFilters> {
                         side: const BorderSide(color: AppColors.border),
                         shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(14))),
-                    icon: const Icon(Icons.date_range_outlined),
+                    icon: const Icon(PhosphorIconsRegular.calendarBlank),
                     label: Text(_from == null
                         ? widget.financial
                             ? _financePeriod == 'custom'
@@ -392,7 +398,7 @@ class _OperationsFiltersState extends State<_OperationsFilters> {
                       label: _destination == null
                           ? 'Semua destinasi'
                           : _destinationLabel ?? 'Destinasi terpilih',
-                      icon: Icons.place_outlined,
+                      icon: PhosphorIconsRegular.mapPin,
                       onPressed: !enabled
                           ? null
                           : () async {
@@ -423,8 +429,8 @@ class _OperationsFiltersState extends State<_OperationsFilters> {
                               {'from': isoDay(_from!), 'to': isoDay(_to!)},
                               includeYear: true)
                           : 'Pilih periode',
-                      icon: Icons.calendar_today_outlined,
-                      trailing: Icons.chevron_right_rounded,
+                      icon: PhosphorIconsRegular.calendarBlank,
+                      trailing: PhosphorIconsRegular.caretRight,
                       onPressed: enabled ? _dates : null),
                   if (_validation != null) _Notice(_validation!),
                   if (!enabled)
@@ -485,7 +491,7 @@ class _OperationsFiltersState extends State<_OperationsFilters> {
                         label: _destination == null
                             ? 'Semua destinasi saya'
                             : _destinationLabel ?? '1 destinasi dipilih',
-                        icon: Icons.place_outlined,
+                        icon: PhosphorIconsRegular.mapPin,
                         onPressed: !_valid
                             ? null
                             : () async {
@@ -511,7 +517,7 @@ class _OperationsFiltersState extends State<_OperationsFilters> {
                             : widget.financial
                                 ? 'Bulan ini · UTC (default)'
                                 : 'Pilih rentang tanggal',
-                        icon: Icons.date_range_outlined,
+                        icon: PhosphorIconsRegular.calendarBlank,
                         onPressed: _valid ? _dates : null),
                     if (_validation != null) _Notice(_validation!),
                     if (!_valid)
@@ -715,7 +721,8 @@ class _OperationsDestinationPickerState
                               labelText: widget.home ? null : 'Cari destinasi',
                               hintText:
                                   widget.home ? 'Cari destinasi...' : null,
-                              prefixIcon: Icon(Icons.search)),
+                              prefixIcon:
+                                  Icon(PhosphorIconsRegular.magnifyingGlass)),
                           onChanged: (value) =>
                               setState(() => _search = value)),
                       const SizedBox(height: 12),
@@ -782,7 +789,7 @@ class _OperationsDestinationPickerState
                         }
                       : null,
                   child: Row(children: [
-                    const Icon(Icons.place_outlined, size: 20),
+                    const Icon(PhosphorIconsRegular.mapPin, size: 20),
                     const SizedBox(width: 12),
                     Expanded(
                         child: Text(label,
@@ -798,9 +805,9 @@ class _OperationsDestinationPickerState
                       Icon(
                           selected
                               ? widget.home
-                                  ? Icons.check_rounded
-                                  : Icons.radio_button_checked
-                              : Icons.radio_button_off,
+                                  ? PhosphorIconsRegular.check
+                                  : PhosphorIconsRegular.radioButton
+                              : PhosphorIconsRegular.circle,
                           size: 20,
                           color: AppColors.blue),
                   ]))));
@@ -1006,7 +1013,7 @@ class _OperationsDateRangeCalendarState
                               caption: widget.home ? 'START DATE' : null,
                               trailing: widget.home
                                   ? null
-                                  : Icons.keyboard_arrow_down,
+                                  : PhosphorIconsRegular.caretDown,
                               label: widget.home
                                   ? _from == null
                                       ? 'Pilih tanggal'
@@ -1023,7 +1030,7 @@ class _OperationsDateRangeCalendarState
                               caption: widget.home ? 'END DATE' : null,
                               trailing: widget.home
                                   ? null
-                                  : Icons.keyboard_arrow_down,
+                                  : PhosphorIconsRegular.caretDown,
                               label: widget.home
                                   ? _to == null
                                       ? 'Pilih tanggal'
@@ -1044,7 +1051,7 @@ class _OperationsDateRangeCalendarState
                                 ? () => setState(() => _month =
                                     DateTime(_month.year, _month.month - 1))
                                 : null,
-                        icon: const Icon(Icons.chevron_left)),
+                        icon: const Icon(PhosphorIconsRegular.caretLeft)),
                     Expanded(
                         child: Text(
                             '${_months[_month.month - 1]} ${_month.year}',
@@ -1060,7 +1067,7 @@ class _OperationsDateRangeCalendarState
                                 ? () => setState(() => _month =
                                     DateTime(_month.year, _month.month + 1))
                                 : null,
-                        icon: const Icon(Icons.chevron_right)),
+                        icon: const Icon(PhosphorIconsRegular.caretRight)),
                   ]),
                   LayoutBuilder(
                       builder: (context, constraints) => SingleChildScrollView(
@@ -1213,7 +1220,7 @@ class _OperationsSheetHeading extends StatelessWidget {
                         borderRadius: BorderRadius.circular(12)))
                 : null,
             onPressed: () => Navigator.pop(context),
-            icon: Icon(Icons.close, size: home ? 18 : 24)),
+            icon: Icon(PhosphorIconsRegular.x, size: home ? 18 : 24)),
       ]);
 }
 
@@ -1224,7 +1231,7 @@ class _OperationsFilterField extends StatelessWidget {
       this.onPressed,
       this.home = false,
       this.caption,
-      this.trailing = Icons.keyboard_arrow_down});
+      this.trailing = PhosphorIconsRegular.caretDown});
   final String label;
   final IconData? icon;
   final VoidCallback? onPressed;
