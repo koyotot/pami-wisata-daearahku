@@ -6,9 +6,17 @@ import '../theme/app_colors.dart';
 /// A clock for display only. Reaching zero asks Laravel for status; never expires a booking.
 class PaymentDeadline extends StatefulWidget {
   const PaymentDeadline(
-      {super.key, required this.expiresAt, required this.onElapsed});
+      {super.key,
+      required this.expiresAt,
+      required this.onElapsed,
+      this.label = 'Batas pembayaran',
+      this.now});
   final DateTime? expiresAt;
   final VoidCallback onElapsed;
+  final String label;
+
+  /// Injectable clock; defaults to the device clock.
+  final DateTime Function()? now;
   @override
   State<PaymentDeadline> createState() => _PaymentDeadlineState();
 }
@@ -18,7 +26,8 @@ class _PaymentDeadlineState extends State<PaymentDeadline>
   Timer? _timer;
   bool _elapsed = false;
   Duration get _remaining =>
-      widget.expiresAt?.difference(DateTime.now()) ?? Duration.zero;
+      widget.expiresAt?.difference((widget.now ?? DateTime.now)()) ??
+      Duration.zero;
   @override
   void initState() {
     super.initState();
@@ -79,8 +88,9 @@ class _PaymentDeadlineState extends State<PaymentDeadline>
             spacing: 12,
             runSpacing: 6,
             children: [
-              const Text('Batas pembayaran',
-                  style: TextStyle(fontSize: 12, color: Color(0xFF80531B))),
+              Text(widget.label,
+                  style:
+                      const TextStyle(fontSize: 12, color: Color(0xFF80531B))),
               Text(
                   widget.expiresAt == null
                       ? 'Belum tersedia'

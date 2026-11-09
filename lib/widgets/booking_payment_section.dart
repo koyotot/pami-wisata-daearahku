@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../data/business_repository.dart';
 import '../core/config/app_config.dart';
 import '../data/payment_models.dart';
+import '../screens/booking_payment_screen.dart';
 import '../screens/demo_checkout_screen.dart';
 import '../theme/app_colors.dart';
 import 'ewallet_payment_section.dart';
@@ -109,6 +110,51 @@ class _BookingPaymentSectionState extends State<BookingPaymentSection>
     }
   }
 
+  /// BNI VA / QRIS checkout. Only navigates; nothing is created until the customer taps "Lanjut Bayar".
+  Future<void> _openCheckout() async {
+    if (_opening || !_valid) return;
+    setState(() => _opening = true);
+    try {
+      await Navigator.of(context).push(MaterialPageRoute<void>(
+          builder: (_) => BookingPaymentScreen(
+              bookingGuid: widget.booking.guid,
+              repository: widget.repository)));
+      if (!_valid) return;
+      await widget.onReturned();
+      if (_valid) await _load();
+    } finally {
+      if (_valid) setState(() => _opening = false);
+    }
+  }
+
+  /// Label for the checkout entry, or null when the server offers nothing to do here.
+  String? get _checkoutLabel {
+    final snapshot = _intent ?? _methods;
+    if (snapshot == null || !snapshot.isDoku) return null;
+    final status = snapshot.attemptStatus;
+    final method = snapshot.attemptMethod;
+    // Unresolved past its expiry: only a status view, never "pay again".
+    if (status != null && snapshot.verificationPending) {
+      return 'Lihat Status Pembayaran';
+    }
+    if (status == null) {
+      return snapshot.canCreate && snapshot.payChoices.any((c) => c.available)
+          ? 'Pilih Metode Pembayaran'
+          : null;
+    }
+    // Legacy wallet attempts keep their own section.
+    if (method != 'virtual_account' && method != 'qris') return null;
+    if (const ['initiating', 'pending', 'unknown'].contains(status)) {
+      return 'Lanjutkan Pembayaran';
+    }
+    if (const ['failed', 'expired', 'cancelled'].contains(status) &&
+        snapshot.canCreate &&
+        snapshot.intentStatus != 'needs_review') {
+      return 'Pilih Metode Pembayaran';
+    }
+    return 'Lihat Status Pembayaran';
+  }
+
   @override
   void dispose() {
     ++_request;
@@ -122,7 +168,7 @@ class _BookingPaymentSectionState extends State<BookingPaymentSection>
     final demo = !doku && AppConfig.demoPaymentEnabled;
     final dokuReason = _methods?.json['reason'] == null
         ? 'Pembayaran online tersedia.'
-        : _methods?.reason;
+        : payChoiceReason(_methods?.json['reason'] as String?);
     // With DEMO off, a server still in demo mode is shown as unavailable, never as a simulator.
     final String? statusText = _error ??
         (doku
@@ -153,15 +199,24 @@ class _BookingPaymentSectionState extends State<BookingPaymentSection>
                     fontSize: 12, height: 1.5, color: Color(0xFF526787))),
           // DOKU wallets: a separate, always-mounted section owns start/return/resume (a reload here
           // must not dispose it mid-refresh). The DEMO controls stay for demo mode.
-          if (doku)
+          if (doku) ...[
+            if (_checkoutLabel != null)
+              Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: ElevatedButton(
+                      key: const Key('payment-open-checkout'),
+                      onPressed: _loading || _opening || !_valid
+                          ? null
+                          : _openCheckout,
+                      child: Text(_checkoutLabel!))),
             EwalletPaymentSection(
                 booking: widget.booking,
                 repository: widget.repository,
                 onChanged: () async {
                   await widget.onReturned();
                   if (_valid) await _load();
-                })
-          else if (demo) ...[
+                }),
+          ] else if (demo) ...[
             ElevatedButton(
                 onPressed: _loading ||
                         _opening ||
