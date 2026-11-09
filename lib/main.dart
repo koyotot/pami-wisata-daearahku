@@ -2,6 +2,7 @@ import 'services/auth_session.dart';
 import 'core/config/app_config.dart';
 import 'services/fcm_device_manager.dart';
 import 'screens/payment_return_screen.dart';
+import 'screens/ticket_link_screen.dart';
 import 'screens/session_destination.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -170,8 +171,10 @@ class _WisataDaerahkuAppState extends State<WisataDaerahkuApp> {
         ),
       ),
       home: sessionDestination(),
-      // HTTPS App Link from the e-wallet return page: /payment/return[?result=...].
-      onGenerateRoute: paymentReturnRoute,
+      // HTTPS App Links: /payment/return[?result=...] (e-wallet return page) and
+      // /tickets/{booking_guid} (e-ticket email). Both are navigation hints; the server decides.
+      onGenerateRoute: (settings) =>
+          paymentReturnRoute(settings) ?? ticketLinkRoute(settings),
     );
   }
 }

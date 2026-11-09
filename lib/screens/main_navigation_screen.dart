@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import '../data/business_repository.dart';
 import '../data/notification_state.dart';
+import '../data/ticket_link.dart';
 import '../services/auth_session.dart';
 import '../theme/app_colors.dart';
 import '../widgets/floating_bottom_nav.dart';
@@ -10,6 +12,7 @@ import 'cari_wisata_screen.dart';
 import 'notifikasi_screen.dart';
 import 'profil_user_screen.dart';
 import 'session_destination.dart';
+import 'ticket_link_screen.dart';
 
 class MainNavigationScreen extends StatefulWidget {
   const MainNavigationScreen({super.key});
@@ -67,6 +70,17 @@ class _MainNavigationScreenState extends State<MainNavigationScreen>
     _sessionGeneration = AuthSession.instance.sessionGeneration;
     AuthSession.instance.sessionChanges.addListener(_sessionChanged);
     _notifications.refreshCount();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _continueTicketLink());
+  }
+
+  /// A signed-out visitor opened an e-ticket link: after signing in, continue to that ticket.
+  void _continueTicketLink() {
+    final guid = PendingTicketLink.take();
+    if (guid == null || !mounted) return;
+    Navigator.of(context).push(MaterialPageRoute<void>(
+        settings: RouteSettings(name: '/tickets/$guid'),
+        builder: (_) => TicketLinkScreen(
+            bookingGuid: guid, repository: BusinessRepository())));
   }
 
   void _sessionChanged() {

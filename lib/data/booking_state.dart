@@ -205,7 +205,7 @@ class SavedDocument {
 Future<SavedDocument> saveBookingDocument(
     BusinessRepository repository, String bookingGuid, String type,
     {String? bookingNumber, Directory? directory}) async {
-  if (type != 'invoice' && type != 'ticket') {
+  if (type != 'invoice' && type != 'ticket' && type != 'receipt') {
     throw const ApiException('Jenis dokumen tidak dikenal.');
   }
   final response = await repository.downloadDocument(bookingGuid, type);

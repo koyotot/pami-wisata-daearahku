@@ -18,6 +18,7 @@ import '../services/auth_session.dart';
 import 'auth_presentation.dart';
 import '../widgets/booking_ticket_qr_section.dart';
 import '../widgets/booking_payment_section.dart';
+import '../widgets/booking_refund_section.dart';
 import '../widgets/payment_deadline.dart';
 
 // ── Palet (sama dengan home_screen) ──────────────────────────
@@ -121,7 +122,8 @@ String _formatBookingTotal(Booking booking) {
       : '${booking.currency} $amount';
 }
 
-String _nextStepFor(Booking booking, {required bool? ticketIssued}) =>
+String _nextStepFor(Booking booking,
+        {required bool? ticketIssued, EntryTicketsInfo? entry}) =>
     switch (booking.status) {
       'pending_approval' => 'Pendaftaran menunggu persetujuan pengelola.',
       'awaiting_payment' =>
@@ -129,6 +131,7 @@ String _nextStepFor(Booking booking, {required bool? ticketIssued}) =>
       'payment_verification' ||
       'payment_review' =>
         'Pembayaran sedang diverifikasi dan belum dipastikan diterima.',
+      'confirmed' when entry != null => _entryNextStep(entry),
       'confirmed' => switch (ticketIssued) {
           true => 'Tiket telah diterbitkan dan tersedia pada bagian Dokumen.',
           false =>
@@ -140,6 +143,22 @@ String _nextStepFor(Booking booking, {required bool? ticketIssued}) =>
       'expired' => 'Pendaftaran telah kedaluwarsa.',
       'cancelled' => 'Pendaftaran telah dibatalkan.',
       _ => 'Informasi lanjutan belum tersedia untuk status ini.',
+    };
+
+/// Next-step copy for a confirmed booking, from `entry_tickets.state` only.
+String _entryNextStep(EntryTicketsInfo entry) => switch (entry.state) {
+      'available' ||
+      'partially_checked_in' =>
+        'Tiket masuk (QR) tersedia pada bagian Tiket masuk. Tunjukkan QR kepada petugas pada hari kunjungan.',
+      'scheduled' => entry.qrAvailableFrom == null
+          ? 'QR tiket masuk akan tersedia menjelang hari kunjungan.'
+          : 'QR tiket masuk akan tersedia pada ${_formatBookingDate(entry.qrAvailableFrom!)}.',
+      'fully_checked_in' => 'Seluruh tiket masuk sudah check-in.',
+      'revoked' => 'Tiket masuk tidak dapat digunakan.',
+      'expired' => 'Masa kunjungan telah berakhir.',
+      'awaiting_payment' => 'Tiket masuk tersedia setelah pembayaran terverifikasi.',
+      'awaiting_approval' => 'Tiket masuk tersedia setelah pendaftaran disetujui.',
+      _ => 'Status tiket masuk sedang diperiksa.',
     };
 
 Pendaftar _fromBooking(Booking booking) {
@@ -831,7 +850,7 @@ class _TicketCardState extends State<_TicketCard> {
     }
     final documents = _controller?.documents;
     if (documents != null) {
-      widget.onTicketIssued?.call(documents.ticket != null);
+      widget.onTicketIssued?.call(documents.entryTicketsIssued);
     }
   }
 
@@ -1303,7 +1322,8 @@ class _TicketCardState extends State<_TicketCard> {
           const SizedBox(height: 5),
           Text(
               _nextStepFor(b,
-                  ticketIssued: docs == null ? null : docs.ticket != null),
+                  ticketIssued: docs?.entryTicketsIssued,
+                  entry: docs?.entryTickets),
               style: _font(12, FontWeight.w500, _textMuted, height: 1.45)),
         ]),
       ),
@@ -1314,9 +1334,10 @@ class _TicketCardState extends State<_TicketCard> {
               key: const ValueKey('detailMessage'),
               style: _font(12, FontWeight.w600, _red)),
         ),
-      if (const ['awaiting_payment', 'payment_verification', 'payment_review']
-              .contains(b.status) ||
-          (b.paymentTestOnly && b.paymentStatus != 'paid'))
+      if (!b.isFree &&
+          (const ['awaiting_payment', 'payment_verification', 'payment_review']
+                  .contains(b.status) ||
+              (b.paymentTestOnly && b.paymentStatus != 'paid')))
         BookingPaymentSection(
             booking: b,
             repository: c.repository,
@@ -1325,11 +1346,19 @@ class _TicketCardState extends State<_TicketCard> {
               await c.loadDocuments();
             }),
       if (b.status == 'confirmed' &&
-          (b.paymentStatus == 'paid' || b.paymentTestOnly))
+          (b.paymentStatus == 'paid' ||
+              b.paymentTestOnly ||
+              b.isFree ||
+              docs?.entryTickets?.isFree == true))
         BookingTicketQrSection(
             repository: c.repository,
             bookingGuid: b.guid,
             onRefreshed: c.refresh),
+      if (b.status == 'confirmed' && b.paymentStatus == 'paid')
+        BookingRefundSection(
+            repository: c.repository,
+            bookingGuid: b.guid,
+            onChanged: c.refresh),
       if (b.cancellable) ...[
         const SizedBox(height: 12),
         SizedBox(
@@ -1370,12 +1399,25 @@ class _TicketCardState extends State<_TicketCard> {
               onPressed: c.loadDocuments, child: const Text('Coba lagi')),
         ])
       else if (docs != null) ...[
-        if (docs.invoice == null && docs.ticket == null)
+        if (docs.invoice == null &&
+            !docs.ticketDownloadAvailable &&
+            !docs.receiptAvailable)
           Text('Dokumen belum diterbitkan.',
               style: _font(12, FontWeight.w500, _textMuted)),
         if (docs.invoice != null)
           _documentRow(c, 'invoice', 'Konfirmasi pendaftaran (invoice)'),
-        if (docs.ticket != null) _documentRow(c, 'ticket', 'Tiket'),
+        if (docs.receiptAvailable)
+          _documentRow(c, 'receipt', 'Bukti pembayaran'),
+        if (docs.ticketDownloadAvailable) ...[
+          _documentRow(c, 'ticket', 'Dokumen tiket grup (PDF)'),
+          Padding(
+            padding: const EdgeInsets.only(bottom: 4),
+            child: Text(
+                'Dokumen ini hanya konfirmasi pendaftaran, bukan tiket masuk. QR tiket masuk ada pada bagian Tiket masuk.',
+                key: const ValueKey('ticketDocumentNote'),
+                style: _font(11.5, FontWeight.w500, _textMuted)),
+          ),
+        ],
         if (docs.invoice != null)
           Padding(
             padding: const EdgeInsets.only(top: 4),
@@ -1857,9 +1899,13 @@ class BookingTicketScreen extends StatefulWidget {
     super.key,
     required this.bookingGuid,
     this.repository,
+    this.preloaded,
   });
   final String bookingGuid;
   final BusinessRepository? repository;
+
+  /// A booking the caller already read from the server (the App Link screen), so it is not read twice.
+  final Booking? preloaded;
   @override
   State<BookingTicketScreen> createState() => _BookingTicketScreenState();
 }
@@ -1878,7 +1924,10 @@ class _BookingTicketScreenState extends State<BookingTicketScreen> {
     if (session.authenticated.value &&
         session.deviceSessionReady &&
         session.role == 0) {
-      _booking = _repository.booking(widget.bookingGuid);
+      final preloaded = widget.preloaded;
+      _booking = preloaded != null && preloaded.guid == widget.bookingGuid
+          ? Future.value(preloaded)
+          : _repository.booking(widget.bookingGuid);
     }
     session.sessionChanges.addListener(_changed);
   }

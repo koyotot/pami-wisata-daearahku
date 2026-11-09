@@ -130,6 +130,9 @@ class Booking {
   String get visitDate => json['visit_date'] as String? ?? '';
   int get quantity => (json['quantity'] as num?)?.toInt() ?? 0;
   int get totalAmount => (json['total_amount'] as num?)?.toInt() ?? 0;
+
+  /// An explicit Rp0 total. A missing amount is never read as free.
+  bool get isFree => json['total_amount'] is num && totalAmount == 0;
   String get currency => json['currency'] as String? ?? 'IDR';
   String? get notes => json['notes'] as String?;
   String get status => json['status'] as String;
@@ -268,7 +271,73 @@ class BookingDocuments {
   final Json json;
   BookingDocuments(this.json);
   Json? get invoice => json['invoice'] is Json ? json['invoice'] as Json : null;
+
+  /// Booking confirmation PDF for the group. It is NOT an admission ticket and carries no token;
+  /// entry tickets are described only by [entryTickets].
   Json? get ticket => json['ticket'] is Json ? json['ticket'] as Json : null;
+
+  /// Always false on current servers; kept so a stray `true` could never be mistaken for an entry ticket.
+  bool get ticketLegacy => ticket?['legacy'] == true;
+  bool get ticketAdmission => ticket?['admission'] == true;
+
+  /// The confirmation PDF may be downloaded only when the server says so. An older server that sends
+  /// no `download_available` flag keeps the previous behavior: a present `ticket` is downloadable.
+  bool get ticketDownloadAvailable {
+    final t = ticket;
+    if (t == null) return false;
+    return t.containsKey('download_available')
+        ? t['download_available'] == true
+        : true;
+  }
+
+  /// Per-visitor entry QR tickets. Null on an older server or when the object is malformed.
+  EntryTicketsInfo? get entryTickets {
+    final value = json['entry_tickets'];
+    if (value is! Json || value['state'] is! String) return null;
+    return EntryTicketsInfo(value);
+  }
+
+  /// Whether entry QR tickets exist (scheduled, available or used). With `entry_tickets` only its
+  /// state decides; the legacy `ticket` document never does. Without it (older server) the previous
+  /// rule applies, except that a document the server marks as not admission is not an entry ticket.
+  bool get entryTicketsIssued {
+    final entry = entryTickets;
+    if (entry != null) return entry.issued;
+    final t = ticket;
+    return t != null && t['admission'] != false && t['legacy'] != true;
+  }
+
+  /// Paid receipt entry; absent on older servers, which means unavailable.
+  Json? get receipt => json['receipt'] is Json ? json['receipt'] as Json : null;
+  bool get receiptAvailable => receipt?['download_available'] == true;
+}
+
+/// `entry_tickets` of the documents response. Only [state] says whether QR tickets are available,
+/// scheduled or revoked.
+class EntryTicketsInfo {
+  final Json json;
+  EntryTicketsInfo(this.json);
+  String get state => json['state'] as String;
+  int? get quantity {
+    final value = json['quantity'];
+    return value is num ? value.toInt() : null;
+  }
+
+  /// Calendar date (YYYY-MM-DD) the QR becomes visible.
+  String? get qrAvailableFrom {
+    final value = json['qr_available_from'];
+    return value is String && value.isNotEmpty ? value : null;
+  }
+
+  /// `paid`, `free`, `unverified`, ...
+  String? get entitlement => json['entitlement'] as String?;
+  bool get isFree => entitlement == 'free';
+  bool get issued => const {
+        'scheduled',
+        'available',
+        'partially_checked_in',
+        'fully_checked_in',
+      }.contains(state);
 }
 
 class AdminAccount {
@@ -381,6 +450,39 @@ class BusinessRepository {
   Future<PaymentSnapshot> paymentIntent(String guid) async => PaymentSnapshot(
       await api.object('GET', 'bookings/${_id(guid)}/payment-intent',
           authenticated: true));
+
+  /// Refund requests of a booking, newest first (owner only).
+  Future<List<RefundRequest>> refundRequests(String guid) async {
+    final data = await api.object(
+        'GET', 'bookings/${_id(guid)}/refund-requests',
+        authenticated: true);
+    final list = data['refund_requests'];
+    if (list is! List) {
+      throw const ApiException(
+          'Respons pengembalian dana tidak valid.', null, 'invalid_response');
+    }
+    return [
+      for (final item in list)
+        RefundRequest(item is Json
+            ? item
+            : throw const ApiException('Respons pengembalian dana tidak valid.',
+                null, 'invalid_response'))
+    ];
+  }
+
+  /// Files a refund request. The body is only the reason: amount, currency and status belong to
+  /// Laravel. [key] is the Idempotency-Key reused until the outcome is known.
+  Future<RefundRequest> requestRefund(
+      String guid, String key, String reason) async {
+    final data = await api.object(
+        'POST', 'bookings/${_id(guid)}/refund-requests',
+        authenticated: true,
+        body: {'reason': reason},
+        headers: {'Idempotency-Key': key});
+    final nested = data['refund_request'];
+    return RefundRequest(nested is Json ? nested : data);
+  }
+
   Future<Json> initiateDemoPayment(String guid, String key) =>
       api.object('POST', 'bookings/${_id(guid)}/demo-payment',
           authenticated: true, body: {}, headers: {'Idempotency-Key': key});
@@ -390,6 +492,21 @@ class BusinessRepository {
           authenticated: true,
           body: {'method_code': 'ewallet', 'channel': channel},
           headers: {'Idempotency-Key': key});
+
+
+  /// Starts a BNI virtual account or QRIS payment. The body is only `method_code` and `channel`:
+  /// amount, currency, provider, environment, status and time fields belong to Laravel.
+  Future<Json> initiatePayment(String guid, String key,
+          {required String methodCode, required String channel}) =>
+      api.object('POST', 'bookings/${_id(guid)}/payment-attempts',
+          authenticated: true,
+          body: {'method_code': methodCode, 'channel': channel},
+          headers: {'Idempotency-Key': key});
+
+  /// Private no-store SVG of the provider QRIS payload for an unfinished attempt (owner only).
+  Future<BinaryResponse> paymentQr(String guid, String attemptGuid) =>
+      api.session.requestBytes(
+          'bookings/${_id(guid)}/payment-attempts/${_id(attemptGuid)}/qr');
 
   /// Asks the server to run its authenticated provider status inquiry for [attemptGuid].
   /// Never proves payment on its own: read the returned snapshot.
@@ -506,7 +623,7 @@ class BusinessRepository {
           'GET', 'bookings/${_id(guid)}/documents',
           authenticated: true));
 
-  /// [type] is `invoice` or `ticket`; returns the PDF issued by the backend.
+  /// [type] is `invoice`, `ticket` or `receipt`; returns the PDF issued by the backend.
   Future<BinaryResponse> downloadDocument(String guid, String type) =>
       api.session.requestBytes('bookings/${_id(guid)}/documents/$type');
 

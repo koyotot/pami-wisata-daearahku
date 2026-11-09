@@ -39,8 +39,22 @@
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
                 <data android:scheme="https" android:host="${appLinkHost}" android:pathPrefix="/payment/return" />
+                <!-- E-ticket email link: https://<host>/tickets/{booking_guid}. The app validates the path strictly
+                     (UUID only) and the server decides ownership; the link carries no token. -->
+                <data android:scheme="https" android:host="${appLinkHost}" android:pathPrefix="/tickets/" />
             </intent-filter>
         </activity>
+        <!-- Payment QR share: read-only content URIs for one cache sub-folder (res/xml/payment_qr_paths.xml).
+             No storage permission is requested; saving uses the system "create document" picker. -->
+        <provider
+            android:name=".PaymentQrFileProvider"
+            android:authorities="${applicationId}.payment_qr"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/payment_qr_paths" />
+        </provider>
         <!-- Don't delete the meta-data below.
              This is used by the Flutter tool to generate GeneratedPluginRegistrant.java -->
         <meta-data
