@@ -30,15 +30,13 @@
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
-            <!-- HTTPS App Link: the e-wallet return page (GET /payment/return) hands the user back here.
-                 The host comes from the APP_LINK_HOST gradle property (see build.gradle.kts). The link is only a
-                 navigation hint; payment state is always re-read from the server. -->
+            <!-- HTTPS App Link. The host comes from the APP_LINK_HOST gradle property (see build.gradle.kts).
+                 The link is only a navigation hint; state is always re-read from the server. -->
             <meta-data android:name="flutter_deeplinking_enabled" android:value="true" />
             <intent-filter android:autoVerify="true">
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
-                <data android:scheme="https" android:host="${appLinkHost}" android:pathPrefix="/payment/return" />
                 <!-- E-ticket email link: https://<host>/tickets/{booking_guid}. The app validates the path strictly
                      (UUID only) and the server decides ownership; the link carries no token. -->
                 <data android:scheme="https" android:host="${appLinkHost}" android:pathPrefix="/tickets/" />

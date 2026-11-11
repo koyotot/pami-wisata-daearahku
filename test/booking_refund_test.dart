@@ -210,7 +210,7 @@ void main() {
       expect(refunded.message, 'Dana telah dikembalikan.');
     });
 
-    test('manual_refunded is a closed, manual refund and says it was not a DOKU refund',
+    test('manual_refunded is a closed, manual refund and says it was not a provider refund',
         () {
       final refund = RefundRequest(refundJson(
           status: 'manual_refunded',
@@ -226,7 +226,7 @@ void main() {
       expect(refund.title, 'Dana Dikembalikan Manual');
       expect(refund.message, contains('Dana dikembalikan manual oleh pengelola'));
       expect(refund.message, contains('bukan pengembalian otomatis'));
-      expect(refund.message, contains('DOKU'));
+      expect(refund.message, contains('penyedia pembayaran'));
       // The server wording is not trusted for this status either: it must not claim an automatic refund.
       expect(refund.message, isNot(contains('melalui DOKU otomatis')));
     });

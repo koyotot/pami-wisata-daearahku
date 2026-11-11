@@ -388,7 +388,7 @@ class FinancialUnavailablePanel extends StatelessWidget {
                       color: AppColors.navy))),
         ]),
         const SizedBox(height: 12),
-        const Text('DOKU belum terhubung',
+        const Text('Gateway pembayaran belum terhubung',
             style: TextStyle(fontSize: 13, color: Color(0xFF526787))),
         const SizedBox(height: 12),
         for (final label in [

@@ -6,18 +6,17 @@ import 'package:wisata_daerahku/core/config/app_config.dart';
 import 'package:wisata_daerahku/data/app_data.dart';
 import 'package:wisata_daerahku/data/business_repository.dart';
 import 'package:wisata_daerahku/widgets/booking_payment_section.dart';
-import 'package:wisata_daerahku/widgets/ewallet_payment_section.dart';
 
 import 'user_support.dart';
 
-/// The server still runs in DEMO mode (or DOKU); the app must not offer the simulator unless a build opts in.
+/// The server runs in DEMO mode (or Midtrans); the app must not offer the simulator unless a build opts in.
 Map<String, dynamic> _snapshot({required bool demo}) => {
       'booking_guid': 'booking-1',
       'intent_guid': null,
       'status': 'not_created',
       'amount': 20000,
       'currency': 'IDR',
-      'provider': demo ? 'demo' : 'doku',
+      'provider': demo ? 'demo' : 'midtrans',
       'environment': demo ? 'demo' : 'sandbox',
       'test_only': true,
       'can_pay': true,
@@ -30,11 +29,11 @@ Map<String, dynamic> _snapshot({required bool demo}) => {
             ]
           : [
               {
-                'code': 'ewallet',
+                'code': 'virtual_account',
                 'available': true,
                 'reason': null,
                 'channels': [
-                  {'channel': 'dana', 'available': true, 'reason': null}
+                  {'channel': 'bca', 'available': true, 'reason': null}
                 ]
               }
             ],
@@ -98,15 +97,16 @@ void main() {
     expect(find.text('Cek Status / Pulihkan Pembayaran'), findsNothing);
     expect(find.text('Pembayaran online belum tersedia saat ini.'),
         findsOneWidget);
-    expect(find.byType(EwalletPaymentSection), findsNothing);
     expect(requests.where((r) => r.url.path.contains('demo-payment')), isEmpty);
     expect(requests.where((r) => r.method == 'POST'), isEmpty);
   });
 
-  testWidgets('a DOKU server still offers the wallet section', (tester) async {
+  testWidgets('a Midtrans server shows real payment status without simulator or wallet',
+      (tester) async {
     final requests = await pumpSection(tester, demoServer: false);
 
-    expect(find.byType(EwalletPaymentSection), findsOneWidget);
+    expect(find.text('Pembayaran online tersedia.'), findsOneWidget);
+    expect(find.textContaining('DANA'), findsNothing);
     expect(find.textContaining('DEMO'), findsNothing);
     expect(requests.where((r) => r.method == 'POST'), isEmpty);
   });

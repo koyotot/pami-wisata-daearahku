@@ -486,12 +486,6 @@ class BusinessRepository {
   Future<Json> initiateDemoPayment(String guid, String key) =>
       api.object('POST', 'bookings/${_id(guid)}/demo-payment',
           authenticated: true, body: {}, headers: {'Idempotency-Key': key});
-  Future<Json> initiateEwalletPayment(
-          String guid, String key, String channel) =>
-      api.object('POST', 'bookings/${_id(guid)}/payment-attempts',
-          authenticated: true,
-          body: {'method_code': 'ewallet', 'channel': channel},
-          headers: {'Idempotency-Key': key});
 
   /// Starts a BNI virtual account or QRIS payment. The body is only `method_code` and `channel`:
   /// amount, currency, provider, environment, status and time fields belong to Laravel.

@@ -25,7 +25,7 @@ android {
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
-        // HTTPS host of the Laravel API that serves /payment/return and /.well-known/assetlinks.json.
+        // HTTPS host of the Laravel API that serves /tickets/{booking} and /.well-known/assetlinks.json.
         // Set ORG_GRADLE_PROJECT_APP_LINK_HOST=api.example.com in the environment (flutter build does not accept -P) or
         // APP_LINK_HOST in android/gradle.properties; the default never matches a real host.
         manifestPlaceholders["appLinkHost"] =

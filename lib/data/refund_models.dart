@@ -6,7 +6,7 @@ const refundReasonMaxLength = 500;
 
 /// One customer refund request as Laravel reports it. Money was returned only for `refunded`
 /// (verified with the payment provider) and `manual_refunded` (transferred by the manager and recorded
-/// with proof, NOT an automatic DOKU refund); [isClosedRefund] covers both.
+/// with proof, NOT an automatic provider refund); [isClosedRefund] covers both.
 class RefundRequest {
   RefundRequest(this.json) {
     if (json['guid'] is! String ||
@@ -84,9 +84,9 @@ class RefundRequest {
   /// Server wording is the primary copy, except when it claims a return for any status other than
   /// `refunded`: the customer must never be told money came back before it did.
   String get message {
-    // Fixed wording: the server text is never allowed to describe a manual refund as a DOKU one.
+    // Fixed wording: the server text is never allowed to describe a manual refund as a provider one.
     if (isManualRefunded) {
-      return 'Dana dikembalikan manual oleh pengelola. Ini bukan pengembalian otomatis melalui DOKU.';
+      return 'Dana dikembalikan manual oleh pengelola. Ini bukan pengembalian otomatis dari penyedia pembayaran.';
     }
     final server = _text('message');
     if (server != null && (isRefunded || !_claimsReturn(server))) return server;

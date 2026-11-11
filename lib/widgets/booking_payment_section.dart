@@ -5,7 +5,6 @@ import '../data/payment_models.dart';
 import '../screens/booking_payment_screen.dart';
 import '../screens/demo_checkout_screen.dart';
 import '../theme/app_colors.dart';
-import 'ewallet_payment_section.dart';
 
 /// Read-only capabilities beside the existing booking detail; one checkout route for all entries.
 class BookingPaymentSection extends StatefulWidget {
@@ -31,8 +30,7 @@ class _BookingPaymentSectionState extends State<BookingPaymentSection>
   bool _loading = false;
   bool _opening = false;
 
-  /// Remembered across reloads so the wallet section is not unmounted while a refresh is running.
-  bool _dokuSeen = false;
+  /// Remembered across reloads so the real-payment view is not swapped out while a refresh is running.
   bool _realSeen = false;
   late final _generation = widget.repository.api.session.sessionGeneration;
   int _request = 0;
@@ -86,7 +84,6 @@ class _BookingPaymentSectionState extends State<BookingPaymentSection>
       setState(() {
         _methods = methods;
         _intent = intent;
-        _dokuSeen = methods.isDoku;
         _realSeen = intent.isRealPayment || methods.isRealPayment;
       });
       widget.onSnapshot?.call(intent);
@@ -147,7 +144,7 @@ class _BookingPaymentSectionState extends State<BookingPaymentSection>
           ? 'Pilih Metode Pembayaran'
           : null;
     }
-    // Legacy wallet attempts keep their own section.
+    // Historical wallet attempts are read-only: no checkout action.
     if (method != 'virtual_account' && method != 'qris') return null;
     if (const ['initiating', 'pending', 'unknown'].contains(status)) {
       return 'Lanjutkan Pembayaran';
@@ -169,16 +166,15 @@ class _BookingPaymentSectionState extends State<BookingPaymentSection>
 
   @override
   Widget build(BuildContext context) {
-    final doku = _dokuSeen;
     final real = _realSeen;
     final demo = !real && AppConfig.demoPaymentEnabled;
-    final dokuReason = _methods?.json['reason'] == null
+    final realReason = _methods?.json['reason'] == null
         ? 'Pembayaran online tersedia.'
         : payChoiceReason(_methods?.json['reason'] as String?);
     // With DEMO off, a server still in demo mode is shown as unavailable, never as a simulator.
     final String? statusText = _error ??
         (real
-            ? dokuReason
+            ? realReason
             : demo
                 ? _methods?.reason
                 : (_methods == null
@@ -203,8 +199,7 @@ class _BookingPaymentSectionState extends State<BookingPaymentSection>
             Text('Attempt terakhir: ${_intent!.attemptStatus}',
                 style: const TextStyle(
                     fontSize: 12, height: 1.5, color: Color(0xFF526787))),
-          // DOKU wallets: a separate, always-mounted section owns start/return/resume (a reload here
-          // must not dispose it mid-refresh). The DEMO controls stay for demo mode.
+          // Real payments open the native checkout. The DEMO controls stay for demo mode.
           if (real) ...[
             if (_checkoutLabel != null)
               Padding(
@@ -215,14 +210,6 @@ class _BookingPaymentSectionState extends State<BookingPaymentSection>
                           ? null
                           : _openCheckout,
                       child: Text(_checkoutLabel!))),
-            if (doku)
-              EwalletPaymentSection(
-                  booking: widget.booking,
-                  repository: widget.repository,
-                  onChanged: () async {
-                    await widget.onReturned();
-                    if (_valid) await _load();
-                  }),
           ] else if (demo) ...[
             ElevatedButton(
                 onPressed: _loading ||

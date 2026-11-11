@@ -49,11 +49,11 @@ class PaymentSnapshot {
           method['available'] == true);
   String get reason => paymentReason(json['reason'] as String?);
 
-  bool get isDoku => json['provider'] == 'doku';
-
   bool get isMidtrans => json['provider'] == 'midtrans';
+
+  /// Midtrans, or a historical DOKU ledger that stays readable (never payable from the app).
   bool get isRealPayment =>
-      (isDoku || isMidtrans) &&
+      (isMidtrans || json['provider'] == 'doku') &&
       ((json['environment'] == 'sandbox' && json['test_only'] == true) ||
           (json['environment'] == 'production' && json['test_only'] == false));
   DateTime? get serverTime => _time(json['server_time']);
@@ -179,40 +179,6 @@ class PaymentSnapshot {
 
   static DateTime? _time(Object? value) =>
       value is String ? DateTime.tryParse(value) : null;
-
-  /// HTTPS wallet URL the server still considers usable for the pending attempt.
-  Uri? get redirectUrl {
-    final instruction = this.instruction;
-    if (instruction?['presentation_type'] != 'ewallet_redirect') return null;
-    final value = instruction?['redirect_url'];
-    final uri = value is String ? Uri.tryParse(value) : null;
-    return uri != null && uri.scheme == 'https' && uri.host.isNotEmpty
-        ? uri
-        : null;
-  }
-
-  /// E-wallet channels the server currently marks payable (`methods[ewallet].channels`).
-  List<String> get availableEwalletChannels {
-    if (!isDoku || json['can_pay'] != true || json['methods'] is! List) {
-      return const [];
-    }
-    for (final method in json['methods'] as List) {
-      if (method is Map &&
-          method['code'] == 'ewallet' &&
-          method['available'] == true &&
-          method['channels'] is List) {
-        return [
-          for (final channel in method['channels'] as List)
-            if (channel is Map &&
-                channel['available'] == true &&
-                channel['channel'] is String &&
-                const ['dana', 'shopeepay'].contains(channel['channel']))
-              channel['channel'] as String
-        ];
-      }
-    }
-    return const [];
-  }
 }
 
 /// One payable BCA/BNI VA / QRIS option as the server reports it.
@@ -270,9 +236,6 @@ String payChoiceReason(String? reason) => switch (reason) {
       'channel_unavailable' ||
       null =>
         'Metode ini belum tersedia saat ini.',
-      'doku_not_configured' ||
-      'doku_disabled' =>
-        'Pembayaran online sedang tidak tersedia.',
       _ => paymentReason(reason),
     };
 
@@ -284,8 +247,6 @@ String switchReasonText(String? reason) => switch (reason) {
     };
 
 String paymentReason(String? reason) => switch (reason) {
-      'doku_not_configured' =>
-        'Pembayaran belum tersedia. Simulator DEMO belum diaktifkan pada server.',
       'booking_not_awaiting_payment' =>
         'Booking ini tidak sedang menunggu pembayaran.',
       'booking_not_payable' => 'Booking ini tidak memerlukan pembayaran DEMO.',
@@ -296,7 +257,6 @@ String paymentReason(String? reason) => switch (reason) {
         'Waktu pembayaran untuk kunjungan ini telah berakhir.',
       'payment_provider_conflict' =>
         'Booking terhubung ke sumber pembayaran lain. Hubungi pengelola.',
-      'doku_disabled' => 'Pembayaran online sedang dinonaktifkan.',
       'payment_needs_review' =>
         'Pembayaran sedang diperiksa pengelola. Tidak perlu membayar ulang.',
       null => 'Pembayaran DEMO tersedia; tidak ada transfer uang nyata.',
