@@ -13,9 +13,11 @@ class BookingPaymentSection extends StatefulWidget {
       {super.key,
       required this.booking,
       required this.repository,
+      this.onSnapshot,
       required this.onReturned});
   final Booking booking;
   final BusinessRepository repository;
+  final ValueChanged<PaymentSnapshot>? onSnapshot;
   final Future<void> Function() onReturned;
   @override
   State<BookingPaymentSection> createState() => _BookingPaymentSectionState();
@@ -31,6 +33,7 @@ class _BookingPaymentSectionState extends State<BookingPaymentSection>
 
   /// Remembered across reloads so the wallet section is not unmounted while a refresh is running.
   bool _dokuSeen = false;
+  bool _realSeen = false;
   late final _generation = widget.repository.api.session.sessionGeneration;
   int _request = 0;
   bool get _valid =>
@@ -84,7 +87,9 @@ class _BookingPaymentSectionState extends State<BookingPaymentSection>
         _methods = methods;
         _intent = intent;
         _dokuSeen = methods.isDoku;
+        _realSeen = intent.isRealPayment || methods.isRealPayment;
       });
+      widget.onSnapshot?.call(intent);
     } catch (e) {
       if (_valid && request == _request) {
         setState(() => _error = paymentError(e));
@@ -110,7 +115,7 @@ class _BookingPaymentSectionState extends State<BookingPaymentSection>
     }
   }
 
-  /// BNI VA / QRIS checkout. Only navigates; nothing is created until the customer taps "Lanjut Bayar".
+  /// BCA/BNI VA / QRIS checkout. Only navigates; nothing is created until the customer taps "Lanjut Bayar".
   Future<void> _openCheckout() async {
     if (_opening || !_valid) return;
     setState(() => _opening = true);
@@ -130,7 +135,7 @@ class _BookingPaymentSectionState extends State<BookingPaymentSection>
   /// Label for the checkout entry, or null when the server offers nothing to do here.
   String? get _checkoutLabel {
     final snapshot = _intent ?? _methods;
-    if (snapshot == null || !snapshot.isDoku) return null;
+    if (snapshot == null || !snapshot.isRealPayment) return null;
     final status = snapshot.attemptStatus;
     final method = snapshot.attemptMethod;
     // Unresolved past its expiry: only a status view, never "pay again".
@@ -165,13 +170,14 @@ class _BookingPaymentSectionState extends State<BookingPaymentSection>
   @override
   Widget build(BuildContext context) {
     final doku = _dokuSeen;
-    final demo = !doku && AppConfig.demoPaymentEnabled;
+    final real = _realSeen;
+    final demo = !real && AppConfig.demoPaymentEnabled;
     final dokuReason = _methods?.json['reason'] == null
         ? 'Pembayaran online tersedia.'
         : payChoiceReason(_methods?.json['reason'] as String?);
     // With DEMO off, a server still in demo mode is shown as unavailable, never as a simulator.
     final String? statusText = _error ??
-        (doku
+        (real
             ? dokuReason
             : demo
                 ? _methods?.reason
@@ -193,13 +199,13 @@ class _BookingPaymentSectionState extends State<BookingPaymentSection>
               style: const TextStyle(
                   fontSize: 12, height: 1.5, color: Color(0xFF526787))),
           const SizedBox(height: 8),
-          if (_intent?.attemptStatus != null && (doku || demo))
+          if (_intent?.attemptStatus != null && (real || demo))
             Text('Attempt terakhir: ${_intent!.attemptStatus}',
                 style: const TextStyle(
                     fontSize: 12, height: 1.5, color: Color(0xFF526787))),
           // DOKU wallets: a separate, always-mounted section owns start/return/resume (a reload here
           // must not dispose it mid-refresh). The DEMO controls stay for demo mode.
-          if (doku) ...[
+          if (real) ...[
             if (_checkoutLabel != null)
               Padding(
                   padding: const EdgeInsets.only(bottom: 8),
@@ -209,13 +215,14 @@ class _BookingPaymentSectionState extends State<BookingPaymentSection>
                           ? null
                           : _openCheckout,
                       child: Text(_checkoutLabel!))),
-            EwalletPaymentSection(
-                booking: widget.booking,
-                repository: widget.repository,
-                onChanged: () async {
-                  await widget.onReturned();
-                  if (_valid) await _load();
-                }),
+            if (doku)
+              EwalletPaymentSection(
+                  booking: widget.booking,
+                  repository: widget.repository,
+                  onChanged: () async {
+                    await widget.onReturned();
+                    if (_valid) await _load();
+                  }),
           ] else if (demo) ...[
             ElevatedButton(
                 onPressed: _loading ||

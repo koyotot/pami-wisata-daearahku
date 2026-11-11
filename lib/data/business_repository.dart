@@ -493,7 +493,6 @@ class BusinessRepository {
           body: {'method_code': 'ewallet', 'channel': channel},
           headers: {'Idempotency-Key': key});
 
-
   /// Starts a BNI virtual account or QRIS payment. The body is only `method_code` and `channel`:
   /// amount, currency, provider, environment, status and time fields belong to Laravel.
   Future<Json> initiatePayment(String guid, String key,
@@ -503,7 +502,7 @@ class BusinessRepository {
           body: {'method_code': methodCode, 'channel': channel},
           headers: {'Idempotency-Key': key});
 
-  /// Private no-store SVG of the provider QRIS payload for an unfinished attempt (owner only).
+  /// Private no-store Midtrans PNG for an unfinished payment attempt (owner only).
   Future<BinaryResponse> paymentQr(String guid, String attemptGuid) =>
       api.session.requestBytes(
           'bookings/${_id(guid)}/payment-attempts/${_id(attemptGuid)}/qr');

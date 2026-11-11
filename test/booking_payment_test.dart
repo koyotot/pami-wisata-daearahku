@@ -21,8 +21,8 @@ import 'package:wisata_daerahku/widgets/booking_ticket_qr_section.dart';
 import 'user_support.dart';
 
 const _operationKey = 'booking_payment_operation_user-1_booking-1';
-final _pngSignature = Uint8List.fromList(
-    [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 1, 2, 3]);
+final _pngSignature = base64Decode(
+    'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aN1cAAAAASUVORK5CYII=');
 const _svg =
     '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10"><rect width="10" height="10" fill="#000"/></svg>';
 
@@ -48,12 +48,13 @@ class FakeV3Server {
   bool canCreate = true;
   bool canPay = true;
   String? switchReason = 'payment_switch_contract_unverified';
+  bool bcaAvailable = true;
   bool bniAvailable = true;
   String? bniReason;
   bool qrisAvailable = true;
   String? qrisReason;
   bool ewalletAvailable = true;
-  late DateTime bookingExpiry = clock().add(const Duration(hours: 2));
+  late DateTime bookingExpiry = clock().add(const Duration(minutes: 15));
   String vaNumber = '8277012345678901';
 
   // Tickets
@@ -70,6 +71,8 @@ class FakeV3Server {
   Completer<void>? refreshBarrier;
   void Function()? onRefresh;
   String createResponseStatus = 'pending';
+  String committedStatus = 'pending';
+  bool? canSwitchOverride;
 
   // Counters.
   int createPosts = 0;
@@ -118,7 +121,7 @@ class FakeV3Server {
     attemptChannel = channel;
     attemptStatus = status;
     intentStatus = 'processing';
-    attemptExpiresAt = clock().add(const Duration(minutes: 30));
+    attemptExpiresAt = bookingExpiry;
     canCreate = false;
   }
 
@@ -129,14 +132,15 @@ class FakeV3Server {
     }
     if (attemptMethod == 'qris') {
       return {
-        'presentation_type': 'qr_payload',
-        'qr_content': '00020101021226670016COM.NOBUBANK.WWW',
+        'presentation_type': 'qr_image',
+        'image_available': true,
+        'image_content_type': 'image/png',
         'copyable': false
       };
     }
     return {
       'presentation_type': 'virtual_account',
-      'bank_code': 'bni',
+      'bank_code': attemptChannel,
       'va_number': vaNumber,
       'copyable': true
     };
@@ -159,11 +163,16 @@ class FakeV3Server {
         },
         {
           'code': 'virtual_account',
-          'available': bniAvailable,
+          'available': bniAvailable || bcaAvailable,
           'presentation_type': 'virtual_account',
           'reason': bniReason,
           'channel': 'bni',
           'channels': [
+            {
+              'channel': 'bca',
+              'available': bcaAvailable,
+              'presentation_type': 'virtual_account'
+            },
             {
               'channel': 'bni',
               'available': bniAvailable,
@@ -208,7 +217,7 @@ class FakeV3Server {
         'applied_attempt_guid': appliedAttemptGuid,
         'receipt_available': receiptAvailable,
         'can_create': canCreate,
-        'can_switch': false,
+        'can_switch': canSwitchOverride ?? (canCreate && attemptStatus != null),
         'switch_reason': switchReason,
         'availability': canPay ? 'available' : 'unavailable',
         'reason': canPay ? null : (bniReason ?? qrisReason),
@@ -217,7 +226,8 @@ class FakeV3Server {
         'currency': 'IDR',
         'payment_status': bookingPaymentStatus,
         'expires_at': bookingExpiry.toUtc().toIso8601String(),
-        'provider': 'doku',
+        'provider': 'midtrans',
+        'server_time': clock().toUtc().toIso8601String(),
         'environment': 'sandbox',
         'test_only': true,
         'intent_guid': intentStatus == 'not_created' ? null : 'intent-1',
@@ -248,6 +258,10 @@ class FakeV3Server {
         'checked_in_count': 0,
         'payment_status': bookingPaymentStatus,
         'ticket_state': ticketState,
+        'admission_state':
+            ticketState == 'available' ? 'active' : 'unavailable',
+        'entitlement': 'paid',
+        'refund_pending': false,
         'tickets': [
           for (var i = 1; i <= 2; i++)
             {
@@ -255,6 +269,8 @@ class FakeV3Server {
               'sequence': i,
               'status': 'not_checked_in',
               'qr_available': ticketQrAvailable,
+              'admission_state':
+                  ticketState == 'available' ? 'active' : 'unavailable',
               'checked_in_at': null
             }
         ],
@@ -297,7 +313,8 @@ class FakeV3Server {
         final body = createBodies.last;
         startAttempt(
             method: body['method_code'] as String,
-            channel: body['channel'] as String);
+            channel: body['channel'] as String,
+            status: committedStatus);
         if (createCommitsThenFails) return jsonResponse({'message': 'x'}, 500);
         return _ok({
           ...intent(),
@@ -313,8 +330,8 @@ class FakeV3Server {
           path.endsWith('/qr')) {
         qrGets++;
         if (qrStatus != 200) return jsonResponse({'message': 'x'}, qrStatus);
-        return http.Response(_svg, 200, headers: {
-          'content-type': 'image/svg+xml',
+        return http.Response.bytes(_pngSignature, 200, headers: {
+          'content-type': 'image/png',
           'cache-control': 'private, no-store'
         });
       }
@@ -368,7 +385,7 @@ class FakeExporter implements PaymentQrExporter {
   bool get supported => isSupported;
   @override
   Future<PaymentQrExportResult> save(Uint8List png,
-      {required String fileName}) async {
+      {required String fileName, required Duration validFor}) async {
     saved.add(png);
     names.add(fileName);
     return nextResult;
@@ -376,7 +393,7 @@ class FakeExporter implements PaymentQrExporter {
 
   @override
   Future<PaymentQrExportResult> share(Uint8List png,
-      {required String fileName}) async {
+      {required String fileName, required Duration validFor}) async {
     shared.add(png);
     names.add(fileName);
     return nextResult;
@@ -397,8 +414,8 @@ void main() {
     FlutterSecureStorage.setMockInitialValues({});
     now = DateTime.utc(2026, 11, 9, 8);
     server = FakeV3Server(() => now);
-    server.readStoredKey = () =>
-        const FlutterSecureStorage().read(key: _operationKey);
+    server.readStoredKey =
+        () => const FlutterSecureStorage().read(key: _operationKey);
     session = await signedInSession(server.handle);
     currentUser = User(
         id: 'user-1',
@@ -419,7 +436,8 @@ void main() {
       {String? bookingNumber}) async {
     final response = await repo.downloadDocument(guid, type);
     documents.add(type);
-    return SavedDocument('/tmp/$type-$bookingNumber.pdf', response.bytes.length);
+    return SavedDocument(
+        '/tmp/$type-$bookingNumber.pdf', response.bytes.length);
   }
 
   BookingPaymentScreen screen({Key? key}) => BookingPaymentScreen(
@@ -429,7 +447,7 @@ void main() {
       exporter: exporter,
       now: () => now,
       jitter: () => 0.5,
-      rasterizer: (svg) async => _pngSignature,
+      elapsed: () => now.difference(DateTime.utc(2026, 11, 9, 8)),
       documentSaver: fakeSaver);
 
   Future<void> pumpScreen(WidgetTester tester,
@@ -511,14 +529,13 @@ void main() {
       server.startAttempt();
       final snapshot = PaymentSnapshot(server.intent());
       expect(snapshot.attemptExpiresAt, server.attemptExpiresAt);
-      expect(snapshot.attemptExpiresAt, isNot(server.bookingExpiry));
+      expect(snapshot.attemptExpiresAt, server.bookingExpiry);
     });
 
-    test('only BNI VA and QRIS are payable choices; wallets are never offered',
-        () {
+    test('BCA BNI and QRIS follow backend capabilities; no wallets', () {
       final snapshot = PaymentSnapshot(server.intent());
       expect(snapshot.payChoices.map((c) => c.key).toList(),
-          ['virtual_account/bni', 'qris/qris']);
+          ['virtual_account/bca', 'virtual_account/bni', 'qris/qris']);
       expect(snapshot.payChoices.every((c) => c.available), isTrue);
 
       server.bniAvailable = false;
@@ -529,7 +546,8 @@ void main() {
       expect(bni.reason, 'provider_expiry_window_unverified');
 
       server.canPay = false;
-      expect(PaymentSnapshot(server.intent()).payChoices.every((c) => c.available),
+      expect(
+          PaymentSnapshot(server.intent()).payChoices.every((c) => c.available),
           isFalse);
     });
   });
@@ -589,9 +607,10 @@ void main() {
       });
       expect(server.createKeys.single, isNotEmpty);
       // The key was already in secure storage when the POST happened, and is cleared once resolved.
-      expect(server.storedKeyAtCreate.single, contains(server.createKeys.single));
-      expect(await const FlutterSecureStorage().read(key: _operationKey),
-          isNull);
+      expect(
+          server.storedKeyAtCreate.single, contains(server.createKeys.single));
+      expect(
+          await const FlutterSecureStorage().read(key: _operationKey), isNull);
       expect(find.byKey(const Key('pay-qr-image')), findsOneWidget);
       // Instruction is shown; the page never offers a second create.
       expect(start(), findsNothing);
@@ -607,7 +626,8 @@ void main() {
       await tester.pump();
       await tester.pump();
       expect(server.createPosts, 1);
-      final stored = await const FlutterSecureStorage().read(key: _operationKey);
+      final stored =
+          await const FlutterSecureStorage().read(key: _operationKey);
       expect(stored, contains(server.createKeys.single));
       await unmount(tester);
 
@@ -642,8 +662,8 @@ void main() {
       await pumpScreen(tester);
       expect(server.createPosts, 1);
       expect(find.byKey(const Key('pay-va-number')), findsOneWidget);
-      expect(await const FlutterSecureStorage().read(key: _operationKey),
-          isNull);
+      expect(
+          await const FlutterSecureStorage().read(key: _operationKey), isNull);
     });
 
     testWidgets('an active attempt blocks switching and explains why',
@@ -662,8 +682,8 @@ void main() {
     testWidgets('VA shows the server number and copies the raw digits',
         (tester) async {
       String? copied;
-      tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
-          SystemChannels.platform, (call) async {
+      tester.binding.defaultBinaryMessenger
+          .setMockMethodCallHandler(SystemChannels.platform, (call) async {
         if (call.method == 'Clipboard.setData') {
           copied = (call.arguments as Map)['text'] as String?;
         }
@@ -689,7 +709,9 @@ void main() {
       await pumpScreen(tester);
       expect(server.qrGets, 1);
       expect(find.byKey(const Key('pay-qr-image')), findsOneWidget);
-      expect(find.bySemanticsLabel(RegExp('QR pembayaran QRIS.*bukan tiket masuk')),
+      expect(
+          find.bySemanticsLabel(
+              RegExp('QR pembayaran QRIS.*bukan tiket masuk')),
           findsOneWidget);
       expect(find.textContaining('Tiket masuk'), findsNothing);
 
@@ -747,20 +769,80 @@ void main() {
     });
   });
 
+  testWidgets('BCA instruction and copy preserve leading zero', (tester) async {
+    server.vaNumber = '00081234001';
+    server.startAttempt(channel: 'bca');
+    String? copied;
+    tester.binding.defaultBinaryMessenger
+        .setMockMethodCallHandler(SystemChannels.platform, (call) async {
+      if (call.method == 'Clipboard.setData') {
+        copied = (call.arguments as Map)['text'] as String;
+      }
+      return null;
+    });
+    await pumpScreen(tester);
+    expect(find.text('Virtual Account Bank BCA'), findsOneWidget);
+    expect(find.textContaining('BCA Virtual Account,'), findsOneWidget);
+    await tap(tester, find.byKey(const Key('pay-va-copy')));
+    expect(copied, '00081234001');
+    tester.binding.defaultBinaryMessenger
+        .setMockMethodCallHandler(SystemChannels.platform, null);
+    await unmount(tester);
+  });
+
+  testWidgets('refund pending never claims returned funds', (tester) async {
+    server.startAttempt(status: 'refund_pending');
+    await pumpScreen(tester);
+    expect(find.text('Pengembalian dana diproses'), findsOneWidget);
+    expect(find.text('Pembayaran dikembalikan'), findsNothing);
+    expect(find.byKey(const Key('pay-view-ticket')), findsNothing);
+    await unmount(tester);
+  });
+
+  testWidgets(
+      'unknown create keeps its key across resume and prevents another charge',
+      (tester) async {
+    server.createResponseStatus = 'unknown';
+    server.committedStatus = 'unknown';
+    await pumpScreen(tester);
+    await tap(tester, choice('virtual_account', 'bca'));
+    await tap(tester, start());
+    await tester.pump();
+    final stored = await const FlutterSecureStorage().read(key: _operationKey);
+    expect(stored, isNotNull);
+    await unmount(tester);
+    await pumpScreen(tester);
+    expect(await const FlutterSecureStorage().read(key: _operationKey), stored);
+    expect(server.createPosts, 1);
+    expect(find.byKey(const Key('pay-retry')), findsNothing);
+    await unmount(tester);
+  });
+
+  testWidgets('terminal attempt cannot retry without backend can_switch',
+      (tester) async {
+    server.startAttempt(status: 'failed');
+    server.canCreate = true;
+    server.canSwitchOverride = false;
+    await pumpScreen(tester);
+    expect(find.byKey(const Key('pay-retry')), findsNothing);
+    expect(server.createPosts, 0);
+    await unmount(tester);
+  });
+
   group('countdown', () {
     testWidgets(
-        'uses last_attempt.expires_at, survives reopen and zero only asks the gate',
+        'caps attempt expiry at booking deadline, survives reopen and zero only asks the gate',
         (tester) async {
       server.startAttempt();
       server.attemptExpiresAt = now.add(const Duration(minutes: 25));
       await pumpScreen(tester);
-      expect(find.text('00:25:00'), findsOneWidget);
+      expect(find.text('00:15:00'), findsOneWidget);
       expect(find.text('02:00:00'), findsNothing);
       await elapse(tester, 60);
-      expect(find.text('00:24:00'), findsOneWidget);
+      expect(find.text('00:14:00'), findsOneWidget);
       await unmount(tester);
       await pumpScreen(tester);
-      expect(find.text('00:24:00'), findsOneWidget);
+      expect(find.text('00:14:00'), findsOneWidget);
 
       await unmount(tester);
       server.attemptExpiresAt = now.add(const Duration(seconds: 5));
@@ -872,12 +954,10 @@ void main() {
       expect(server.totalRequests, greaterThan(covered));
 
       final afterReturn = server.totalRequests;
-      tester.binding
-          .handleAppLifecycleStateChanged(AppLifecycleState.paused);
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
       await elapse(tester, 120);
       expect(server.totalRequests, afterReturn);
-      tester.binding
-          .handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
       await tester.pump();
       await tester.pump();
       expect(server.intentGets, greaterThan(1));
@@ -969,7 +1049,8 @@ void main() {
       expect(find.byKey(const Key('pay-success')), findsNothing);
     });
 
-    testWidgets('retry needs an explicit CTA and a fresh can_create; double tap is safe',
+    testWidgets(
+        'retry needs an explicit CTA and a fresh can_create; double tap is safe',
         (tester) async {
       server.startAttempt(status: 'failed');
       server.intentStatus = 'requires_payment';
@@ -1101,7 +1182,8 @@ void main() {
       expect(find.byKey(const Key('pay-qr-image')), findsNothing);
     });
 
-    testWidgets('payment adjustment after paid replaces success', (tester) async {
+    testWidgets('payment adjustment after paid replaces success',
+        (tester) async {
       server.startAttempt();
       server.settlePaid();
       await pumpScreen(tester);
@@ -1154,8 +1236,7 @@ void main() {
     for (final size in sizes.entries) {
       for (final scale in [1.0, 2.0]) {
         for (final setup in setups.entries) {
-          testWidgets(
-              '${setup.key} fits ${size.key}px at text scale ${scale}x',
+          testWidgets('${setup.key} fits ${size.key}px at text scale ${scale}x',
               (tester) async {
             setup.value(server);
             await pumpScreen(tester, size: size.value, textScale: scale);
@@ -1187,16 +1268,24 @@ void main() {
 
     test('save and share go through the dedicated channel with PNG metadata',
         () async {
-      await mock((call) async => call.method == 'saveImage' ? 'saved' : 'shared');
+      await mock(
+          (call) async => call.method == 'saveImage' ? 'saved' : 'shared');
       final exporter = PlatformPaymentQrExporter(forceAndroid: true);
       expect(exporter.supported, isTrue);
-      expect(await exporter.save(_pngSignature, fileName: 'qris-BK-0001.png'),
+      expect(
+          await exporter.save(_pngSignature,
+              fileName: 'qris-BK-0001.png',
+              validFor: const Duration(minutes: 1)),
           PaymentQrExportResult.saved);
-      expect(await exporter.share(_pngSignature, fileName: 'qris-BK-0001.png'),
+      expect(
+          await exporter.share(_pngSignature,
+              fileName: 'qris-BK-0001.png',
+              validFor: const Duration(minutes: 1)),
           PaymentQrExportResult.shared);
       expect(calls.map((c) => c.method), ['saveImage', 'shareImage']);
       final args = calls.first.arguments as Map;
       expect(args['mimeType'], 'image/png');
+      expect(args['validForMillis'], greaterThan(0));
       expect(args['fileName'], 'qris-BK-0001.png');
       expect(args['bytes'], _pngSignature);
     });
@@ -1204,22 +1293,35 @@ void main() {
     test('platform errors map to truthful results', () async {
       final exporter = PlatformPaymentQrExporter(forceAndroid: true);
       await mock((call) async => 'cancelled');
-      expect(await exporter.save(_pngSignature, fileName: 'a.png'),
+      expect(
+          await exporter.save(_pngSignature,
+              fileName: 'a.png', validFor: const Duration(minutes: 1)),
           PaymentQrExportResult.cancelled);
-      await mock((call) async => throw PlatformException(code: 'PERMISSION_DENIED'));
-      expect(await exporter.save(_pngSignature, fileName: 'a.png'),
+      await mock(
+          (call) async => throw PlatformException(code: 'PERMISSION_DENIED'));
+      expect(
+          await exporter.save(_pngSignature,
+              fileName: 'a.png', validFor: const Duration(minutes: 1)),
           PaymentQrExportResult.denied);
       await mock((call) async => throw PlatformException(code: 'CANCELLED'));
-      expect(await exporter.share(_pngSignature, fileName: 'a.png'),
+      expect(
+          await exporter.share(_pngSignature,
+              fileName: 'a.png', validFor: const Duration(minutes: 1)),
           PaymentQrExportResult.cancelled);
       await mock((call) async => throw PlatformException(code: 'IO_ERROR'));
-      expect(await exporter.share(_pngSignature, fileName: 'a.png'),
+      expect(
+          await exporter.share(_pngSignature,
+              fileName: 'a.png', validFor: const Duration(minutes: 1)),
           PaymentQrExportResult.failed);
       await mock((call) async => throw MissingPluginException());
-      expect(await exporter.save(_pngSignature, fileName: 'a.png'),
+      expect(
+          await exporter.save(_pngSignature,
+              fileName: 'a.png', validFor: const Duration(minutes: 1)),
           PaymentQrExportResult.unavailable);
       await mock((call) async => throw PlatformException(code: 'UNAVAILABLE'));
-      expect(await exporter.share(_pngSignature, fileName: 'a.png'),
+      expect(
+          await exporter.share(_pngSignature,
+              fileName: 'a.png', validFor: const Duration(minutes: 1)),
           PaymentQrExportResult.unavailable);
     });
 
@@ -1227,20 +1329,32 @@ void main() {
       await mock((call) async => 'saved');
       final exporter = PlatformPaymentQrExporter(forceAndroid: false);
       expect(exporter.supported, isFalse);
-      expect(await exporter.save(_pngSignature, fileName: 'a.png'),
+      expect(
+          await exporter.save(_pngSignature,
+              fileName: 'a.png', validFor: const Duration(minutes: 1)),
           PaymentQrExportResult.unavailable);
       expect(calls, isEmpty);
+    });
+
+    test(
+        'expired QR never reaches the native bridge and native expiry is truthful',
+        () async {
+      await mock((call) async => 'expired');
+      final exporter = PlatformPaymentQrExporter(forceAndroid: true);
+      expect(
+          await exporter.save(_pngSignature,
+              fileName: 'a.png', validFor: Duration.zero),
+          PaymentQrExportResult.expired);
+      expect(calls, isEmpty);
+      expect(
+          await exporter.save(_pngSignature,
+              fileName: 'a.png', validFor: const Duration(seconds: 1)),
+          PaymentQrExportResult.expired);
     });
 
     test('file names are sanitised', () {
       expect(paymentQrFileName('BK/0001 ../x'), 'qris-BK_0001_.._x.png');
       expect(paymentQrFileName(''), 'qris-pembayaran.png');
-    });
-
-    testWidgets('SVG from the server rasterises to a PNG', (tester) async {
-      final png = await tester.runAsync(
-          () => rasterizePaymentQr(Uint8List.fromList(utf8.encode(_svg)), size: 64));
-      expect(png!.sublist(0, 8), _pngSignature.sublist(0, 8));
     });
   });
 
@@ -1275,7 +1389,8 @@ void main() {
     });
 
     for (final status in ['pending', 'unknown', 'expired', 'failed']) {
-      testWidgets('state: $status + verification_pending is verifying, never retryable',
+      testWidgets(
+          'state: $status + verification_pending is verifying, never retryable',
           (tester) async {
         pendingVerification(server, status: status);
         final state = BookingPaymentState(repository, 'booking-1',
@@ -1346,7 +1461,8 @@ void main() {
       await unmount(tester);
     });
 
-    testWidgets('screen: escalated keeps the same truthful message and no retry',
+    testWidgets(
+        'screen: escalated keeps the same truthful message and no retry',
         (tester) async {
       pendingVerification(server, escalated: true);
       await pumpScreen(tester);
@@ -1416,7 +1532,8 @@ void main() {
       await tester.pump();
     }
 
-    testWidgets('offers the checkout without creating anything', (tester) async {
+    testWidgets('offers the checkout without creating anything',
+        (tester) async {
       await pumpSection(tester);
       final open = find.byKey(const Key('payment-open-checkout'));
       expect(open, findsOneWidget);

@@ -13,10 +13,11 @@ class AppConfig {
 
   /// The DEMO payment simulator is off unless a build opts in with
   /// `--dart-define=DEMO_PAYMENT_ENABLED=true`. It never replaces real payment methods.
-  static const bool demoPaymentEnabled = bool.fromEnvironment(
+  static const bool _demoPaymentRequested = bool.fromEnvironment(
     'DEMO_PAYMENT_ENABLED',
     defaultValue: false,
   );
+  static bool get demoPaymentEnabled => _demoPaymentRequested && !isProduction;
 
   static bool get isDevelopment => appEnv == 'development' || appEnv == 'local';
 

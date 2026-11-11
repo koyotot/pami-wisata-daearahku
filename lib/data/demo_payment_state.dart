@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:math';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import '../core/config/app_config.dart';
 import '../services/api_client.dart';
 import '../services/auth_session.dart';
 import 'app_data.dart';
@@ -49,6 +50,7 @@ class DemoPaymentState extends ChangeNotifier {
       booking?.paymentEnvironment == 'demo' &&
       booking?.paymentTestOnly == true;
   bool get canPay =>
+      !AppConfig.isProduction &&
       valid &&
       reconciled &&
       methods?.demoAvailable == true &&

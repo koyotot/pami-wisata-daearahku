@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:ui' show FontFeature;
 import 'package:flutter/material.dart';
 import '../theme/app_colors.dart';
 
@@ -10,13 +9,16 @@ class PaymentDeadline extends StatefulWidget {
       required this.expiresAt,
       required this.onElapsed,
       this.label = 'Batas pembayaran',
+      this.serverTime,
       this.now});
   final DateTime? expiresAt;
   final VoidCallback onElapsed;
   final String label;
 
-  /// Injectable clock; defaults to the device clock.
-  final DateTime Function()? now;
+  final DateTime? serverTime;
+
+  /// Authoritative clock, or server timestamp plus monotonic elapsed time. Never falls back to device time.
+  final DateTime? Function()? now;
   @override
   State<PaymentDeadline> createState() => _PaymentDeadlineState();
 }
@@ -25,9 +27,17 @@ class _PaymentDeadlineState extends State<PaymentDeadline>
     with WidgetsBindingObserver {
   Timer? _timer;
   bool _elapsed = false;
-  Duration get _remaining =>
-      widget.expiresAt?.difference((widget.now ?? DateTime.now)()) ??
-      Duration.zero;
+  final Stopwatch _clock = Stopwatch()..start();
+  DateTime? get _now => widget.now != null
+      ? widget.now!()
+      : widget.serverTime?.add(_clock.elapsed);
+  Duration get _remaining {
+    final current = _now;
+    return current != null
+        ? widget.expiresAt?.difference(current) ?? Duration.zero
+        : Duration.zero;
+  }
+
   @override
   void initState() {
     super.initState();
@@ -46,7 +56,10 @@ class _PaymentDeadlineState extends State<PaymentDeadline>
   void _tick() {
     if (!mounted) return;
     setState(() {});
-    if (widget.expiresAt != null && _remaining <= Duration.zero && !_elapsed) {
+    if (_now != null &&
+        widget.expiresAt != null &&
+        _remaining <= Duration.zero &&
+        !_elapsed) {
       _elapsed = true;
       widget.onElapsed();
     }
@@ -56,6 +69,10 @@ class _PaymentDeadlineState extends State<PaymentDeadline>
   void didUpdateWidget(PaymentDeadline oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.expiresAt != widget.expiresAt) _elapsed = false;
+    if (oldWidget.serverTime != widget.serverTime) {
+      _clock.reset();
+      _elapsed = false;
+    }
   }
 
   @override
@@ -92,7 +109,7 @@ class _PaymentDeadlineState extends State<PaymentDeadline>
                   style:
                       const TextStyle(fontSize: 12, color: Color(0xFF80531B))),
               Text(
-                  widget.expiresAt == null
+                  widget.expiresAt == null || _now == null
                       ? 'Belum tersedia'
                       : seconds == 0
                           ? 'Waktu habis · periksa status'

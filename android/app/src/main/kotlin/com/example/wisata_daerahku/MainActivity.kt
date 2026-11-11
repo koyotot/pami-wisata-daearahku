@@ -6,6 +6,7 @@ import android.content.ClipData
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
+import android.os.SystemClock
 import android.util.Log
 import androidx.core.content.FileProvider
 import io.flutter.embedding.android.FlutterActivity
@@ -18,7 +19,7 @@ import java.io.IOException
 class PaymentQrFileProvider : FileProvider()
 
 class MainActivity : FlutterActivity() {
-    private class PendingSave(val bytes: ByteArray, val result: MethodChannel.Result)
+    private class PendingSave(val bytes: ByteArray, val result: MethodChannel.Result, val cutoff: Long)
 
     private var pendingSave: PendingSave? = null
 
@@ -26,11 +27,17 @@ class MainActivity : FlutterActivity() {
         super.configureFlutterEngine(flutterEngine)
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "id.wisatadaerahku.app/payment_qr")
             .setMethodCallHandler { call, result ->
+                val validFor = call.argument<Number>("validForMillis")?.toLong() ?: 0L
+                if (validFor <= 0) {
+                    result.success("expired")
+                    return@setMethodCallHandler
+                }
+                val cutoff = SystemClock.elapsedRealtime() + validFor.coerceAtMost(15 * 60 * 1000L)
                 when (call.method) {
                     "saveImage" -> saveQrImage(call.argument<ByteArray>("bytes"), call.argument<String>("fileName"),
-                        call.argument<String>("mimeType"), result)
+                        call.argument<String>("mimeType"), result, cutoff)
                     "shareImage" -> shareQrImage(call.argument<ByteArray>("bytes"), call.argument<String>("fileName"),
-                        call.argument<String>("mimeType"), result)
+                        call.argument<String>("mimeType"), result, cutoff)
                     else -> result.notImplemented()
                 }
             }
@@ -82,7 +89,7 @@ class MainActivity : FlutterActivity() {
      * Save through the system "create document" picker: the customer chooses the place, so no storage
      * permission is needed. The bytes live in memory only until the picker answers.
      */
-    private fun saveQrImage(bytes: ByteArray?, fileName: String?, mimeType: String?, result: MethodChannel.Result) {
+    private fun saveQrImage(bytes: ByteArray?, fileName: String?, mimeType: String?, result: MethodChannel.Result, cutoff: Long) {
         val name = validQrImage(bytes, fileName, mimeType)
         if (name == null || bytes == null) {
             result.error("INVALID_IMAGE", "Gambar QR tidak valid", null)
@@ -96,7 +103,7 @@ class MainActivity : FlutterActivity() {
             .addCategory(Intent.CATEGORY_OPENABLE)
             .setType("image/png")
             .putExtra(Intent.EXTRA_TITLE, name)
-        pendingSave = PendingSave(bytes, result)
+        pendingSave = PendingSave(bytes, result, cutoff)
         try {
             startActivityForResult(intent, SAVE_QR_REQUEST)
         } catch (error: ActivityNotFoundException) {
@@ -122,6 +129,10 @@ class MainActivity : FlutterActivity() {
             pending.result.success("cancelled")
             return
         }
+        if (SystemClock.elapsedRealtime() >= pending.cutoff) {
+            pending.result.success("expired")
+            return
+        }
         try {
             val stream = contentResolver.openOutputStream(target, "wt") ?: throw IOException("No stream")
             stream.use { it.write(pending.bytes) }
@@ -138,7 +149,7 @@ class MainActivity : FlutterActivity() {
      * Share through a chooser with a read-only content URI from a cache sub-folder. The image is the
      * payment QR only; stale copies are removed on every call.
      */
-    private fun shareQrImage(bytes: ByteArray?, fileName: String?, mimeType: String?, result: MethodChannel.Result) {
+    private fun shareQrImage(bytes: ByteArray?, fileName: String?, mimeType: String?, result: MethodChannel.Result, cutoff: Long) {
         val name = validQrImage(bytes, fileName, mimeType)
         if (name == null || bytes == null) {
             result.error("INVALID_IMAGE", "Gambar QR tidak valid", null)
@@ -157,6 +168,11 @@ class MainActivity : FlutterActivity() {
                 .putExtra(Intent.EXTRA_STREAM, uri)
                 .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
             send.clipData = ClipData.newRawUri("QR pembayaran", uri)
+            if (SystemClock.elapsedRealtime() >= cutoff) {
+                file.delete()
+                result.success("expired")
+                return
+            }
             startActivity(Intent.createChooser(send, "Bagikan QR pembayaran"))
             result.success("shared")
         } catch (error: ActivityNotFoundException) {

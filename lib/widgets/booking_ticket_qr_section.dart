@@ -114,9 +114,9 @@ class _BookingTicketQrSectionState extends State<BookingTicketQrSection>
       _selected = ticket.guid;
       _clearQr();
       _error = null;
-      _loadingQr = ticket.qrAvailable;
+      _loadingQr = ticket.qrAvailable && _data?.admissionAllowed == true;
     });
-    if (!ticket.qrAvailable) return;
+    if (!ticket.qrAvailable || _data?.admissionAllowed != true) return;
     try {
       final image =
           await widget.repository.ticketQr(widget.bookingGuid, ticket.guid);

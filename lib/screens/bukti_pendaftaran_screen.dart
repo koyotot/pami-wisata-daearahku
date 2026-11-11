@@ -14,6 +14,7 @@ import '../data/app_data.dart';
 import '../data/booking_errors.dart';
 import '../data/booking_state.dart';
 import '../data/business_repository.dart';
+import '../data/payment_models.dart';
 import '../services/auth_session.dart';
 import 'auth_presentation.dart';
 import '../widgets/booking_ticket_qr_section.dart';
@@ -156,8 +157,10 @@ String _entryNextStep(EntryTicketsInfo entry) => switch (entry.state) {
       'fully_checked_in' => 'Seluruh tiket masuk sudah check-in.',
       'revoked' => 'Tiket masuk tidak dapat digunakan.',
       'expired' => 'Masa kunjungan telah berakhir.',
-      'awaiting_payment' => 'Tiket masuk tersedia setelah pembayaran terverifikasi.',
-      'awaiting_approval' => 'Tiket masuk tersedia setelah pendaftaran disetujui.',
+      'awaiting_payment' =>
+        'Tiket masuk tersedia setelah pembayaran terverifikasi.',
+      'awaiting_approval' =>
+        'Tiket masuk tersedia setelah pendaftaran disetujui.',
       _ => 'Status tiket masuk sedang diperiksa.',
     };
 
@@ -819,6 +822,7 @@ class _TicketCardState extends State<_TicketCard> {
   bool get _sudahUlasan => _controller?.booking.review != null;
   String? _statusSebelumnya;
   BookingDetailController? _controller;
+  PaymentSnapshot? _paymentSnapshot;
 
   @override
   void initState() {
@@ -985,6 +989,7 @@ class _TicketCardState extends State<_TicketCard> {
               padding: const EdgeInsets.fromLTRB(18, 0, 18, 14),
               child: PaymentDeadline(
                   expiresAt: controller.booking.paymentExpiresAt,
+                  serverTime: _paymentSnapshot?.serverTime,
                   onElapsed: () {
                     controller.refresh();
                     BookingEvents.notify();
@@ -1341,6 +1346,9 @@ class _TicketCardState extends State<_TicketCard> {
         BookingPaymentSection(
             booking: b,
             repository: c.repository,
+            onSnapshot: (snapshot) {
+              if (mounted) setState(() => _paymentSnapshot = snapshot);
+            },
             onReturned: () async {
               await c.refresh();
               await c.loadDocuments();

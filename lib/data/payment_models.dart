@@ -33,7 +33,7 @@ class PaymentSnapshot {
   String? get attemptGuid => lastAttempt?['attempt_guid'] as String?;
   String? get attemptStatus => lastAttempt?['status'] as String?;
 
-  /// The attempt is still unresolved after its 30 minute instruction expired. The customer must not
+  /// The attempt is still unresolved after its absolute payment instruction expired. The customer must not
   /// be told it failed or expired, and must not be offered a new payment.
   bool get verificationPending => lastAttempt?['verification_pending'] == true;
 
@@ -51,6 +51,13 @@ class PaymentSnapshot {
 
   bool get isDoku => json['provider'] == 'doku';
 
+  bool get isMidtrans => json['provider'] == 'midtrans';
+  bool get isRealPayment =>
+      (isDoku || isMidtrans) &&
+      ((json['environment'] == 'sandbox' && json['test_only'] == true) ||
+          (json['environment'] == 'production' && json['test_only'] == false));
+  DateTime? get serverTime => _time(json['server_time']);
+
   /// Latest refund request (`refund_request`), or null when none was made. A malformed object is
   /// an invalid response, never an empty refund.
   RefundRequest? get refundRequest {
@@ -62,6 +69,7 @@ class PaymentSnapshot {
     }
     return RefundRequest(value);
   }
+
   String get bookingStatus => json['booking_status'] as String? ?? '';
   String get paymentStatus => json['payment_status'] as String? ?? 'unverified';
   String? get attemptMethod => lastAttempt?['method'] as String?;
@@ -86,7 +94,7 @@ class PaymentSnapshot {
   bool get canSwitch => json['can_switch'] == true;
   String? get switchReason => _text('switch_reason');
 
-  /// Booking deadline (top level `expires_at` on GET). Not the 30 minute attempt countdown.
+  /// Booking deadline (top level `expires_at` on GET). Every attempt shares this deadline.
   DateTime? get bookingExpiresAt => _time(json['expires_at']);
 
   /// Absolute server time the unfinished attempt stops being payable.
@@ -106,7 +114,13 @@ class PaymentSnapshot {
       instruction?['qr_content'] is String &&
       (instruction!['qr_content'] as String).isNotEmpty;
 
-  /// BNI virtual account and QRIS are the only choices a new payment can use; the server decides
+  bool get hasQrImage =>
+      isMidtrans &&
+      instructionType == 'qr_image' &&
+      instruction?['image_available'] == true &&
+      instruction?['image_content_type'] == 'image/png';
+
+  /// BCA/BNI virtual accounts and QRIS are the only choices a new payment can use; the server decides
   /// availability. Wallets are deliberately absent from this list.
   List<PayChoice> get payChoices {
     final list = json['methods'];
@@ -136,7 +150,7 @@ class PaymentSnapshot {
   }
 
   bool _choiceAvailable(List methods, String code, String channel) =>
-      isDoku &&
+      isRealPayment &&
       json['can_pay'] == true &&
       _family(methods, code)?['available'] == true &&
       _channel(methods, code, channel)?['available'] == true;
@@ -201,7 +215,7 @@ class PaymentSnapshot {
   }
 }
 
-/// One payable BNI VA / QRIS option as the server reports it.
+/// One payable BCA/BNI VA / QRIS option as the server reports it.
 class PayChoice {
   const PayChoice(this.methodCode, this.channel, this.available, this.reason);
   final String methodCode;
@@ -211,6 +225,7 @@ class PayChoice {
 
   /// Order shown to the customer: virtual account first, then QRIS.
   static const supported = [
+    ('virtual_account', 'bca'),
     ('virtual_account', 'bni'),
     ('qris', 'qris'),
   ];
@@ -227,6 +242,7 @@ class PayChoice {
 String paymentMethodLabel(String? method, String? channel) =>
     switch ((method, channel)) {
       ('virtual_account', 'bni') => 'BNI Virtual Account',
+      ('virtual_account', 'bca') => 'BCA Virtual Account',
       ('virtual_account', final bank?) =>
         'Virtual Account ${bank.toUpperCase()}',
       ('qris', _) => 'QRIS',

@@ -21,6 +21,48 @@ Future<void> _tap(WidgetTester tester, Finder finder) async {
 void main() {
   setUpAll(() => GoogleFonts.config.allowRuntimeFetching = false);
 
+  for (final provider in ['doku', 'midtrans', 'mixed', 'demo', 'unknown']) {
+    testWidgets('finance sandbox validates historical provider $provider',
+        (tester) async {
+      final session = await adminSession((request) async {
+        final environment =
+            request.url.queryParameters['environment'] ?? 'demo';
+        return jsonResponse({
+          'data': {
+            'financial': {
+              'environment': environment,
+              'provider': environment == 'demo' ? 'demo' : provider,
+              'test_only': true,
+              'currency': 'IDR',
+              'availability': 'partial',
+              'source': environment == 'demo'
+                  ? 'simulated_demo_events'
+                  : 'verified_sandbox_events',
+              'scope': {'mode': 'global', 'destination_guid': null},
+              'gross_revenue': 12345,
+              'successful_transactions': 2,
+            }
+          }
+        });
+      }, role: 2);
+      await tester.pumpWidget(MaterialApp(
+          home: Scaffold(
+              body: OperationsFinancialScreen(
+                  repository: repositoryFor(session), session: session))));
+      await tester.pumpAndSettle();
+      await _tap(tester, find.text('Sandbox'));
+      final invalid =
+          find.textContaining('Sumber atau scope data keuangan tidak sesuai');
+      expect(
+          invalid,
+          ['doku', 'midtrans', 'mixed'].contains(provider)
+              ? findsNothing
+              : findsOneWidget);
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox.shrink());
+    });
+  }
+
   testWidgets('action center preserves server urgency order and guarded route',
       (tester) async {
     final requests = <http.Request>[];

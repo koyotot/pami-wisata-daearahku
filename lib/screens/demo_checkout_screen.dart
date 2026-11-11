@@ -1,4 +1,3 @@
-import 'dart:ui' show FontFeature;
 import 'package:flutter/material.dart';
 import 'package:phosphor_icons/phosphor_icons.dart';
 import '../data/booking_state.dart';
@@ -295,6 +294,9 @@ class _DemoCheckoutScreenState extends State<DemoCheckoutScreen>
                                           ]),
                                           PaymentDeadline(
                                               expiresAt: b.paymentExpiresAt,
+                                              serverTime:
+                                                  p.intent?.serverTime ??
+                                                      p.methods?.serverTime,
                                               onElapsed: p.recover),
                                           _action(
                                               'Coba Lagi (DEMO)',
@@ -366,6 +368,9 @@ class _DemoCheckoutScreenState extends State<DemoCheckoutScreen>
                                                   ])),
                                           PaymentDeadline(
                                               expiresAt: b.paymentExpiresAt,
+                                              serverTime:
+                                                  p.intent?.serverTime ??
+                                                      p.methods?.serverTime,
                                               onElapsed: p.recover),
                                           const SizedBox(height: 12),
                                           _panel([

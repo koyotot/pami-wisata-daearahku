@@ -1,8 +1,5 @@
-import 'dart:ui' as ui;
-
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_svg/flutter_svg.dart';
 
 enum PaymentQrExportResult {
   /// The file was written where the customer chose.
@@ -12,19 +9,21 @@ enum PaymentQrExportResult {
   shared,
   cancelled,
   denied,
+  expired,
 
   /// This platform (or build) has no save/share bridge.
   unavailable,
   failed,
 }
 
-/// Saves or shares the payment QR as a PNG. It only ever receives pixels rendered from the server's
-/// QR image; it never sees credentials or entry tickets.
+/// Saves or shares the payment QR as a PNG. It only ever receives authentic PNG bytes from Laravel's
+/// QR endpoint; it never sees credentials or entry tickets.
 abstract class PaymentQrExporter {
   bool get supported;
-  Future<PaymentQrExportResult> save(Uint8List png, {required String fileName});
+  Future<PaymentQrExportResult> save(Uint8List png,
+      {required String fileName, required Duration validFor});
   Future<PaymentQrExportResult> share(Uint8List png,
-      {required String fileName});
+      {required String fileName, required Duration validFor});
 }
 
 /// Android bridge: a Storage Access Framework "create document" intent for saving and a
@@ -45,27 +44,30 @@ class PlatformPaymentQrExporter implements PaymentQrExporter {
 
   @override
   Future<PaymentQrExportResult> save(Uint8List png,
-          {required String fileName}) =>
-      _invoke('saveImage', png, fileName);
+          {required String fileName, required Duration validFor}) =>
+      _invoke('saveImage', png, fileName, validFor);
 
   @override
   Future<PaymentQrExportResult> share(Uint8List png,
-          {required String fileName}) =>
-      _invoke('shareImage', png, fileName);
+          {required String fileName, required Duration validFor}) =>
+      _invoke('shareImage', png, fileName, validFor);
 
   Future<PaymentQrExportResult> _invoke(
-      String method, Uint8List png, String fileName) async {
+      String method, Uint8List png, String fileName, Duration validFor) async {
     if (!supported) return PaymentQrExportResult.unavailable;
+    if (validFor.inMilliseconds <= 0) return PaymentQrExportResult.expired;
     try {
       final result = await _channel.invokeMethod<String>(method, {
         'bytes': png,
         'fileName': fileName,
         'mimeType': 'image/png',
+        'validForMillis': validFor.inMilliseconds,
       });
       return switch (result) {
         'saved' => PaymentQrExportResult.saved,
         'shared' => PaymentQrExportResult.shared,
         'cancelled' => PaymentQrExportResult.cancelled,
+        'expired' => PaymentQrExportResult.expired,
         _ => PaymentQrExportResult.failed,
       };
     } on MissingPluginException {
@@ -83,37 +85,9 @@ class PlatformPaymentQrExporter implements PaymentQrExporter {
 
 /// A file name that is safe on every platform and carries no payment data.
 String paymentQrFileName(String bookingNumber) {
-  final label = bookingNumber.trim().replaceAll(RegExp(r'[^A-Za-z0-9_.-]'), '_');
+  final label =
+      bookingNumber.trim().replaceAll(RegExp(r'[^A-Za-z0-9_.-]'), '_');
   return 'qris-${label.isEmpty ? 'pembayaran' : label}.png';
-}
-
-/// Rasterises the server-provided SVG onto an opaque white square with a quiet zone, so the exported
-/// PNG still scans. Plain SVG bytes in, PNG bytes out.
-Future<Uint8List> rasterizePaymentQr(Uint8List svg, {int size = 1024}) async {
-  final info = await vg.loadPicture(SvgBytesLoader(svg), null);
-  try {
-    final quiet = size / 16;
-    final inner = size - quiet * 2;
-    final recorder = ui.PictureRecorder();
-    final canvas = ui.Canvas(recorder);
-    canvas.drawRect(ui.Rect.fromLTWH(0, 0, size.toDouble(), size.toDouble()),
-        ui.Paint()..color = const ui.Color(0xFFFFFFFF));
-    canvas.translate(quiet, quiet);
-    canvas.scale(
-        inner / (info.size.width <= 0 ? 1 : info.size.width),
-        inner / (info.size.height <= 0 ? 1 : info.size.height));
-    canvas.drawPicture(info.picture);
-    final image = await recorder.endRecording().toImage(size, size);
-    try {
-      final data = await image.toByteData(format: ui.ImageByteFormat.png);
-      if (data == null) throw StateError('PNG encoding failed');
-      return data.buffer.asUint8List();
-    } finally {
-      image.dispose();
-    }
-  } finally {
-    info.picture.dispose();
-  }
 }
 
 /// Customer wording for an export result. `shared` only says the share sheet opened.
@@ -121,6 +95,8 @@ String paymentQrExportMessage(PaymentQrExportResult result,
         {required bool saving}) =>
     switch (result) {
       PaymentQrExportResult.saved => 'QR tersimpan.',
+      PaymentQrExportResult.expired =>
+        'Batas pembayaran telah berakhir. QR tidak diekspor.',
       PaymentQrExportResult.shared =>
         'Menu bagikan dibuka. Pilih aplikasi tujuan untuk mengirim QR.',
       PaymentQrExportResult.cancelled => saving

@@ -114,7 +114,10 @@ class _OperationsFinancialState extends State<OperationsFinancialScreen>
       final scope = financial['scope'];
       final unavailable = financial['availability'] == 'unavailable';
       if (financial['environment'] != environment ||
-          financial['provider'] != (environment == 'demo' ? 'demo' : 'doku') ||
+          !(environment == 'demo'
+                  ? const ['demo']
+                  : const ['doku', 'midtrans', 'mixed'])
+              .contains(financial['provider']) ||
           financial['test_only'] != (environment != 'production') ||
           financial['currency'] != 'IDR' ||
           !const ['partial', 'available', 'unavailable']
@@ -441,7 +444,7 @@ class _OperationsFinancialState extends State<OperationsFinancialScreen>
                     SizedBox(height: AppSpacing.sm),
                     Text(
                         'Angka berasal dari simulasi pembayaran DEMO, '
-                        'bukan transaksi uang nyata atau settlement DOKU.',
+                        'bukan transaksi uang nyata atau settlement gateway.',
                         style: TextStyle(
                             fontSize: 12,
                             height: 1.6,

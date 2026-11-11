@@ -29,7 +29,7 @@ enum PaymentPhase {
   /// The booking cannot be paid now (not awaiting payment, window closed, other provider...).
   blocked,
 
-  /// No attempt yet: choose BNI VA or QRIS.
+  /// No attempt yet: choose BCA/BNI VA or QRIS.
   choose,
 
   /// A pending attempt with a usable VA number or QR.
@@ -52,7 +52,7 @@ enum PaymentPhase {
   paid,
 }
 
-/// Payment lifecycle for one booking (BNI virtual account and QRIS).
+/// Payment lifecycle for one booking (BCA/BNI virtual accounts and QRIS).
 ///
 /// Success is never inferred from a redirect, a create response, a QR on screen or a local timer: it
 /// needs the server's booking `confirmed`/`paid`, intent `paid` and the applied attempt to match.
@@ -62,11 +62,13 @@ class BookingPaymentState extends ChangeNotifier with WidgetsBindingObserver {
   BookingPaymentState(this.repository, this.bookingGuid,
       {FlutterSecureStorage? storage,
       DateTime Function()? now,
+      Duration Function()? elapsed,
       double Function()? jitter,
       this.minInterval = const Duration(seconds: 10),
       this.maxInterval = const Duration(seconds: 60)})
       : _storage = storage ?? const FlutterSecureStorage(),
         now = now ?? DateTime.now,
+        _elapsedOverride = elapsed,
         _jitter = jitter ?? Random().nextDouble,
         _generation = repository.api.session.sessionGeneration,
         _userGuid = currentUser?.id {
@@ -79,6 +81,27 @@ class BookingPaymentState extends ChangeNotifier with WidgetsBindingObserver {
   final BusinessRepository repository;
   final String bookingGuid;
   final DateTime Function() now;
+  final Duration Function()? _elapsedOverride;
+  final Stopwatch _clock = Stopwatch()..start();
+  Duration get _elapsed => _elapsedOverride?.call() ?? _clock.elapsed;
+  DateTime? _serverTime;
+  Duration _serverAnchor = Duration.zero;
+  DateTime? get serverNow => _serverTime?.add(_elapsed - _serverAnchor);
+  DateTime? get paymentDeadline {
+    final bookingDeadline = snapshot?.bookingExpiresAt;
+    final attemptDeadline = snapshot?.attemptExpiresAt;
+    if (bookingDeadline == null) return null;
+    return attemptDeadline != null && attemptDeadline.isBefore(bookingDeadline)
+        ? attemptDeadline
+        : bookingDeadline;
+  }
+
+  bool get windowOpen =>
+      _foreground &&
+      _routeVisible &&
+      serverNow != null &&
+      paymentDeadline != null &&
+      serverNow!.isBefore(paymentDeadline!);
   final Duration minInterval;
   final Duration maxInterval;
   final FlutterSecureStorage _storage;
@@ -105,7 +128,7 @@ class BookingPaymentState extends ChangeNotifier with WidgetsBindingObserver {
   String? error;
   String? notice;
 
-  Uint8List? qrSvg;
+  Uint8List? qrPng;
   bool qrLoading = false;
   String? qrError;
 
@@ -128,7 +151,8 @@ class BookingPaymentState extends ChangeNotifier with WidgetsBindingObserver {
 
   // ── Identity and session ───────────────────────────────────
 
-  String get _operationKey => 'booking_payment_operation_${_userGuid}_$bookingGuid';
+  String get _operationKey =>
+      'booking_payment_operation_${_userGuid}_$bookingGuid';
 
   bool get valid =>
       !_disposed &&
@@ -165,8 +189,9 @@ class BookingPaymentState extends ChangeNotifier with WidgetsBindingObserver {
     final b = booking;
     return s != null &&
         b != null &&
-        s.isDoku &&
+        s.isRealPayment &&
         b.status == 'confirmed' &&
+        s.bookingStatus == 'confirmed' &&
         b.paymentStatus == 'paid' &&
         s.paymentStatus == 'paid' &&
         s.intentStatus == 'paid' &&
@@ -179,10 +204,20 @@ class BookingPaymentState extends ChangeNotifier with WidgetsBindingObserver {
 
   bool get instructionUsable {
     final s = snapshot;
-    if (s == null || s.attemptStatus != 'pending') return false;
+    if (s == null ||
+        !s.isRealPayment ||
+        !windowOpen ||
+        s.attemptStatus != 'pending' ||
+        s.intentStatus != 'processing' ||
+        booking?.status != 'awaiting_payment' ||
+        s.bookingStatus != 'awaiting_payment') {
+      return false;
+    }
     return switch (s.attemptMethod) {
-      'virtual_account' => s.vaNumber != null,
-      'qris' => s.hasQrPayload,
+      'virtual_account' => s.vaNumber != null &&
+          s.bankCode == s.attemptChannel &&
+          const ['bca', 'bni'].contains(s.bankCode),
+      'qris' => s.hasQrImage,
       _ => false,
     };
   }
@@ -191,7 +226,9 @@ class BookingPaymentState extends ChangeNotifier with WidgetsBindingObserver {
     final s = snapshot;
     final b = booking;
     if (!loaded || s == null || b == null) {
-      return error != null && !loading ? PaymentPhase.loadFailed : PaymentPhase.loading;
+      return error != null && !loading
+          ? PaymentPhase.loadFailed
+          : PaymentPhase.loading;
     }
     if (confirmed) return PaymentPhase.paid;
     final status = s.attemptStatus;
@@ -200,10 +237,10 @@ class BookingPaymentState extends ChangeNotifier with WidgetsBindingObserver {
       return PaymentPhase.adjusted;
     }
     if (s.intentStatus == 'needs_review') return PaymentPhase.review;
-    // Past its 30 minutes but unresolved: never expired/failed, never retryable, keep watching.
+    // Past its deadline but unresolved: never expired/failed, never retryable, keep watching.
     if (s.verificationPending) return PaymentPhase.verifying;
     if (status == null) {
-      return b.status == 'awaiting_payment' && s.isDoku
+      return b.status == 'awaiting_payment' && s.isRealPayment && windowOpen
           ? PaymentPhase.choose
           : PaymentPhase.blocked;
     }
@@ -233,6 +270,8 @@ class BookingPaymentState extends ChangeNotifier with WidgetsBindingObserver {
       const [PaymentPhase.failed, PaymentPhase.expired, PaymentPhase.cancelled]
           .contains(phase) &&
       snapshot?.canCreate == true &&
+      (snapshot?.isMidtrans != true || snapshot?.canSwitch == true) &&
+      windowOpen &&
       booking?.status == 'awaiting_payment';
 
   bool get chooserVisible =>
@@ -256,6 +295,7 @@ class BookingPaymentState extends ChangeNotifier with WidgetsBindingObserver {
       chooserVisible &&
       choice.available &&
       snapshot?.canCreate == true &&
+      windowOpen &&
       booking?.status == 'awaiting_payment' &&
       (lockedChoiceKey == null || lockedChoiceKey == choice.key);
 
@@ -289,6 +329,9 @@ class BookingPaymentState extends ChangeNotifier with WidgetsBindingObserver {
     } else {
       _foreground = false;
       _cancelPollTimer();
+      _serverTime = null;
+      _clearQr();
+      _notify();
     }
   }
 
@@ -300,6 +343,9 @@ class BookingPaymentState extends ChangeNotifier with WidgetsBindingObserver {
       onResumed();
     } else {
       _cancelPollTimer();
+      _serverTime = null;
+      _clearQr();
+      _notify();
     }
   }
 
@@ -367,8 +413,10 @@ class BookingPaymentState extends ChangeNotifier with WidgetsBindingObserver {
 
   Future<void> _read() async {
     _requireValid();
-    final results = await Future.wait<Object>(
-        [repository.booking(bookingGuid), repository.paymentIntent(bookingGuid)]);
+    final results = await Future.wait<Object>([
+      repository.booking(bookingGuid),
+      repository.paymentIntent(bookingGuid)
+    ]);
     _requireValid();
     final freshBooking = results[0] as Booking;
     final freshSnapshot = results[1] as PaymentSnapshot;
@@ -391,6 +439,8 @@ class BookingPaymentState extends ChangeNotifier with WidgetsBindingObserver {
     final previousAttempt = snapshot?.attemptGuid;
     booking = freshBooking;
     snapshot = fresh;
+    _serverTime = fresh.serverTime;
+    _serverAnchor = _elapsed;
     loaded = true;
     final signature = [
       fresh.attemptGuid,
@@ -432,6 +482,7 @@ class BookingPaymentState extends ChangeNotifier with WidgetsBindingObserver {
     final attempt = snapshot?.attemptGuid;
     if (operation != null &&
         attempt != null &&
+        !const ['unknown', 'initiating'].contains(snapshot?.attemptStatus) &&
         attempt != operation!['base_attempt_guid']) {
       await _storage.delete(key: _operationKey);
       _requireValid();
@@ -497,6 +548,8 @@ class BookingPaymentState extends ChangeNotifier with WidgetsBindingObserver {
           .any((item) => item.key == choice.key && item.available);
       if (!stillAvailable ||
           !fresh.canCreate ||
+          !windowOpen ||
+          (fresh.attemptGuid != null && fresh.isMidtrans && !fresh.canSwitch) ||
           booking?.status != 'awaiting_payment' ||
           !chooserVisible) {
         throw const ApiException(
@@ -516,12 +569,13 @@ class BookingPaymentState extends ChangeNotifier with WidgetsBindingObserver {
             null, 'invalid_response');
       }
       // The POST landed. Whatever the response says, only the next read decides what is shown.
-      _createReason = response['reason'] is String
-          ? response['reason'] as String
-          : null;
-      await _storage.delete(key: _operationKey);
-      _requireValid();
-      operation = null;
+      _createReason =
+          response['reason'] is String ? response['reason'] as String : null;
+      if (!const ['unknown', 'initiating'].contains(response['status'])) {
+        await _storage.delete(key: _operationKey);
+        _requireValid();
+        operation = null;
+      }
       retryOpen = false;
       await _read();
       BookingEvents.notify();
@@ -560,6 +614,8 @@ class BookingPaymentState extends ChangeNotifier with WidgetsBindingObserver {
 
   /// Local timer reached zero: ask for a refresh through the gate. Never marks anything expired.
   void onCountdownElapsed() {
+    _clearQr();
+    _notify();
     if (!valid || !_pollable) return;
     _nextPollAt = now();
     _schedule();
@@ -691,7 +747,7 @@ class BookingPaymentState extends ChangeNotifier with WidgetsBindingObserver {
   // ── QR, tickets, receipt ───────────────────────────────────
 
   void _clearQr() {
-    qrSvg = null;
+    qrPng = null;
     qrLoading = false;
     qrError = null;
     _qrAttempt = null;
@@ -707,22 +763,33 @@ class BookingPaymentState extends ChangeNotifier with WidgetsBindingObserver {
         s?.attemptMethod != 'qris') {
       return;
     }
-    if (_qrAttempt == attempt && (qrSvg != null || qrLoading)) return;
+    if (_qrAttempt == attempt && (qrPng != null || qrLoading)) return;
     _qrAttempt = attempt;
     qrLoading = true;
     qrError = null;
     _notify();
     try {
       final image = await repository.paymentQr(bookingGuid, attempt);
-      if (!valid || _qrAttempt != attempt) return;
-      if (!image.contentType.contains('image/svg+xml') ||
-          image.bytes.isEmpty) {
+      if (!valid ||
+          _qrAttempt != attempt ||
+          phase != PaymentPhase.awaiting ||
+          !windowOpen) {
+        return;
+      }
+      const signature = [137, 80, 78, 71, 13, 10, 26, 10];
+      if (image.contentType.split(';').first.trim().toLowerCase() !=
+              'image/png' ||
+          image.bytes.length < 8 ||
+          image.bytes.length > 1048576 ||
+          !List.generate(8, (i) => image.bytes[i] == signature[i])
+              .every((match) => match)) {
         throw const ApiException('QR tidak valid.', null, 'invalid_response');
       }
-      qrSvg = image.bytes;
+      qrPng = image.bytes;
     } catch (_) {
       if (valid && _qrAttempt == attempt) {
-        qrError = 'QR pembayaran belum dapat dimuat. Periksa koneksi lalu coba lagi.';
+        qrError =
+            'QR pembayaran belum dapat dimuat. Periksa koneksi lalu coba lagi.';
         _qrAttempt = null;
       }
     } finally {
@@ -748,7 +815,8 @@ class BookingPaymentState extends ChangeNotifier with WidgetsBindingObserver {
       final data = await repository.bookingTickets(bookingGuid);
       if (!valid) return;
       if (data.bookingGuid != bookingGuid) {
-        throw const ApiException('Respons tiket tidak cocok.', null, 'invalid_response');
+        throw const ApiException(
+            'Respons tiket tidak cocok.', null, 'invalid_response');
       }
       tickets = data;
     } catch (e) {
@@ -763,7 +831,10 @@ class BookingPaymentState extends ChangeNotifier with WidgetsBindingObserver {
 
   /// Authenticated receipt download; only when the server says the receipt exists.
   Future<SavedDocument?> downloadReceipt(DocumentSaver saver) async {
-    if (!valid || receiptBusy || !confirmed || snapshot?.receiptAvailable != true) {
+    if (!valid ||
+        receiptBusy ||
+        !confirmed ||
+        snapshot?.receiptAvailable != true) {
       return null;
     }
     receiptBusy = true;

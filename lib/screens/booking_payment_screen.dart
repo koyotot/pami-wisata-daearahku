@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
-import 'package:flutter_svg/flutter_svg.dart';
 import 'package:phosphor_icons/phosphor_icons.dart';
 
 import '../data/booking_payment_state.dart';
@@ -16,9 +15,7 @@ import '../widgets/booking_ticket_qr_section.dart';
 import '../widgets/payment_deadline.dart';
 import 'auth_presentation.dart';
 
-typedef PaymentQrRasterizer = Future<Uint8List> Function(Uint8List svg);
-
-/// Native checkout for BNI virtual account and QRIS. Amounts, currency, deadlines and availability all
+/// Native checkout for BCA/BNI virtual accounts and QRIS. Amounts, currency, deadlines and availability all
 /// come from Laravel; this page only sends the chosen method and channel, on an explicit tap.
 class BookingPaymentScreen extends StatefulWidget {
   const BookingPaymentScreen(
@@ -26,17 +23,17 @@ class BookingPaymentScreen extends StatefulWidget {
       required this.bookingGuid,
       required this.repository,
       this.exporter,
-      this.rasterizer,
       this.documentSaver,
       this.now,
+      this.elapsed,
       this.jitter,
       this.storage});
   final String bookingGuid;
   final BusinessRepository repository;
   final PaymentQrExporter? exporter;
-  final PaymentQrRasterizer? rasterizer;
   final DocumentSaver? documentSaver;
   final DateTime Function()? now;
+  final Duration Function()? elapsed;
   final double Function()? jitter;
   final FlutterSecureStorage? storage;
 
@@ -47,7 +44,10 @@ class BookingPaymentScreen extends StatefulWidget {
 class _BookingPaymentScreenState extends State<BookingPaymentScreen> {
   late final BookingPaymentState _payment = BookingPaymentState(
       widget.repository, widget.bookingGuid,
-      storage: widget.storage, now: widget.now, jitter: widget.jitter);
+      storage: widget.storage,
+      now: widget.now,
+      elapsed: widget.elapsed,
+      jitter: widget.jitter);
   late final PaymentQrExporter _exporter =
       widget.exporter ?? PlatformPaymentQrExporter();
   PayChoice? _selected;
@@ -111,24 +111,30 @@ class _BookingPaymentScreenState extends State<BookingPaymentScreen> {
   Future<void> _copyVa(String digits) async {
     await Clipboard.setData(ClipboardData(text: digits));
     if (!mounted) return;
-    setState(() => _feedback = 'Nomor VA disalin. Tempel di aplikasi bank Anda.');
+    setState(
+        () => _feedback = 'Nomor VA disalin. Tempel di aplikasi bank Anda.');
   }
 
   Future<void> _export({required bool save}) async {
-    final svg = _payment.qrSvg;
-    if (svg == null || _exporting) return;
+    final png = _payment.qrPng;
+    if (png == null ||
+        !_payment.windowOpen ||
+        _payment.phase != PaymentPhase.awaiting ||
+        _exporting) {
+      return;
+    }
     setState(() {
       _exporting = true;
       _feedback = null;
     });
     PaymentQrExportResult result;
     try {
-      final png = await (widget.rasterizer ?? rasterizePaymentQr)(svg);
-      final name =
-          paymentQrFileName(_payment.booking?.bookingNumber ?? '');
+      final validFor =
+          _payment.paymentDeadline!.difference(_payment.serverNow!);
+      final name = paymentQrFileName(_payment.booking?.bookingNumber ?? '');
       result = save
-          ? await _exporter.save(png, fileName: name)
-          : await _exporter.share(png, fileName: name);
+          ? await _exporter.save(png, fileName: name, validFor: validFor)
+          : await _exporter.share(png, fileName: name, validFor: validFor);
     } catch (_) {
       result = PaymentQrExportResult.failed;
     }
@@ -200,9 +206,8 @@ class _BookingPaymentScreenState extends State<BookingPaymentScreen> {
               fontWeight: FontWeight.w800,
               color: AppColors.navy)));
 
-  Widget _body(String text, {Color color = AppColors.textSecondary}) => Text(
-      text,
-      style: TextStyle(fontSize: 13, height: 1.5, color: color));
+  Widget _body(String text, {Color color = AppColors.textSecondary}) =>
+      Text(text, style: TextStyle(fontSize: 13, height: 1.5, color: color));
 
   Widget _button(String text, VoidCallback? onPressed,
           {Key? key, bool primary = true, IconData? icon}) =>
@@ -216,8 +221,8 @@ class _BookingPaymentScreenState extends State<BookingPaymentScreen> {
                   : OutlinedButton(
                       key: key,
                       style: OutlinedButton.styleFrom(
-                          minimumSize: const Size.fromHeight(
-                              kMinInteractiveDimension),
+                          minimumSize:
+                              const Size.fromHeight(kMinInteractiveDimension),
                           shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(16))),
                       onPressed: onPressed,
@@ -241,7 +246,9 @@ class _BookingPaymentScreenState extends State<BookingPaymentScreen> {
         Text(title,
             textAlign: TextAlign.center,
             style: const TextStyle(
-                fontSize: 18, fontWeight: FontWeight.w800, color: AppColors.navy)),
+                fontSize: 18,
+                fontWeight: FontWeight.w800,
+                color: AppColors.navy)),
         const SizedBox(height: AppSpacing.sm),
         Text(text,
             textAlign: TextAlign.center,
@@ -274,13 +281,16 @@ class _BookingPaymentScreenState extends State<BookingPaymentScreen> {
     return _panel([
       Text(b.destinationName,
           style: const TextStyle(
-              fontSize: 16, fontWeight: FontWeight.w800, color: AppColors.navy)),
+              fontSize: 16,
+              fontWeight: FontWeight.w800,
+              color: AppColors.navy)),
       const SizedBox(height: AppSpacing.sm),
       _line('Nomor booking', s.bookingNumber ?? b.bookingNumber),
       if (s.invoiceNumber != null) _line('Nomor invoice', s.invoiceNumber!),
       _line('Tanggal kunjungan', formatLongDate(b.visitDate)),
       if (s.quantity != null && s.unitPrice != null)
-        _line('Tiket', '${s.quantity} × ${formatMoney(s.unitPrice!, currency)}'),
+        _line(
+            'Tiket', '${s.quantity} × ${formatMoney(s.unitPrice!, currency)}'),
       if (s.subtotal != null)
         _line('Subtotal', formatMoney(s.subtotal!, currency)),
       if ((s.serviceFee ?? 0) > 0)
@@ -297,8 +307,9 @@ class _BookingPaymentScreenState extends State<BookingPaymentScreen> {
       child: PaymentDeadline(
           key: const Key('pay-countdown'),
           label: 'Batas waktu pembayaran',
-          expiresAt: _payment.snapshot?.attemptExpiresAt,
-          now: _payment.now,
+          expiresAt:
+              _payment.serverNow == null ? null : _payment.paymentDeadline,
+          now: () => _payment.serverNow,
           onElapsed: _payment.onCountdownElapsed));
 
   Widget _chooser() {
@@ -320,8 +331,7 @@ class _BookingPaymentScreenState extends State<BookingPaymentScreen> {
             padding: const EdgeInsets.only(top: AppSpacing.sm),
             child: _body(
                 'Belum ada metode yang dapat dipakai. Tidak ada tagihan dibuat.')),
-      _button(
-          p.creating ? 'Membuat instruksi pembayaran…' : 'Lanjut Bayar',
+      _button(p.creating ? 'Membuat instruksi pembayaran…' : 'Lanjut Bayar',
           selected != null && p.canStartWith(selected) ? _start : null,
           key: const Key('pay-start')),
     ]);
@@ -349,9 +359,12 @@ class _BookingPaymentScreenState extends State<BookingPaymentScreen> {
                         color: isSelected ? AppColors.blue : AppColors.border,
                         width: isSelected ? 2 : 1)),
                 child: InkWell(
-                    key: Key('pay-choice-${choice.methodCode}-${choice.channel}'),
+                    key: Key(
+                        'pay-choice-${choice.methodCode}-${choice.channel}'),
                     borderRadius: BorderRadius.circular(14),
-                    onTap: canPick ? () => setState(() => _selected = choice) : null,
+                    onTap: canPick
+                        ? () => setState(() => _selected = choice)
+                        : null,
                     child: ConstrainedBox(
                         constraints: const BoxConstraints(
                             minHeight: kMinInteractiveDimension),
@@ -394,8 +407,8 @@ class _BookingPaymentScreenState extends State<BookingPaymentScreen> {
                                               style: const TextStyle(
                                                   fontSize: 12,
                                                   height: 1.5,
-                                                  color: AppColors
-                                                      .warningText)),
+                                                  color:
+                                                      AppColors.warningText)),
                                           const SizedBox(height: AppSpacing.xs),
                                           Text('Kode alasan: ${choice.reason}',
                                               style: const TextStyle(
@@ -414,13 +427,13 @@ class _BookingPaymentScreenState extends State<BookingPaymentScreen> {
     ].join(' ');
   }
 
-  Widget _steps(List<String> steps) => Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
+  Widget _steps(List<String> steps) =>
+      Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         for (var i = 0; i < steps.length; i++)
           Padding(
               padding: const EdgeInsets.only(bottom: AppSpacing.sm),
-              child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              child:
+                  Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
                 SizedBox(
                     width: AppSpacing.xl,
                     child: Text('${i + 1}.',
@@ -451,11 +464,12 @@ class _BookingPaymentScreenState extends State<BookingPaymentScreen> {
 
   Widget _vaPanel(PaymentSnapshot s, String? amount) {
     final digits = s.vaNumber!;
+    final bank = s.bankCode!.toUpperCase();
     final grouped = _groupDigits(digits);
     return _panel([
-      _heading('Virtual Account Bank BNI'),
+      _heading('Virtual Account Bank $bank'),
       Semantics(
-          label: 'Nomor virtual account BNI ${digits.split('').join(' ')}',
+          label: 'Nomor virtual account $bank ${digits.split('').join(' ')}',
           excludeSemantics: true,
           child: Text(grouped,
               key: const Key('pay-va-number'),
@@ -478,9 +492,11 @@ class _BookingPaymentScreenState extends State<BookingPaymentScreen> {
       ],
       const SizedBox(height: AppSpacing.md),
       _heading('Cara membayar'),
-      _steps(const [
-        'Buka m-banking, internet banking, atau ATM BNI.',
-        'Pilih menu Virtual Account atau transfer, lalu masukkan nomor di atas.',
+      _steps([
+        'Buka m-banking, internet banking, atau ATM $bank.',
+        bank == 'BCA'
+            ? 'Pilih BCA Virtual Account, lalu masukkan nomor di atas.'
+            : 'Pilih Virtual Account Billing, lalu masukkan nomor di atas.',
         'Periksa nama dan nominal, lalu konfirmasi pembayaran.',
       ]),
       _body(
@@ -490,7 +506,7 @@ class _BookingPaymentScreenState extends State<BookingPaymentScreen> {
 
   Widget _qrisPanel(String? amount) {
     final p = _payment;
-    final svg = p.qrSvg;
+    final png = p.qrPng;
     return _panel([
       _heading('QR Pembayaran QRIS'),
       _body('Kode ini hanya untuk membayar, bukan tiket masuk.'),
@@ -500,7 +516,7 @@ class _BookingPaymentScreenState extends State<BookingPaymentScreen> {
             child: Padding(
                 padding: EdgeInsets.all(AppSpacing.xl),
                 child: CircularProgressIndicator()))
-      else if (svg != null)
+      else if (png != null && p.windowOpen)
         Center(
             child: Semantics(
                 image: true,
@@ -513,7 +529,7 @@ class _BookingPaymentScreenState extends State<BookingPaymentScreen> {
                         constraints: const BoxConstraints(maxWidth: 280),
                         child: AspectRatio(
                             aspectRatio: 1,
-                            child: SvgPicture.memory(svg,
+                            child: Image.memory(png,
                                 key: const Key('pay-qr-image'),
                                 excludeFromSemantics: true,
                                 errorBuilder: (_, __, ___) => const Center(
@@ -528,7 +544,7 @@ class _BookingPaymentScreenState extends State<BookingPaymentScreen> {
         const SizedBox(height: AppSpacing.md),
         _body('Nominal tetap $amount.'),
       ],
-      if (svg != null) ...[
+      if (png != null && p.windowOpen) ...[
         if (_exporter.supported) ...[
           _button('Simpan QR', _exporting ? null : () => _export(save: true),
               key: const Key('pay-qr-save'),
@@ -595,8 +611,10 @@ class _BookingPaymentScreenState extends State<BookingPaymentScreen> {
     const key = Key('pay-inline-state');
     switch (phase) {
       case PaymentPhase.verifying when s.verificationPending:
-        return _statePanel(PhosphorIconsRegular.hourglassHigh,
-            'Pembayaran sedang diverifikasi', verificationPendingMessage,
+        return _statePanel(
+            PhosphorIconsRegular.hourglassHigh,
+            'Pembayaran sedang diverifikasi',
+            verificationPendingMessage,
             AppColors.blueDeep,
             key: key);
       case PaymentPhase.verifying:
@@ -652,11 +670,17 @@ class _BookingPaymentScreenState extends State<BookingPaymentScreen> {
             key: key,
             actions: retry);
       case PaymentPhase.adjusted:
-        final refunded = status == 'refunded' || status == 'refund_pending';
+        final refunded = status == 'refunded';
         return _statePanel(
             PhosphorIconsRegular.arrowsClockwise,
-            refunded ? 'Pembayaran dikembalikan' : 'Pembayaran dibatalkan penyedia',
-            'Status pembayaran berubah setelah dilaporkan lunas, jadi booking ini tidak lagi tercatat sebagai lunas. Hubungi pengelola bila ada pertanyaan; tiket yang belum dipakai dapat dicabut.',
+            status == 'refund_pending'
+                ? 'Pengembalian dana diproses'
+                : (refunded
+                    ? 'Pembayaran dikembalikan'
+                    : 'Pembayaran dibatalkan penyedia'),
+            status == 'refund_pending'
+                ? 'Dana belum dinyatakan kembali. Hak masuk ditahan sementara sampai proses selesai.'
+                : 'Status pembayaran berubah setelah dilaporkan lunas. Periksa status tiket atau hubungi pengelola.',
             AppColors.warningText,
             key: key);
       default:
@@ -699,12 +723,13 @@ class _BookingPaymentScreenState extends State<BookingPaymentScreen> {
               : 'Status tiket masuk belum diperiksa.');
     } else {
       final list = data.tickets;
-      qrReady = data.state != 'scheduled' &&
+      qrReady = data.admissionAllowed &&
+          data.state != 'scheduled' &&
           list.any((t) => t.qrAvailable || t.checkedIn);
       text = switch (data.state) {
         'scheduled' =>
           'QR tiket masuk per pengunjung tersedia mulai ${formatLongDate(data.availableFrom)} (${data.timezone}).',
-        'available' when !qrReady =>
+        'available' when data.admissionAllowed && !qrReady =>
           'Tiket sedang diterbitkan. QR per pengunjung akan muncul di sini begitu siap.',
         _ => data.message,
       };
@@ -755,8 +780,11 @@ class _BookingPaymentScreenState extends State<BookingPaymentScreen> {
             _line('Jumlah tiket', '${s.quantity ?? b.quantity}'),
             _line('Metode',
                 paymentMethodLabel(s.attemptMethod, s.attemptChannel)),
-            _line('Total dibayar',
-                total == null ? 'Belum tersedia' : formatMoney(total, currency)),
+            _line(
+                'Total dibayar',
+                total == null
+                    ? 'Belum tersedia'
+                    : formatMoney(total, currency)),
             _line('Waktu bayar', _paidAtLabel()),
           ]),
           _ticketStatus(),
@@ -764,8 +792,7 @@ class _BookingPaymentScreenState extends State<BookingPaymentScreen> {
           if (!s.receiptAvailable)
             _body('Bukti pembayaran sedang disiapkan.',
                 color: AppColors.textMuted),
-          _button(
-              p.receiptBusy ? 'Mengunduh…' : 'Unduh Bukti Pembayaran',
+          _button(p.receiptBusy ? 'Mengunduh…' : 'Unduh Bukti Pembayaran',
               s.receiptAvailable && !p.receiptBusy ? _downloadReceipt : null,
               key: const Key('pay-receipt')),
           BookingRefundSection(
@@ -799,8 +826,8 @@ class _BookingPaymentScreenState extends State<BookingPaymentScreen> {
                             children: [
                               _header(context, phase),
                               Padding(
-                                  padding: const EdgeInsets.fromLTRB(
-                                      20, AppSpacing.lg + 2, 20, AppSpacing.xl + 4),
+                                  padding: const EdgeInsets.fromLTRB(20,
+                                      AppSpacing.lg + 2, 20, AppSpacing.xl + 4),
                                   child: _content(phase)),
                             ]))))));
   }
@@ -809,33 +836,40 @@ class _BookingPaymentScreenState extends State<BookingPaymentScreen> {
       TimeBasedScenicBackground(
           active: true,
           child: Padding(
-              padding: EdgeInsets.fromLTRB(AppSpacing.md,
-                  MediaQuery.paddingOf(context).top + AppSpacing.sm, 20, AppSpacing.xl),
-              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                const Row(children: [
-                  BackButton(color: Colors.white),
-                  Expanded(
-                      child: Text('WISATA DAERAHKU',
-                          style: TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w800,
-                              color: Colors.white)))
-                ]),
-                Padding(
-                    padding:
-                        const EdgeInsets.only(left: AppSpacing.sm, top: AppSpacing.lg),
-                    child: Semantics(
-                        header: true,
-                        child: Text(_title(phase),
-                            style: const TextStyle(
-                                fontSize: 24,
-                                fontWeight: FontWeight.w800,
-                                color: Colors.white)))),
-                const Padding(
-                    padding: EdgeInsets.only(left: AppSpacing.sm, top: 6),
-                    child: Text('Status pembayaran dikonfirmasi oleh server',
-                        style: TextStyle(fontSize: 12, color: Colors.white))),
-              ])));
+              padding: EdgeInsets.fromLTRB(
+                  AppSpacing.md,
+                  MediaQuery.paddingOf(context).top + AppSpacing.sm,
+                  20,
+                  AppSpacing.xl),
+              child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Row(children: [
+                      BackButton(color: Colors.white),
+                      Expanded(
+                          child: Text('WISATA DAERAHKU',
+                              style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w800,
+                                  color: Colors.white)))
+                    ]),
+                    Padding(
+                        padding: const EdgeInsets.only(
+                            left: AppSpacing.sm, top: AppSpacing.lg),
+                        child: Semantics(
+                            header: true,
+                            child: Text(_title(phase),
+                                style: const TextStyle(
+                                    fontSize: 24,
+                                    fontWeight: FontWeight.w800,
+                                    color: Colors.white)))),
+                    const Padding(
+                        padding: EdgeInsets.only(left: AppSpacing.sm, top: 6),
+                        child: Text(
+                            'Status pembayaran dikonfirmasi oleh server',
+                            style:
+                                TextStyle(fontSize: 12, color: Colors.white))),
+                  ])));
 
   Widget _content(PaymentPhase phase) {
     final p = _payment;
@@ -870,14 +904,15 @@ class _BookingPaymentScreenState extends State<BookingPaymentScreen> {
     return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
       if (p.busy && p.creating) const LinearProgressIndicator(),
       if (p.error != null)
-        _live(p.error!, key: const Key('pay-error'), color: const Color(0xFF9C493D)),
+        _live(p.error!,
+            key: const Key('pay-error'), color: const Color(0xFF9C493D)),
       _summary(),
       if (phase == PaymentPhase.verifying &&
           s.attemptExpiresAt != null &&
           !s.verificationPending &&
           s.attemptStatus != 'paid')
         _countdown(),
-      if (p.chooserVisible) _chooser(),
+      if (p.chooserVisible) ...[_countdown(), _chooser()],
       if (phase == PaymentPhase.awaiting)
         _instruction()
       else if (!p.chooserVisible)
