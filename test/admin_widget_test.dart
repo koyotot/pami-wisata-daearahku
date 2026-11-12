@@ -224,7 +224,7 @@ void main() {
             session: session)));
     await tester.pumpAndSettle();
 
-    expect(find.text('2026-12-01'), findsOneWidget);
+    expect(find.text('1 Des 2026'), findsOneWidget);
     expect(find.text('20'), findsOneWidget);
     expect(find.text('7'), findsOneWidget);
     expect(find.text('13'), findsOneWidget);

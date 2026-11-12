@@ -185,7 +185,6 @@ class _KelolaAdminScreenState extends State<KelolaAdminScreen> {
     final items = _list.items;
     final allowed = canManageAdmins(_session.role);
     return AdminPage(
-      badge: 'AKUN ADMINISTRATOR',
       title: 'Kelola Admin',
       subtitle: allowed
           ? '${_list.total ?? items.length} akun'

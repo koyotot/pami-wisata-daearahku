@@ -6,7 +6,8 @@ import '../../services/auth_session.dart';
 import '../../services/api_client.dart';
 import 'admin_common.dart';
 import 'operations_booking_screen.dart';
-import 'operations_dashboard/operations_dashboard.dart' show OperationsPage, showOperationsFilters;
+import 'operations_dashboard/operations_dashboard.dart'
+    show OperationsPage, showOperationsFilters;
 import '../../theme/app_colors.dart';
 import '../../widgets/operations_chrome.dart';
 
@@ -268,7 +269,6 @@ class _DaftarPendaftarScreenState extends State<DaftarPendaftarScreen> {
                           onTap: () => _open(booking)))),
           ]);
     return AdminPage(
-        badge: 'DATA PENGUNJUNG',
         title: 'Data Pendaftar',
         subtitle: 'Riwayat booking dari Laravel',
         onRefresh: _load,

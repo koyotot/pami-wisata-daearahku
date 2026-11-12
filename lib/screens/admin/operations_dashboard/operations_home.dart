@@ -151,30 +151,11 @@ class _AdminAssignmentSummary extends StatelessWidget {
     return _DashboardCard(
         child:
             Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-      Wrap(
-          alignment: WrapAlignment.spaceBetween,
-          crossAxisAlignment: WrapCrossAlignment.center,
-          spacing: AppSpacing.sm,
-          runSpacing: AppSpacing.sm,
-          children: [
-            const Text('LINGKUP PENUGASAN',
-                style: TextStyle(
-                    fontSize: 11,
-                    letterSpacing: 1,
-                    fontWeight: FontWeight.w700,
-                    color: AppColors.textSecondary)),
-            Container(
-                padding: const EdgeInsets.symmetric(
-                    horizontal: AppSpacing.sm, vertical: AppSpacing.xs),
-                decoration: BoxDecoration(
-                    color: AppColors.blueTint,
-                    borderRadius: BorderRadius.circular(12)),
-                child: const Text('ADMIN ROLE 1',
-                    style: TextStyle(
-                        fontSize: 10,
-                        fontWeight: FontWeight.w700,
-                        color: AppColors.blueDeep))),
-          ]),
+      const Text('Lingkup penugasan',
+          style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+              color: AppColors.textSecondary)),
       const SizedBox(height: AppSpacing.md),
       Text.rich(TextSpan(children: [
         TextSpan(
@@ -196,22 +177,6 @@ class _AdminAssignmentSummary extends StatelessWidget {
           '$names · periode ${operationsPeriodLabel(data.period.map((k, v) => MapEntry(k, '$v')), includeYear: true)}',
           style: const TextStyle(
               fontSize: 12, height: 1.5, color: AppColors.textSecondary)),
-      const Padding(
-          padding: EdgeInsets.symmetric(vertical: AppSpacing.sm),
-          child: Divider(color: AppColors.border)),
-      Wrap(
-          alignment: WrapAlignment.spaceBetween,
-          spacing: AppSpacing.sm,
-          runSpacing: AppSpacing.xs,
-          children: [
-            const Text('Keputusan berhasil',
-                style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
-            Text('${_value(data.metrics['approved_decisions'])} disetujui',
-                style: const TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w700,
-                    color: AppColors.navy)),
-          ]),
     ]));
   }
 }

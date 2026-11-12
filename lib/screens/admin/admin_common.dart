@@ -4,9 +4,9 @@
 // existing admin pages): page shell, filter chips, status views, dialogs.
 // ============================================================
 import 'package:flutter/material.dart';
-import 'package:phosphor_icons/phosphor_icons.dart';
 import '../../services/auth_session.dart';
 import '../../widgets/operations_chrome.dart';
+import '../../widgets/scroll_aware_status_bar.dart';
 
 class AdminColors {
   static const blue = Color(0xFF1976D2);
@@ -28,7 +28,6 @@ class AdminColors {
 /// Gradient header + scrolling body, matching the other admin pages.
 class AdminPage extends StatelessWidget {
   final int? role;
-  final String badge;
   final String title;
   final String subtitle;
   final List<Widget> slivers;
@@ -39,7 +38,6 @@ class AdminPage extends StatelessWidget {
   const AdminPage({
     super.key,
     this.role,
-    required this.badge,
     required this.title,
     required this.subtitle,
     required this.slivers,
@@ -51,162 +49,41 @@ class AdminPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final currentRole = role ?? AuthSession.instance.role;
+    void back() => Navigator.maybePop(context);
     return OperationsTheme(
         role: currentRole,
-        child: Scaffold(
-          backgroundColor: AdminColors.bg,
-          floatingActionButton: floatingActionButton,
-          body: RefreshIndicator(
-            onRefresh: onRefresh ?? () async {},
-            child: CustomScrollView(
-              physics: const BouncingScrollPhysics(
-                  parent: AlwaysScrollableScrollPhysics()),
-              slivers: [
-                if (currentRole == 1)
+        child: ScrollAwareStatusBar(
+          builder: (context, headerKey) => Scaffold(
+            backgroundColor: AdminColors.bg,
+            floatingActionButton: floatingActionButton,
+            body: RefreshIndicator(
+              onRefresh: onRefresh ?? () async {},
+              child: CustomScrollView(
+                physics: const BouncingScrollPhysics(
+                    parent: AlwaysScrollableScrollPhysics()),
+                slivers: [
                   SliverToBoxAdapter(
-                      child: OperationsScenicHeader(
-                          title: title,
-                          subtitle: subtitle,
-                          onBack: () => Navigator.maybePop(context),
-                          actions: actions ?? const []))
-                else
-                  SliverAppBar(
-                    expandedHeight: 210,
-                    floating: false,
-                    pinned: true,
-                    snap: false,
-                    backgroundColor: AdminColors.blueDeep,
-                    elevation: 0,
-                    leading: GestureDetector(
-                      onTap: () => Navigator.maybePop(context),
-                      child: Container(
-                        margin: const EdgeInsets.all(10),
-                        decoration: BoxDecoration(
-                          color: Colors.white.withValues(alpha: 0.22),
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(
-                              color: Colors.white.withValues(alpha: 0.35)),
-                        ),
-                        child: const Icon(PhosphorIconsRegular.caretLeft,
-                            size: 16, color: Colors.white),
-                      ),
-                    ),
-                    actions: actions,
-                    flexibleSpace: FlexibleSpaceBar(
-                      collapseMode: CollapseMode.parallax,
-                      background: Container(
-                        decoration: const BoxDecoration(
-                          gradient: LinearGradient(
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                            colors: [
-                              Color(0xFF2A93F0),
-                              Color(0xFF1976D2),
-                              Color(0xFF1558B0)
-                            ],
-                            stops: [0.0, 0.5, 1.0],
-                          ),
-                        ),
-                        child: Stack(
-                          children: [
-                            Positioned(
-                              left: 20,
-                              right: 20,
-                              bottom: 46,
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(
-                                        horizontal: 10, vertical: 5),
-                                    decoration: BoxDecoration(
-                                      color:
-                                          Colors.white.withValues(alpha: 0.16),
-                                      borderRadius: BorderRadius.circular(20),
-                                      border: Border.all(
-                                          color: Colors.white
-                                              .withValues(alpha: 0.28)),
-                                    ),
-                                    child: Row(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        Container(
-                                          width: 6,
-                                          height: 6,
-                                          decoration: const BoxDecoration(
-                                            color: AdminColors.orange,
-                                            shape: BoxShape.circle,
-                                          ),
-                                        ),
-                                        const SizedBox(width: 7),
-                                        Text(
-                                          badge,
-                                          style: const TextStyle(
-                                            color: Colors.white,
-                                            fontSize: 10,
-                                            fontWeight: FontWeight.w800,
-                                            letterSpacing: 1.8,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                  const SizedBox(height: 12),
-                                  Text(
-                                    title,
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: const TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 32,
-                                      fontWeight: FontWeight.w800,
-                                      letterSpacing: -0.8,
-                                      height: 1.1,
-                                      shadows: [
-                                        Shadow(
-                                          color: Color(0x33000000),
-                                          blurRadius: 12,
-                                          offset: Offset(0, 3),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                  const SizedBox(height: 6),
-                                  Text(
-                                    subtitle,
-                                    maxLines: 2,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: TextStyle(
-                                      color:
-                                          Colors.white.withValues(alpha: 0.88),
-                                      fontSize: 12.5,
-                                      fontWeight: FontWeight.w500,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            Positioned(
-                              left: 0,
-                              right: 0,
-                              bottom: -1,
-                              child: Container(
-                                height: 26,
-                                decoration: const BoxDecoration(
-                                  color: AdminColors.bg,
-                                  borderRadius: BorderRadius.vertical(
-                                      top: Radius.circular(26)),
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
+                    child: KeyedSubtree(
+                      key: headerKey,
+                      child: currentRole == 1
+                          ? OperationsScenicHeader(
+                              title: title,
+                              subtitle: subtitle,
+                              onBack: back,
+                              actions: actions ?? const [])
+                          // Superadmin child pages share the dashboard header.
+                          : OperationsDayHeader(
+                              label: 'Wisata Daerahku · Operasional',
+                              title: title,
+                              subtitle: subtitle,
+                              onBack: back,
+                              actions: actions ?? const []),
                     ),
                   ),
-                ...slivers,
-              ],
+                  const SliverToBoxAdapter(child: SizedBox(height: 8)),
+                  ...slivers,
+                ],
+              ),
             ),
           ),
         ));

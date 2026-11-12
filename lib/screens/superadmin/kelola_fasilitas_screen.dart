@@ -155,7 +155,6 @@ class _KelolaFasilitasScreenState extends State<KelolaFasilitasScreen> {
     final items = _list.items;
     final allowed = _allowed;
     return AdminPage(
-      badge: 'FASILITAS DESTINASI',
       title: 'Kelola Fasilitas',
       subtitle: allowed
           ? '${_list.total ?? items.length} fasilitas'
@@ -306,7 +305,7 @@ class _FacilityCard extends StatelessWidget {
               tooltip: 'Ubah',
               onPressed: onEdit,
               icon: const Icon(PhosphorIconsRegular.pencilSimple,
-                  color: Color(0xFFA78BFA), size: 20),
+                  color: AdminColors.blue, size: 20),
             ),
             IconButton(
               key: ValueKey('toggle-${facility.guid}'),

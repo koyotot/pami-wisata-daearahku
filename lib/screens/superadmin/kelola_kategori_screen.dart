@@ -134,7 +134,6 @@ class _KelolaKategoriScreenState extends State<KelolaKategoriScreen> {
     final items = _list.items;
     final allowed = canManageCategories(_session.role);
     return AdminPage(
-      badge: 'KATEGORI DESTINASI',
       title: 'Kelola Kategori',
       subtitle: allowed
           ? '${_list.total ?? items.length} kategori'
@@ -264,7 +263,7 @@ class _CategoryCard extends StatelessWidget {
               tooltip: 'Ubah',
               onPressed: onEdit,
               icon: const Icon(PhosphorIconsRegular.pencilSimple,
-                  color: Color(0xFFA78BFA), size: 20),
+                  color: AdminColors.blue, size: 20),
             ),
             IconButton(
               key: ValueKey('toggle-${category.guid}'),

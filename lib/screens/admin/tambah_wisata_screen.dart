@@ -481,9 +481,8 @@ class _TambahWisataScreenState extends State<TambahWisataScreen> {
               textTheme: GoogleFonts.plusJakartaSansTextTheme(
                   Theme.of(context).textTheme),
             ),
-      // Role 1 has a scrolling scenic header; other roles keep a pinned dark bar.
+      // Both operations roles open with a scenic header that scrolls away.
       child: ScrollAwareStatusBar(
-        tracksHeader: _session.role == 1,
         navigationBarColor: Colors.white,
         builder: (context, headerKey) => PopScope(
             canPop: !_dirty && !_isSaving,
@@ -541,146 +540,17 @@ class _TambahWisataScreenState extends State<TambahWisataScreen> {
                                   'Informasi, galeri, dan fasilitas destinasi',
                               onBack: () => Navigator.maybePop(context))))
                 else
-                  SliverAppBar(
-                    expandedHeight: 210,
-                    floating: false,
-                    pinned: true,
-                    snap: false,
-                    backgroundColor: const Color(0xFF1558B0),
-                    elevation: 0,
-                    leading: GestureDetector(
-                      onTap: () async {
-                        if (await _confirmDiscard() && context.mounted) {
-                          Navigator.pop(context);
-                        }
-                      },
-                      child: Container(
-                        margin: const EdgeInsets.all(10),
-                        decoration: BoxDecoration(
-                          color: Colors.white.withValues(alpha: 0.22),
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(
-                              color: Colors.white.withValues(alpha: 0.35)),
-                        ),
-                        child: const Icon(PhosphorIconsRegular.caretLeft,
-                            size: 16, color: Colors.white),
-                      ),
-                    ),
-                    flexibleSpace: FlexibleSpaceBar(
-                      collapseMode: CollapseMode.parallax,
-                      background: Container(
-                        decoration: const BoxDecoration(
-                          gradient: LinearGradient(
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                            colors: [
-                              Color(0xFF2A93F0),
-                              Color(0xFF1976D2),
-                              Color(0xFF1558B0)
-                            ],
-                            stops: [0.0, 0.5, 1.0],
-                          ),
-                        ),
-                        child: Stack(
-                          children: [
-                            // Teks header
-                            Positioned(
-                              left: 20,
-                              right: 20,
-                              bottom: 46,
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(
-                                        horizontal: 10, vertical: 5),
-                                    decoration: BoxDecoration(
-                                      color:
-                                          Colors.white.withValues(alpha: 0.16),
-                                      borderRadius: BorderRadius.circular(20),
-                                      border: Border.all(
-                                          color: Colors.white
-                                              .withValues(alpha: 0.28)),
-                                    ),
-                                    child: Row(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        Container(
-                                          width: 6,
-                                          height: 6,
-                                          decoration: const BoxDecoration(
-                                            color: _C.gold,
-                                            shape: BoxShape.circle,
-                                          ),
-                                        ),
-                                        const SizedBox(width: 7),
-                                        Text(
-                                          isEdit
-                                              ? 'UBAH DESTINASI'
-                                              : 'DESTINASI BARU',
-                                          style: const TextStyle(
-                                            color: Colors.white,
-                                            fontSize: 10,
-                                            fontWeight: FontWeight.w800,
-                                            letterSpacing: 1.8,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                  const SizedBox(height: 12),
-                                  Text(
-                                    isEdit ? 'Edit Wisata' : 'Tambah Wisata',
-                                    style: const TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 32,
-                                      fontWeight: FontWeight.w800,
-                                      letterSpacing: -0.8,
-                                      height: 1.1,
-                                      shadows: [
-                                        Shadow(
-                                          color: Color(0x33000000),
-                                          blurRadius: 12,
-                                          offset: Offset(0, 3),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                  const SizedBox(height: 6),
-                                  Text(
-                                    isEdit
-                                        ? 'Perbarui informasi destinasi'
-                                        : 'Tambah destinasi nusantara baru',
-                                    style: TextStyle(
-                                      color:
-                                          Colors.white.withValues(alpha: 0.88),
-                                      fontSize: 12.5,
-                                      fontWeight: FontWeight.w500,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            // Tepi bawah melengkung menyatu dengan form
-                            Positioned(
-                              left: 0,
-                              right: 0,
-                              bottom: -1,
-                              child: Container(
-                                height: 26,
-                                decoration: const BoxDecoration(
-                                  color: _C.bg,
-                                  borderRadius: BorderRadius.vertical(
-                                      top: Radius.circular(26)),
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
+                  SliverToBoxAdapter(
+                      child: KeyedSubtree(
+                          key: headerKey,
+                          child: OperationsDayHeader(
+                              label: 'Wisata Daerahku · Operasional',
+                              title: isEdit
+                                  ? 'Ubah Destinasi'
+                                  : 'Tambah Destinasi',
+                              subtitle:
+                                  'Informasi, galeri, dan fasilitas destinasi',
+                              onBack: () => Navigator.maybePop(context)))),
 
                 // ── Konten Form ──────────────────────────────────
                 SliverToBoxAdapter(

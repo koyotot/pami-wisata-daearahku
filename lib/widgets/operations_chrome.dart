@@ -163,3 +163,127 @@ class OperationsScenicHeader extends StatelessWidget {
                     ]))),
       );
 }
+
+/// Daylight scenic header shared by the Superadmin dashboard and its child
+/// pages, so every operations route opens with the same hierarchy.
+class OperationsDayHeader extends StatelessWidget {
+  const OperationsDayHeader(
+      {super.key,
+      required this.label,
+      required this.title,
+      required this.subtitle,
+      this.onBack,
+      this.actions = const []});
+  final String label;
+  final String title;
+  final String subtitle;
+  final VoidCallback? onBack;
+  final List<Widget> actions;
+
+  @override
+  Widget build(BuildContext context) => ClipRect(
+      child: CustomPaint(
+          painter: const _OperationsDayScenery(),
+          child: SafeArea(
+              bottom: false,
+              child: Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 38),
+                  child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Row(children: [
+                          if (onBack != null)
+                            BackButton(color: Colors.white, onPressed: onBack)
+                          else ...[
+                            const Icon(PhosphorIconsRegular.mountains,
+                                color: Colors.white, size: 22),
+                            const SizedBox(width: 8),
+                          ],
+                          Expanded(
+                              child: Text(label,
+                                  style: const TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w700,
+                                      color: Colors.white))),
+                          for (final action in actions)
+                            IconButtonTheme(
+                                data: IconButtonThemeData(
+                                    style: IconButton.styleFrom(
+                                        foregroundColor: Colors.white,
+                                        minimumSize: const Size(48, 48))),
+                                child: action),
+                        ]),
+                        const SizedBox(height: 10),
+                        Text(title,
+                            style: const TextStyle(
+                                fontSize: 24,
+                                height: 1.2,
+                                fontWeight: FontWeight.w800,
+                                letterSpacing: -.6,
+                                color: Colors.white)),
+                        const SizedBox(height: 6),
+                        Text(subtitle,
+                            style: const TextStyle(
+                                fontSize: 12,
+                                height: 1.5,
+                                color: Color(0xFFE6F1FF))),
+                      ])))));
+}
+
+class _OperationsDayScenery extends CustomPainter {
+  const _OperationsDayScenery();
+  @override
+  void paint(Canvas canvas, Size size) {
+    final w = size.width;
+    final h = size.height;
+    canvas.drawRect(
+        Offset.zero & size,
+        Paint()
+          ..shader = const LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [Color(0xFF2491EF), AppColors.blue, AppColors.blueDeep],
+              stops: [0, .52, 1]).createShader(Offset.zero & size));
+    canvas.drawCircle(
+        Offset(w * .96, 0),
+        72,
+        Paint()
+          ..color = Colors.white.withValues(alpha: .15)
+          ..style = PaintingStyle.stroke);
+    final back = Path()
+      ..moveTo(0, h)
+      ..lineTo(0, h - 2)
+      ..lineTo(w * .10, h - 18)
+      ..lineTo(w * .18, h - 7)
+      ..lineTo(w * .27, h - 26)
+      ..lineTo(w * .40, h - 6)
+      ..lineTo(w * .47, h - 16)
+      ..lineTo(w * .60, h - 3)
+      ..lineTo(w * .72, h - 30)
+      ..lineTo(w * .81, h - 9)
+      ..lineTo(w * .89, h - 23)
+      ..lineTo(w, h - 4)
+      ..lineTo(w, h)
+      ..close();
+    canvas.drawPath(
+        back, Paint()..color = const Color(0xFF76B3ED).withValues(alpha: .56));
+    final front = Path()
+      ..moveTo(0, h)
+      ..lineTo(w * .16, h - 3)
+      ..lineTo(w * .29, h - 10)
+      ..lineTo(w * .40, h - 1)
+      ..lineTo(w * .53, h - 16)
+      ..lineTo(w * .62, h - 1)
+      ..lineTo(w * .75, h - 7)
+      ..lineTo(w * .83, h - 1)
+      ..lineTo(w * .93, h - 11)
+      ..lineTo(w, h - 2)
+      ..lineTo(w, h)
+      ..close();
+    canvas.drawPath(
+        front, Paint()..color = const Color(0xFFAECDF2).withValues(alpha: .36));
+  }
+
+  @override
+  bool shouldRepaint(_OperationsDayScenery oldDelegate) => false;
+}

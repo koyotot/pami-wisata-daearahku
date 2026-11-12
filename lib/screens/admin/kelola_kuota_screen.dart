@@ -12,7 +12,8 @@ import '../../services/api_client.dart';
 import '../../services/auth_session.dart';
 import 'admin_common.dart';
 import '../../widgets/operations_chrome.dart';
-import 'operations_dashboard/operations_dashboard.dart' show showOperationsDateRangeCalendar;
+import 'operations_dashboard/operations_dashboard.dart'
+    show showOperationsDateRangeCalendar;
 
 class KelolaKuotaScreen extends StatefulWidget {
   final String destinationGuid;
@@ -112,7 +113,6 @@ class _KelolaKuotaScreenState extends State<KelolaKuotaScreen> {
     final allowed = canManageQuota(_session.role);
     return AdminPage(
       role: _session.role,
-      badge: 'KUOTA KUNJUNGAN',
       title: 'Kelola Kuota',
       subtitle: widget.destinationName,
       onRefresh: allowed ? _muat : null,
@@ -172,24 +172,32 @@ class _QuotaCard extends StatelessWidget {
   final VoidCallback onEdit;
   const _QuotaCard({super.key, required this.entry, required this.onEdit});
 
-  Widget _metric(String label, int value, Color color) => Expanded(
-        child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 10),
-          decoration: BoxDecoration(
-            color: color.withValues(alpha: 0.08),
-            borderRadius: BorderRadius.circular(12),
+  // Labels and values stay on one line and shrink on narrow, large-text
+  // layouts instead of breaking mid-word.
+  Widget _metric(String label, int value, {Color color = AdminColors.text}) =>
+      Expanded(
+        child: Padding(
+          padding: const EdgeInsets.only(right: 8),
+          child: FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.centerLeft,
+            child:
+                Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text(label,
+                  maxLines: 1,
+                  softWrap: false,
+                  style: const TextStyle(
+                      color: AdminColors.textMuted,
+                      fontSize: 11.5,
+                      fontWeight: FontWeight.w600)),
+              const SizedBox(height: 2),
+              Text('$value',
+                  maxLines: 1,
+                  softWrap: false,
+                  style: TextStyle(
+                      color: color, fontSize: 18, fontWeight: FontWeight.w800)),
+            ]),
           ),
-          child: Column(children: [
-            Text('$value',
-                style: TextStyle(
-                    color: color, fontSize: 18, fontWeight: FontWeight.w800)),
-            const SizedBox(height: 2),
-            Text(label,
-                style: const TextStyle(
-                    color: AdminColors.textMuted,
-                    fontSize: 10.5,
-                    fontWeight: FontWeight.w600)),
-          ]),
         ),
       );
 
@@ -210,7 +218,7 @@ class _QuotaCard extends StatelessWidget {
                   color: AdminColors.blue, size: 18),
               const SizedBox(width: 8),
               Expanded(
-                child: Text(entry.visitDate,
+                child: Text(visitDayLabel(entry.visitDate),
                     style: const TextStyle(
                         color: AdminColors.text,
                         fontSize: 15,
@@ -221,19 +229,34 @@ class _QuotaCard extends StatelessWidget {
                 tooltip: 'Ubah kuota',
                 onPressed: onEdit,
                 icon: const Icon(PhosphorIconsRegular.pencilSimple,
-                    color: Color(0xFFA78BFA), size: 20),
+                    color: AdminColors.blue, size: 20),
               ),
             ],
           ),
           const SizedBox(height: 8),
-          Row(children: [
-            _metric('Kapasitas', entry.capacity, AdminColors.blue),
-            const SizedBox(width: 8),
-            _metric('Teralokasi', entry.allocated, AdminColors.orange),
-            const SizedBox(width: 8),
-            _metric('Sisa', entry.remaining, AdminColors.success),
+          Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            _metric('Kapasitas', entry.capacity),
+            _metric('Teralokasi', entry.allocated),
+            _metric('Sisa', entry.remaining,
+                color: entry.remaining > 0
+                    ? AdminColors.success
+                    : AdminColors.danger),
           ]),
           const SizedBox(height: 10),
+          ExcludeSemantics(
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(4),
+              child: LinearProgressIndicator(
+                value: entry.capacity <= 0
+                    ? 0
+                    : (entry.allocated / entry.capacity).clamp(0.0, 1.0),
+                minHeight: 6,
+                color: AdminColors.blue,
+                backgroundColor: AdminColors.tint,
+              ),
+            ),
+          ),
+          const SizedBox(height: 12),
           Text(
             'Booking dibuka: ${opens == null ? '-' : formatDateTime(opens)}',
             style: const TextStyle(color: AdminColors.textMuted, fontSize: 12),
