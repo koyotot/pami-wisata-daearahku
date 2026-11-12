@@ -5,8 +5,8 @@ import 'package:http/http.dart' as http;
 import 'package:wisata_daerahku/data/business_repository.dart';
 import 'package:wisata_daerahku/data/ticket_link.dart';
 import 'package:wisata_daerahku/data/ticket_models.dart';
-import 'package:wisata_daerahku/screens/bukti_pendaftaran_screen.dart';
-import 'package:wisata_daerahku/screens/ticket_link_screen.dart';
+import 'package:wisata_daerahku/screens/user/bukti_pendaftaran_screen.dart';
+import 'package:wisata_daerahku/screens/shared/ticket_link_screen.dart';
 import 'package:wisata_daerahku/services/api_client.dart';
 import 'package:wisata_daerahku/services/auth_session.dart';
 

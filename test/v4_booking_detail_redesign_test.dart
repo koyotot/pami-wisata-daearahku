@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:wisata_daerahku/data/business_repository.dart';
-import 'package:wisata_daerahku/screens/bukti_pendaftaran_screen.dart';
+import 'package:wisata_daerahku/screens/user/bukti_pendaftaran_screen.dart';
 import 'package:wisata_daerahku/services/api_client.dart';
 import 'package:wisata_daerahku/services/auth_session.dart';
 import 'user_support.dart';

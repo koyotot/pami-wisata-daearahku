@@ -2,8 +2,8 @@ import 'dart:ui' show SemanticsAction;
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:wisata_daerahku/screens/admin_common.dart';
-import 'package:wisata_daerahku/screens/operations_dashboard.dart';
+import 'package:wisata_daerahku/screens/admin/admin_common.dart';
+import 'package:wisata_daerahku/screens/admin/operations_dashboard/operations_dashboard.dart';
 import 'package:wisata_daerahku/widgets/floating_bottom_nav.dart';
 
 void main() {

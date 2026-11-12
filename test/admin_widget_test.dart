@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
-import 'package:wisata_daerahku/screens/daftar_pendaftar_screen.dart';
-import 'package:wisata_daerahku/screens/kelola_admin_screen.dart';
-import 'package:wisata_daerahku/screens/kelola_kategori_screen.dart';
-import 'package:wisata_daerahku/screens/kelola_kuota_screen.dart';
+import 'package:wisata_daerahku/screens/admin/daftar_pendaftar_screen.dart';
+import 'package:wisata_daerahku/screens/superadmin/kelola_admin_screen.dart';
+import 'package:wisata_daerahku/screens/superadmin/kelola_kategori_screen.dart';
+import 'package:wisata_daerahku/screens/admin/kelola_kuota_screen.dart';
 import 'admin_test_support.dart';
 import 'operations_test_support.dart';
 

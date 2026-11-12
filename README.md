@@ -463,7 +463,7 @@ layar login.
 
 ### 10.7 Role-based navigation
 
-`sessionDestination()` (`lib/screens/session_destination.dart`):
+`sessionDestination()` (`lib/screens/shared/session_destination.dart`):
 
 | Kondisi | Tujuan |
 | --- | --- |

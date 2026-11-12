@@ -10,7 +10,7 @@ import 'package:wisata_daerahku/data/app_data.dart';
 import 'package:wisata_daerahku/data/booking_refund_state.dart';
 import 'package:wisata_daerahku/data/business_repository.dart';
 import 'package:wisata_daerahku/data/payment_models.dart';
-import 'package:wisata_daerahku/screens/booking_payment_screen.dart';
+import 'package:wisata_daerahku/screens/user/booking_payment_screen.dart';
 import 'package:wisata_daerahku/services/auth_session.dart';
 import 'package:wisata_daerahku/widgets/booking_refund_section.dart';
 

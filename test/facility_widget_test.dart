@@ -2,7 +2,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
-import 'package:wisata_daerahku/screens/kelola_fasilitas_screen.dart';
+import 'package:wisata_daerahku/screens/superadmin/kelola_fasilitas_screen.dart';
 import 'admin_test_support.dart';
 import 'user_support.dart' as users;
 

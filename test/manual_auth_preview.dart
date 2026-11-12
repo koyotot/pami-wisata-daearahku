@@ -3,11 +3,11 @@
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
-import 'package:wisata_daerahku/screens/user_login_screen.dart';
-import 'package:wisata_daerahku/screens/user_register_screen.dart';
-import 'package:wisata_daerahku/screens/forgot_password_screen.dart';
-import 'package:wisata_daerahku/screens/verify_reset_otp_screen.dart';
-import 'package:wisata_daerahku/screens/reset_password_screen.dart';
+import 'package:wisata_daerahku/screens/auth/user_login_screen.dart';
+import 'package:wisata_daerahku/screens/auth/user_register_screen.dart';
+import 'package:wisata_daerahku/screens/auth/forgot_password_screen.dart';
+import 'package:wisata_daerahku/screens/auth/verify_reset_otp_screen.dart';
+import 'package:wisata_daerahku/screens/auth/reset_password_screen.dart';
 import 'package:wisata_daerahku/services/auth_session.dart';
 
 void main() => runApp(const Preview());

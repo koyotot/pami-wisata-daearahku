@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:wisata_daerahku/data/app_data.dart';
 import 'package:wisata_daerahku/data/business_repository.dart';
-import 'package:wisata_daerahku/screens/detail_wisata_screen.dart';
+import 'package:wisata_daerahku/screens/user/detail_wisata_screen.dart';
 
 class _DetailRepository extends BusinessRepository {
   _DetailRepository(this.facilities);

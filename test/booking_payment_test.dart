@@ -12,7 +12,7 @@ import 'package:wisata_daerahku/data/booking_payment_state.dart';
 import 'package:wisata_daerahku/data/booking_state.dart';
 import 'package:wisata_daerahku/data/business_repository.dart';
 import 'package:wisata_daerahku/data/payment_models.dart';
-import 'package:wisata_daerahku/screens/booking_payment_screen.dart';
+import 'package:wisata_daerahku/screens/user/booking_payment_screen.dart';
 import 'package:wisata_daerahku/services/auth_session.dart';
 import 'package:wisata_daerahku/services/payment_qr_export.dart';
 import 'package:wisata_daerahku/widgets/booking_payment_section.dart';

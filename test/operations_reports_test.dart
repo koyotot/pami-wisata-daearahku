@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:wisata_daerahku/screens/operations_dashboard.dart';
+import 'package:wisata_daerahku/screens/admin/operations_dashboard/operations_dashboard.dart';
 import 'admin_test_support.dart';
 import 'operations_shell_test.dart' show overviewFixture;
 

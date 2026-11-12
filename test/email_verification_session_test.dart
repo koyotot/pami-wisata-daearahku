@@ -5,9 +5,9 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:wisata_daerahku/data/app_data.dart';
-import 'package:wisata_daerahku/screens/main_navigation_screen.dart';
-import 'package:wisata_daerahku/screens/session_destination.dart';
-import 'package:wisata_daerahku/screens/verify_email_otp_screen.dart';
+import 'package:wisata_daerahku/screens/user/main_navigation_screen.dart';
+import 'package:wisata_daerahku/screens/shared/session_destination.dart';
+import 'package:wisata_daerahku/screens/auth/verify_email_otp_screen.dart';
 import 'package:wisata_daerahku/services/auth_session.dart';
 
 import 'auth_session_test.dart' show MemoryStore, ok, tokens, user;

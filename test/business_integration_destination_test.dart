@@ -4,7 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:http/http.dart' as http;
 import 'package:wisata_daerahku/data/app_data.dart';
 import 'package:wisata_daerahku/data/business_repository.dart';
-import 'package:wisata_daerahku/screens/tambah_wisata_screen.dart';
+import 'package:wisata_daerahku/screens/admin/tambah_wisata_screen.dart';
 import 'package:wisata_daerahku/services/auth_session.dart';
 
 import 'admin_test_support.dart';

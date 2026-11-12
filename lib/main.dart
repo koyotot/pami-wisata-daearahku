@@ -1,13 +1,13 @@
 import 'services/auth_session.dart';
 import 'core/config/app_config.dart';
 import 'services/fcm_device_manager.dart';
-import 'screens/ticket_link_screen.dart';
-import 'screens/session_destination.dart';
+import 'screens/shared/ticket_link_screen.dart';
+import 'screens/shared/session_destination.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'firebase_options.dart';
-import 'screens/user_login_screen.dart';
+import 'screens/auth/user_login_screen.dart';
 import 'theme/app_colors.dart';
 import 'theme/app_icons.dart';
 

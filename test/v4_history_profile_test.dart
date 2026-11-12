@@ -5,9 +5,9 @@ import 'package:wisata_daerahku/data/app_data.dart';
 import 'package:wisata_daerahku/data/business_repository.dart';
 import 'package:wisata_daerahku/data/favorite_state.dart';
 import 'package:wisata_daerahku/widgets/floating_bottom_nav.dart';
-import 'package:wisata_daerahku/screens/auth_presentation.dart';
-import 'package:wisata_daerahku/screens/profil_user_screen.dart';
-import 'package:wisata_daerahku/screens/bukti_pendaftaran_screen.dart';
+import 'package:wisata_daerahku/screens/auth/auth_presentation.dart';
+import 'package:wisata_daerahku/screens/user/profil_user_screen.dart';
+import 'package:wisata_daerahku/screens/user/bukti_pendaftaran_screen.dart';
 
 void main() {
   setUpAll(() => GoogleFonts.config.allowRuntimeFetching = false);

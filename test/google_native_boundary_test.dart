@@ -3,7 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 // The platform interface is installed transitively by google_sign_in.
 // ignore: depend_on_referenced_packages
 import 'package:google_sign_in_platform_interface/google_sign_in_platform_interface.dart';
-import 'package:wisata_daerahku/screens/user_login_screen.dart';
+import 'package:wisata_daerahku/screens/auth/user_login_screen.dart';
 import 'package:wisata_daerahku/services/auth_session.dart';
 
 class FakeGooglePlatform extends GoogleSignInPlatform {

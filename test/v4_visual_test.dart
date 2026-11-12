@@ -11,9 +11,9 @@ import 'package:wisata_daerahku/data/business_repository.dart';
 import 'package:wisata_daerahku/widgets/availability_calendar.dart';
 import 'package:wisata_daerahku/widgets/floating_bottom_nav.dart';
 import 'package:wisata_daerahku/widgets/international_phone_field.dart';
-import 'package:wisata_daerahku/screens/main_navigation_screen.dart';
-import 'package:wisata_daerahku/screens/auth_presentation.dart';
-import 'package:wisata_daerahku/screens/cari_wisata_screen.dart';
+import 'package:wisata_daerahku/screens/user/main_navigation_screen.dart';
+import 'package:wisata_daerahku/screens/auth/auth_presentation.dart';
+import 'package:wisata_daerahku/screens/user/cari_wisata_screen.dart';
 import 'package:wisata_daerahku/services/auth_session.dart';
 
 void main() {

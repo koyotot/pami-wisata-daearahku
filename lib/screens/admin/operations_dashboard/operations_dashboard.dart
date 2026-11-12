@@ -1,0 +1,896 @@
+import 'dart:math' as math;
+import 'dart:ui' show FontFeature;
+import 'package:flutter/material.dart';
+import 'package:phosphor_icons/phosphor_icons.dart';
+import 'package:flutter/services.dart';
+import '../../../data/admin_state.dart';
+import '../../../data/approval_queue_state.dart';
+import '../../../data/business_repository.dart';
+import '../../../data/operational_models.dart';
+import '../../../services/api_client.dart';
+import '../../../services/auth_session.dart';
+import '../../../theme/app_colors.dart';
+import '../../../widgets/operations_chrome.dart';
+import '../../../widgets/operations_tabs.dart';
+import '../../../widgets/visit_format.dart' show visitDateLabel;
+import '../admin_ticket_scanner_screen.dart';
+import '../daftar_wisata_screen.dart';
+import '../daftar_pendaftar_screen.dart';
+import '../operations_booking_screen.dart';
+import '../operations_queue_screen.dart';
+
+part 'operations_reports.dart';
+part 'operations_filters.dart';
+part 'operations_presentation.dart';
+part 'operations_financial.dart';
+part 'operations_home.dart';
+
+class OperationsPage extends StatelessWidget {
+  const OperationsPage(
+      {super.key,
+      required this.title,
+      required this.subtitle,
+      required this.children,
+      this.onRefresh,
+      this.bottomBar,
+      this.role,
+      this.actions = const [],
+      this.embedded = true});
+  final String title;
+  final String subtitle;
+  final Widget? bottomBar;
+  final int? role;
+  final List<Widget> children;
+  final List<Widget> actions;
+  final Future<void> Function()? onRefresh;
+  final bool embedded;
+  @override
+  Widget build(BuildContext context) {
+    final content = ListView(
+        padding: EdgeInsets.zero,
+        physics: const AlwaysScrollableScrollPhysics(),
+        children: [
+          _DashboardHero(
+              title: title,
+              subtitle: subtitle,
+              onBack: embedded ? null : () => Navigator.maybePop(context),
+              actions: actions,
+              role: role),
+          Padding(
+              padding: EdgeInsets.fromLTRB(
+                  16,
+                  16,
+                  16,
+                  (role ?? AuthSession.instance.role) == 1 && !embedded
+                      ? 24
+                      : 128),
+              child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: children)),
+        ]);
+    return OperationsTheme(
+        role: role ?? AuthSession.instance.role,
+        child: Scaffold(
+            bottomNavigationBar: bottomBar,
+            backgroundColor: AppColors.bg,
+            body: AnnotatedRegion<SystemUiOverlayStyle>(
+                value: const SystemUiOverlayStyle(
+                    statusBarColor: Colors.transparent,
+                    statusBarIconBrightness: Brightness.light,
+                    statusBarBrightness: Brightness.dark),
+                child: SafeArea(
+                    top: false,
+                    bottom: false,
+                    child: onRefresh == null
+                        ? content
+                        : RefreshIndicator(
+                            onRefresh: onRefresh!, child: content)))));
+  }
+}
+
+class OperationsDashboard extends StatefulWidget {
+  const OperationsDashboard(
+      {super.key,
+      this.repository,
+      this.session,
+      this.active = true,
+      this.onOpenQueue,
+      this.onOpenDestinations});
+  final BusinessRepository? repository;
+  final AuthSession? session;
+  final bool active;
+  final VoidCallback? onOpenQueue;
+  final VoidCallback? onOpenDestinations;
+  @override
+  State<OperationsDashboard> createState() => _OperationsDashboardState();
+}
+
+class _OperationsDashboardState extends State<OperationsDashboard>
+    with WidgetsBindingObserver {
+  late final _session = widget.session ?? AuthSession.instance;
+  late final _repository =
+      widget.repository ?? BusinessRepository(ApiClient(_session));
+  late final _generation = _session.sessionGeneration;
+  late final _role = _session.role;
+  OperationalReport? _data;
+  OperationalReport? _approvals;
+  List<OperationalRow> _actions = [];
+  Object? _error;
+  bool _loading = true;
+  bool _personal = false;
+  int _request = 0;
+  Map<String, String> _filters = {};
+  String? _destinationLabel;
+  List<Destination> _assignedDestinations = [];
+  bool get _valid =>
+      mounted &&
+      _session.authenticated.value &&
+      _session.deviceSessionReady &&
+      _session.isCurrentGeneration(_generation) &&
+      _session.role == _role &&
+      (_role == 1 || _role == 2);
+  @override
+  void initState() {
+    super.initState();
+    if (_role == 1) _filters = _homeMonthFilters();
+    _session.sessionChanges.addListener(_sessionChanged);
+    operationsDataChanges.addListener(_dataChanged);
+    WidgetsBinding.instance.addObserver(this);
+    _load();
+  }
+
+  void _sessionChanged() {
+    if (mounted) {
+      setState(() {
+        _request++;
+        _data = null;
+        _approvals = null;
+        _actions = [];
+        _assignedDestinations = [];
+        _destinationLabel = null;
+        _loading = false;
+        _error ??= const ApiException(
+            'Akses diperbarui. Muat ulang data sesuai akses terbaru.');
+      });
+    }
+  }
+
+  void _dataChanged() {
+    if (!_valid) return;
+    if (widget.active && (ModalRoute.of(context)?.isCurrent ?? true)) {
+      _load();
+    } else {
+      _sessionChanged();
+    }
+  }
+
+  @override
+  void didUpdateWidget(OperationsDashboard oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.active && !oldWidget.active) _load();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed && widget.active) _load();
+  }
+
+  @override
+  void dispose() {
+    _request++;
+    _session.sessionChanges.removeListener(_sessionChanged);
+    operationsDataChanges.removeListener(_dataChanged);
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  Future<void> _load() async {
+    if (!_valid || !widget.active) return;
+    final request = ++_request;
+    setState(() {
+      _loading = true;
+      _error = null;
+      _data = null;
+      _approvals = null;
+      _actions = [];
+      _assignedDestinations = [];
+    });
+    try {
+      final data =
+          await _repository.operationalReport('overview', query: _filters);
+      if (!_valid || request != _request) return;
+      final actions = await _repository.operationalRows('action-center',
+          query: {..._filters, 'per_page': '3'});
+      if (!_valid || request != _request) return;
+      final approvals = _role == 2
+          ? await _repository.operationalReport('approvals', query: _filters)
+          : null;
+      if (!_valid || request != _request) return;
+      List<Destination> destinations = [];
+      if (_role == 1) {
+        try {
+          destinations = (await _repository.adminDestinations(query: {
+            'per_page': '2',
+            'status': 'all',
+          }))
+              .items;
+        } catch (e) {
+          if (_scopeError(e)) rethrow;
+        }
+      }
+      if (!_valid || request != _request) return;
+      setState(() {
+        _data = data;
+        _actions = actions.items;
+        _approvals = approvals;
+        _assignedDestinations = destinations;
+        _loading = false;
+      });
+    } catch (e) {
+      if (!_valid || request != _request) return;
+      setState(() {
+        _error = e;
+        _loading = false;
+        if (_scopeError(e)) {
+          _filters = _role == 1 ? _homeMonthFilters() : {};
+          _destinationLabel = null;
+        }
+      });
+      if (_scopeError(e)) _session.me().catchError((Object _) {});
+    }
+  }
+
+  Future<void> _open(Widget page) async {
+    await Navigator.of(context)
+        .push(MaterialPageRoute<void>(builder: (_) => page));
+    if (_valid) await _load();
+  }
+
+  Future<void> _filter() async {
+    final request = _request;
+    var destinationLabel = _destinationLabel;
+    final result = await showOperationsFilters(context,
+        repository: _repository,
+        session: _session,
+        initial: _filters,
+        home: _role == 1,
+        destinationLabel: _destinationLabel,
+        onDestinationLabelSelected: (label) => destinationLabel = label,
+        utc: true);
+    if (result != null && _valid && request == _request) {
+      _filters = result;
+      _destinationLabel =
+          result['destination_guid'] == null ? null : destinationLabel;
+      await _load();
+    }
+  }
+
+  Widget _actionCenter(OperationalReport data) => _DashboardActionCenter(
+      pending: _value(data.metrics['pending_approvals']),
+      executive: _role == 2,
+      hasActions: _actions.isNotEmpty,
+      onOpen: () => _open(OperationsReportScreen(
+          section: 'action-center',
+          initialFilters: _filters,
+          initialDestinationLabel: _destinationLabel,
+          repository: _repository,
+          session: _session)));
+
+  Widget _homeFilterBar(OperationalReport data) => OperationsFilterBar(
+          filters: {
+            ...data.period.map((key, value) => MapEntry(key, '$value')),
+            ..._filters
+          },
+          keyPrefix: 'home',
+          destinationLabel: _destinationLabel,
+          dateTooltip: 'Periode aktivitas booking dan keputusan (UTC)',
+          onDestinationPressed: _filter,
+          onDatePressed: _filter);
+
+  List<Widget> _personalHome(OperationalReport data) {
+    final personal = data.personal;
+    final response =
+        _value(personal['avg_response_seconds']).replaceAll('.', ',');
+    return [
+      _homeFilterBar(data),
+      const SizedBox(height: AppSpacing.md),
+      _AdminPersonalSummary(
+          approvalRate:
+              _percent(personal['approval_rate_percent']).replaceAll('.', ',')),
+      const SizedBox(height: AppSpacing.md),
+      OperationsMetrics(
+          values: [
+            ('Disetujui', _value(personal['approved_decisions'])),
+            ('Ditolak', _value(personal['rejected_decisions'])),
+            ('Respons rata-rata', response == '—' ? response : '$response dtk'),
+            (
+              'Kepatuhan SLA',
+              _percent(personal['sla_compliance_percent']).replaceAll('.', ',')
+            ),
+          ],
+          icons: const [
+            PhosphorIconsRegular.check,
+            PhosphorIconsRegular.x,
+            PhosphorIconsRegular.clock,
+            PhosphorIconsRegular.shieldCheck
+          ],
+          labelStyle: const TextStyle(
+              fontSize: 11,
+              color: AppColors.navy,
+              fontWeight: FontWeight.w500)),
+      const SizedBox(height: AppSpacing.xl),
+      const _AdminHomeHeading('Penugasan aktif'),
+      _AdminApprovalPerformance(
+          data: data, response: response == '—' ? response : '$response detik'),
+      const SizedBox(height: AppSpacing.md),
+      _AdminHomeShortcut(
+          title: 'Lihat antrean kerja',
+          subtitle: 'Kembali ke permintaan yang tersedia',
+          icon: PhosphorIconsRegular.tray,
+          onTap: widget.onOpenQueue),
+    ];
+  }
+
+  List<Widget> _destinationHome(OperationalReport data) => [
+        _homeFilterBar(data),
+        const SizedBox(height: AppSpacing.md),
+        _AdminAssignmentSummary(
+            data: data,
+            destinations: _assignedDestinations,
+            destinationLabel: _destinationLabel),
+        const SizedBox(height: AppSpacing.md),
+        OperationsMetrics(
+            values: [
+              ('Pending approval', _value(data.metrics['pending_approvals'])),
+              (
+                'Destinasi ditugaskan',
+                _value(data.metrics['assigned_destinations'])
+              ),
+              ('Disetujui', _value(data.metrics['approved_decisions'])),
+              ('Ditolak', _value(data.metrics['rejected_decisions'])),
+            ],
+            icons: const [
+              PhosphorIconsRegular.clock,
+              PhosphorIconsRegular.mapPin,
+              PhosphorIconsRegular.check,
+              PhosphorIconsRegular.warningCircle
+            ],
+            labelStyle: const TextStyle(
+                fontSize: 11,
+                color: AppColors.navy,
+                fontWeight: FontWeight.w500)),
+        const SizedBox(height: AppSpacing.lg),
+        const _AdminHomeHeading('Butuh perhatian'),
+        if (_actions.isEmpty)
+          const _DashboardCard(
+              child: Text('Tidak ada tindakan yang perlu ditinjau.')),
+        for (final row in _actions)
+          Padding(
+              padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+              child: _AdminAttentionTile(
+                  row: row,
+                  onTap: () => _open(OperationsBookingScreen(
+                      bookingGuid: row.bookingGuid!,
+                      repository: _repository,
+                      session: _session)))),
+        const SizedBox(height: AppSpacing.lg),
+        const _AdminHomeHeading('Akses cepat'),
+        for (final entry in <(String, String, IconData, VoidCallback?)>[
+          (
+            'Antrean approval',
+            'Kelola dan ambil tugas',
+            PhosphorIconsRegular.tray,
+            widget.onOpenQueue
+          ),
+          (
+            'Kinerja destinasi',
+            'Kapasitas dan okupansi',
+            PhosphorIconsRegular.chartLine,
+            widget.onOpenDestinations
+          ),
+          (
+            'Kunjungan & check-in',
+            'Tiket dan tingkat kehadiran',
+            PhosphorIconsRegular.qrCode,
+            () => _open(OperationsReportScreen(
+                section: 'visitors',
+                repository: _repository,
+                session: _session,
+                initialDestinationLabel: _destinationLabel,
+                initialFilters: _filters))
+          ),
+          (
+            'Data pendaftar',
+            'Lihat status booking',
+            PhosphorIconsRegular.users,
+            () => _open(DaftarPendaftarScreen(
+                repository: _repository, session: _session))
+          ),
+        ])
+          Padding(
+              padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+              child: _AdminHomeShortcut(
+                  title: entry.$1,
+                  subtitle: entry.$2,
+                  icon: entry.$3,
+                  onTap: entry.$4)),
+        const SizedBox(height: AppSpacing.lg),
+        const _AdminHomeHeading('Keuangan & aktivitas'),
+        OperationsFinancialScreen(
+            key: ValueKey('finance-$_request'),
+            repository: _repository,
+            session: _session,
+            preview: true,
+            active: widget.active),
+        const SizedBox(height: AppSpacing.md),
+        _DashboardCard(
+            child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+              const _AdminHomeHeading('Aktivitas booking'),
+              const Text('Berdasarkan tanggal booking dibuat · UTC',
+                  style:
+                      TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+              const SizedBox(height: AppSpacing.md),
+              OperationsTrend(
+                  rows: data.bookingTrend, valueKey: 'bookings', bars: true),
+            ])),
+      ];
+
+  @override
+  Widget build(BuildContext context) {
+    if (!_valid) return const SizedBox.shrink();
+    final data = _data;
+    final metrics = _personal ? data?.personal : data?.metrics;
+    final noAssignment = !_loading &&
+        _error == null &&
+        _role == 1 &&
+        _number(data?.metrics['assigned_destinations']) == 0;
+    return OperationsTheme(
+        role: _role,
+        child: AnnotatedRegion<SystemUiOverlayStyle>(
+            value: const SystemUiOverlayStyle(
+              statusBarColor: Colors.transparent,
+              statusBarIconBrightness: Brightness.light,
+              statusBarBrightness: Brightness.dark,
+            ),
+            child: Scaffold(
+              backgroundColor: AppColors.bg,
+              body: SafeArea(
+                  top: false,
+                  bottom: false,
+                  child: RefreshIndicator(
+                    onRefresh: _load,
+                    child: ListView(
+                      padding: const EdgeInsets.only(bottom: 128),
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      children: [
+                        _DashboardHero(
+                          executive: _role == 2,
+                          role: _role,
+                          onActions: noAssignment
+                              ? null
+                              : () => _open(OperationsReportScreen(
+                                  section: 'action-center',
+                                  initialFilters: _filters,
+                                  repository: _repository,
+                                  session: _session)),
+                        ),
+                        Padding(
+                          padding: EdgeInsets.fromLTRB(
+                              AppSpacing.lg,
+                              _role == 1 ? AppSpacing.lg : AppSpacing.xs,
+                              AppSpacing.lg,
+                              0),
+                          child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                if (_loading)
+                                  const OperationsSkeleton()
+                                else if (_error != null) ...[
+                                  _errorBlock(_error!,
+                                      _scopeError(_error) ? _filter : _load,
+                                      role: _role),
+                                  const SizedBox(height: 16),
+                                  OperationsFinancialScreen(
+                                      key: ValueKey('finance-$_request'),
+                                      repository: _repository,
+                                      session: _session,
+                                      preview: true,
+                                      active: widget.active),
+                                ] else if (noAssignment) ...[
+                                  const _NoAssignmentState(),
+                                  const SizedBox(height: 16),
+                                  OperationsFinancialScreen(
+                                      key: ValueKey('finance-$_request'),
+                                      repository: _repository,
+                                      session: _session,
+                                      preview: true,
+                                      active: widget.active),
+                                ] else if (data != null) ...[
+                                  if (_role == 1) ...[
+                                    OperationsHomeTabs(
+                                        personal: _personal,
+                                        onChanged: (value) =>
+                                            setState(() => _personal = value)),
+                                    const SizedBox(height: 16),
+                                  ],
+                                  if (_role == 1 && _personal)
+                                    ..._personalHome(data)
+                                  else if (_role == 1)
+                                    ..._destinationHome(data)
+                                  else ...[
+                                    _ScopeCard(
+                                      executive: _role == 2,
+                                      label:
+                                          _filters['destination_guid'] != null
+                                              ? 'Destinasi terpilih'
+                                              : _role == 2
+                                                  ? 'Seluruh destinasi'
+                                                  : 'Semua destinasi saya',
+                                      detail: _role == 2
+                                          ? 'Scope global · ${_period(data.period)}'
+                                          : 'Scope penugasan · ${_period(data.period)}',
+                                      onTap: _filter,
+                                    ),
+                                    const SizedBox(height: 12),
+                                    if (_role == 1) ...[
+                                      _DashboardCard(
+                                          child: Column(
+                                              crossAxisAlignment:
+                                                  CrossAxisAlignment.stretch,
+                                              children: [
+                                            Text(
+                                                _personal
+                                                    ? 'Keputusan pribadi'
+                                                    : 'Prioritas persetujuan',
+                                                style: const TextStyle(
+                                                    fontSize: 16,
+                                                    fontWeight:
+                                                        FontWeight.w700)),
+                                            const SizedBox(height: 12),
+                                            Text(
+                                                _personal
+                                                    ? _value(data.personal[
+                                                        'approved_decisions'])
+                                                    : _value(data.metrics[
+                                                        'pending_approvals']),
+                                                style: const TextStyle(
+                                                    fontSize: 32,
+                                                    fontWeight:
+                                                        FontWeight.w800)),
+                                            Text(
+                                                _personal
+                                                    ? 'Booking disetujui pada periode ini'
+                                                    : 'Booking menunggu keputusan',
+                                                style: const TextStyle(
+                                                    fontSize: 13)),
+                                            const SizedBox(height: 12),
+                                            FilledButton(
+                                                onPressed: () => _open(_personal
+                                                    ? OperationsReportScreen(
+                                                        section: 'approvals',
+                                                        personal: true,
+                                                        repository: _repository,
+                                                        session: _session,
+                                                        initialFilters:
+                                                            _filters)
+                                                    : OperationsQueueScreen(
+                                                        repository: _repository,
+                                                        session: _session,
+                                                        filters: _filters)),
+                                                child: Text(_personal
+                                                    ? 'Lihat kinerja saya'
+                                                    : 'Tinjau antrean')),
+                                          ])),
+                                      const SizedBox(height: 12),
+                                    ],
+                                    OperationsMetrics(
+                                      values: _personal
+                                          ? (_role == 1
+                                              ? _decisionValues(metrics ?? {})
+                                                  .skip(1)
+                                                  .toList()
+                                              : _decisionValues(metrics ?? {}))
+                                          : [
+                                              if (_role == 1) ...[
+                                                (
+                                                  'Destinasi ditugaskan',
+                                                  _value(metrics?[
+                                                      'assigned_destinations'])
+                                                ),
+                                                (
+                                                  'Claim saya',
+                                                  _value(data.assignedWorkload[
+                                                      'personal_claims'])
+                                                ),
+                                                (
+                                                  'Disetujui',
+                                                  _value(metrics?[
+                                                      'approved_decisions'])
+                                                ),
+                                                (
+                                                  'Kepatuhan SLA',
+                                                  _percent(metrics?[
+                                                      'sla_compliance_percent'])
+                                                ),
+                                              ] else ...[
+                                                (
+                                                  _role == 2
+                                                      ? 'Pending global'
+                                                      : 'Pending approval',
+                                                  _value(metrics?[
+                                                      'pending_approvals'])
+                                                ),
+                                                (
+                                                  _role == 2
+                                                      ? 'Destinasi global'
+                                                      : 'Destinasi ditugaskan',
+                                                  _value(metrics?[
+                                                      'assigned_destinations'])
+                                                ),
+                                                (
+                                                  'Disetujui',
+                                                  _value(metrics?[
+                                                      'approved_decisions'])
+                                                ),
+                                                (
+                                                  'Ditolak',
+                                                  _value(metrics?[
+                                                      'rejected_decisions'])
+                                                ),
+                                              ],
+                                            ],
+                                      icons: _role == 1
+                                          ? null
+                                          : _personal
+                                              ? const [
+                                                  PhosphorIconsRegular
+                                                      .checkCircle,
+                                                  PhosphorIconsRegular.xCircle,
+                                                  PhosphorIconsRegular.percent,
+                                                  PhosphorIconsRegular.timer,
+                                                  PhosphorIconsRegular.sealCheck
+                                                ]
+                                              : const [
+                                                  PhosphorIconsRegular.clock,
+                                                  PhosphorIconsRegular.mapPin,
+                                                  PhosphorIconsRegular
+                                                      .checkCircle,
+                                                  PhosphorIconsRegular.xCircle,
+                                                ],
+                                      metadata: _role == 1
+                                          ? null
+                                          : _personal
+                                              ? null
+                                              : [
+                                                  'Snapshot saat ini',
+                                                  _role == 2
+                                                      ? 'Seluruh destinasi'
+                                                      : 'Dalam penugasan',
+                                                  'Periode keputusan',
+                                                  'Periode keputusan',
+                                                ],
+                                    ),
+                                    if (_personal) ...[
+                                      const SizedBox(height: 12),
+                                      _Notice(
+                                          'Claim aktif saya saat ini: ${_value(data.assignedWorkload['personal_claims'])}. Riwayat keputusan pribadi mencakup penugasan sebelumnya.'),
+                                      if (_role != 1)
+                                        _routeLink(
+                                            'Lihat kinerja saya',
+                                            () => _open(OperationsReportScreen(
+                                                section: 'approvals',
+                                                initialFilters: _filters,
+                                                personal: true,
+                                                repository: _repository,
+                                                session: _session))),
+                                    ],
+                                    const SizedBox(height: 16),
+                                    if (_role != 1 || !_personal)
+                                      _actionCenter(data),
+                                    const SizedBox(height: 16),
+                                    if (_role != 1 || !_personal)
+                                      OperationsFinancialScreen(
+                                          key: ValueKey('finance-$_request'),
+                                          repository: _repository,
+                                          session: _session,
+                                          preview: true,
+                                          active: widget.active),
+                                    const SizedBox(height: 12),
+                                    if (_approvals != null) ...[
+                                      _DashboardCard(
+                                          child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.stretch,
+                                        children: [
+                                          const _SectionTitle(
+                                              'Tren Keputusan Tim'),
+                                          Text(
+                                              'Keputusan tim · UTC · ${_period(_approvals!.period)}',
+                                              style: const TextStyle(
+                                                  fontSize: 12,
+                                                  color: Color(0xFF526787))),
+                                          OperationsTrend(
+                                              rows: _approvals!.series,
+                                              valueKey: 'approved_decisions',
+                                              secondKey: 'rejected_decisions'),
+                                          const Text(
+                                              'Biru: disetujui · abu-abu: ditolak',
+                                              style: TextStyle(
+                                                  fontSize: 12,
+                                                  color: Color(0xFF526787))),
+                                          _routeLink(
+                                              'Lihat kinerja tim',
+                                              () => _open(
+                                                  OperationsReportScreen(
+                                                      section: 'approvals',
+                                                      initialFilters: _filters,
+                                                      repository: _repository,
+                                                      session: _session))),
+                                        ],
+                                      )),
+                                      const SizedBox(height: 16),
+                                    ],
+                                    if (_role != 1 || !_personal)
+                                      _DashboardCard(
+                                          child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.stretch,
+                                        children: [
+                                          const _SectionTitle(
+                                              'Aktivitas booking'),
+                                          const Text(
+                                              'Booking dibuat · tanggal UTC',
+                                              style: TextStyle(
+                                                  fontSize: 13,
+                                                  color: Color(0xFF526787))),
+                                          const SizedBox(height: 8),
+                                          Text(
+                                              'Periode: ${_period(data.period)} · basis dibuat (UTC)',
+                                              style: const TextStyle(
+                                                  fontSize: 12,
+                                                  height: 1.5,
+                                                  color: Color(0xFF526787))),
+                                          OperationsTrend(
+                                              rows: data.bookingTrend,
+                                              valueKey: 'bookings',
+                                              bars: true),
+                                        ],
+                                      )),
+                                    const SizedBox(height: 12),
+                                    if (_role != 1)
+                                      FilledButton.icon(
+                                          onPressed: () => _open(
+                                              OperationsQueueScreen(
+                                                  repository: _repository,
+                                                  session: _session,
+                                                  filters: _filters)),
+                                          icon: const Icon(
+                                              PhosphorIconsRegular.arrowRight),
+                                          iconAlignment: IconAlignment.end,
+                                          label: Text(_role == 2
+                                              ? 'Buka Antrean Global'
+                                              : 'Buka Antrean Approval')),
+                                    if (_actions.isNotEmpty &&
+                                        (_role != 1 || !_personal)) ...[
+                                      const SizedBox(height: 16),
+                                      _DashboardCard(
+                                          child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.stretch,
+                                        children: [
+                                          const _SectionTitle(
+                                              'Prioritas tindakan'),
+                                          for (final row in _actions)
+                                            _actionTile(
+                                                row,
+                                                () => _open(
+                                                    OperationsBookingScreen(
+                                                        bookingGuid:
+                                                            row.bookingGuid ??
+                                                                '',
+                                                        repository: _repository,
+                                                        session: _session))),
+                                          _routeLink(
+                                              'Lihat seluruh tindakan',
+                                              () => _open(
+                                                  OperationsReportScreen(
+                                                      section: 'action-center',
+                                                      initialFilters: _filters,
+                                                      repository: _repository,
+                                                      session: _session))),
+                                        ],
+                                      )),
+                                    ],
+                                    const SizedBox(height: 16),
+                                    _DashboardCard(
+                                        child: Column(children: [
+                                      _routeLink(
+                                          'Riwayat seluruh booking',
+                                          () => _open(DaftarPendaftarScreen(
+                                              repository: _repository,
+                                              session: _session))),
+                                      _routeLink(
+                                          'Kinerja destinasi',
+                                          () => _open(OperationsReportScreen(
+                                              section: 'destinations',
+                                              repository: _repository,
+                                              session: _session,
+                                              initialFilters: _filters))),
+                                      _routeLink(
+                                          'Kunjungan dan check-in',
+                                          () => _open(OperationsReportScreen(
+                                              section: 'visitors',
+                                              repository: _repository,
+                                              session: _session,
+                                              initialFilters: _filters))),
+                                    ])),
+                                  ],
+                                ],
+                              ]),
+                        ),
+                      ],
+                    ),
+                  )),
+            )));
+  }
+}
+
+class OperationsAnalyticsHub extends StatelessWidget {
+  const OperationsAnalyticsHub(
+      {super.key, this.repository, this.session, this.active = true});
+  final BusinessRepository? repository;
+  final AuthSession? session;
+  final bool active;
+  @override
+  Widget build(BuildContext context) => OperationsPage(
+          title: 'Analitik',
+          subtitle: 'Perbandingan berbasis data Laravel',
+          children: [
+            for (final entry in [
+              (
+                'destinations',
+                'Perbandingan destinasi',
+                'Kapasitas, alokasi, dan konfirmasi'
+              ),
+              ('approvals', 'Kinerja Admin', 'Keputusan tim dan beban claim'),
+              ('visitors', 'Kunjungan', 'Check-in yang teramati')
+            ])
+              Card(
+                  margin: const EdgeInsets.only(bottom: 8),
+                  color: Colors.white,
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                      side: const BorderSide(color: AppColors.border)),
+                  clipBehavior: Clip.antiAlias,
+                  child: ListTile(
+                      contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 14, vertical: 8),
+                      title: Text(entry.$2,
+                          style: const TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w700,
+                              color: AppColors.navy)),
+                      subtitle: Text(entry.$3,
+                          style: const TextStyle(
+                              fontSize: 12,
+                              height: 1.5,
+                              color: Color(0xFF526787))),
+                      trailing: const Icon(PhosphorIconsRegular.caretRight,
+                          color: AppColors.blue),
+                      onTap: () => Navigator.of(context).push(
+                          MaterialPageRoute<void>(
+                              builder: (_) => OperationsReportScreen(
+                                  section: entry.$1,
+                                  repository: repository,
+                                  session: session))))),
+            const SizedBox(height: 20),
+            OperationsFinancialScreen(
+                repository: repository,
+                session: session,
+                preview: true,
+                active: active),
+          ]);
+}

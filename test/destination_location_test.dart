@@ -6,8 +6,8 @@ import 'package:http/http.dart' as http;
 import 'package:latlong2/latlong.dart';
 import 'package:wisata_daerahku/data/app_data.dart';
 import 'package:wisata_daerahku/data/business_repository.dart';
-import 'package:wisata_daerahku/screens/destination_location_picker_screen.dart';
-import 'package:wisata_daerahku/screens/detail_wisata_screen.dart';
+import 'package:wisata_daerahku/screens/admin/destination_location_picker_screen.dart';
+import 'package:wisata_daerahku/screens/user/detail_wisata_screen.dart';
 import 'package:wisata_daerahku/widgets/destination_location_map_preview.dart';
 import 'admin_test_support.dart';
 

@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 import '../data/business_repository.dart';
 import '../core/config/app_config.dart';
 import '../data/payment_models.dart';
-import '../screens/booking_payment_screen.dart';
-import '../screens/demo_checkout_screen.dart';
+import '../screens/user/booking_payment_screen.dart';
+import '../screens/user/demo_checkout_screen.dart';
 import '../theme/app_colors.dart';
 
 /// Read-only capabilities beside the existing booking detail; one checkout route for all entries.

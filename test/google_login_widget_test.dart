@@ -6,7 +6,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
-import 'package:wisata_daerahku/screens/user_login_screen.dart';
+import 'package:wisata_daerahku/screens/auth/user_login_screen.dart';
 import 'package:wisata_daerahku/services/auth_session.dart';
 
 import 'auth_session_test.dart' show MemoryStore;

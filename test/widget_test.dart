@@ -9,7 +9,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 // Pastikan import ini mengarah ke file main.dart proyek Anda
 import 'package:wisata_daerahku/main.dart';
-import 'package:wisata_daerahku/screens/user_login_screen.dart';
+import 'package:wisata_daerahku/screens/auth/user_login_screen.dart';
 import 'package:wisata_daerahku/services/auth_session.dart';
 import 'package:wisata_daerahku/services/fcm_device_manager.dart';
 

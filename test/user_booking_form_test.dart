@@ -7,8 +7,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:wisata_daerahku/data/app_data.dart';
 import 'package:wisata_daerahku/data/booking_intent.dart';
 import 'package:wisata_daerahku/data/business_repository.dart';
-import 'package:wisata_daerahku/screens/daftar_kunjungan_screen.dart';
-import 'package:wisata_daerahku/screens/permintaan_terkirim_screen.dart';
+import 'package:wisata_daerahku/screens/user/daftar_kunjungan_screen.dart';
+import 'package:wisata_daerahku/screens/user/permintaan_terkirim_screen.dart';
 import 'package:wisata_daerahku/services/api_client.dart';
 import 'package:wisata_daerahku/services/auth_session.dart';
 

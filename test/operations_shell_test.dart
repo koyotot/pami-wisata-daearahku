@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:wisata_daerahku/screens/operations_navigation_shell.dart';
-import 'package:wisata_daerahku/screens/main_navigation_screen.dart';
-import 'package:wisata_daerahku/screens/session_destination.dart';
-import 'package:wisata_daerahku/screens/user_login_screen.dart';
+import 'package:wisata_daerahku/screens/admin/operations_navigation_shell.dart';
+import 'package:wisata_daerahku/screens/user/main_navigation_screen.dart';
+import 'package:wisata_daerahku/screens/shared/session_destination.dart';
+import 'package:wisata_daerahku/screens/auth/user_login_screen.dart';
 import 'package:wisata_daerahku/widgets/floating_bottom_nav.dart';
 import 'admin_test_support.dart';
 

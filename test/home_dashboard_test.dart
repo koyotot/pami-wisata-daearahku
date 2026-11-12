@@ -4,7 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:wisata_daerahku/data/business_repository.dart';
 import 'package:wisata_daerahku/data/favorite_state.dart';
-import 'package:wisata_daerahku/screens/beranda_user_screen.dart';
+import 'package:wisata_daerahku/screens/user/beranda_user_screen.dart';
 import 'package:wisata_daerahku/services/auth_session.dart';
 import 'package:wisata_daerahku/theme/app_colors.dart';
 import 'package:wisata_daerahku/widgets/api_image.dart';

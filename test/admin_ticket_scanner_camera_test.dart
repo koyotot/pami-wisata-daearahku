@@ -5,7 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:mobile_scanner/src/method_channel/mobile_scanner_method_channel.dart';
-import 'package:wisata_daerahku/screens/admin_ticket_scanner_screen.dart';
+import 'package:wisata_daerahku/screens/admin/admin_ticket_scanner_screen.dart';
 import 'admin_test_support.dart';
 
 class _CameraPlatform extends MethodChannelMobileScanner {

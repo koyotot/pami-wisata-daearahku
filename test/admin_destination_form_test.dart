@@ -5,7 +5,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:http/http.dart' as http;
 import 'package:wisata_daerahku/data/app_data.dart' show Wisata;
 import 'package:wisata_daerahku/data/business_repository.dart' show Destination;
-import 'package:wisata_daerahku/screens/tambah_wisata_screen.dart';
+import 'package:wisata_daerahku/screens/admin/tambah_wisata_screen.dart';
 import 'admin_test_support.dart';
 import 'gallery_test_support.dart';
 

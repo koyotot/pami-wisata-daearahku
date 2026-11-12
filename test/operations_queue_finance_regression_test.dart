@@ -2,12 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:http/http.dart' as http;
-import 'package:wisata_daerahku/screens/operations_dashboard.dart';
-import 'package:wisata_daerahku/screens/operations_queue_screen.dart';
-import 'package:wisata_daerahku/screens/operations_booking_screen.dart';
-import 'package:wisata_daerahku/screens/operations_navigation_shell.dart';
-import 'package:wisata_daerahku/screens/daftar_wisata_screen.dart';
-import 'package:wisata_daerahku/screens/user_login_screen.dart';
+import 'package:wisata_daerahku/screens/admin/operations_dashboard/operations_dashboard.dart';
+import 'package:wisata_daerahku/screens/admin/operations_queue_screen.dart';
+import 'package:wisata_daerahku/screens/admin/operations_booking_screen.dart';
+import 'package:wisata_daerahku/screens/admin/operations_navigation_shell.dart';
+import 'package:wisata_daerahku/screens/admin/daftar_wisata_screen.dart';
+import 'package:wisata_daerahku/screens/auth/user_login_screen.dart';
 import 'admin_test_support.dart';
 import 'operations_test_support.dart';
 
