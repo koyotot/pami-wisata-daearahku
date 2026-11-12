@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:phosphor_icons/phosphor_icons.dart';
-import 'package:flutter/services.dart';
 import 'package:latlong2/latlong.dart';
 import '../../data/app_data.dart';
 import '../../data/business_repository.dart';
@@ -13,10 +12,12 @@ import '../../widgets/reviews_sheet.dart';
 import '../../widgets/visit_format.dart';
 import '../../widgets/destination_location_map_preview.dart';
 import '../../widgets/operations_chrome.dart';
+import '../../widgets/scroll_aware_status_bar.dart';
 import 'daftar_kunjungan_screen.dart';
 import 'destination_map_screen.dart';
 
-export '../../services/destination_directions.dart' show destinationDirectionsUri;
+export '../../services/destination_directions.dart'
+    show destinationDirectionsUri;
 
 class _C {
   static const blue = Color(0xFF1976D2);
@@ -286,13 +287,10 @@ class _DetailWisataScreenState extends State<DetailWisataScreen> {
         destination.ratingCount > 0 && destination.ratingAverage != null
             ? destination.ratingAverage!.toStringAsFixed(1)
             : 'Belum dinilai';
-    return AnnotatedRegion<SystemUiOverlayStyle>(
-      value: const SystemUiOverlayStyle(
-          statusBarColor: Colors.transparent,
-          statusBarIconBrightness: Brightness.light,
-          systemNavigationBarColor: Colors.transparent,
-          systemNavigationBarIconBrightness: Brightness.dark),
-      child: Scaffold(
+    // The hero photo is the last dark surface; past it the status bar sits on
+    // the light page background.
+    return ScrollAwareStatusBar(
+      builder: (context, heroKey) => Scaffold(
         backgroundColor: _C.bg,
         bottomNavigationBar: _bookingBar(destination),
         body: RefreshIndicator(
@@ -332,6 +330,7 @@ class _DetailWisataScreenState extends State<DetailWisataScreen> {
                   )),
                 SliverToBoxAdapter(
                     child: SizedBox(
+                        key: heroKey,
                         height: heroHeight,
                         child: Stack(children: [
                           Positioned.fill(

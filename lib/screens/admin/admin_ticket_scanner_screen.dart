@@ -390,9 +390,31 @@ class _AdminTicketScannerScreenState extends State<AdminTicketScannerScreen>
                 child: Text(_cameraError!, textAlign: TextAlign.center)),
           const SizedBox(height: 12),
           Row(children: [
+            // Label follows the real camera state; while it is running or
+            // starting `_start` is a no-op, so the button is shown disabled.
             Expanded(
-                child: OutlinedButton(
-                    onPressed: _start, child: const Text('Aktifkan kamera'))),
+                child: ValueListenableBuilder<MobileScannerState>(
+                    valueListenable: _camera,
+                    builder: (_, value, __) {
+                      final busy = value.isRunning || value.isStarting;
+                      final label = value.isRunning
+                          ? 'Kamera aktif'
+                          : value.isStarting
+                              ? 'Menyalakan kamera…'
+                              : _cameraError != null || value.error != null
+                                  ? 'Coba buka kamera lagi'
+                                  : 'Aktifkan kamera';
+                      return OutlinedButton.icon(
+                          key: const ValueKey('scanner-camera-button'),
+                          onPressed: busy ? null : _start,
+                          icon: Icon(
+                              value.isRunning
+                                  ? PhosphorIconsRegular.checkCircle
+                                  : PhosphorIconsRegular.camera,
+                              size: 18),
+                          label: Text(label,
+                              maxLines: 1, overflow: TextOverflow.ellipsis));
+                    })),
             const SizedBox(width: 8),
             ValueListenableBuilder<MobileScannerState>(
                 valueListenable: _camera,

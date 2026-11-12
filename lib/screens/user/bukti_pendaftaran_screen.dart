@@ -386,8 +386,12 @@ class _BuktiPendaftaranScreenState extends State<BuktiPendaftaranScreen> {
     required int disetujui,
     required int ditolak,
   }) {
+    // Larger text wraps the title and subtitle; give them room so they stay
+    // below the toolbar pill instead of running into it.
+    final textGrowth =
+        (MediaQuery.textScalerOf(context).scale(13) / 13 - 1).clamp(0.0, 2.0);
     return SliverAppBar(
-      expandedHeight: 252,
+      expandedHeight: 252 + textGrowth * 150,
       pinned: true,
       elevation: 0,
       scrolledUnderElevation: 0,
@@ -740,25 +744,33 @@ class _StatTile extends StatelessWidget {
                 ]
               : null,
         ),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Text(
-              '$count',
-              style: _font(
-                  20, FontWeight.w800, selected ? accent : Colors.white,
-                  height: 1.1),
-            ),
-            const SizedBox(height: 2),
-            Text(
-              label,
-              style: _font(
-                11,
-                FontWeight.w700,
-                selected ? _textMuted : Colors.white.withValues(alpha: 0.92),
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+        // The tile height is fixed by the header; at large text scales the
+        // label stays on one line and the content shrinks only as far as needed.
+        child: FittedBox(
+          fit: BoxFit.scaleDown,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                '$count',
+                style: _font(
+                    20, FontWeight.w800, selected ? accent : Colors.white,
+                    height: 1.1),
               ),
-            ),
-          ],
+              const SizedBox(height: 2),
+              Text(
+                label,
+                maxLines: 1,
+                softWrap: false,
+                style: _font(
+                  11,
+                  FontWeight.w700,
+                  selected ? _textMuted : Colors.white.withValues(alpha: 0.92),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

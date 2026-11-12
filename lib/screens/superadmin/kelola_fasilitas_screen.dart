@@ -203,7 +203,9 @@ class _KelolaFasilitasScreenState extends State<KelolaFasilitasScreen> {
           adminEmptySliver(
               PhosphorIconsRegular.bellSimple,
               'Belum ada fasilitas',
-              'Tambahkan fasilitas pertama untuk dipilih pada destinasi.')
+              'Tambahkan fasilitas pertama untuk dipilih pada destinasi.',
+              // Same clearance as the populated list below.
+              bottomInset: 94)
         else ...[
           if (_list.error != null)
             SliverToBoxAdapter(

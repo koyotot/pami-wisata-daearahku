@@ -14,6 +14,7 @@ import '../../data/app_data.dart';
 import '../../data/business_repository.dart';
 import '../../services/auth_session.dart';
 import '../../widgets/operations_chrome.dart';
+import '../../widgets/scroll_aware_status_bar.dart';
 import '../../theme/app_colors.dart';
 import '../../data/gallery_draft.dart';
 import '../../widgets/admin_destination_gallery_editor.dart';
@@ -480,15 +481,11 @@ class _TambahWisataScreenState extends State<TambahWisataScreen> {
               textTheme: GoogleFonts.plusJakartaSansTextTheme(
                   Theme.of(context).textTheme),
             ),
-      child: AnnotatedRegion<SystemUiOverlayStyle>(
-        value: const SystemUiOverlayStyle(
-          statusBarColor: Colors.transparent,
-          statusBarIconBrightness: Brightness.light,
-          statusBarBrightness: Brightness.dark,
-          systemNavigationBarColor: Colors.white,
-          systemNavigationBarIconBrightness: Brightness.dark,
-        ),
-        child: PopScope(
+      // Role 1 has a scrolling scenic header; other roles keep a pinned dark bar.
+      child: ScrollAwareStatusBar(
+        tracksHeader: _session.role == 1,
+        navigationBarColor: Colors.white,
+        builder: (context, headerKey) => PopScope(
             canPop: !_dirty && !_isSaving,
             onPopInvokedWithResult: (didPop, _) async {
               if (!didPop && await _confirmDiscard() && mounted) {
@@ -496,7 +493,7 @@ class _TambahWisataScreenState extends State<TambahWisataScreen> {
                 if (context.mounted) Navigator.pop(context);
               }
             },
-            child: _buildScaffold(context)),
+            child: _buildScaffold(context, headerKey)),
       ),
     );
   }
@@ -509,7 +506,7 @@ class _TambahWisataScreenState extends State<TambahWisataScreen> {
     if (mounted && _savedDestinationGuid != null) await _reloadGallery();
   }
 
-  Widget _buildScaffold(BuildContext context) {
+  Widget _buildScaffold(BuildContext context, GlobalKey headerKey) {
     final isEdit = widget.wisataEdit != null || _savedDestinationGuid != null;
 
     if (!canAccessAdmin(_session.role) ||
@@ -534,11 +531,15 @@ class _TambahWisataScreenState extends State<TambahWisataScreen> {
                 // ── SliverAppBar ─────────────────────────────────
                 if (_session.role == 1)
                   SliverToBoxAdapter(
-                      child: OperationsScenicHeader(
-                          title: isEdit ? 'Ubah Destinasi' : 'Tambah Destinasi',
-                          subtitle:
-                              'Informasi, galeri, dan fasilitas destinasi',
-                          onBack: () => Navigator.maybePop(context)))
+                      child: KeyedSubtree(
+                          key: headerKey,
+                          child: OperationsScenicHeader(
+                              title: isEdit
+                                  ? 'Ubah Destinasi'
+                                  : 'Tambah Destinasi',
+                              subtitle:
+                                  'Informasi, galeri, dan fasilitas destinasi',
+                              onBack: () => Navigator.maybePop(context))))
                 else
                   SliverAppBar(
                     expandedHeight: 210,
@@ -877,11 +878,13 @@ class _TambahWisataScreenState extends State<TambahWisataScreen> {
                             size: 20,
                           ),
                           const SizedBox(width: 10),
-                          const Flexible(
+                          Flexible(
                               child: Text(
-                            'Simpan Perubahan',
+                            isEdit
+                                ? 'Simpan Perubahan'
+                                : 'Simpan Destinasi Baru',
                             textAlign: TextAlign.center,
-                            style: TextStyle(
+                            style: const TextStyle(
                                 fontSize: 15, fontWeight: FontWeight.w800),
                           )),
                         ],
@@ -1229,7 +1232,7 @@ class _TambahWisataScreenState extends State<TambahWisataScreen> {
                 style: TextStyle(color: _C.textMuted, fontSize: 12)),
           if (widget.wisataEdit != null)
             const Text(
-                'Fasilitas hanya diganti bila pilihan diubah. Penggantian dapat melepas relasi fasilitas nonaktif yang tersembunyi.',
+                'Fasilitas hanya diperbarui jika pilihan diubah. Saat diperbarui, fasilitas yang sudah dinonaktifkan dan tidak tampil di daftar ini dapat ikut dilepas dari destinasi.',
                 style: TextStyle(color: _C.textMuted, fontSize: 12)),
           if (_facilities.loading)
             const Padding(

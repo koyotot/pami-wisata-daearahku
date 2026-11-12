@@ -10,7 +10,8 @@ import '../../services/api_client.dart';
 import 'admin_common.dart';
 import '../../theme/app_colors.dart';
 import '../../widgets/operations_chrome.dart';
-import 'operations_dashboard/operations_dashboard.dart' show OperationsPage, OperationsSkeleton;
+import 'operations_dashboard/operations_dashboard.dart'
+    show OperationsPage, OperationsSkeleton;
 
 class OperationsBookingScreen extends StatefulWidget {
   const OperationsBookingScreen(
@@ -570,12 +571,13 @@ class _OperationsBookingScreenState extends State<OperationsBookingScreen>
                         child: AdminBadge(bookingStatusLabel(booking.status),
                             AdminColors.blueDeep)),
                     const SizedBox(height: 14),
-                    _BookingField('Kunjungan', visitDay(booking.visitDate)),
+                    _BookingField(
+                        'Kunjungan', visitDayLabel(booking.visitDate)),
                     _BookingField('Tiket', '${booking.quantity} orang'),
                     _BookingField('Total booking',
                         formatMoney(booking.totalAmount, booking.currency)),
                     _BookingField('Batas persetujuan',
-                        '${booking.json['approval_expires_at'] ?? '—'}'),
+                        formatDeadline(booking.json['approval_expires_at'])),
                   ])),
               const SizedBox(height: 12),
               _BookingPanel(

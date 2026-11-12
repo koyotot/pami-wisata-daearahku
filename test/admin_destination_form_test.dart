@@ -92,7 +92,7 @@ void main() {
     await tester.pumpAndSettle();
     await pickGalleryPhoto(tester);
     await pickDraftLocation(tester);
-    await tester.tap(find.text('Simpan Perubahan'));
+    await tester.tap(find.text('Simpan Destinasi Baru'));
     await tester.pumpAndSettle();
 
     final post = log.singleWhere((r) => r.method == 'POST');

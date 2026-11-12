@@ -244,8 +244,8 @@ void main() {
       } else {
         expect(find.text('Gross tercatat'), findsOneWidget);
         expect(find.text('Rp12.345'), findsOneWidget);
-        expect(find.text('Sumber: simulated_demo_events · partial'),
-            findsOneWidget);
+        expect(
+            find.text('Sumber: Simulasi DEMO · data sebagian'), findsOneWidget);
       }
       expect(tester.takeException(), isNull);
     });

@@ -78,10 +78,62 @@ String formatMoney(int amount, String currency) {
     buffer.write(digits[i]);
   }
   final sign = amount < 0 ? '-' : '';
-  return amount == 0 ? 'Gratis' : '$currency $sign$buffer';
+  if (amount == 0) return 'Gratis';
+  // Same wording as the visitor catalog and detail (`Rp15.000`).
+  return currency == 'IDR' ? '${sign}Rp$buffer' : '$currency $sign$buffer';
 }
 
 String _two(int v) => v.toString().padLeft(2, '0');
+
+const _shortMonths = [
+  'Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', //
+  'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des',
+];
+
+/// `13 Nov 2026` for a calendar `visit_date`, without time-zone conversion.
+/// Anything that is not a plain date is shown as received.
+String visitDayLabel(String value) {
+  final day = visitDay(value);
+  final parsed = RegExp(r'^(\d{4})-(\d{2})-(\d{2})$').firstMatch(day);
+  if (parsed == null) return day;
+  final month = int.parse(parsed[2]!);
+  if (month < 1 || month > 12) return day;
+  return '${int.parse(parsed[3]!)} ${_shortMonths[month - 1]} ${parsed[1]}';
+}
+
+/// Zone name for a UTC offset, e.g. `WIB`; other offsets as `UTC+5:30`.
+String zoneLabel(Duration offset) {
+  switch (offset.inMinutes) {
+    case 420:
+      return 'WIB';
+    case 480:
+      return 'WITA';
+    case 540:
+      return 'WIT';
+  }
+  final minutes = offset.inMinutes.abs();
+  final sign = offset.isNegative ? '-' : '+';
+  final rest = minutes % 60 == 0 ? '' : ':${_two(minutes % 60)}';
+  return 'UTC$sign${minutes ~/ 60}$rest';
+}
+
+/// `12 Nov 2026, 22.14 WIB`: [instant] shown at [offset] with the zone named,
+/// so the moment itself never changes.
+String formatInstantAt(DateTime instant, Duration offset) {
+  final d = instant.toUtc().add(offset);
+  return '${d.day} ${_shortMonths[d.month - 1]} ${d.year}, '
+      '${_two(d.hour)}.${_two(d.minute)} ${zoneLabel(offset)}';
+}
+
+/// A server deadline such as `approval_expires_at`, in the device time zone
+/// with its zone named. Missing → `—`; unparseable → shown as received.
+String formatDeadline(Object? raw) {
+  final text = raw?.toString().trim() ?? '';
+  if (text.isEmpty) return '—';
+  final parsed = DateTime.tryParse(text);
+  if (parsed == null) return text;
+  return formatInstantAt(parsed, parsed.toLocal().timeZoneOffset);
+}
 
 /// `dd/MM/yyyy HH:mm` in the device time zone.
 String formatDateTime(DateTime value) {

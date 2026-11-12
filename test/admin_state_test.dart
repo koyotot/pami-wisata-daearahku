@@ -491,7 +491,7 @@ void main() {
     test('server visit_date timestamps are shown as a day', () {
       expect(visitDay('2026-12-01T00:00:00.000000Z'), '2026-12-01');
       expect(visitDay('2026-12-01'), '2026-12-01');
-      expect(formatMoney(25000, 'IDR'), 'IDR 25.000');
+      expect(formatMoney(25000, 'IDR'), 'Rp25.000');
       expect(formatMoney(0, 'IDR'), 'Gratis');
     });
   });

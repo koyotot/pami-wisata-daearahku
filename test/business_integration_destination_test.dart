@@ -134,7 +134,7 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('facility-f1')));
     await pickGalleryPhoto(tester);
     await pickDraftLocation(tester);
-    await tester.tap(find.text('Simpan Perubahan'));
+    await tester.tap(find.text('Simpan Destinasi Baru'));
     await tester.pumpAndSettle();
     expect(find.textContaining('Destinasi sudah tersimpan.'), findsOneWidget);
     expect(requests.where((r) => r.method == 'POST'), hasLength(1));

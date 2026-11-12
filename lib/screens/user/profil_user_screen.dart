@@ -946,8 +946,11 @@ class _ProfilUserScreenState extends State<ProfilUserScreen>
           children: [
             Icon(PhosphorIconsRegular.globeHemisphereWest, color: _C.teal),
             const SizedBox(width: 10),
-            Text('Wisata Daerahku',
-                style: TextStyle(color: _C.text, fontWeight: FontWeight.w800)),
+            const Expanded(
+              child: Text('Wisata Daerahku',
+                  style:
+                      TextStyle(color: _C.text, fontWeight: FontWeight.w800)),
+            ),
           ],
         ),
         content: Text(

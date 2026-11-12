@@ -334,8 +334,10 @@ class _AccountCard extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    // Long names and similar emails must stay distinguishable,
+                    // so the name gets two lines and the email wraps in full.
                     Text(a.name,
-                        maxLines: 1,
+                        maxLines: 2,
                         overflow: TextOverflow.ellipsis,
                         style: const TextStyle(
                             color: AdminColors.text,
@@ -343,8 +345,6 @@ class _AccountCard extends StatelessWidget {
                             fontWeight: FontWeight.w800)),
                     const SizedBox(height: 2),
                     Text(a.email,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
                         style: const TextStyle(
                             color: AdminColors.textMuted, fontSize: 12)),
                   ],

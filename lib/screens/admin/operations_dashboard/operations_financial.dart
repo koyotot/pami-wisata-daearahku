@@ -334,16 +334,18 @@ class _OperationsFinancialState extends State<OperationsFinancialScreen>
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
                       const _SectionTitle('Sumber & kelengkapan'),
-                      _financialRow(
-                          'Environment', '${financial['environment']}'),
-                      _financialRow('Provider', '${financial['provider']}'),
+                      _financialRow('Lingkungan',
+                          _financialEnvironmentLabel(financial['environment'])),
+                      _financialRow('Penyedia', '${financial['provider']}'),
                       _financialRow('Label', '${financial['label'] ?? '—'}'),
                       _financialRow(
-                          'Sumber', '${financial['source'] ?? 'unavailable'}'),
+                          'Sumber', _financialSourceLabel(financial['source'])),
                       _financialRow(
-                          'Ketersediaan', '${financial['availability']}'),
-                      _financialRow(
-                          'Basis nominal', '${financial['date_basis'] ?? '—'}'),
+                          'Kelengkapan',
+                          _financialAvailabilityLabel(
+                              financial['availability'])),
+                      _financialRow('Nominal dihitung menurut',
+                          _financialDateBasisLabel(financial['date_basis'])),
                       Text(_financialReason(financial['reason']),
                           style: const TextStyle(
                               fontSize: 12,
@@ -352,7 +354,7 @@ class _OperationsFinancialState extends State<OperationsFinancialScreen>
                       if (financial['missing_fields'] is List &&
                           (financial['missing_fields'] as List).isNotEmpty)
                         Text(
-                            'Belum tersedia: ${(financial['missing_fields'] as List).join(', ')}',
+                            'Belum tersedia: ${(financial['missing_fields'] as List).map(_financialFieldLabel).join(', ')}',
                             style: const TextStyle(
                                 fontSize: 12,
                                 height: 1.6,
@@ -534,8 +536,7 @@ class _OperationsFinancialState extends State<OperationsFinancialScreen>
                     children: [
                   const _AdminHomeHeading('Sumber data'),
                   Text(
-                      '${financial['source'] ?? 'unavailable'} · '
-                      '${financial['availability']}. '
+                      '${_financialSourceLine(financial)}. '
                       'Jangan tafsirkan sebagai saldo tersedia atau net settlement.',
                       style: const TextStyle(
                           fontSize: 12,
@@ -600,8 +601,7 @@ class _OperationsFinancialState extends State<OperationsFinancialScreen>
             ]),
           const SizedBox(height: 8),
           if (_financial != null)
-            Text(
-                'Sumber: ${_financial!['source']} · ${_financial!['availability']}',
+            Text('Sumber: ${_financialSourceLine(_financial)}',
                 style: const TextStyle(
                     fontSize: 12, height: 1.5, color: Color(0xFF526787))),
           _routeLink('Buka Financial Dashboard', _open),
@@ -620,7 +620,7 @@ class _OperationsFinancialState extends State<OperationsFinancialScreen>
           Tooltip(
               message: 'Ringkasan DEMO bulan ini (UTC), seluruh penugasan. '
                   'Filter keuangan tersedia di dashboard. '
-                  'Sumber: ${_financial?['source'] ?? 'belum tersedia'}',
+                  'Sumber: ${_financialSourceLabel(_financial?['source'])}',
               child: const Icon(PhosphorIconsRegular.money,
                   size: 20, color: AppColors.navy)),
         ]),
@@ -645,7 +645,9 @@ class _OperationsFinancialState extends State<OperationsFinancialScreen>
           const Divider(height: AppSpacing.sm, color: AppColors.border),
           _financialRow('Transaksi sukses', _metric('successful_transactions')),
           if (_financial?['availability'] == 'partial')
-            Text('Sumber: ${_financial!['source']} · partial',
+            Text(
+                'Sumber: ${_financialSourceLabel(_financial!['source'])} · '
+                '${_financialAvailabilityLabel('partial')}',
                 style: const TextStyle(
                     fontSize: 12, height: 1.5, color: AppColors.textSecondary)),
         ],
@@ -688,8 +690,11 @@ class _OperationsFinancialState extends State<OperationsFinancialScreen>
                           color: Colors.white,
                           fontFeatures: const [FontFeature.tabularFigures()])),
                   const SizedBox(height: 6),
-                  const Text('Nominal recognized · paid_utc',
-                      style: TextStyle(fontSize: 12, color: Colors.white)),
+                  Text(
+                      'Nominal diakui menurut '
+                      '${_financialDateBasisLabel('paid_utc')}',
+                      style:
+                          const TextStyle(fontSize: 12, color: Colors.white)),
                 ])),
         const SizedBox(height: 12),
         LayoutBuilder(builder: (context, constraints) {
@@ -742,7 +747,8 @@ class _OperationsFinancialState extends State<OperationsFinancialScreen>
                       ? 'Lengkap'
                       : 'Belum lengkap'),
               Text(
-                  'Refund: ${financial['refunds_basis'] ?? '—'} · ${financial['refund_date_basis'] ?? '—'}',
+                  'Dasar refund: ${_financialDateBasisLabel(financial['refunds_basis'])} · '
+                  '${_financialDateBasisLabel(financial['refund_date_basis'])}',
                   style: const TextStyle(
                       fontSize: 12, height: 1.5, color: Color(0xFF526787))),
               const Text('Data yang belum tersedia tidak dihitung sebagai Rp0.',
@@ -766,15 +772,17 @@ class _OperationsFinancialState extends State<OperationsFinancialScreen>
           child:
               Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
         const _SectionTitle('Percobaan pembayaran'),
-        _financialRow('Total attempt', _metric('payment_attempts')),
-        _financialRow('Capture sukses · paid_utc',
-            _metric('successful_payment_attempts')),
-        _financialRow(
-            'Gagal · attempt_started_utc', _metric('failed_attempts')),
-        _financialRow(
-            'Expired · attempt_started_utc', _metric('expired_attempts')),
-        _financialRow(
-            'Unknown · attempt_started_utc', _metric('unknown_attempts')),
+        Text(
+            'Berhasil dihitung menurut ${_financialDateBasisLabel('paid_utc')}; '
+            'lainnya menurut ${_financialDateBasisLabel('attempt_started_utc')}.',
+            style: const TextStyle(
+                fontSize: 12, height: 1.5, color: Color(0xFF526787))),
+        const SizedBox(height: 4),
+        _financialRow('Total percobaan', _metric('payment_attempts')),
+        _financialRow('Berhasil', _metric('successful_payment_attempts')),
+        _financialRow('Gagal', _metric('failed_attempts')),
+        _financialRow('Kedaluwarsa', _metric('expired_attempts')),
+        _financialRow('Status belum diketahui', _metric('unknown_attempts')),
         _financialRow(
             'Rata-rata durasi',
             !_available || financial['avg_payment_seconds'] == null
@@ -797,7 +805,7 @@ class _OperationsFinancialState extends State<OperationsFinancialScreen>
                 '${item['method'] ?? '—'} · ${item['channel'] ?? '—'}',
                 _financialMoney(item['gross_collected'])),
             Text(
-                '${_financialNumber(item['successful_attempts'])} capture sukses · paid_utc',
+                '${_financialNumber(item['successful_attempts'])} pembayaran berhasil',
                 style: const TextStyle(fontSize: 12, color: Color(0xFF526787))),
             const SizedBox(height: 8),
           ],
@@ -837,7 +845,10 @@ class _OperationsFinancialState extends State<OperationsFinancialScreen>
       const SizedBox(height: 8),
       _financialRow(countLabel,
           '${_financialNumber(conversion[numerator])} / ${_financialNumber(conversion[denominator])}'),
-      Text('Basis: ${conversion['date_basis'] ?? 'Belum Tersedia'}',
+      Text(
+          conversion['date_basis'] == null
+              ? 'Dasar tanggal: Belum Tersedia'
+              : 'Dasar tanggal: ${_financialDateBasisLabel(conversion['date_basis'])}',
           style: const TextStyle(
               fontSize: 12, height: 1.5, color: Color(0xFF526787))),
       if (conversion['denominator_scope'] != null)
@@ -978,9 +989,67 @@ String _financialMoney(dynamic value) {
       : 'Rp${_financialNumber(number)}';
 }
 
+// Operational wording for server codes. Unknown codes are shown as received
+// rather than guessed, so a new backend value is never mislabelled.
+
+String _financialSourceLabel(dynamic source) => switch (source) {
+      'simulated_demo_events' => 'Simulasi DEMO',
+      'verified_sandbox_events' => 'Pembayaran sandbox terverifikasi',
+      'verified_production_events' => 'Pembayaran produksi terverifikasi',
+      null || 'unavailable' => 'Belum tersedia',
+      _ => '$source',
+    };
+
+String _financialAvailabilityLabel(dynamic availability) =>
+    switch (availability) {
+      'available' => 'data lengkap',
+      'partial' => 'data sebagian',
+      'unavailable' => 'belum tersedia',
+      null => '—',
+      _ => '$availability',
+    };
+
+String _financialEnvironmentLabel(dynamic environment) => switch (environment) {
+      'demo' => 'Demo (simulasi)',
+      'sandbox' => 'Sandbox (uji coba)',
+      'production' => 'Produksi',
+      null => '—',
+      _ => '$environment',
+    };
+
+/// Which date places a figure in the period; all bases are in UTC.
+String _financialDateBasisLabel(dynamic basis) => switch (basis) {
+      'paid_utc' => 'tanggal pembayaran berhasil (UTC)',
+      'attempt_started_utc' => 'tanggal percobaan dimulai (UTC)',
+      'refund_utc' => 'tanggal refund (UTC)',
+      'verified_receipts' => 'bukti refund terverifikasi',
+      null => '—',
+      _ => '$basis',
+    };
+
+/// Names of server fields that are not available yet.
+String _financialFieldLabel(dynamic field) => switch (field) {
+      'verified_capture_source' => 'sumber pembayaran terverifikasi',
+      'gateway_fees' => 'biaya gateway',
+      'net_revenue' => 'net revenue',
+      'settlement' => 'settlement',
+      'refunds' => 'refund',
+      _ => '$field',
+    };
+
+/// `Sumber · kelengkapan`, said once when both mean "not available".
+String _financialSourceLine(Json? financial) {
+  final source = _financialSourceLabel(financial?['source']);
+  if (financial?['availability'] == 'unavailable' &&
+      source == _financialSourceLabel(null)) {
+    return source;
+  }
+  return '$source · ${_financialAvailabilityLabel(financial?['availability'])}';
+}
+
 String _financialReason(dynamic reason) => switch (reason) {
       'no_verified_payment_source' =>
-        'Belum ada sumber pembayaran terverifikasi pada environment dan scope ini.',
+        'Belum ada pembayaran terverifikasi untuk lingkungan dan cakupan ini.',
       'fees_and_refunds_unavailable' =>
         'Data tersedia sebagian. Biaya gateway, net, settlement, dan kelengkapan refund belum tersedia.',
       'fees_unavailable_refunds_incomplete' =>

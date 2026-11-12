@@ -16,6 +16,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../data/app_data.dart';
 import '../../data/catalog_state.dart';
 import '../../widgets/api_image.dart';
+import '../../widgets/visit_format.dart';
 import '../auth/auth_presentation.dart';
 import 'detail_wisata_screen.dart';
 
@@ -42,6 +43,12 @@ TextStyle _font(
       height: height,
       letterSpacing: letterSpacing,
     );
+
+/// Same price wording as the detail screen (`Rp15.000`, `Gratis`). Local
+/// sample destinations keep their free-form label.
+String _hargaLabel(Wisata wisata) => wisata.isLaravel
+    ? visitMoney(wisata.ticketPrice, wisata.hargaTiket.split(' ').first)
+    : wisata.hargaTiket;
 
 const _kColor = {
   'Pantai': Color(0xFF0EA5E9),
@@ -263,8 +270,12 @@ class _CariWisataScreenState extends State<CariWisataScreen> {
 
   // ── Header gradien + kotak cari yang menempel ──────────────
   Widget _buildHeader() {
+    // Larger text needs more room above the search field so the title and a
+    // wrapped subtitle never slide under it or into the toolbar.
+    final textGrowth =
+        (MediaQuery.textScalerOf(context).scale(13) / 13 - 1).clamp(0.0, 2.0);
     return SliverAppBar(
-      expandedHeight: 220,
+      expandedHeight: 248 + textGrowth * 80,
       pinned: true,
       elevation: 0,
       scrolledUnderElevation: 0,
@@ -332,7 +343,8 @@ class _CariWisataScreenState extends State<CariWisataScreen> {
               Positioned(
                 left: 22,
                 right: 22,
-                bottom: 90,
+                // Search field occupies 50–104 from the bottom; keep a 16 dp gap.
+                bottom: 120,
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   mainAxisSize: MainAxisSize.min,
@@ -393,6 +405,7 @@ class _CariWisataScreenState extends State<CariWisataScreen> {
                     color: _blue, size: 22),
                 suffixIcon: _query.isNotEmpty
                     ? IconButton(
+                        tooltip: 'Hapus pencarian',
                         icon: const Icon(PhosphorIconsRegular.x,
                             color: _textMuted, size: 18),
                         onPressed: () {
@@ -454,7 +467,7 @@ class _CariWisataScreenState extends State<CariWisataScreen> {
   Widget _buildCategoryChips() {
     final kategori = _catalog.categories.data ?? [];
     return SizedBox(
-      height: 46,
+      height: 48,
       child: ListView.separated(
         padding: const EdgeInsets.symmetric(horizontal: 20),
         scrollDirection: Axis.horizontal,
@@ -469,46 +482,50 @@ class _CariWisataScreenState extends State<CariWisataScreen> {
           final warna = _kColor[k] ?? _blue;
           final ikon = _kIcon[k] ?? PhosphorIconsRegular.squaresFour;
 
-          return GestureDetector(
-            onTap: () {
-              setState(() => _kategori = guid);
-              _loadCatalog();
-            },
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 220),
-              curve: Curves.easeOut,
-              padding: const EdgeInsets.symmetric(horizontal: 14),
-              decoration: BoxDecoration(
-                gradient: aktif
-                    ? const LinearGradient(
-                        colors: [Color(0xFF2386E8), _blueDeep])
-                    : null,
-                color: aktif ? null : Colors.white,
-                borderRadius: BorderRadius.circular(16),
-                border: aktif ? null : Border.all(color: _border, width: 1.2),
-                boxShadow: aktif
-                    ? [
-                        BoxShadow(
-                          color: _blue.withValues(alpha: 0.3),
-                          blurRadius: 12,
-                          offset: const Offset(0, 5),
-                        ),
-                      ]
-                    : null,
-              ),
-              child: Row(
-                children: [
-                  Icon(ikon, size: 17, color: aktif ? Colors.white : warna),
-                  const SizedBox(width: 6),
-                  Text(
-                    k,
-                    style: _font(
-                      12.5,
-                      FontWeight.w700,
-                      aktif ? Colors.white : _navy,
+          return Semantics(
+            button: true,
+            selected: aktif,
+            child: GestureDetector(
+              onTap: () {
+                setState(() => _kategori = guid);
+                _loadCatalog();
+              },
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 220),
+                curve: Curves.easeOut,
+                padding: const EdgeInsets.symmetric(horizontal: 14),
+                decoration: BoxDecoration(
+                  gradient: aktif
+                      ? const LinearGradient(
+                          colors: [Color(0xFF2386E8), _blueDeep])
+                      : null,
+                  color: aktif ? null : Colors.white,
+                  borderRadius: BorderRadius.circular(16),
+                  border: aktif ? null : Border.all(color: _border, width: 1.2),
+                  boxShadow: aktif
+                      ? [
+                          BoxShadow(
+                            color: _blue.withValues(alpha: 0.3),
+                            blurRadius: 12,
+                            offset: const Offset(0, 5),
+                          ),
+                        ]
+                      : null,
+                ),
+                child: Row(
+                  children: [
+                    Icon(ikon, size: 17, color: aktif ? Colors.white : warna),
+                    const SizedBox(width: 6),
+                    Text(
+                      k,
+                      style: _font(
+                        12.5,
+                        FontWeight.w700,
+                        aktif ? Colors.white : _navy,
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
           );
@@ -841,7 +858,7 @@ class _HeroCard extends StatelessWidget {
                                     size: 12, color: Colors.white),
                                 const SizedBox(width: 5),
                                 Text(
-                                  wisata.hargaTiket,
+                                  _hargaLabel(wisata),
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
                                   style: _font(
@@ -969,7 +986,7 @@ class _GridCard extends StatelessWidget {
                           children: [
                             Expanded(
                               child: Text(
-                                wisata.hargaTiket,
+                                _hargaLabel(wisata),
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                                 style: _font(12, FontWeight.w800, _orange),
@@ -1099,7 +1116,7 @@ class _ListCard extends StatelessWidget {
                             const SizedBox(width: 4),
                             Expanded(
                               child: Text(
-                                wisata.hargaTiket,
+                                _hargaLabel(wisata),
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                                 style: _font(11.5, FontWeight.w700, _orange),

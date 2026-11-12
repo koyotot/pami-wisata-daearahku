@@ -24,6 +24,9 @@ class _NotifikasiScreenState extends State<NotifikasiScreen> {
   bool _unreadOnly = false;
   bool _opening = false;
 
+  /// Notifications whose full body is shown; others are clamped for scanning.
+  final _expanded = <String>{};
+
   Future<void> _refresh() async {
     if (widget.state.inbox.loading || widget.state.count.loading) return;
     await widget.state.refresh();
@@ -344,11 +347,16 @@ class _NotifikasiScreenState extends State<NotifikasiScreen> {
                                   fontWeight: FontWeight.w800,
                                   color: AppColors.navy)),
                           const SizedBox(height: 5),
-                          Text(item.body,
-                              style: const TextStyle(
-                                  fontSize: 12,
-                                  height: 1.6,
-                                  color: AppColors.textMuted)),
+                          _NotificationBody(
+                            key: ValueKey('notification-body-${item.guid}'),
+                            text: item.body,
+                            expanded: _expanded.contains(item.guid),
+                            onToggle: () => setState(() {
+                              if (!_expanded.remove(item.guid)) {
+                                _expanded.add(item.guid);
+                              }
+                            }),
+                          ),
                           if (date != null)
                             Padding(
                               padding: const EdgeInsets.only(top: 10),
@@ -417,4 +425,60 @@ class _NotifikasiScreenState extends State<NotifikasiScreen> {
           ],
         ),
       );
+}
+
+/// Notification text clamped to three lines so the list stays scannable.
+/// When the text is longer, a toggle reveals the full body in place; the
+/// card's own tap still opens the notification as before.
+class _NotificationBody extends StatelessWidget {
+  const _NotificationBody({
+    super.key,
+    required this.text,
+    required this.expanded,
+    required this.onToggle,
+  });
+
+  static const _maxLines = 3;
+  static const _style =
+      TextStyle(fontSize: 12, height: 1.6, color: AppColors.textMuted);
+
+  final String text;
+  final bool expanded;
+  final VoidCallback onToggle;
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(builder: (context, constraints) {
+      final painter = TextPainter(
+        text: TextSpan(text: text, style: _style),
+        maxLines: _maxLines,
+        textDirection: Directionality.of(context),
+        textScaler: MediaQuery.textScalerOf(context),
+      )..layout(maxWidth: constraints.maxWidth);
+      final overflows = painter.didExceedMaxLines;
+      painter.dispose();
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(text,
+              style: _style,
+              maxLines: expanded || !overflows ? null : _maxLines,
+              overflow: expanded || !overflows ? null : TextOverflow.ellipsis),
+          if (overflows)
+            TextButton(
+              onPressed: onToggle,
+              style: TextButton.styleFrom(
+                padding: const EdgeInsets.symmetric(horizontal: 0),
+                minimumSize: const Size(48, 40),
+                foregroundColor: AppColors.blueDeep,
+                alignment: Alignment.centerLeft,
+              ),
+              child: Text(expanded ? 'Ringkas' : 'Lihat selengkapnya',
+                  style: const TextStyle(
+                      fontSize: 12, fontWeight: FontWeight.w700)),
+            ),
+        ],
+      );
+    });
+  }
 }

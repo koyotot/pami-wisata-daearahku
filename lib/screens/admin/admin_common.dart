@@ -295,37 +295,52 @@ Widget adminErrorSliver(String message, VoidCallback onRetry, {int? role}) =>
       ),
     );
 
-Widget adminEmptySliver(IconData icon, String title, String subtitle) =>
+/// [bottomInset] keeps the message clear of a floating action button; when
+/// the text is too tall for the remaining space the sliver scrolls instead.
+Widget adminEmptySliver(IconData icon, String title, String subtitle,
+        {double bottomInset = 0}) =>
     SliverFillRemaining(
       hasScrollBody: false,
-      child: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(26),
-              decoration: BoxDecoration(
-                color: AdminColors.blue.withValues(alpha: 0.07),
-                shape: BoxShape.circle,
-                border: Border.all(
-                    color: AdminColors.blue.withValues(alpha: 0.15),
-                    width: 1.5),
-              ),
-              child: Icon(icon,
-                  size: 42, color: AdminColors.blue.withValues(alpha: 0.5)),
-            ),
-            const SizedBox(height: 18),
-            Text(title,
-                style: const TextStyle(
-                    color: AdminColors.text,
-                    fontSize: 16,
-                    fontWeight: FontWeight.w800)),
-            const SizedBox(height: 6),
-            Text(subtitle,
-                textAlign: TextAlign.center,
-                style: const TextStyle(
-                    color: AdminColors.textMuted, fontSize: 13)),
-          ],
+      child: Padding(
+        padding: EdgeInsets.fromLTRB(24, 16, 24, 16 + bottomInset),
+        child: Center(
+          child: Builder(builder: (context) {
+            // Short screens with large text drop the decorative icon so the
+            // message stays readable without scrolling.
+            final media = MediaQuery.of(context);
+            final compact = media.size.height / media.textScaler.scale(1) < 500;
+            return Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (!compact) ...[
+                  Container(
+                    padding: const EdgeInsets.all(26),
+                    decoration: BoxDecoration(
+                      color: AdminColors.blue.withValues(alpha: 0.07),
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                          color: AdminColors.blue.withValues(alpha: 0.15),
+                          width: 1.5),
+                    ),
+                    child: Icon(icon,
+                        size: 42,
+                        color: AdminColors.blue.withValues(alpha: 0.5)),
+                  ),
+                  const SizedBox(height: 18),
+                ],
+                Text(title,
+                    style: const TextStyle(
+                        color: AdminColors.text,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w800)),
+                const SizedBox(height: 6),
+                Text(subtitle,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                        color: AdminColors.textMuted, fontSize: 13)),
+              ],
+            );
+          }),
         ),
       ),
     );

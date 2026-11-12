@@ -70,27 +70,35 @@ class _DestinationHeroGalleryState extends State<DestinationHeroGallery> {
               controller: _pages,
               onPageChanged: _changed,
               itemCount: widget.images.length,
-              itemBuilder: (context, i) => GestureDetector(
-                  onTap: !widget.allowFullscreen
-                      ? null
-                      : () async {
-                          final index = await Navigator.push<int>(
-                              context,
-                              MaterialPageRoute(
-                                  builder: (_) => FullscreenDestinationGallery(
-                                      images: widget.images,
-                                      initialIndex: i,
-                                      adminGuid: widget.adminGuid,
-                                      repository: widget.repository)));
-                          if (mounted && index != null) {
-                            _pages.jumpToPage(index);
-                            _changed(index);
-                          }
-                        },
-                  child: ApiImage(
-                      imageUrl: widget.images[i].url('display'),
-                      adminGuid: widget.adminGuid,
-                      repository: widget.repository)))),
+              itemBuilder: (context, i) => Semantics(
+                  button: widget.allowFullscreen,
+                  label: widget.allowFullscreen
+                      ? 'Foto ${i + 1} dari ${widget.images.length}. '
+                          'Buka galeri layar penuh'
+                      : 'Foto ${i + 1} dari ${widget.images.length}',
+                  image: !widget.allowFullscreen,
+                  child: GestureDetector(
+                      onTap: !widget.allowFullscreen
+                          ? null
+                          : () async {
+                              final index = await Navigator.push<int>(
+                                  context,
+                                  MaterialPageRoute(
+                                      builder: (_) =>
+                                          FullscreenDestinationGallery(
+                                              images: widget.images,
+                                              initialIndex: i,
+                                              adminGuid: widget.adminGuid,
+                                              repository: widget.repository)));
+                              if (mounted && index != null) {
+                                _pages.jumpToPage(index);
+                                _changed(index);
+                              }
+                            },
+                      child: ApiImage(
+                          imageUrl: widget.images[i].url('display'),
+                          adminGuid: widget.adminGuid,
+                          repository: widget.repository))))),
       if (widget.images.length > 1) ...[
         Positioned(
           right: 20,

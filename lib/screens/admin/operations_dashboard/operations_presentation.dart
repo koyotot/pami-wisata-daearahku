@@ -2,6 +2,7 @@ part of 'operations_dashboard.dart';
 
 class _DashboardHero extends StatelessWidget {
   const _DashboardHero({
+    super.key,
     this.executive = false,
     this.role,
     this.title,
