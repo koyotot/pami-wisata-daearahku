@@ -9,6 +9,7 @@ import '../../data/favorite_state.dart';
 import '../../services/api_client.dart';
 import '../../theme/app_colors.dart';
 import '../../widgets/api_image.dart';
+import '../../widgets/scroll_aware_status_bar.dart';
 import '../auth/auth_presentation.dart';
 import 'bukti_pendaftaran_screen.dart';
 import 'detail_wisata_screen.dart';
@@ -201,79 +202,89 @@ class _BerandaUserScreenState extends State<BerandaUserScreen>
   Widget build(BuildContext context) {
     final favorites = _favorites.favorites;
     final saved = favorites.data ?? [];
-    return Scaffold(
-      backgroundColor: AppColors.bg,
-      body: RefreshIndicator(
-        onRefresh: _refresh,
-        child: SingleChildScrollView(
-          physics: const AlwaysScrollableScrollPhysics(
-              parent: BouncingScrollPhysics()),
-          child:
-              Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-            _hero(),
-            Center(
-                child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 640),
-              child: Padding(
-                padding: EdgeInsets.fromLTRB(
-                    20, 20, 20, 16 + MediaQuery.paddingOf(context).bottom),
-                child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      _heading('Perjalanan Kamu', 'Riwayat', widget.onHistory),
-                      const SizedBox(height: 12),
-                      _journey(),
-                      if (favorites.loading && saved.isEmpty) ...[
-                        const SizedBox(height: 24),
-                        _heading('Favorit Kamu'),
-                        const SizedBox(height: 12),
-                        _loading('Memuat favorit…'),
-                      ] else if (favorites.error != null) ...[
-                        const SizedBox(height: 24),
-                        _heading('Favorit Kamu'),
-                        _error(
-                            'Favorit belum dapat diperbarui.', _favorites.load),
-                      ] else if (saved.isNotEmpty) ...[
-                        const SizedBox(height: 24),
-                        _heading(
-                            'Favorit Kamu',
-                            'Lihat Semua',
-                            () => showModalBottomSheet<void>(
-                                context: context,
-                                backgroundColor: Colors.transparent,
-                                isScrollControlled: true,
-                                builder: (_) =>
-                                    const SavedDestinationsSheet())),
-                        const SizedBox(height: 12),
-                        _favoritesRow(saved.map((f) => f.destination).toList()),
-                      ],
-                      const SizedBox(height: 24),
-                      _heading(
-                          'Inspirasi Wisata', 'Lihat Semua', widget.onExplore),
-                      const SizedBox(height: 6),
-                      Text('Sedikit inspirasi untuk perjalanan berikutnya.',
-                          style: _text(13, color: AppColors.textMuted)),
-                      const SizedBox(height: 14),
-                      if (_inspiration.error != null)
-                        _error('Inspirasi belum dapat diperbarui.',
-                            _loadInspiration)
-                      else if (_inspiration.loading &&
-                          _inspiration.data == null)
-                        _loading('Memuat inspirasi…', minHeight: 210)
-                      else if ((_inspiration.data ?? []).isEmpty)
-                        Text('Destinasi baru akan hadir di sini.',
-                            style: _text(14, color: AppColors.textMuted))
-                      else
-                        _editorial(_inspiration.data!),
-                      const SizedBox(height: 24),
-                      _exploreBanner(),
-                    ]),
+    // Light icons over the scenic hero, dark once it scrolls away.
+    return ScrollAwareStatusBar(
+        builder: (context, headerKey) => Scaffold(
+              backgroundColor: AppColors.bg,
+              body: RefreshIndicator(
+                onRefresh: _refresh,
+                child: SingleChildScrollView(
+                  physics: const AlwaysScrollableScrollPhysics(
+                      parent: BouncingScrollPhysics()),
+                  child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        KeyedSubtree(key: headerKey, child: _hero()),
+                        Center(
+                            child: ConstrainedBox(
+                          constraints: const BoxConstraints(maxWidth: 640),
+                          child: Padding(
+                            padding: EdgeInsets.fromLTRB(20, 20, 20,
+                                16 + MediaQuery.paddingOf(context).bottom),
+                            child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                                children: [
+                                  _heading('Perjalanan Kamu', 'Riwayat',
+                                      widget.onHistory),
+                                  const SizedBox(height: 12),
+                                  _journey(),
+                                  if (favorites.loading && saved.isEmpty) ...[
+                                    const SizedBox(height: 24),
+                                    _heading('Favorit Kamu'),
+                                    const SizedBox(height: 12),
+                                    _loading('Memuat favorit…'),
+                                  ] else if (favorites.error != null) ...[
+                                    const SizedBox(height: 24),
+                                    _heading('Favorit Kamu'),
+                                    _error('Favorit belum dapat diperbarui.',
+                                        _favorites.load),
+                                  ] else if (saved.isNotEmpty) ...[
+                                    const SizedBox(height: 24),
+                                    _heading(
+                                        'Favorit Kamu',
+                                        'Lihat Semua',
+                                        () => showModalBottomSheet<void>(
+                                            context: context,
+                                            backgroundColor: Colors.transparent,
+                                            isScrollControlled: true,
+                                            builder: (_) =>
+                                                const SavedDestinationsSheet())),
+                                    const SizedBox(height: 12),
+                                    _favoritesRow(saved
+                                        .map((f) => f.destination)
+                                        .toList()),
+                                  ],
+                                  const SizedBox(height: 24),
+                                  _heading('Inspirasi Wisata', 'Lihat Semua',
+                                      widget.onExplore),
+                                  const SizedBox(height: 6),
+                                  Text(
+                                      'Sedikit inspirasi untuk perjalanan berikutnya.',
+                                      style: _text(13,
+                                          color: AppColors.textMuted)),
+                                  const SizedBox(height: 14),
+                                  if (_inspiration.error != null)
+                                    _error('Inspirasi belum dapat diperbarui.',
+                                        _loadInspiration)
+                                  else if (_inspiration.loading &&
+                                      _inspiration.data == null)
+                                    _loading('Memuat inspirasi…',
+                                        minHeight: 210)
+                                  else if ((_inspiration.data ?? []).isEmpty)
+                                    Text('Destinasi baru akan hadir di sini.',
+                                        style: _text(14,
+                                            color: AppColors.textMuted))
+                                  else
+                                    _editorial(_inspiration.data!),
+                                  const SizedBox(height: 24),
+                                  _exploreBanner(),
+                                ]),
+                          ),
+                        )),
+                      ]),
+                ),
               ),
-            )),
-          ]),
-        ),
-      ),
-    );
+            ));
   }
 
   Widget _hero() {

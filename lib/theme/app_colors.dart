@@ -52,11 +52,16 @@ class AppColors {
         scaffoldBackgroundColor: bg,
         canvasColor: bg,
         textTheme: GoogleFonts.plusJakartaSansTextTheme(),
-        appBarTheme: const AppBarTheme(
+        // Plain sub-page bars share one title treatment: centred, bold navy.
+        appBarTheme: AppBarTheme(
             backgroundColor: bg,
             foregroundColor: navy,
             elevation: 0,
-            surfaceTintColor: Colors.transparent),
+            scrolledUnderElevation: 0,
+            centerTitle: true,
+            surfaceTintColor: Colors.transparent,
+            titleTextStyle: GoogleFonts.plusJakartaSans(
+                fontSize: 18, fontWeight: FontWeight.w800, color: navy)),
         elevatedButtonTheme: ElevatedButtonThemeData(
             style: ElevatedButton.styleFrom(
                 backgroundColor: blue,
