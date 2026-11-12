@@ -159,108 +159,111 @@ class _CariWisataScreenState extends State<CariWisataScreen> {
     final hasil = _hasil;
     final sedangMencari = _query.trim().isNotEmpty || _kategori != _semua;
 
+    // Once the scenic background has faded, the pinned toolbar sits on the
+    // light page: switch the status bar icons and the count pill to dark.
     return AnnotatedRegion<SystemUiOverlayStyle>(
-      value: const SystemUiOverlayStyle(
-        statusBarColor: Colors.transparent,
-        statusBarIconBrightness: Brightness.light,
-        statusBarBrightness: Brightness.dark,
-      ),
+      value: _statusBarStyle(_collapsed),
       child: Scaffold(
         backgroundColor: _background,
         body: GestureDetector(
           behavior: HitTestBehavior.translucent,
           onTap: () => FocusScope.of(context).unfocus(),
-          child: RefreshIndicator(
-            onRefresh: _refresh,
-            child: CustomScrollView(
-              physics: const BouncingScrollPhysics(
-                  parent: AlwaysScrollableScrollPhysics()),
-              slivers: [
-                _buildHeader(),
-                SliverToBoxAdapter(child: _buildCategoryChips()),
-                SliverToBoxAdapter(
-                    child: _buildSectionTitle(hasil.length, sedangMencari)),
-                if (_catalog.categories.loading ||
-                    _catalog.destinations.loading)
-                  const SliverFillRemaining(
-                      hasScrollBody: false,
-                      child: Center(child: CircularProgressIndicator()))
-                else if (_catalog.categories.error != null ||
-                    _catalog.destinations.error != null)
-                  SliverFillRemaining(
-                      hasScrollBody: false,
-                      child: Center(
-                          child:
-                              Column(mainAxisSize: MainAxisSize.min, children: [
-                        const Text('Gagal memuat data wisata.'),
-                        TextButton(
-                            onPressed: _refresh,
-                            child: const Text('Coba lagi')),
-                      ])))
-                else if (hasil.isEmpty)
-                  SliverFillRemaining(
-                      hasScrollBody: false, child: _notFoundState())
-                else if (_modeGrid) ...[
-                  // Kartu besar (hasil pertama)
+          child: NotificationListener<ScrollNotification>(
+            onNotification: _onScroll,
+            child: RefreshIndicator(
+              onRefresh: _refresh,
+              child: CustomScrollView(
+                physics: const BouncingScrollPhysics(
+                    parent: AlwaysScrollableScrollPhysics()),
+                slivers: [
+                  _buildHeader(),
+                  SliverToBoxAdapter(child: _buildCategoryChips()),
                   SliverToBoxAdapter(
-                    child: Padding(
-                      padding: const EdgeInsets.fromLTRB(20, 0, 20, 14),
-                      child: _FadeSlide(
-                        key: ValueKey(_animKey(hasil.first)),
-                        index: 0,
-                        child: _HeroCard(wisata: hasil.first),
+                      child: _buildSectionTitle(hasil.length, sedangMencari)),
+                  if (_catalog.categories.loading ||
+                      _catalog.destinations.loading)
+                    const SliverFillRemaining(
+                        hasScrollBody: false,
+                        child: Center(child: CircularProgressIndicator()))
+                  else if (_catalog.categories.error != null ||
+                      _catalog.destinations.error != null)
+                    SliverFillRemaining(
+                        hasScrollBody: false,
+                        child: Center(
+                            child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                              const Text('Gagal memuat data wisata.'),
+                              TextButton(
+                                  onPressed: _refresh,
+                                  child: const Text('Coba lagi')),
+                            ])))
+                  else if (hasil.isEmpty)
+                    SliverFillRemaining(
+                        hasScrollBody: false, child: _notFoundState())
+                  else if (_modeGrid) ...[
+                    // Kartu besar (hasil pertama)
+                    SliverToBoxAdapter(
+                      child: Padding(
+                        padding: const EdgeInsets.fromLTRB(20, 0, 20, 14),
+                        child: _FadeSlide(
+                          key: ValueKey(_animKey(hasil.first)),
+                          index: 0,
+                          child: _HeroCard(wisata: hasil.first),
+                        ),
                       ),
                     ),
-                  ),
-                  // Sisanya: grid 2 kolom
-                  if (hasil.length > 1)
+                    // Sisanya: grid 2 kolom
+                    if (hasil.length > 1)
+                      SliverPadding(
+                        padding: const EdgeInsets.fromLTRB(20, 0, 20, 32),
+                        sliver: SliverGrid(
+                          gridDelegate:
+                              SliverGridDelegateWithFixedCrossAxisCount(
+                            crossAxisCount: MediaQuery.sizeOf(context).width <
+                                        370 ||
+                                    MediaQuery.textScalerOf(context).scale(1) >
+                                        1.3
+                                ? 1
+                                : 2,
+                            mainAxisSpacing: 14,
+                            crossAxisSpacing: 14,
+                            mainAxisExtent: 248 *
+                                MediaQuery.textScalerOf(context)
+                                    .scale(1)
+                                    .clamp(1, 1.5),
+                          ),
+                          delegate: SliverChildBuilderDelegate(
+                            (_, i) {
+                              final w = hasil[i + 1];
+                              return _FadeSlide(
+                                key: ValueKey(_animKey(w)),
+                                index: i + 1,
+                                child: _GridCard(wisata: w),
+                              );
+                            },
+                            childCount: hasil.length - 1,
+                          ),
+                        ),
+                      )
+                    else
+                      const SliverToBoxAdapter(child: SizedBox(height: 32)),
+                  ] else
                     SliverPadding(
                       padding: const EdgeInsets.fromLTRB(20, 0, 20, 32),
-                      sliver: SliverGrid(
-                        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                          crossAxisCount: MediaQuery.sizeOf(context).width <
-                                      370 ||
-                                  MediaQuery.textScalerOf(context).scale(1) >
-                                      1.3
-                              ? 1
-                              : 2,
-                          mainAxisSpacing: 14,
-                          crossAxisSpacing: 14,
-                          mainAxisExtent: 248 *
-                              MediaQuery.textScalerOf(context)
-                                  .scale(1)
-                                  .clamp(1, 1.5),
-                        ),
+                      sliver: SliverList(
                         delegate: SliverChildBuilderDelegate(
-                          (_, i) {
-                            final w = hasil[i + 1];
-                            return _FadeSlide(
-                              key: ValueKey(_animKey(w)),
-                              index: i + 1,
-                              child: _GridCard(wisata: w),
-                            );
-                          },
-                          childCount: hasil.length - 1,
+                          (_, i) => _FadeSlide(
+                            key: ValueKey(_animKey(hasil[i])),
+                            index: i,
+                            child: _ListCard(wisata: hasil[i]),
+                          ),
+                          childCount: hasil.length,
                         ),
-                      ),
-                    )
-                  else
-                    const SliverToBoxAdapter(child: SizedBox(height: 32)),
-                ] else
-                  SliverPadding(
-                    padding: const EdgeInsets.fromLTRB(20, 0, 20, 32),
-                    sliver: SliverList(
-                      delegate: SliverChildBuilderDelegate(
-                        (_, i) => _FadeSlide(
-                          key: ValueKey(_animKey(hasil[i])),
-                          index: i,
-                          child: _ListCard(wisata: hasil[i]),
-                        ),
-                        childCount: hasil.length,
                       ),
                     ),
-                  ),
-              ],
+                ],
+              ),
             ),
           ),
         ),
@@ -268,42 +271,77 @@ class _CariWisataScreenState extends State<CariWisataScreen> {
     );
   }
 
-  // ── Header gradien + kotak cari yang menempel ──────────────
-  Widget _buildHeader() {
+  bool _collapsed = false;
+
+  static SystemUiOverlayStyle _statusBarStyle(bool collapsed) =>
+      SystemUiOverlayStyle(
+        statusBarColor: Colors.transparent,
+        statusBarIconBrightness: collapsed ? Brightness.dark : Brightness.light,
+        statusBarBrightness: collapsed ? Brightness.light : Brightness.dark,
+      );
+
+  double get _expandedHeight {
     // Larger text needs more room above the search field so the title and a
     // wrapped subtitle never slide under it or into the toolbar.
     final textGrowth =
         (MediaQuery.textScalerOf(context).scale(13) / 13 - 1).clamp(0.0, 2.0);
+    return 248 + textGrowth * 80;
+  }
+
+  bool _onScroll(ScrollNotification n) {
+    if (n.depth != 0 || n.metrics.axis != Axis.vertical) return false;
+    // FlexibleSpaceBar fades its background over the last toolbar height of
+    // the collapse range (expanded height minus toolbar and search field).
+    final fadeStart = _expandedHeight - 104 - 2 * kToolbarHeight;
+    final next = n.metrics.pixels > fadeStart;
+    if (next != _collapsed) setState(() => _collapsed = next);
+    return false;
+  }
+
+  // ── Header gradien + kotak cari yang menempel ──────────────
+  Widget _buildHeader() {
+    final collapsed = _collapsed;
     return SliverAppBar(
-      expandedHeight: 248 + textGrowth * 80,
+      expandedHeight: _expandedHeight,
       pinned: true,
       elevation: 0,
       scrolledUnderElevation: 0,
       shadowColor: Colors.transparent,
       surfaceTintColor: Colors.transparent,
       shape: const Border(),
-      forceMaterialTransparency: true,
-      backgroundColor: _blue,
+      // Pinned headers let the list scroll underneath them; once collapsed
+      // the bar turns opaque so cards do not show through the search field.
+      forceMaterialTransparency: !collapsed,
+      // The app bar's own overlay style wins over the page region above.
+      systemOverlayStyle: _statusBarStyle(collapsed),
+      backgroundColor: collapsed ? _background : _blue,
       automaticallyImplyLeading: false,
       centerTitle: true,
       // Pill jumlah destinasi
-      title: Container(
+      title: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
         height: 34,
         padding: const EdgeInsets.symmetric(horizontal: 12),
         decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: 0.22),
+          color: collapsed
+              ? _blue.withValues(alpha: 0.08)
+              : Colors.white.withValues(alpha: 0.22),
           borderRadius: BorderRadius.circular(17),
-          border: Border.all(color: Colors.white.withValues(alpha: 0.35)),
+          border: Border.all(
+              color: collapsed
+                  ? _blue.withValues(alpha: 0.20)
+                  : Colors.white.withValues(alpha: 0.35)),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(PhosphorIconsRegular.mapPin,
-                size: 14, color: Colors.white),
+            Icon(PhosphorIconsRegular.mapPin,
+                size: 14, color: collapsed ? _blue : Colors.white),
             const SizedBox(width: 5),
             Text(
               '${_hasil.length} destinasi tersedia',
-              style: _font(11.5, FontWeight.w700, Colors.white),
+              style: _font(
+                  11.5, FontWeight.w700, collapsed ? _navy : Colors.white),
             ),
           ],
         ),

@@ -298,6 +298,8 @@ class _ProfilUserScreenState extends State<ProfilUserScreen>
   Widget build(BuildContext context) {
     final user = currentUser;
     final tahunBergabung = user?.emailVerifiedAt?.year.toString() ?? '\u2014';
+    // With large text the identity card alone fills most of the viewport.
+    final compact = MediaQuery.textScalerOf(context).scale(1) > 1.3;
 
     return Theme(
       // Font Plus Jakarta Sans untuk seluruh halaman, dialog & bottom sheet
@@ -351,130 +353,166 @@ class _ProfilUserScreenState extends State<ProfilUserScreen>
                                           .toDouble(),
                                 ),
                               ),
-                              PinnedHeaderSliver(
-                                child: Padding(
-                                  padding: const EdgeInsets.symmetric(
-                                      horizontal: 20),
-                                  child: _buildHeaderCard(user, tahunBergabung),
+                              // Large text: the card scrolls with the menu
+                              // instead of pinning over it.
+                              if (compact)
+                                SliverToBoxAdapter(
+                                  child: Padding(
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 20),
+                                    child:
+                                        _buildHeaderCard(user, tahunBergabung),
+                                  ),
+                                )
+                              else
+                                PinnedHeaderSliver(
+                                  child: Padding(
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 20),
+                                    child:
+                                        _buildHeaderCard(user, tahunBergabung),
+                                  ),
                                 ),
-                              ),
                               SliverLayoutBuilder(
                                 builder: (context, constraints) =>
                                     SliverToBoxAdapter(
                                   child: ClipRect(
                                     clipper: _ProfileMenuClipper(
-                                      constraints.scrollOffset +
-                                          270 -
-                                          (layoutConstraints.maxHeight -
-                                              constraints
-                                                  .viewportMainAxisExtent) -
-                                          (constraints.viewportMainAxisExtent -
-                                              constraints.remainingPaintExtent),
+                                      compact
+                                          ? 0
+                                          : constraints.scrollOffset +
+                                              270 -
+                                              (layoutConstraints.maxHeight -
+                                                  constraints
+                                                      .viewportMainAxisExtent) -
+                                              (constraints
+                                                      .viewportMainAxisExtent -
+                                                  constraints
+                                                      .remainingPaintExtent),
                                     ),
-                                    child: Padding(
-                                      padding: EdgeInsets.only(
-                                          bottom: MediaQuery.paddingOf(context)
-                                              .bottom),
-                                      child: Padding(
-                                        padding: const EdgeInsets.fromLTRB(
-                                            20, 26, 20, 32),
-                                        child: Column(
-                                          crossAxisAlignment:
-                                              CrossAxisAlignment.start,
-                                          children: [
-                                            if (_jumlahError != null)
-                                              TextButton.icon(
-                                                onPressed:
-                                                    _loadJumlahPendaftaran,
-                                                icon: const Icon(
-                                                    PhosphorIconsRegular
-                                                        .arrowsClockwise),
-                                                label: Text(
-                                                    '$_jumlahError Coba lagi'),
-                                              ),
-                                            const SizedBox(height: 26),
-                                            _sectionLabel('Aktivitas Saya'),
-                                            const SizedBox(height: 12),
-                                            _buildMenuGroup([
-                                              _MenuItemData(
-                                                icon: PhosphorIconsRegular
-                                                    .chatText,
-                                                iconColor:
-                                                    const Color(0xFF1E88E5),
-                                                title: 'Riwayat Ulasan',
-                                                subtitle:
-                                                    'Ulasan yang pernah kamu tulis',
-                                                onTap: () =>
-                                                    _bukaRiwayatUlasan(context),
-                                              ),
-                                            ],
-                                                leading:
-                                                    _buildWisataTersimpan()),
-                                            const SizedBox(height: 26),
-                                            _sectionLabel(
-                                                'Pengaturan & Keamanan'),
-                                            const SizedBox(height: 12),
-                                            _buildMenuGroup([
-                                              _MenuItemData(
-                                                icon:
-                                                    PhosphorIconsRegular.globe,
-                                                iconColor:
-                                                    const Color(0xFF7E57C2),
-                                                title: 'Bahasa',
-                                                subtitle:
-                                                    'Indonesia · bahasa lain belum tersedia',
-                                                onTap: () =>
-                                                    _bukaPilihBahasa(context),
-                                              ),
-                                              _MenuItemData(
-                                                icon: PhosphorIconsRegular.key,
-                                                iconColor:
-                                                    const Color(0xFF26A69A),
-                                                title: 'Ubah Password',
-                                                subtitle:
-                                                    'Belum tersedia untuk akun API',
-                                                onTap: () =>
-                                                    _bukaGantiPassword(context),
-                                              ),
-                                            ]),
-                                            const SizedBox(height: 26),
-                                            _sectionLabel('Informasi Aplikasi'),
-                                            const SizedBox(height: 12),
-                                            _buildMenuGroup([
-                                              _MenuItemData(
-                                                icon: PhosphorIconsRegular.info,
-                                                iconColor: _C.blue,
-                                                title: 'Tentang Aplikasi',
-                                                subtitle:
-                                                    'Wisata Daerahku · versi 1.0.0',
-                                                onTap: () =>
-                                                    _tampilkanTentang(context),
-                                              ),
-                                            ]),
-                                            const SizedBox(height: 26),
-                                            _sectionLabel('Pengelolaan Akun'),
-                                            const SizedBox(height: 12),
-                                            _buildMenuGroup([
-                                              _MenuItemData(
-                                                icon:
-                                                    PhosphorIconsRegular.trash,
-                                                iconColor: _C.danger,
-                                                title: 'Hapus Akun',
-                                                subtitle:
-                                                    'Belum tersedia untuk akun API',
-                                                onTap: () =>
-                                                    _konfirmasiHapusAkun(
-                                                        context),
-                                                isDanger: true,
-                                              ),
-                                            ]),
-                                            const SizedBox(height: 24),
-                                            _buildLogoutButton(context),
-                                            const SizedBox(height: 8),
-                                          ],
-                                        ),
-                                      ),
-                                    ),
+                                    child: DecoratedBox(
+                                        // Compact: the menu scrolls over the
+                                        // scenic header, so give it the page
+                                        // surface like a sheet.
+                                        decoration: compact
+                                            ? const BoxDecoration(
+                                                color: _C.bg,
+                                                borderRadius:
+                                                    BorderRadius.vertical(
+                                                        top: Radius.circular(
+                                                            28)))
+                                            : const BoxDecoration(),
+                                        child: Padding(
+                                          padding: EdgeInsets.only(
+                                              bottom:
+                                                  MediaQuery.paddingOf(context)
+                                                      .bottom),
+                                          child: Padding(
+                                            padding: const EdgeInsets.fromLTRB(
+                                                20, 26, 20, 32),
+                                            child: Column(
+                                              crossAxisAlignment:
+                                                  CrossAxisAlignment.start,
+                                              children: [
+                                                if (_jumlahError != null)
+                                                  TextButton.icon(
+                                                    onPressed:
+                                                        _loadJumlahPendaftaran,
+                                                    icon: const Icon(
+                                                        PhosphorIconsRegular
+                                                            .arrowsClockwise),
+                                                    label: Text(
+                                                        '$_jumlahError Coba lagi'),
+                                                  ),
+                                                const SizedBox(height: 26),
+                                                _sectionLabel('Aktivitas Saya'),
+                                                const SizedBox(height: 12),
+                                                _buildMenuGroup([
+                                                  _MenuItemData(
+                                                    icon: PhosphorIconsRegular
+                                                        .chatText,
+                                                    iconColor:
+                                                        const Color(0xFF1E88E5),
+                                                    title: 'Riwayat Ulasan',
+                                                    subtitle:
+                                                        'Ulasan yang pernah kamu tulis',
+                                                    onTap: () =>
+                                                        _bukaRiwayatUlasan(
+                                                            context),
+                                                  ),
+                                                ],
+                                                    leading:
+                                                        _buildWisataTersimpan()),
+                                                const SizedBox(height: 26),
+                                                _sectionLabel(
+                                                    'Pengaturan & Keamanan'),
+                                                const SizedBox(height: 12),
+                                                _buildMenuGroup([
+                                                  _MenuItemData(
+                                                    icon: PhosphorIconsRegular
+                                                        .globe,
+                                                    iconColor: _C.blueDeep,
+                                                    title: 'Bahasa',
+                                                    subtitle:
+                                                        'Indonesia · bahasa lain belum tersedia',
+                                                    onTap: () =>
+                                                        _bukaPilihBahasa(
+                                                            context),
+                                                  ),
+                                                  _MenuItemData(
+                                                    icon: PhosphorIconsRegular
+                                                        .key,
+                                                    iconColor: _C.blue,
+                                                    title: 'Ubah Password',
+                                                    subtitle:
+                                                        'Belum tersedia untuk akun API',
+                                                    onTap: () =>
+                                                        _bukaGantiPassword(
+                                                            context),
+                                                  ),
+                                                ]),
+                                                const SizedBox(height: 26),
+                                                _sectionLabel(
+                                                    'Informasi Aplikasi'),
+                                                const SizedBox(height: 12),
+                                                _buildMenuGroup([
+                                                  _MenuItemData(
+                                                    icon: PhosphorIconsRegular
+                                                        .info,
+                                                    iconColor: _C.blue,
+                                                    title: 'Tentang Aplikasi',
+                                                    subtitle:
+                                                        'Wisata Daerahku · versi 1.0.0',
+                                                    onTap: () =>
+                                                        _tampilkanTentang(
+                                                            context),
+                                                  ),
+                                                ]),
+                                                const SizedBox(height: 26),
+                                                _sectionLabel(
+                                                    'Pengelolaan Akun'),
+                                                const SizedBox(height: 12),
+                                                _buildMenuGroup([
+                                                  _MenuItemData(
+                                                    icon: PhosphorIconsRegular
+                                                        .trash,
+                                                    iconColor: _C.danger,
+                                                    title: 'Hapus Akun',
+                                                    subtitle:
+                                                        'Belum tersedia untuk akun API',
+                                                    onTap: () =>
+                                                        _konfirmasiHapusAkun(
+                                                            context),
+                                                    isDanger: true,
+                                                  ),
+                                                ]),
+                                                const SizedBox(height: 24),
+                                                _buildLogoutButton(context),
+                                                const SizedBox(height: 8),
+                                              ],
+                                            ),
+                                          ),
+                                        )),
                                   ),
                                 ),
                               ),
@@ -631,9 +669,14 @@ class _ProfilUserScreenState extends State<ProfilUserScreen>
               child: Column(children: [
                 Text(stat.$2, style: _font(16, FontWeight.w800, _C.navy)),
                 const SizedBox(height: 4),
-                Text(stat.$1,
-                    textAlign: TextAlign.center,
-                    style: _font(12, FontWeight.w500, _C.textMuted)),
+                // One line; shrinks rather than breaking a word in two.
+                FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Text(stat.$1,
+                      maxLines: 1,
+                      textAlign: TextAlign.center,
+                      style: _font(12, FontWeight.w500, _C.textMuted)),
+                ),
               ]),
             ),
         ]),

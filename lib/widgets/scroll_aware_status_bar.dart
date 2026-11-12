@@ -7,17 +7,21 @@ import 'package:flutter/services.dart';
 /// that header still covers the status bar and turn dark once it has scrolled
 /// away and the light page background shows through. With [tracksHeader]
 /// false the icons stay light (for pages whose dark header stays pinned).
+/// A non-null [scrimColor] also paints that colour behind the status bar
+/// once the header is gone, so scrolled text does not run under the icons.
 class ScrollAwareStatusBar extends StatefulWidget {
   const ScrollAwareStatusBar({
     super.key,
     required this.builder,
     this.tracksHeader = true,
     this.navigationBarColor = Colors.transparent,
+    this.scrimColor,
   });
 
   final Widget Function(BuildContext context, GlobalKey headerKey) builder;
   final bool tracksHeader;
   final Color navigationBarColor;
+  final Color? scrimColor;
 
   @override
   State<ScrollAwareStatusBar> createState() => _ScrollAwareStatusBarState();
@@ -75,7 +79,21 @@ class _ScrollAwareStatusBarState extends State<ScrollAwareStatusBar> {
           systemNavigationBarColor: widget.navigationBarColor,
           systemNavigationBarIconBrightness: Brightness.dark,
         ),
-        child: widget.builder(context, _headerKey),
+        child: widget.scrimColor == null
+            ? widget.builder(context, _headerKey)
+            : Stack(fit: StackFit.expand, children: [
+                widget.builder(context, _headerKey),
+                Positioned(
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    height: MediaQuery.paddingOf(context).top,
+                    child: IgnorePointer(
+                        child: AnimatedOpacity(
+                            opacity: light ? 0 : 1,
+                            duration: const Duration(milliseconds: 150),
+                            child: ColoredBox(color: widget.scrimColor!)))),
+              ]),
       ),
     );
   }

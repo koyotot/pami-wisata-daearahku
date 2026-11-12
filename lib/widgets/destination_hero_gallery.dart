@@ -62,7 +62,10 @@ class _DestinationHeroGalleryState extends State<DestinationHeroGallery> {
     if (widget.images.isEmpty) {
       return const ColoredBox(
           color: Color(0xFFE5EDF5),
-          child: Center(child: Icon(PhosphorIconsRegular.mountains, size: 64)));
+          // Same muted brand blue as the catalogue's image placeholders.
+          child: Center(
+              child: Icon(PhosphorIconsRegular.mountains,
+                  size: 64, color: Color(0x801976D2))));
     }
     return Stack(children: [
       Positioned.fill(

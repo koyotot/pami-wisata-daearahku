@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:phosphor_icons/phosphor_icons.dart';
-import 'package:flutter/services.dart';
+import 'package:google_fonts/google_fonts.dart';
 import '../../data/notification_state.dart';
 import '../../data/business_repository.dart';
 import '../../theme/app_colors.dart';
+import '../../widgets/scroll_aware_status_bar.dart';
 import '../auth/auth_presentation.dart';
 import 'bukti_pendaftaran_screen.dart';
 
@@ -66,13 +67,11 @@ class _NotifikasiScreenState extends State<NotifikasiScreen> {
   }
 
   @override
-  Widget build(BuildContext context) => AnnotatedRegion<SystemUiOverlayStyle>(
-        value: const SystemUiOverlayStyle(
-          statusBarColor: Colors.transparent,
-          statusBarIconBrightness: Brightness.light,
-          statusBarBrightness: Brightness.dark,
-        ),
-        child: Scaffold(
+  // Light icons over the scenic hero; once it scrolls away the icons turn
+  // dark over a page-coloured strip so cards never run under them.
+  Widget build(BuildContext context) => ScrollAwareStatusBar(
+        scrimColor: AppColors.bg,
+        builder: (context, heroKey) => Scaffold(
           backgroundColor: AppColors.bg,
           body: RefreshIndicator(
             onRefresh: _refresh,
@@ -80,16 +79,18 @@ class _NotifikasiScreenState extends State<NotifikasiScreen> {
               physics: const AlwaysScrollableScrollPhysics(
                   parent: BouncingScrollPhysics()),
               slivers: [
-                SliverToBoxAdapter(child: _buildHero(context)),
+                SliverToBoxAdapter(
+                    child:
+                        KeyedSubtree(key: heroKey, child: _buildHero(context))),
                 SliverToBoxAdapter(child: _buildFilters()),
-                const SliverToBoxAdapter(
+                SliverToBoxAdapter(
                   child: Padding(
-                    padding: EdgeInsets.fromLTRB(20, 10, 20, 10),
+                    padding: const EdgeInsets.fromLTRB(20, 10, 20, 10),
                     child: Text('Aktivitas terbaru',
-                        style: TextStyle(
+                        style: _jakarta(const TextStyle(
                             color: AppColors.navy,
                             fontSize: 16,
-                            fontWeight: FontWeight.w800)),
+                            fontWeight: FontWeight.w800))),
                   ),
                 ),
                 ListenableBuilder(
@@ -134,15 +135,18 @@ class _NotifikasiScreenState extends State<NotifikasiScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const SizedBox(height: 94),
-                const Text('Notifikasi',
-                    style: TextStyle(
+                Text('Notifikasi',
+                    style: _jakarta(const TextStyle(
                         color: Colors.white,
                         fontSize: 26,
                         height: 1.15,
-                        fontWeight: FontWeight.w800)),
+                        fontWeight: FontWeight.w800))),
                 const SizedBox(height: 2),
-                const Text('Kabar terbaru tentang kunjungan Anda.',
-                    style: TextStyle(color: Colors.white, fontSize: 13)),
+                Text('Kabar terbaru tentang kunjungan Anda.',
+                    style: _jakarta(const TextStyle(
+                        color: Colors.white,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w500))),
               ],
             ),
           ),
@@ -342,10 +346,10 @@ class _NotifikasiScreenState extends State<NotifikasiScreen> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(item.title,
-                              style: const TextStyle(
+                              style: _jakarta(const TextStyle(
                                   fontSize: 14,
                                   fontWeight: FontWeight.w800,
-                                  color: AppColors.navy)),
+                                  color: AppColors.navy))),
                           const SizedBox(height: 5),
                           _NotificationBody(
                             key: ValueKey('notification-body-${item.guid}'),
@@ -356,16 +360,14 @@ class _NotifikasiScreenState extends State<NotifikasiScreen> {
                                 _expanded.add(item.guid);
                               }
                             }),
+                            footer: date == null
+                                ? null
+                                : Text(
+                                    '${twoDigits(date.day)}/${twoDigits(date.month)}/${date.year} • ${twoDigits(date.hour)}:${twoDigits(date.minute)}',
+                                    style: const TextStyle(
+                                        fontSize: 10,
+                                        color: AppColors.textMuted)),
                           ),
-                          if (date != null)
-                            Padding(
-                              padding: const EdgeInsets.only(top: 10),
-                              child: Text(
-                                  '${twoDigits(date.day)}/${twoDigits(date.month)}/${date.year} \u2022 ${twoDigits(date.hour)}:${twoDigits(date.minute)}',
-                                  style: const TextStyle(
-                                      fontSize: 10,
-                                      color: AppColors.textMuted)),
-                            ),
                         ],
                       ),
                     ),
@@ -430,12 +432,16 @@ class _NotifikasiScreenState extends State<NotifikasiScreen> {
 /// Notification text clamped to three lines so the list stays scannable.
 /// When the text is longer, a toggle reveals the full body in place; the
 /// card's own tap still opens the notification as before.
+TextStyle _jakarta(TextStyle style) =>
+    GoogleFonts.plusJakartaSans(textStyle: style);
+
 class _NotificationBody extends StatelessWidget {
   const _NotificationBody({
     super.key,
     required this.text,
     required this.expanded,
     required this.onToggle,
+    this.footer,
   });
 
   static const _maxLines = 3;
@@ -445,6 +451,9 @@ class _NotificationBody extends StatelessWidget {
   final String text;
   final bool expanded;
   final VoidCallback onToggle;
+
+  /// Timestamp line; shares the toggle's row so the card has no dead gap.
+  final Widget? footer;
 
   @override
   Widget build(BuildContext context) {
@@ -465,18 +474,32 @@ class _NotificationBody extends StatelessWidget {
               maxLines: expanded || !overflows ? null : _maxLines,
               overflow: expanded || !overflows ? null : TextOverflow.ellipsis),
           if (overflows)
-            TextButton(
-              onPressed: onToggle,
-              style: TextButton.styleFrom(
-                padding: const EdgeInsets.symmetric(horizontal: 0),
-                minimumSize: const Size(48, 40),
-                foregroundColor: AppColors.blueDeep,
-                alignment: Alignment.centerLeft,
+            SizedBox(
+              width: double.infinity,
+              child: Wrap(
+                alignment: WrapAlignment.spaceBetween,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                spacing: 12,
+                children: [
+                  TextButton(
+                    onPressed: onToggle,
+                    style: TextButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(horizontal: 0),
+                      minimumSize: const Size(48, 40),
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      foregroundColor: AppColors.blueDeep,
+                      alignment: Alignment.centerLeft,
+                    ),
+                    child: Text(expanded ? 'Ringkas' : 'Lihat selengkapnya',
+                        style: const TextStyle(
+                            fontSize: 12, fontWeight: FontWeight.w700)),
+                  ),
+                  if (footer != null) footer!,
+                ],
               ),
-              child: Text(expanded ? 'Ringkas' : 'Lihat selengkapnya',
-                  style: const TextStyle(
-                      fontSize: 12, fontWeight: FontWeight.w700)),
-            ),
+            )
+          else if (footer != null)
+            Padding(padding: const EdgeInsets.only(top: 10), child: footer),
         ],
       );
     });

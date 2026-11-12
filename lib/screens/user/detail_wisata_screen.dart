@@ -290,6 +290,7 @@ class _DetailWisataScreenState extends State<DetailWisataScreen> {
     // The hero photo is the last dark surface; past it the status bar sits on
     // the light page background.
     return ScrollAwareStatusBar(
+      scrimColor: _C.bg,
       builder: (context, heroKey) => Scaffold(
         backgroundColor: _C.bg,
         bottomNavigationBar: _bookingBar(destination),
@@ -608,17 +609,22 @@ class _DetailWisataScreenState extends State<DetailWisataScreen> {
                                                     fontSize: 12)),
                                         ])),
                                 const SizedBox(height: 24),
-                                Wrap(
-                                    alignment: WrapAlignment.spaceBetween,
-                                    crossAxisAlignment:
-                                        WrapCrossAlignment.center,
-                                    spacing: 12,
-                                    children: [
-                                      _heading('Ulasan Pengunjung'),
-                                      TextButton(
-                                          onPressed: _openReviews,
-                                          child: const Text('Lihat Semua'))
-                                    ]),
+                                // Full width so the link sits at the right
+                                // edge; it still wraps below at large text.
+                                SizedBox(
+                                  width: double.infinity,
+                                  child: Wrap(
+                                      alignment: WrapAlignment.spaceBetween,
+                                      crossAxisAlignment:
+                                          WrapCrossAlignment.center,
+                                      spacing: 12,
+                                      children: [
+                                        _heading('Ulasan Pengunjung'),
+                                        TextButton(
+                                            onPressed: _openReviews,
+                                            child: const Text('Lihat Semua'))
+                                      ]),
+                                ),
                                 const SizedBox(height: 10),
                                 if (destination.ratingCount == 0)
                                   const Text(

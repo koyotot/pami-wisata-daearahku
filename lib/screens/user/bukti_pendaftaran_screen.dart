@@ -1055,7 +1055,8 @@ class _TicketCardState extends State<_TicketCard> {
                         softWrap: true,
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
-                        style: _font(13, FontWeight.w700, _blue))),
+                        // Sized so a full BK- code fits one line at 393 dp.
+                        style: _font(12, FontWeight.w700, _blue))),
               ]),
             ),
           ),
@@ -1127,16 +1128,17 @@ class _TicketCardState extends State<_TicketCard> {
               ],
             );
           }
+          // Short values share a row; name and phone get the full width so
+          // an email-style name or a long number is not broken mid-word.
           return Column(children: [
             Row(children: [
-              Expanded(child: fields[0]),
-              Expanded(child: fields[1])
+              Expanded(child: fields[1]),
+              Expanded(child: fields[2])
             ]),
             const SizedBox(height: 14),
-            Row(children: [
-              Expanded(child: fields[2]),
-              Expanded(child: fields[3])
-            ]),
+            fields[0],
+            const SizedBox(height: 14),
+            fields[3],
           ]);
         },
       ),
