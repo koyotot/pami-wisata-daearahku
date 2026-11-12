@@ -9,7 +9,6 @@ import 'package:firebase_core/firebase_core.dart';
 import 'firebase_options.dart';
 import 'screens/auth/user_login_screen.dart';
 import 'theme/app_colors.dart';
-import 'theme/app_icons.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -99,76 +98,15 @@ class _WisataDaerahkuAppState extends State<WisataDaerahkuApp> {
           final session = AuthSession.instance;
           if (session.authenticated.value &&
               session.deviceSessionReady &&
-              session.role == 0) {
-            // The Navigator overlay also needs the visitor theme during route flights.
-            return Theme(data: AppColors.visitorTheme, child: child!);
+              session.role == 1) {
+            // Role-one dialogs, sheets and route flights share the operations shell theme.
+            return Theme(data: AppColors.operationsTheme, child: child!);
           }
           return child!;
         },
       ),
-      theme: ThemeData(
-        actionIconTheme: AppIcons.actionTheme,
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color(0xFF0A6E5E),
-          brightness: Brightness.light,
-        ),
-        useMaterial3: true,
-        fontFamily: 'Georgia',
-        scaffoldBackgroundColor: const Color(0xFFF7F4EF),
-        appBarTheme: const AppBarTheme(
-          backgroundColor: Color(0xFF0A6E5E),
-          foregroundColor: Colors.white,
-          elevation: 0,
-          centerTitle: true,
-          titleTextStyle: TextStyle(
-            fontFamily: 'Georgia',
-            fontSize: 18,
-            fontWeight: FontWeight.bold,
-            color: Colors.white,
-            letterSpacing: 0.5,
-          ),
-        ),
-        elevatedButtonTheme: ElevatedButtonThemeData(
-          style: ElevatedButton.styleFrom(
-            backgroundColor: const Color(0xFF0A6E5E),
-            foregroundColor: Colors.white,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(14),
-            ),
-            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-            textStyle: const TextStyle(
-              fontFamily: 'Georgia',
-              fontSize: 15,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-        ),
-        inputDecorationTheme: InputDecorationTheme(
-          filled: true,
-          fillColor: Colors.white,
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(14),
-            borderSide: BorderSide.none,
-          ),
-          enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(14),
-            borderSide: const BorderSide(color: Color(0xFFE0D9CE), width: 1.5),
-          ),
-          focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(14),
-            borderSide: const BorderSide(color: Color(0xFF0A6E5E), width: 2),
-          ),
-          labelStyle: const TextStyle(color: Color(0xFF7A7065)),
-          hintStyle: const TextStyle(color: Color(0xFFB0A898)),
-        ),
-        cardTheme: CardThemeData(
-          elevation: 0,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(20),
-          ),
-          color: Colors.white,
-        ),
-      ),
+      // Blue/navy + Plus Jakarta Sans root for every role, auth and overlay route.
+      theme: AppColors.visitorTheme,
       home: sessionDestination(),
       // HTTPS App Link: /tickets/{booking_guid} (e-ticket email). A navigation hint; the server decides.
       onGenerateRoute: (settings) => ticketLinkRoute(settings),

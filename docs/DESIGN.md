@@ -46,8 +46,7 @@ Nilai adalah ARGB; sumber dan pemakaian membedakan tema, konstanta dan gaya loka
 
 | Nama/peran | Nilai | Sumber dan penggunaan |
 |---|---|---|
-| seed/aksi, latar scaffold | `#FF0A6E5E`, `#FFF7F4EF` | `lib/main.dart:30-37`, ThemeData light |
-| AppBar/tombol, teks | `#FF0A6E5E`, `#FFFFFFFF` | `lib/main.dart:38-62` |
+| Tema root (semua role, auth, dialog/sheet/snackbar) | `AppColors.visitorTheme`: primary `#FF1976D2`, navy `#FF102D59`, latar `#FFF5F8FD` | `lib/main.dart` `theme:`; role 1 dibungkus `AppColors.operationsTheme` di `builder` Navigator. Teal `#FF0A6E5E`/krem `#FFF7F4EF` legacy tidak lagi dipakai root. |
 | input: surface, border enabled/focused, label/hint | `#FFFFFFFF`, `#FFE0D9CE`, `#FF0A6E5E`, `#FF7A7065`, `#FFB0A898` | `lib/main.dart:65-82` |
 | blue, blueDeep, navy, orange | `#FF1976D2`, `#FF1558B0`, `#FF102D59`, `#FFFF9800` | konstanta lokal `home_screen.dart:31-34`, `_C` serupa `main_navigation_screen.dart:24-31` dan `beranda_user_screen.dart:16-23` |
 | background, muted, border, danger | `#FFF5F8FD`, `#FF728099`, `#FFDCE4F0`, `#FFE5484D` | `_C` lokal misalnya `admin_dashboard.dart:22-35` |
@@ -62,14 +61,14 @@ Warna lokal lain dan transparansi ditentukan langsung pada masing-masing layar; 
 
 | Kategori | Nilai aktual dan sumber |
 |---|---|
-| Font global | `Georgia`, `ThemeData` (`lib/main.dart:36`); file font Georgia tidak didaftarkan di pubspec, sehingga ketersediaan/fallback bergantung platform. |
+| Font global | Plus Jakarta Sans via `GoogleFonts.plusJakartaSansTextTheme()` di `AppColors.visitorTheme`/`operationsTheme`, dipasang sebagai tema root (`lib/main.dart`). Georgia legacy sudah dihapus dari root. |
 | Font lokal | `GoogleFonts.plusJakartaSans`, helper `_font` misalnya `home_screen.dart:14-26`, `admin_dashboard.dart:38-51`; sebagian layar memakai `plusJakartaSansTextTheme` (`profil_user_screen.dart:283`). |
 | Ukuran/weight/tracking | AppBar 18/bold/0.5 dan ElevatedButton 15/bold (`lib/main.dart:43-62`); contoh lokal judul 18/w800/-0.4 (`home_screen.dart:133`), 20/w800/-0.5 (`admin_dashboard.dart:491`). Ukuran dan tracking lain ditentukan per widget; skala resmi tunggal tidak ditemukan. |
 | Spacing | ElevatedButton horizontal 24, vertikal 16 (`lib/main.dart:58`); `home_screen.dart:74-89` memakai gap 12, 14, 16 dan 22. Tidak ada token spacing global ditemukan. |
 | Radius/border | Tema input dan tombol 14, card 20; input enabled 1.5, focused 2 (`lib/main.dart:53-88`). Lokal misalnya hero beranda 28 dan kartu 24 (`beranda_user_screen.dart:233`, `:716`), action home 18 dan border 1.4 (`home_screen.dart:293-324`). |
 | Elevation/shadow | AppBar dan Card theme elevation 0 (`lib/main.dart:41,85`); hero home memakai `BoxShadow` blur 28, offset (0,12) (`home_screen.dart:153-156`); kartu dashboard blur 20, offset (0,8) (`admin_dashboard.dart:469-472`). |
 | Ikon | Material `Icons`, `uses-material-design: true` (`pubspec.yaml`, `home_screen.dart:124`); ukuran ditentukan lokal atau default Flutter jika tidak dinyatakan. Package `cupertino_icons` terdaftar tetapi penggunaan tidak ditemukan. |
-| Mode | `ColorScheme.fromSeed` dengan `Brightness.light`; `darkTheme`/`themeMode` tidak ditemukan (`lib/main.dart:28-92`). Ada layar bergaya gelap secara lokal, bukan dukungan dark mode global. |
+| Mode | `ColorScheme.fromSeed(seedColor: AppColors.blue)` light (`lib/theme/app_colors.dart`); `darkTheme`/`themeMode` tidak ditemukan. Ada layar bergaya gelap secara lokal, bukan dukungan dark mode global. |
 
 ## 4. Komponen UI Reusable
 
