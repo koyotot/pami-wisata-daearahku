@@ -18,6 +18,7 @@ import '../../data/booking_state.dart';
 import '../../data/business_repository.dart';
 import '../../data/favorite_state.dart';
 import '../../widgets/reviews_sheet.dart';
+import '../../widgets/select_sheet.dart' show showConfirmSheet;
 import '../../widgets/profile_avatar.dart';
 import '../../widgets/international_phone_field.dart';
 import '../auth/auth_presentation.dart';
@@ -1154,23 +1155,13 @@ class _EditProfilScreenState extends State<_EditProfilScreen> {
     if (_isLoading || _confirmingClose || _allowPop) return;
     if (_hasChanges) {
       _confirmingClose = true;
-      final discard = await showDialog<bool>(
-        context: context,
-        builder: (context) => AlertDialog(
-          title: const Text('Buang perubahan?'),
-          content: const Text('Perubahan profil belum disimpan.'),
-          actions: [
-            TextButton(
-                onPressed: () => Navigator.pop(context, false),
-                child: const Text('Lanjut Edit')),
-            TextButton(
-                onPressed: () => Navigator.pop(context, true),
-                child: const Text('Buang Perubahan')),
-          ],
-        ),
-      );
+      final discard = await showConfirmSheet(context,
+          title: 'Buang perubahan?',
+          message: 'Perubahan profil belum disimpan.',
+          confirmLabel: 'Buang Perubahan',
+          cancelLabel: 'Lanjut Edit');
       _confirmingClose = false;
-      if (!mounted || discard != true) return;
+      if (!mounted || !discard) return;
     }
     if (!mounted) return;
     setState(() => _allowPop = true);
