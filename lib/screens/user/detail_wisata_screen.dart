@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:phosphor_icons/phosphor_icons.dart';
 import 'package:latlong2/latlong.dart';
+import '../../data/admin_state.dart' show canAccessAdmin;
 import '../../data/app_data.dart';
 import '../../data/business_repository.dart';
 import '../../data/favorite_state.dart';
@@ -82,7 +83,7 @@ class _DetailWisataScreenState extends State<DetailWisataScreen> {
       if (widget.adminPreview &&
           (!_session.authenticated.value ||
               !_session.deviceSessionReady ||
-              _session.role != 1)) {
+              !canAccessAdmin(_session.role))) {
         throw const ApiException(
             'Akses pratinjau berakhir. Kembali ke Kelola.', 403);
       }
@@ -202,7 +203,7 @@ class _DetailWisataScreenState extends State<DetailWisataScreen> {
             _detail.loading ||
             _detail.error != null ||
             !_session.authenticated.value ||
-            _session.role != 1)) {
+            !canAccessAdmin(_session.role))) {
       return;
     }
     showModalBottomSheet<void>(
@@ -227,7 +228,7 @@ class _DetailWisataScreenState extends State<DetailWisataScreen> {
       final error = _detail.error;
       if (roleOne)
         return OperationsTheme(
-            role: 1,
+            role: _session.role == 2 ? 2 : 1,
             child: Scaffold(
                 backgroundColor: _C.bg,
                 body: RefreshIndicator(
@@ -286,7 +287,7 @@ class _DetailWisataScreenState extends State<DetailWisataScreen> {
     final rating =
         destination.ratingCount > 0 && destination.ratingAverage != null
             ? destination.ratingAverage!.toStringAsFixed(1)
-            : 'Belum dinilai';
+            : '-';
     // The hero photo is the last dark surface; past it the status bar sits on
     // the light page background.
     return ScrollAwareStatusBar(
@@ -413,6 +414,10 @@ class _DetailWisataScreenState extends State<DetailWisataScreen> {
                                       icon: const Icon(PhosphorIconsFill.star,
                                           color: Color(0xFFE08600), size: 20),
                                       label: Text(rating,
+                                          // Screen readers say "dash" for '-'.
+                                          semanticsLabel: rating == '-'
+                                              ? 'Belum dinilai'
+                                              : null,
                                           style: const TextStyle(
                                               color: _C.navy,
                                               fontWeight: FontWeight.w700)));
@@ -424,13 +429,22 @@ class _DetailWisataScreenState extends State<DetailWisataScreen> {
                                         crossAxisAlignment:
                                             CrossAxisAlignment.start,
                                         children: [title, score]);
+                                  // Title takes the remaining width; the
+                                  // rating hugs the right edge (capped so a
+                                  // long label can't squeeze the title).
                                   return Row(
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.spaceBetween,
                                       crossAxisAlignment:
                                           CrossAxisAlignment.start,
                                       children: [
                                         Expanded(child: title),
                                         const SizedBox(width: 8),
-                                        Flexible(child: score)
+                                        ConstrainedBox(
+                                            constraints: BoxConstraints(
+                                                maxWidth:
+                                                    constraints.maxWidth * .45),
+                                            child: score)
                                       ]);
                                 }),
                                 const SizedBox(height: 10),
@@ -454,8 +468,18 @@ class _DetailWisataScreenState extends State<DetailWisataScreen> {
                                 ],
                                 const SizedBox(height: 30),
                                 _heading('Tentang Destinasi'),
-                                const SizedBox(height: 12),
-                                LayoutBuilder(builder: (context, constraints) {
+                                const SizedBox(height: 14),
+                                // Same white card as "Lokasi Destinasi".
+                                Container(
+                                    width: double.infinity,
+                                    padding: const EdgeInsets.all(18),
+                                    decoration: BoxDecoration(
+                                        color: Colors.white,
+                                        border: Border.all(color: _C.border),
+                                        borderRadius:
+                                            BorderRadius.circular(18)),
+                                    child: LayoutBuilder(
+                                        builder: (context, constraints) {
                                   final description =
                                       destination.description.isEmpty
                                           ? 'Deskripsi belum tersedia.'
@@ -507,7 +531,7 @@ class _DetailWisataScreenState extends State<DetailWisataScreen> {
                                                   ? 'Tampilkan Lebih Sedikit'
                                                   : 'Baca selengkapnya')),
                                       ]);
-                                }),
+                                })),
                                 const SizedBox(height: 30),
                                 _heading('Fasilitas Tersedia'),
                                 const SizedBox(height: 14),
