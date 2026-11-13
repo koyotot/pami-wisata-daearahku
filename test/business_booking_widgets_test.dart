@@ -90,7 +90,7 @@ void main() {
       onChanged: () {},
     ))));
     expect(find.text('+62'), findsOneWidget);
-    expect(find.text(countryFlag(IsoCode.ID)), findsOneWidget);
+    expect(find.byKey(const ValueKey('countryFlag-ID')), findsOneWidget);
     expect(find.text('+1 202-555-0119'), findsOneWidget);
     await tester.tap(find.byKey(const ValueKey('phoneCountryPicker')));
     await tester.pumpAndSettle();
@@ -98,8 +98,13 @@ void main() {
         find.byKey(const ValueKey('countrySearch')), 'United States');
     await tester.pumpAndSettle();
     expect(find.widgetWithText(ListTile, 'United States'), findsOneWidget);
-    expect(find.text(countryFlag(IsoCode.US)), findsOneWidget);
-    expect(find.text('US +1'), findsOneWidget);
+    expect(find.byKey(const ValueKey('countryFlag-US')), findsOneWidget);
+    // Dial code sits at the row's trailing edge.
+    expect(
+        find.descendant(
+            of: find.widgetWithText(ListTile, 'United States'),
+            matching: find.text('+1')),
+        findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 
@@ -150,7 +155,7 @@ void main() {
         ),
       ),
     ));
-    expect(find.text(countryFlag(IsoCode.JP)), findsOneWidget);
+    expect(find.byKey(const ValueKey('countryFlag-JP')), findsOneWidget);
     await tester.tap(find.byKey(const ValueKey('phoneCountryPicker')));
     await tester.pumpAndSettle();
     await tester.enterText(

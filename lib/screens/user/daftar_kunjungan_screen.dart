@@ -6,6 +6,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:phosphor_icons/phosphor_icons.dart';
 import 'package:flutter/services.dart';
+import 'package:google_fonts/google_fonts.dart';
 import '../../data/booking_errors.dart';
 import '../../data/booking_intent.dart';
 import '../../data/booking_state.dart';
@@ -851,16 +852,34 @@ class _DaftarKunjunganScreenState extends State<DaftarKunjunganScreen>
                       const SizedBox(height: 28),
                       KeyedSubtree(
                           key: _guestKey,
-                          child: _sectionLabel('Data Pengunjung')),
-                      const SizedBox(height: 6),
+                          child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text('INFORMASI KONTAK',
+                                    style: _jakarta(const TextStyle(
+                                        color: _C.blue,
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w800,
+                                        letterSpacing: 1.6))),
+                                const SizedBox(height: 6),
+                                Text('Data Pengunjung',
+                                    style: _jakarta(const TextStyle(
+                                        color: _C.navy,
+                                        fontSize: 24,
+                                        height: 1.2,
+                                        fontWeight: FontWeight.w800))),
+                              ])),
+                      const SizedBox(height: 8),
                       const Text(
-                          'Kontak untuk kunjungan ini. Perubahan tidak mengganti profil Anda.',
+                          'Lengkapi kontak yang dapat dihubungi untuk kunjungan wisata ini. Perubahan tidak mengganti profil Anda.',
                           style: TextStyle(
                               color: _C.textMuted, fontSize: 12, height: 1.6)),
-                      const SizedBox(height: 16),
+                      const SizedBox(height: 20),
+                      _fieldLabel('Nama lengkap'),
                       _DarkField(
                           controller: _namaCtrl,
-                          label: 'Nama Lengkap',
+                          label: 'Nama lengkap',
+                          labelAbove: true,
                           hint: 'Masukkan nama lengkap',
                           icon: PhosphorIconsRegular.userCircle,
                           enabled: !_busy,
@@ -872,35 +891,45 @@ class _DaftarKunjunganScreenState extends State<DaftarKunjunganScreen>
                               : v.trim().length > 255
                                   ? 'Nama maksimal 255 karakter'
                                   : null),
-                      const SizedBox(height: 14),
-                      InternationalPhoneField(
-                          controller: _teleponCtrl,
-                          country: _phoneCountry,
-                          enabled: !_busy,
-                          error: _phoneError,
-                          onCountryChanged: (country) => setState(() {
-                                _phoneCountry = country;
-                                _phoneError = null;
-                                if (_teleponCtrl.text.trim().startsWith('+')) {
-                                  final phone = parseBookingPhone(
-                                      _teleponCtrl.text, country);
-                                  if (phone != null)
-                                    _teleponCtrl.text = phone.nsn;
-                                }
-                                final phone = parseBookingPhone(
-                                    _teleponCtrl.text, country);
-                                if (phone != null)
-                                  _teleponCtrl.text = phone.formatNsn(
-                                      format: NsnFormat.international);
-                              }),
-                          onChanged: () => setState(() {
-                                _phoneError = null;
-                                _detectPhoneCountry();
-                              })),
-                      const SizedBox(height: 14),
+                      const SizedBox(height: 20),
+                      _fieldLabel('Nomor telepon'),
+                      Semantics(
+                          label: 'Nomor telepon',
+                          child: InternationalPhoneField(
+                              controller: _teleponCtrl,
+                              country: _phoneCountry,
+                              enabled: !_busy,
+                              error: _phoneError,
+                              label: null,
+                              helper:
+                                  'Gunakan nomor aktif yang dapat dihubungi.',
+                              onCountryChanged: (country) => setState(() {
+                                    _phoneCountry = country;
+                                    _phoneError = null;
+                                    if (_teleponCtrl.text
+                                        .trim()
+                                        .startsWith('+')) {
+                                      final phone = parseBookingPhone(
+                                          _teleponCtrl.text, country);
+                                      if (phone != null)
+                                        _teleponCtrl.text = phone.nsn;
+                                    }
+                                    final phone = parseBookingPhone(
+                                        _teleponCtrl.text, country);
+                                    if (phone != null)
+                                      _teleponCtrl.text = phone.formatNsn(
+                                          format: NsnFormat.international);
+                                  }),
+                              onChanged: () => setState(() {
+                                    _phoneError = null;
+                                    _detectPhoneCountry();
+                                  }))),
+                      const SizedBox(height: 20),
+                      _fieldLabel('Alamat email'),
                       _DarkField(
                           controller: _emailCtrl,
-                          label: 'Email',
+                          label: 'Alamat email',
+                          labelAbove: true,
                           hint: 'nama@email.com',
                           icon: PhosphorIconsRegular.envelope,
                           keyboardType: TextInputType.emailAddress,
@@ -1179,7 +1208,22 @@ class _DaftarKunjunganScreenState extends State<DaftarKunjunganScreen>
   Widget _sectionLabel(String label) => Text(label,
       style: const TextStyle(
           color: _C.navy, fontWeight: FontWeight.w800, fontSize: 17));
+
+  /// Label shown above a contact field (the field itself has no float label).
+  Widget _fieldLabel(String label) => Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: ExcludeSemantics(
+          child: Text(label,
+              style: _jakarta(const TextStyle(
+                  color: _C.navy,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700)))));
 }
+
+/// Plus Jakarta Sans at the requested weight; a plain TextStyle only gets
+/// the theme's regular face rendered artificially bold.
+TextStyle _jakarta(TextStyle style) =>
+    GoogleFonts.plusJakartaSans(textStyle: style);
 
 // ── Destinasi Info Card ────────────────────────────────────
 class _DestinasiCard extends StatelessWidget {
@@ -1317,6 +1361,10 @@ class _DarkField extends StatelessWidget {
   final VoidCallback? onChanged;
   final bool enabled;
 
+  /// The visible label sits above the field: no float label or icon inside,
+  /// [label] stays as the field's accessible name.
+  final bool labelAbove;
+
   const _DarkField({
     required this.controller,
     required this.label,
@@ -1328,10 +1376,16 @@ class _DarkField extends StatelessWidget {
     this.error,
     this.onChanged,
     this.enabled = true,
+    this.labelAbove = false,
   });
 
   @override
   Widget build(BuildContext context) {
+    final field = _field();
+    return labelAbove ? Semantics(label: label, child: field) : field;
+  }
+
+  Widget _field() {
     return TextFormField(
       controller: controller,
       enabled: enabled,
@@ -1344,14 +1398,16 @@ class _DarkField extends StatelessWidget {
       decoration: InputDecoration(
         errorText: error,
         errorMaxLines: 3,
-        labelText: label,
+        labelText: labelAbove ? null : label,
         hintText: hint,
         labelStyle: const TextStyle(color: Color(0xFF728099), fontSize: 13),
         hintStyle: const TextStyle(color: Color(0xFF9AA7BC), fontSize: 13),
-        prefixIcon: Padding(
-          padding: const EdgeInsets.only(left: 14, right: 10),
-          child: Icon(icon, color: const Color(0xFF1976D2), size: 18),
-        ),
+        prefixIcon: labelAbove
+            ? null
+            : Padding(
+                padding: const EdgeInsets.only(left: 14, right: 10),
+                child: Icon(icon, color: const Color(0xFF1976D2), size: 18),
+              ),
         prefixIconConstraints: const BoxConstraints(minWidth: 0, minHeight: 0),
         filled: true,
         fillColor: const Color(0xFFFFFFFF),
@@ -1372,8 +1428,8 @@ class _DarkField extends StatelessWidget {
           borderSide: const BorderSide(color: Color(0xFFE5484D), width: 1.5),
         ),
         errorStyle: const TextStyle(color: Color(0xFFE5484D), fontSize: 11),
-        contentPadding:
-            const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        contentPadding: EdgeInsets.symmetric(
+            horizontal: 16, vertical: labelAbove ? 18 : 14),
       ),
     );
   }
