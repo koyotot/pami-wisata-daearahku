@@ -17,7 +17,6 @@ import '../superadmin/kelola_kategori_screen.dart';
 import 'operations_dashboard/operations_dashboard.dart';
 import 'operations_queue_screen.dart';
 import '../shared/session_destination.dart';
-import 'tambah_wisata_screen.dart';
 
 class OperationsNavigationShell extends StatefulWidget {
   const OperationsNavigationShell(
@@ -234,26 +233,6 @@ class _ManagementPage extends StatelessWidget {
           children: [
             _link(context, 'Destinasi', 'Lihat dan kelola destinasi',
                 DaftarWisataScreen(repository: repository, session: session)),
-            _link(
-                context,
-                'Ubah destinasi',
-                'Edit data destinasi',
-                DaftarWisataScreen(
-                    mode: 'edit', repository: repository, session: session)),
-            _link(
-                context,
-                'Hapus destinasi',
-                'Kelola penghapusan destinasi',
-                DaftarWisataScreen(
-                    mode: 'hapus', repository: repository, session: session)),
-            _link(context, 'Tambah destinasi', 'Buat destinasi wisata',
-                const TambahWisataScreen()),
-            _link(
-                context,
-                'Kuota kunjungan',
-                'Kapasitas dan jadwal booking',
-                DaftarWisataScreen(
-                    mode: 'kuota', repository: repository, session: session)),
             if (session.role == 2) ...[
               _link(context, 'Penugasan Admin', 'Atur Admin per destinasi',
                   const DestinationAdminAssignmentsScreen()),

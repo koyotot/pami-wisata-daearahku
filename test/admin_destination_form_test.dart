@@ -58,7 +58,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('4.5'), findsNothing);
-    expect(find.text('-'), findsOneWidget);
+    expect(find.text('Belum ada rating'), findsOneWidget);
 
     await tester.enterText(
         find.byWidgetPredicate((w) =>
@@ -78,14 +78,10 @@ void main() {
         'Pantai indah');
     await tester.enterText(
         find.byWidgetPredicate((w) =>
-            w is TextField && w.decoration?.hintText == 'Rupiah, 0 = gratis'),
+            w is TextField && w.decoration?.hintText == 'Contoh: 25.000'),
         '25000');
-    await tester.enterText(
-        find.byWidgetPredicate(
-            (w) => w is TextField && w.decoration?.hintText == '08.00 – 17.00'),
-        '08.00 - 17.00');
-    await tester.tap(find.text('Pantai'));
-    await tester.pump();
+    await pickOpeningHours(tester);
+    await pickCategory(tester, 'Pantai');
     await tester.tap(find.byKey(const ValueKey('timezone-field')));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Asia/Makassar (WITA)').last);

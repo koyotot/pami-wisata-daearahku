@@ -4,6 +4,7 @@
 // existing admin pages): page shell, filter chips, status views, dialogs.
 // ============================================================
 import 'package:flutter/material.dart';
+import 'package:phosphor_icons/phosphor_icons.dart';
 import '../../services/auth_session.dart';
 import '../../widgets/operations_chrome.dart';
 import '../../widgets/scroll_aware_status_bar.dart';
@@ -33,6 +34,7 @@ class AdminPage extends StatelessWidget {
   final List<Widget> slivers;
   final Future<void> Function()? onRefresh;
   final Widget? floatingActionButton;
+  final Widget? bottomBar;
   final List<Widget>? actions;
 
   const AdminPage({
@@ -43,6 +45,7 @@ class AdminPage extends StatelessWidget {
     required this.slivers,
     this.onRefresh,
     this.floatingActionButton,
+    this.bottomBar,
     this.actions,
   });
 
@@ -56,6 +59,7 @@ class AdminPage extends StatelessWidget {
           builder: (context, headerKey) => Scaffold(
             backgroundColor: AdminColors.bg,
             floatingActionButton: floatingActionButton,
+            bottomNavigationBar: bottomBar,
             body: RefreshIndicator(
               onRefresh: onRefresh ?? () async {},
               child: CustomScrollView(
@@ -88,6 +92,61 @@ class AdminPage extends StatelessWidget {
           ),
         ));
   }
+}
+
+/// Sticky bottom bar: a short note on the left, the primary action on the right.
+class AdminActionBar extends StatelessWidget {
+  const AdminActionBar({
+    super.key,
+    required this.note,
+    required this.label,
+    required this.icon,
+    required this.onPressed,
+    this.buttonKey,
+  });
+  final String note;
+  final String label;
+  final IconData icon;
+  final VoidCallback onPressed;
+  final Key? buttonKey;
+
+  @override
+  Widget build(BuildContext context) => Container(
+        padding: EdgeInsets.fromLTRB(
+            16, 12, 16, 12 + MediaQuery.paddingOf(context).bottom),
+        decoration: const BoxDecoration(
+            color: Colors.white,
+            border: Border(top: BorderSide(color: AdminColors.border)),
+            boxShadow: [
+              BoxShadow(
+                  color: Color(0x14102D59),
+                  blurRadius: 16,
+                  offset: Offset(0, -4))
+            ]),
+        child: Row(children: [
+          Expanded(
+              child: Text(note,
+                  style: const TextStyle(
+                      color: AdminColors.textMuted,
+                      fontSize: 11.5,
+                      height: 1.4))),
+          const SizedBox(width: 12),
+          FilledButton.icon(
+              key: buttonKey,
+              style: FilledButton.styleFrom(
+                  backgroundColor: AdminColors.blue,
+                  foregroundColor: Colors.white,
+                  minimumSize: const Size(48, 48),
+                  padding: const EdgeInsets.symmetric(horizontal: 18),
+                  textStyle: const TextStyle(
+                      fontSize: 13.5, fontWeight: FontWeight.w800),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14))),
+              onPressed: onPressed,
+              icon: Icon(icon, size: 18),
+              label: Text(label)),
+        ]),
+      );
 }
 
 /// Horizontal single-choice chips (same look as the category chips).
@@ -149,6 +208,78 @@ class AdminFilterChips<T> extends StatelessWidget {
       ),
     );
   }
+}
+
+/// Summary tile for the master-data screens: a big number over a short label,
+/// optionally led by a coloured status dot.
+class AdminStatCard extends StatelessWidget {
+  final String value;
+  final String label;
+  final Color? dotColor;
+  const AdminStatCard(this.value, this.label, {super.key, this.dotColor});
+
+  @override
+  Widget build(BuildContext context) => Container(
+        padding: const EdgeInsets.fromLTRB(14, 14, 10, 12),
+        decoration: BoxDecoration(
+            color: AdminColors.card,
+            border: Border.all(color: AdminColors.border),
+            borderRadius: BorderRadius.circular(16)),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text(value,
+              style: const TextStyle(
+                  color: AdminColors.navy,
+                  fontSize: 26,
+                  height: 1.2,
+                  fontWeight: FontWeight.w800)),
+          const SizedBox(height: 4),
+          Row(children: [
+            if (dotColor != null) ...[
+              Container(
+                  width: 7,
+                  height: 7,
+                  decoration:
+                      BoxDecoration(color: dotColor, shape: BoxShape.circle)),
+              const SizedBox(width: 6),
+            ],
+            Expanded(
+              child: Text(label,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                      color: AdminColors.textMuted,
+                      fontSize: 11.5,
+                      fontWeight: FontWeight.w600)),
+            ),
+          ]),
+        ]),
+      );
+}
+
+/// Dashed rounded outline used behind empty states.
+class AdminDashedBorderPainter extends CustomPainter {
+  const AdminDashedBorderPainter();
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = const Color(0xFFC3D0E3)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.4;
+    final path = Path()
+      ..addRRect(RRect.fromRectAndRadius(
+          Offset.zero & size, const Radius.circular(18)));
+    for (final metric in path.computeMetrics()) {
+      var distance = 0.0;
+      while (distance < metric.length) {
+        canvas.drawPath(metric.extractPath(distance, distance + 6), paint);
+        distance += 11;
+      }
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
 
 Widget adminLoadingSliver() => const SliverFillRemaining(
@@ -338,7 +469,8 @@ Future<bool> adminConfirm(
   return result == true;
 }
 
-InputDecoration adminInputDecoration(String label, {String? hint}) =>
+/// [label] null → no floating label (for fields with a label above them).
+InputDecoration adminInputDecoration(String? label, {String? hint}) =>
     InputDecoration(
       labelText: label,
       hintText: hint,
@@ -362,3 +494,66 @@ InputDecoration adminInputDecoration(String label, {String? hint}) =>
       ),
       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
     );
+
+/// Compact "⋮" row menu with Ubah + activate/deactivate, for master-data
+/// lists. Item keys stay `edit-<id>` / `toggle-<id>`; the button is
+/// `actions-<id>`.
+class AdminRowMenu extends StatelessWidget {
+  final String id;
+  final bool active;
+  final VoidCallback onEdit;
+  final VoidCallback onToggle;
+  const AdminRowMenu({
+    super.key,
+    required this.id,
+    required this.active,
+    required this.onEdit,
+    required this.onToggle,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final toggleColor = active ? AdminColors.danger : AdminColors.success;
+    Widget item(IconData icon, String label, Color color) => Row(children: [
+          Icon(icon, size: 18, color: color),
+          const SizedBox(width: 12),
+          Flexible(
+              child: Text(label,
+                  style: TextStyle(
+                      color:
+                          color == AdminColors.blue ? AdminColors.text : color,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600))),
+        ]);
+    return PopupMenuButton<String>(
+      key: ValueKey('actions-$id'),
+      tooltip: 'Tindakan',
+      icon: const Icon(PhosphorIconsBold.dotsThreeVertical,
+          color: AdminColors.textMuted, size: 20),
+      color: AdminColors.card,
+      surfaceTintColor: Colors.transparent,
+      elevation: 6,
+      shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(14),
+          side: const BorderSide(color: AdminColors.border)),
+      position: PopupMenuPosition.under,
+      onSelected: (value) => value == 'edit' ? onEdit() : onToggle(),
+      itemBuilder: (_) => [
+        PopupMenuItem(
+            key: ValueKey('edit-$id'),
+            value: 'edit',
+            child: item(
+                PhosphorIconsRegular.pencilSimple, 'Ubah', AdminColors.blue)),
+        PopupMenuItem(
+            key: ValueKey('toggle-$id'),
+            value: 'toggle',
+            child: item(
+                active
+                    ? PhosphorIconsRegular.eyeSlash
+                    : PhosphorIconsRegular.arrowCounterClockwise,
+                active ? 'Nonaktifkan' : 'Aktifkan kembali',
+                toggleColor)),
+      ],
+    );
+  }
+}

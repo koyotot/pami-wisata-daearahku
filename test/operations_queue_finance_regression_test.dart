@@ -106,18 +106,9 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Kinerja'), findsOneWidget);
     await _tap(tester, find.text('Kelola'));
-    for (final label in [
-      'Kelola destinasi dan kuota',
-      'Ubah destinasi',
-      'Hapus destinasi',
-      'Kelola kuota'
-    ]) {
-      expect(find.text(label), findsOneWidget);
-    }
-    await _tap(tester, find.text('Kelola kuota'));
     expect(
         tester.widget<DaftarWisataScreen>(find.byType(DaftarWisataScreen)).mode,
-        'kuota');
+        'manage');
     expect(requests.last.url.path, '/api/v1/admin/destinations');
     expect(requests.every((request) => request.method == 'GET'), isTrue);
   });

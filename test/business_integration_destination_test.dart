@@ -128,9 +128,9 @@ void main() {
     await tester.enterText(_input('Contoh: Yogyakarta, DIY'), 'Makassar');
     await tester.enterText(
         _input('Ceritakan keunikan tempat wisata ini...'), 'Pantai indah');
-    await tester.enterText(_input('Rupiah, 0 = gratis'), '25000');
-    await tester.enterText(_input('08.00 – 17.00'), '08.00 - 17.00');
-    await tester.tap(find.text('Pantai'));
+    await tester.enterText(_input('Contoh: 25.000'), '25000');
+    await pickOpeningHours(tester);
+    await pickCategory(tester, 'Pantai');
     await tester.tap(find.byKey(const ValueKey('facility-f1')));
     await pickGalleryPhoto(tester);
     await pickDraftLocation(tester);

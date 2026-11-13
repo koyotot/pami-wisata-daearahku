@@ -118,7 +118,7 @@ void main() {
     expect(find.byKey(const ValueKey('g-all')), findsNothing);
   });
 
-  testWidgets('accounts screen hides role/status actions on the own row',
+  testWidgets('accounts sheet disables role/status actions on the own row',
       (tester) async {
     tallSurface(tester);
     final session = await adminSession((request) async {
@@ -149,10 +149,24 @@ void main() {
 
     expect(find.text('Saya'), findsOneWidget);
     expect(find.text('Akun Anda'), findsOneWidget);
-    expect(find.byKey(const ValueKey('role-other')), findsOneWidget);
-    expect(find.byKey(const ValueKey('status-other')), findsOneWidget);
-    expect(find.byKey(const ValueKey('role-me')), findsNothing);
-    expect(find.byKey(const ValueKey('status-me')), findsNothing);
+    bool enabled(String key) => tester
+            .widget<OutlinedButton>(find.byKey(ValueKey(key)))
+            .onPressed !=
+        null;
+
+    await tester.tap(find.byKey(const ValueKey('manage-other')));
+    await tester.pumpAndSettle();
+    expect(enabled('role-other'), isTrue);
+    expect(enabled('status-other'), isTrue);
+    await tester.tap(find.byTooltip('Tutup'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const ValueKey('manage-me')));
+    await tester.pumpAndSettle();
+    expect(find.text('Akun superadmin yang sedang digunakan dilindungi.'),
+        findsOneWidget);
+    expect(enabled('role-me'), isFalse);
+    expect(enabled('status-me'), isFalse);
   });
 
   testWidgets('deactivating a category in use shows the precise message',
@@ -172,6 +186,8 @@ void main() {
     await tester.pumpAndSettle();
     expect(log.first.url.queryParameters['status'], 'all');
 
+    await tester.tap(find.byKey(const ValueKey('actions-c1')));
+    await tester.pumpAndSettle();
     await tester.tap(find.byKey(const ValueKey('toggle-c1')));
     await tester.pumpAndSettle();
     await tester.tap(find.widgetWithText(ElevatedButton, 'Nonaktifkan'));

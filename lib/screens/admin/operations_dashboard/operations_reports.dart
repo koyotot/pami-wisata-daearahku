@@ -273,6 +273,10 @@ class _OperationsReportScreenState extends State<OperationsReportScreen>
                     ? 'Prioritas operasional dari server'
                     : 'Basis tanggal keputusan · UTC',
         embedded: widget.embedded,
+        bottomBar: _manage && _role == 1 && widget.section == 'destinations'
+            ? DestinationAddBar(
+                onAdd: () => _manageKey.currentState?.addDestination())
+            : null,
         onRefresh: _manage
             ? () => _manageKey.currentState?.refresh() ?? Future<void>.value()
             : _load,
@@ -481,18 +485,6 @@ class _OperationsReportScreenState extends State<OperationsReportScreen>
                 () => Navigator.of(context).push(MaterialPageRoute<void>(
                     builder: (_) => DaftarWisataScreen(
                         repository: _repository, session: _session)))),
-            for (final mode in [
-              ('edit', 'Ubah destinasi'),
-              ('hapus', 'Hapus destinasi'),
-              ('kuota', 'Kelola kuota')
-            ])
-              _routeLink(
-                  mode.$2,
-                  () => Navigator.of(context).push(MaterialPageRoute<void>(
-                      builder: (_) => DaftarWisataScreen(
-                          mode: mode.$1,
-                          repository: _repository,
-                          session: _session)))),
           ],
         ]);
   }
