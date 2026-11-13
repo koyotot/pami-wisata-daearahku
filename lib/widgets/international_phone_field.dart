@@ -1,6 +1,8 @@
+import 'package:country_flags/country_flags.dart';
 import 'package:flutter/material.dart';
 import 'package:phosphor_icons/phosphor_icons.dart';
 import 'package:flutter/services.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:phone_numbers_parser/phone_numbers_parser.dart';
 import 'package:phone_numbers_parser/metadata.dart';
 
@@ -15,8 +17,27 @@ PhoneNumber? parseBookingPhone(String input, IsoCode country) {
   }
 }
 
-String countryFlag(IsoCode country) => String.fromCharCodes(
-    country.name.codeUnits.map((letter) => letter + 0x1F1A5));
+/// Flat rectangular SVG flag (3:2) keyed by ISO code for lookups.
+///
+/// Always hard-sized: country_flags has no flag for some IsoCodes (AC, TA)
+/// and its unsized fallback would fill the ListTile leading slot and throw.
+Widget _flag(IsoCode country, double width) {
+  final height = width * 2 / 3;
+  return SizedBox(
+    key: ValueKey('countryFlag-${country.name}'),
+    width: width,
+    height: height,
+    child: FlagCode.fromCountryCode(country.name) == null
+        ? const ColoredBox(color: Color(0xFFE6EBF2))
+        : ClipRect(
+            child: CountryFlag.fromCountryCode(
+              country.name,
+              theme: ImageTheme(
+                  width: width, height: height, shape: const Rectangle()),
+            ),
+          ),
+  );
+}
 
 String _dialCode(IsoCode country) =>
     PhoneNumber(isoCode: country, nsn: '').countryCode;
@@ -47,6 +68,20 @@ class _NationalPhoneFormatter extends TextInputFormatter {
   }
 }
 
+const _navy = Color(0xFF102D59);
+const _muted = Color(0xFF728099);
+const _border = Color(0xFFDCE4F0);
+const _codeStyle =
+    TextStyle(color: _navy, fontSize: 14, fontWeight: FontWeight.w600);
+
+/// Real Plus Jakarta Sans weights (a plain TextStyle gets faux bold).
+TextStyle _jakarta(double size, FontWeight weight, Color color) =>
+    GoogleFonts.plusJakartaSans(
+        fontSize: size, fontWeight: weight, color: color);
+
+/// Listed first in the country picker, in this order.
+const _regionalCountries = [IsoCode.ID, IsoCode.MY, IsoCode.SG, IsoCode.JP];
+
 class InternationalPhoneField extends StatelessWidget {
   final TextEditingController controller;
   final IsoCode country;
@@ -55,6 +90,13 @@ class InternationalPhoneField extends StatelessWidget {
   final String? error;
   final bool split;
   final bool enabled;
+
+  /// Floating label inside the field; null when the screen shows its own
+  /// label above it.
+  final String? label;
+
+  /// Fixed helper line; when null the parsed international number is shown.
+  final String? helper;
   const InternationalPhoneField({
     super.key,
     required this.controller,
@@ -64,6 +106,8 @@ class InternationalPhoneField extends StatelessWidget {
     this.error,
     this.split = false,
     this.enabled = true,
+    this.label = 'Nomor Telepon',
+    this.helper,
   });
 
   Future<void> _pickCountry(BuildContext context) async {
@@ -72,6 +116,7 @@ class InternationalPhoneField extends StatelessWidget {
       isScrollControlled: true,
       useSafeArea: true,
       showDragHandle: true,
+      backgroundColor: Colors.white,
       builder: (context) => _CountryPicker(selected: country),
     );
     if (result != null) onCountryChanged(result);
@@ -95,13 +140,14 @@ class InternationalPhoneField extends StatelessWidget {
       child: Semantics(
         label: '${_countryNames[country.name]}, +${_dialCode(country)}',
         child: Row(mainAxisSize: MainAxisSize.min, children: [
-          Text(countryFlag(country), style: const TextStyle(fontSize: 20)),
-          const SizedBox(width: 5),
+          _flag(country, 24),
+          const SizedBox(width: 8),
           if (split)
-            Flexible(child: Text('+${_dialCode(country)}'))
+            Flexible(child: Text('+${_dialCode(country)}', style: _codeStyle))
           else
-            Text('+${_dialCode(country)}'),
-          const Icon(PhosphorIconsRegular.caretDown, size: 18),
+            Text('+${_dialCode(country)}', style: _codeStyle),
+          const SizedBox(width: 4),
+          const Icon(PhosphorIconsRegular.caretDown, size: 14, color: _muted),
         ]),
       ),
     );
@@ -114,7 +160,7 @@ class InternationalPhoneField extends StatelessWidget {
       inputFormatters: [_NationalPhoneFormatter(country)],
       style: const TextStyle(color: Color(0xFF102D59), fontSize: 14),
       decoration: InputDecoration(
-        labelText: 'Nomor Telepon',
+        labelText: label,
         hintText: example.formatNsn(format: NsnFormat.international),
         filled: true,
         fillColor: Colors.white,
@@ -124,15 +170,20 @@ class InternationalPhoneField extends StatelessWidget {
             borderSide: const BorderSide(color: Color(0xFF1976D2), width: 2)),
         errorText: error,
         errorMaxLines: 3,
-        helperText: phone == null
-            ? null
-            : '+${phone.countryCode} ${phone.formatNsn(format: NsnFormat.international)}',
+        helperText: helper ??
+            (phone == null
+                ? null
+                : '+${phone.countryCode} ${phone.formatNsn(format: NsnFormat.international)}'),
+        helperStyle: const TextStyle(color: _muted, fontSize: 11),
+        contentPadding: label == null
+            ? const EdgeInsets.symmetric(horizontal: 12, vertical: 18)
+            : null,
         helperMaxLines: 2,
         prefixIconConstraints: const BoxConstraints(minHeight: 48),
         prefixIcon: split
             ? null
             : Padding(
-                padding: const EdgeInsets.only(right: 10),
+                padding: const EdgeInsets.only(left: 4, right: 12),
                 child: DecoratedBox(
                   decoration: const BoxDecoration(
                       border:
@@ -184,44 +235,94 @@ class _CountryPickerState extends State<_CountryPicker> {
                 .toLowerCase()
                 .contains(_query.toLowerCase()))
         .toList();
+    // Unfiltered: the current country, then the region's usual visitors,
+    // then everything else.
+    if (_query.isEmpty) {
+      final leading = {widget.selected, ..._regionalCountries};
+      countries
+        ..removeWhere(leading.contains)
+        ..insertAll(0, leading);
+    }
+    final searchBorder = OutlineInputBorder(
+        borderRadius: BorderRadius.circular(14),
+        borderSide: const BorderSide(color: _border));
     return Padding(
       padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(context).bottom),
       child: SizedBox(
         height: (MediaQuery.sizeOf(context).height -
                 MediaQuery.viewInsetsOf(context).bottom) *
             .72,
-        child: Column(children: [
-          const Text('Pilih negara',
-              style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700)),
+        child:
+            Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
           Padding(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.fromLTRB(20, 0, 12, 0),
+            child: Row(children: [
+              Expanded(
+                child: Text('Pilih negara',
+                    style: _jakarta(20, FontWeight.w800, _navy)),
+              ),
+              IconButton(
+                tooltip: 'Tutup',
+                onPressed: () => Navigator.pop(context),
+                style: IconButton.styleFrom(
+                    backgroundColor: const Color(0xFFF0F3F8),
+                    foregroundColor: _muted),
+                icon: const Icon(PhosphorIconsRegular.x, size: 16),
+              ),
+            ]),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 12, 20, 12),
             child: TextField(
               key: const ValueKey('countrySearch'),
-              decoration: const InputDecoration(
-                  hintText: 'Cari negara atau kode telepon',
-                  prefixIcon: Icon(PhosphorIconsRegular.magnifyingGlass)),
+              style: const TextStyle(color: _navy, fontSize: 14),
+              decoration: InputDecoration(
+                  hintText: 'Cari negara atau kode telepon...',
+                  hintStyle: const TextStyle(color: _muted, fontSize: 14),
+                  prefixIcon: const Icon(PhosphorIconsRegular.magnifyingGlass,
+                      color: _muted, size: 20),
+                  filled: true,
+                  fillColor: const Color(0xFFF5F8FD),
+                  contentPadding: const EdgeInsets.symmetric(vertical: 14),
+                  border: searchBorder,
+                  enabledBorder: searchBorder,
+                  focusedBorder: searchBorder.copyWith(
+                      borderSide: const BorderSide(
+                          color: Color(0xFF1976D2), width: 1.5))),
               onChanged: (value) => setState(() => _query = value),
             ),
           ),
           Expanded(
             child: countries.isEmpty
-                ? const Center(child: Text('Negara tidak ditemukan'))
+                ? const Center(
+                    child: Text('Negara tidak ditemukan',
+                        style: TextStyle(color: _muted)))
                 : ListView.builder(
                     itemCount: countries.length,
                     itemBuilder: (context, index) {
                       final country = countries[index];
+                      final selected = country == widget.selected;
                       return ListTile(
-                        leading: Text(countryFlag(country),
-                            style: const TextStyle(fontSize: 26)),
-                        title:
-                            Text(_countryNames[country.name] ?? country.name),
-                        subtitle:
-                            Text('${country.name} +${_dialCode(country)}'),
-                        selected: country == widget.selected,
-                        trailing: country == widget.selected
-                            ? const Icon(PhosphorIconsRegular.check,
-                                color: Color(0xFF1976D2))
-                            : null,
+                        contentPadding:
+                            const EdgeInsets.symmetric(horizontal: 20),
+                        selected: selected,
+                        selectedTileColor: const Color(0xFFE6F0FC),
+                        leading: _flag(country, 30),
+                        title: Text(_countryNames[country.name] ?? country.name,
+                            style: _jakarta(15, FontWeight.w700, _navy)),
+                        trailing:
+                            Row(mainAxisSize: MainAxisSize.min, children: [
+                          Text('+${_dialCode(country)}',
+                              style: const TextStyle(
+                                  color: _muted,
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w600)),
+                          if (selected) ...[
+                            const SizedBox(width: 10),
+                            const Icon(PhosphorIconsRegular.check,
+                                size: 18, color: Color(0xFF1976D2)),
+                          ],
+                        ]),
                         onTap: () => Navigator.pop(context, country),
                       );
                     }),
