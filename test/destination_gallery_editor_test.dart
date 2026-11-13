@@ -82,7 +82,7 @@ void main() {
     await openEditor(tester, session);
     await tester.tap(find.text('Simpan Perubahan'));
     await tester.pumpAndSettle();
-    expect(find.text('1/10 foto'), findsOneWidget);
+    expect(find.text('1 dari 10 foto'), findsOneWidget);
     expect(find.text('Coba Lagi'), findsOneWidget);
     await tester.tap(find.text('Coba Lagi'));
     await tester.pumpAndSettle();
@@ -102,7 +102,7 @@ void main() {
     expect(find.text('Galeri telah berubah'), findsOneWidget);
     await tester.tap(find.text('Pertahankan draft'));
     await tester.pumpAndSettle();
-    expect(find.text('1/10 foto'), findsOneWidget);
+    expect(find.text('1 dari 10 foto'), findsOneWidget);
     expect(find.text('Coba Lagi'), findsOneWidget);
   });
   testWidgets(
@@ -134,7 +134,7 @@ void main() {
     await openEditor(tester, session);
     await tester.tap(find.byTooltip('Hapus foto 1'));
     await tester.pumpAndSettle();
-    expect(find.text('1/10 foto'), findsOneWidget);
+    expect(find.text('1 dari 10 foto'), findsOneWidget);
     expect(find.text('Minimal satu foto harus dipertahankan.'), findsOneWidget);
     await tester.enterText(
         find.byWidgetPredicate((w) =>

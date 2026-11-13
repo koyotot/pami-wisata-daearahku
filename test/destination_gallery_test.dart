@@ -89,7 +89,7 @@ void main() {
     expect(requests.last.url.path,
         '/api/v1/admin/destinations/d/images/photo-0/fullscreen');
   });
-  testWidgets('three-column editor reorders on long press and follows cover',
+  testWidgets('cover plus four-column thumbnails reorder on long press',
       (tester) async {
     final session = await adminSession((_) async => http.Response.bytes(
         galleryPng, 200,
@@ -115,8 +115,8 @@ void main() {
     expect(
         (grid.gridDelegate as SliverGridDelegateWithFixedCrossAxisCount)
             .crossAxisCount,
-        3);
-    expect(find.text('3/10 foto'), findsOneWidget);
+        4);
+    expect(find.text('3 dari 10 foto'), findsOneWidget);
     final from = tester.getCenter(find.byType(LongPressDraggable<int>).first);
     final to = tester.getCenter(find.byType(LongPressDraggable<int>).last);
     final gesture = await tester.startGesture(from);
@@ -126,7 +126,7 @@ void main() {
     await gesture.up();
     await tester.pumpAndSettle();
     expect(items.map((e) => e.key), ['photo-1', 'photo-2', 'photo-0']);
-    expect(find.text('1 · Cover'), findsOneWidget);
+    expect(find.text('Foto Sampul'), findsOneWidget);
   });
   testWidgets(
       'carousel index fullscreen thumbnail zoom and return stay synchronized',

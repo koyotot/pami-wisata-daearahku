@@ -51,12 +51,31 @@ Future<void> pickGalleryPhoto(WidgetTester tester) async {
   });
   await tester.tap(find.text('Tambah Foto'));
   await tester.pump();
-  for (var i = 0; i < 20 && find.text('1/10 foto').evaluate().isEmpty; i++) {
+  for (var i = 0; i < 20 && find.text('1 dari 10 foto').evaluate().isEmpty; i++) {
     await tester.runAsync(() async {
       await Future<void>.delayed(const Duration(milliseconds: 50));
     });
     await tester.pump();
   }
   await tester.pumpAndSettle();
-  expect(find.text('1/10 foto'), findsOneWidget);
+  expect(find.text('1 dari 10 foto'), findsOneWidget);
+}
+
+/// Types Jam buka / Jam tutup inline (08:00 and 17:00).
+Future<void> pickOpeningHours(WidgetTester tester) async {
+  for (final entry in {'open-time-field': '0800', 'close-time-field': '1700'}
+      .entries) {
+    await tester.ensureVisible(find.byKey(ValueKey(entry.key)));
+    await tester.enterText(find.byKey(ValueKey(entry.key)), entry.value);
+    await tester.pumpAndSettle();
+  }
+}
+
+/// Selects [name] in the "Kategori wisata" dropdown.
+Future<void> pickCategory(WidgetTester tester, String name) async {
+  await tester.ensureVisible(find.byKey(const ValueKey('category-field')));
+  await tester.tap(find.byKey(const ValueKey('category-field')));
+  await tester.pumpAndSettle();
+  await tester.tap(find.text(name).last);
+  await tester.pumpAndSettle();
 }
