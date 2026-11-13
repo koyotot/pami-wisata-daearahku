@@ -69,9 +69,15 @@ class _KelolaKategoriScreenState extends State<KelolaKategoriScreen> {
   Future<void> _muat() => _list.load();
 
   Future<void> _form([Category? category]) async {
-    final saved = await showDialog<bool>(
+    final saved = await showModalBottomSheet<bool>(
       context: context,
-      builder: (_) => _CategoryFormDialog(
+      isScrollControlled: true,
+      useSafeArea: true,
+      showDragHandle: true,
+      backgroundColor: AdminColors.card,
+      shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+      builder: (_) => _CategoryFormSheet(
         category: category,
         onSubmit: (fields) async {
           try {
@@ -257,60 +263,41 @@ class _CategoryCard extends StatelessWidget {
               height: 24,
               child: CircularProgressIndicator(strokeWidth: 2.5),
             )
-          else ...[
-            IconButton(
-              key: ValueKey('edit-${category.guid}'),
-              tooltip: 'Ubah',
-              onPressed: onEdit,
-              icon: const Icon(PhosphorIconsRegular.pencilSimple,
-                  color: AdminColors.blue, size: 20),
+          else
+            AdminRowMenu(
+              id: category.guid,
+              active: active,
+              onEdit: onEdit,
+              onToggle: onToggle,
             ),
-            IconButton(
-              key: ValueKey('toggle-${category.guid}'),
-              tooltip: active ? 'Nonaktifkan' : 'Aktifkan kembali',
-              onPressed: onToggle,
-              icon: Icon(
-                  active
-                      ? PhosphorIconsRegular.eyeSlash
-                      : PhosphorIconsRegular.arrowCounterClockwise,
-                  color: active ? AdminColors.danger : AdminColors.success,
-                  size: 20),
-            ),
-          ],
         ],
       ),
     );
   }
 }
 
-/// Create / edit form. [onSubmit] returns an error message, or null on success.
-class _CategoryFormDialog extends StatefulWidget {
+/// Create / edit bottom sheet. [onSubmit] returns an error message, or null
+/// on success. The slug isn't editable: new categories get one derived from
+/// the name, edits keep the existing slug.
+class _CategoryFormSheet extends StatefulWidget {
   final Category? category;
   final Future<String?> Function(Json fields) onSubmit;
-  const _CategoryFormDialog({this.category, required this.onSubmit});
+  const _CategoryFormSheet({this.category, required this.onSubmit});
 
   @override
-  State<_CategoryFormDialog> createState() => _CategoryFormDialogState();
+  State<_CategoryFormSheet> createState() => _CategoryFormSheetState();
 }
 
-class _CategoryFormDialogState extends State<_CategoryFormDialog> {
+class _CategoryFormSheetState extends State<_CategoryFormSheet> {
   final _formKey = GlobalKey<FormState>();
   late final _name = TextEditingController(text: widget.category?.name ?? '');
-  late final _slug = TextEditingController(text: widget.category?.slug ?? '');
-  late bool _slugEdited = widget.category != null;
   bool _saving = false;
   String? _error;
 
   @override
   void dispose() {
     _name.dispose();
-    _slug.dispose();
     super.dispose();
-  }
-
-  void _nameChanged(String value) {
-    // Suggest a slug from the name until the admin edits the slug by hand.
-    if (!_slugEdited) _slug.text = slugify(value);
   }
 
   Future<void> _submit() async {
@@ -319,9 +306,10 @@ class _CategoryFormDialogState extends State<_CategoryFormDialog> {
       _saving = true;
       _error = null;
     });
+    final name = _name.text.trim();
     final error = await widget.onSubmit({
-      'name': _name.text.trim(),
-      'slug': _slug.text.trim(),
+      'name': name,
+      'slug': widget.category?.slug ?? slugify(name),
     });
     if (!mounted) return;
     if (error == null) {
@@ -337,76 +325,103 @@ class _CategoryFormDialogState extends State<_CategoryFormDialog> {
   @override
   Widget build(BuildContext context) {
     final editing = widget.category != null;
-    return AlertDialog(
-      backgroundColor: AdminColors.card,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-      title: Text(editing ? 'Ubah Kategori' : 'Tambah Kategori',
-          style: const TextStyle(
-              color: AdminColors.text,
-              fontSize: 16,
-              fontWeight: FontWeight.w800)),
-      content: SingleChildScrollView(
+    return Padding(
+      padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(context).bottom),
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
         child: Form(
           key: _formKey,
           child: Column(
             mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
+              Row(children: [
+                Expanded(
+                  child: Text(editing ? 'Ubah Kategori' : 'Tambah Kategori',
+                      style: const TextStyle(
+                          color: AdminColors.text,
+                          fontSize: 18,
+                          fontWeight: FontWeight.w800)),
+                ),
+                const SizedBox(width: 8),
+                IconButton(
+                  key: const ValueKey('category-close'),
+                  tooltip: 'Tutup',
+                  onPressed:
+                      _saving ? null : () => Navigator.pop(context, false),
+                  style: IconButton.styleFrom(
+                      backgroundColor: AdminColors.bg,
+                      foregroundColor: AdminColors.textMuted),
+                  icon: const Icon(PhosphorIconsRegular.x, size: 16),
+                ),
+              ]),
+              const SizedBox(height: 4),
+              Text(
+                  editing
+                      ? 'Perbarui nama kategori destinasi.'
+                      : 'Kategori dipakai untuk mengelompokkan destinasi.',
+                  style: const TextStyle(
+                      color: AdminColors.textMuted, fontSize: 13)),
+              const SizedBox(height: 20),
+              // Label above the field, helper text below it.
+              const Text('Nama Kategori',
+                  style: TextStyle(
+                      color: AdminColors.text,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700)),
+              const SizedBox(height: 8),
               TextFormField(
                 key: const ValueKey('category-name'),
                 controller: _name,
                 enabled: !_saving,
-                textInputAction: TextInputAction.next,
+                autofocus: !editing,
+                textCapitalization: TextCapitalization.words,
+                textInputAction: TextInputAction.done,
+                onFieldSubmitted: (_) => _submit(),
                 decoration:
-                    adminInputDecoration('Nama', hint: 'Contoh: Pantai'),
-                onChanged: _nameChanged,
+                    adminInputDecoration(null, hint: 'Contoh: Wisata Pantai')
+                        .copyWith(
+                  helperText: 'Nama yang tampil sebagai pilihan kategori.',
+                  helperMaxLines: 2,
+                  helperStyle: const TextStyle(
+                      color: AdminColors.textMuted, fontSize: 12),
+                  errorMaxLines: 2,
+                ),
                 validator: (v) =>
                     (v == null || v.trim().isEmpty) ? 'Nama wajib diisi' : null,
-              ),
-              const SizedBox(height: 12),
-              TextFormField(
-                key: const ValueKey('category-slug'),
-                controller: _slug,
-                enabled: !_saving,
-                decoration:
-                    adminInputDecoration('Slug', hint: 'contoh: pantai'),
-                onChanged: (_) => _slugEdited = true,
-                validator: (v) =>
-                    (v == null || v.trim().isEmpty) ? 'Slug wajib diisi' : null,
               ),
               if (_error != null) ...[
                 const SizedBox(height: 12),
                 AdminNotice(_error!),
               ],
+              const SizedBox(height: 24),
+              SizedBox(
+                width: double.infinity,
+                  child: ElevatedButton(
+                    key: const ValueKey('category-save'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AdminColors.blue,
+                      foregroundColor: Colors.white,
+                      elevation: 0,
+                      minimumSize: const Size(0, 48),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12)),
+                    ),
+                    onPressed: _saving ? null : _submit,
+                    child: _saving
+                        ? const SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(
+                                strokeWidth: 2, color: Colors.white))
+                        : const Text('Simpan',
+                            style: TextStyle(fontWeight: FontWeight.w700)),
+                  ),
+                ),
             ],
           ),
         ),
       ),
-      actions: [
-        TextButton(
-          onPressed: _saving ? null : () => Navigator.pop(context, false),
-          child: const Text('Batal',
-              style: TextStyle(color: AdminColors.textMuted, fontSize: 13)),
-        ),
-        ElevatedButton(
-          key: const ValueKey('category-save'),
-          style: ElevatedButton.styleFrom(
-            backgroundColor: AdminColors.blue,
-            foregroundColor: Colors.white,
-            elevation: 0,
-            shape:
-                RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-          ),
-          onPressed: _saving ? null : _submit,
-          child: _saving
-              ? const SizedBox(
-                  width: 16,
-                  height: 16,
-                  child: CircularProgressIndicator(
-                      strokeWidth: 2, color: Colors.white))
-              : const Text('Simpan',
-                  style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
-        ),
-      ],
     );
   }
 }
