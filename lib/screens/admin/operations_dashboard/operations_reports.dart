@@ -38,6 +38,7 @@ class _OperationsReportScreenState extends State<OperationsReportScreen>
   late String? _destinationLabel = widget.initialDestinationLabel;
   OperationalReport? _data;
   ApiPage<OperationalRow>? _rows;
+  List<OperationalRow>? _allRows;
   ApiPage<AdminAccount>? _accounts;
   final Map<String, String> _names = {};
   Object? _error;
@@ -59,10 +60,15 @@ class _OperationsReportScreenState extends State<OperationsReportScreen>
   bool get _paginated =>
       widget.section == 'destinations' || widget.section == 'action-center';
   bool get _usesHomeFilters =>
-      _role == 1 &&
-      (widget.section == 'destinations' ||
-          widget.section == 'visitors' ||
-          widget.section == 'action-center');
+      (_role == 1 &&
+          (widget.section == 'destinations' ||
+              widget.section == 'visitors' ||
+              widget.section == 'action-center')) ||
+      (_role == 2 &&
+          (widget.section == 'approvals' ||
+              widget.section == 'destinations' ||
+              widget.section == 'action-center'));
+  bool get _isComparison => _role == 2 && widget.section == 'destinations';
   @override
   void initState() {
     super.initState();
@@ -81,6 +87,7 @@ class _OperationsReportScreenState extends State<OperationsReportScreen>
         _request++;
         _data = null;
         _rows = null;
+        _allRows = null;
         _accounts = null;
         _names.clear();
         _loading = false;
@@ -127,6 +134,7 @@ class _OperationsReportScreenState extends State<OperationsReportScreen>
       _error = null;
       _data = null;
       _rows = null;
+      _allRows = null;
       _accounts = null;
       _names.clear();
       _accountPage = 0;
@@ -138,7 +146,27 @@ class _OperationsReportScreenState extends State<OperationsReportScreen>
         if (_paginated) 'page': '$_page',
         if (_paginated) 'per_page': '15'
       };
-      if (_paginated) {
+      if (_isComparison) {
+        // The comparison needs every destination to total capacity correctly.
+        final all = <OperationalRow>[];
+        ApiPage<OperationalRow>? first;
+        for (var page = 1; page <= 20; page++) {
+          final result = await _repository.operationalRows(widget.section,
+              query: {..._filters, 'page': '$page', 'per_page': '100'});
+          if (!_valid || request != _request) return;
+          first ??= result;
+          all.addAll(result.items);
+          final hasNext = result.links?.containsKey('next') == true
+              ? result.links!['next'] != null
+              : page < ((_number(result.meta?['last_page']) ?? 1).toInt());
+          if (!hasNext || result.items.isEmpty) break;
+        }
+        setState(() {
+          _rows = first;
+          _allRows = all;
+          _loading = false;
+        });
+      } else if (_paginated) {
         final rows =
             await _repository.operationalRows(widget.section, query: query);
         if (!_valid || request != _request) return;
@@ -166,6 +194,7 @@ class _OperationsReportScreenState extends State<OperationsReportScreen>
       setState(() {
         _data = null;
         _rows = null;
+        _allRows = null;
         _names.clear();
         _error = e;
         _loading = false;
@@ -176,6 +205,50 @@ class _OperationsReportScreenState extends State<OperationsReportScreen>
       });
       if (_scopeError(e)) _session.me().catchError((Object _) {});
     }
+  }
+
+  Future<void> _pickComparisonDestination() async {
+    if (!_valid) return;
+    String? label;
+    final destination = await showOperationsDestinationPicker(context,
+        repository: _repository,
+        session: _session,
+        initial: _filters['destination_guid'],
+        home: true,
+        onLabelSelected: (value) => label = value);
+    if (!_valid || destination == null) return;
+    setState(() {
+      _destinationLabel = destination.isEmpty ? null : label;
+      if (destination.isEmpty) {
+        _filters.remove('destination_guid');
+      } else {
+        _filters['destination_guid'] = destination;
+      }
+    });
+    await _load();
+  }
+
+  Future<void> _pickComparisonPeriod() async {
+    if (!_valid) return;
+    final range = await showOperationsDateRangeCalendar(context,
+        from: DateTime.tryParse(_filters['from'] ?? ''),
+        to: DateTime.tryParse(_filters['to'] ?? ''),
+        home: true);
+    if (!_valid || range == null) return;
+    setState(() {
+      _filters['from'] = isoDay(range.start);
+      _filters['to'] = isoDay(range.end);
+    });
+    await _load();
+  }
+
+  Future<void> _resetComparison() async {
+    if (!_valid) return;
+    setState(() {
+      _filters = _homeMonthFilters();
+      _destinationLabel = null;
+    });
+    await _load();
   }
 
   Future<void> _loadAccounts(int request) async {
@@ -232,7 +305,9 @@ class _OperationsReportScreenState extends State<OperationsReportScreen>
       destinationLabel: _destinationLabel,
       dateTooltip: widget.section == 'action-center'
           ? 'Periode aktivitas operasional (UTC)'
-          : 'Tanggal kunjungan · kalender lokal destinasi',
+          : widget.section == 'approvals'
+              ? 'Periode keputusan (UTC)'
+              : 'Tanggal kunjungan · kalender lokal destinasi',
       onDestinationPressed: _filter,
       onDatePressed: _filter);
 
@@ -257,6 +332,23 @@ class _OperationsReportScreenState extends State<OperationsReportScreen>
           'visitors' => 'Kunjungan',
           _ => 'Pusat Tindakan'
         };
+    if (_isComparison) {
+      return _DestinationComparison(
+          rows: _allRows,
+          loading: _loading,
+          error: _error,
+          filters: _filters,
+          destinationLabel: _destinationLabel,
+          role: _role ?? 2,
+          onRefresh: _load,
+          onRetry: _scopeError(_error) ? _pickComparisonDestination : _load,
+          onPickDestination: _pickComparisonDestination,
+          onPickPeriod: _pickComparisonPeriod,
+          onReset: _resetComparison,
+          onManage: () => Navigator.of(context).push(MaterialPageRoute<void>(
+              builder: (_) => DaftarWisataScreen(
+                  repository: _repository, session: _session))));
+    }
     final data = _data;
     final values = widget.adminGuid != null
         ? data?.raw['team_operational_totals'] as Json? ?? {}
@@ -325,9 +417,7 @@ class _OperationsReportScreenState extends State<OperationsReportScreen>
             const SizedBox(height: 16),
           ],
           if (!_manage) ...[
-            if (_role == 1 &&
-                (widget.section == 'visitors' ||
-                    widget.section == 'action-center')) ...[
+            if (_usesHomeFilters && widget.section != 'destinations') ...[
               _reportFilterBar(),
               const SizedBox(height: AppSpacing.lg),
             ] else if (!_usesHomeFilters) ...[
@@ -412,6 +502,61 @@ class _OperationsReportScreenState extends State<OperationsReportScreen>
                 const SizedBox(height: 12),
                 const _Notice(
                     'Tingkat kehadiran dan no-show belum tersedia karena data kelayakan tiket belum terverifikasi.'),
+              ] else if (_role == 2) ...[
+                _AdminPersonalSummary(
+                    title: 'KINERJA TIM',
+                    subtitle: 'Ringkasan keputusan Admin pada periode aktif.',
+                    approvalRate: _percent(values['approval_rate_percent'])
+                        .replaceAll('.', ',')),
+                const SizedBox(height: AppSpacing.md),
+                OperationsMetrics(
+                    values: [
+                      ('Disetujui', _value(values['approved_decisions'])),
+                      ('Ditolak', _value(values['rejected_decisions'])),
+                      (
+                        'Respons rata-rata',
+                        values['avg_response_seconds'] == null
+                            ? '—'
+                            : '${_value(values['avg_response_seconds']).replaceAll('.', ',')} dtk'
+                      ),
+                      (
+                        'Kepatuhan SLA',
+                        _percent(values['sla_compliance_percent'])
+                            .replaceAll('.', ',')
+                      ),
+                    ],
+                    icons: const [
+                      PhosphorIconsRegular.check,
+                      PhosphorIconsRegular.x,
+                      PhosphorIconsRegular.clock,
+                      PhosphorIconsRegular.shieldCheck
+                    ],
+                    labelStyle: const TextStyle(
+                        fontSize: 11,
+                        color: AppColors.navy,
+                        fontWeight: FontWeight.w500)),
+                const SizedBox(height: AppSpacing.xl),
+                const _AdminHomeHeading('Tren keputusan'),
+                _DashboardCard(
+                    child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                      const _AdminHomeHeading('Keputusan tim'),
+                      Text('Periode: ${_period(data.period)} · UTC',
+                          style: const TextStyle(
+                              fontSize: 12, color: AppColors.textSecondary)),
+                      const SizedBox(height: AppSpacing.md),
+                      OperationsTrend(
+                          rows: data.series,
+                          valueKey: 'approved_decisions',
+                          secondKey: 'rejected_decisions'),
+                      const SizedBox(height: AppSpacing.sm),
+                      const Text('Disetujui: biru · Ditolak: abu-abu',
+                          style: TextStyle(
+                              fontSize: 12, color: AppColors.textSecondary)),
+                    ])),
+                if (widget.adminGuid == null && !widget.personal)
+                  ..._staff(data),
               ] else ...[
                 if (_role == 1) ...[
                   _DashboardCard(
@@ -462,8 +607,6 @@ class _OperationsReportScreenState extends State<OperationsReportScreen>
                 if (widget.personal || _role == 1)
                   const _Notice(
                       'Riwayat pribadi mencakup keputusan Anda pada penugasan sebelumnya.'),
-                if (_role == 2 && widget.adminGuid == null && !widget.personal)
-                  ..._staff(data),
               ],
             ],
           ],

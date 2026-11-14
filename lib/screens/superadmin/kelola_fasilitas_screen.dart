@@ -88,9 +88,7 @@ class _KelolaFasilitasScreenState extends State<KelolaFasilitasScreen> {
       for (final facility in _list.items)
         if ((_status == 'all' ||
                 (_status == 'active') == facility.isActive) &&
-            (query.isEmpty ||
-                facility.name.toLowerCase().contains(query) ||
-                facility.slug.toLowerCase().contains(query)))
+            (query.isEmpty || facility.name.toLowerCase().contains(query)))
           facility,
     ];
   }
@@ -218,7 +216,7 @@ class _KelolaFasilitasScreenState extends State<KelolaFasilitasScreen> {
           onChanged: (value) => setState(() => _query = value),
           style: const TextStyle(fontSize: 14, color: AdminColors.navy),
           decoration: InputDecoration(
-              hintText: 'Cari nama atau slug fasilitas...',
+              hintText: 'Cari nama fasilitas...',
               hintStyle:
                   const TextStyle(color: AdminColors.textMuted, fontSize: 14),
               border: InputBorder.none,
@@ -284,7 +282,7 @@ class _KelolaFasilitasScreenState extends State<KelolaFasilitasScreen> {
                             color: _status == option.$1
                                 ? AdminColors.blue
                                 : AdminColors.textMuted,
-                            fontSize: 12.5,
+                            fontSize: 12,
                             fontWeight: FontWeight.w800)),
                   ),
                 ),
@@ -321,7 +319,7 @@ class _KelolaFasilitasScreenState extends State<KelolaFasilitasScreen> {
                   : 'Tambahkan fasilitas pertama untuk dipilih pada destinasi.',
               textAlign: TextAlign.center,
               style: const TextStyle(
-                  color: AdminColors.textMuted, fontSize: 12.5, height: 1.4)),
+                  color: AdminColors.textMuted, fontSize: 12, height: 1.4)),
           if (filtering) ...[
             const SizedBox(height: 14),
             OutlinedButton(
@@ -329,7 +327,7 @@ class _KelolaFasilitasScreenState extends State<KelolaFasilitasScreen> {
               onPressed: _resetFilters,
               style: OutlinedButton.styleFrom(
                   foregroundColor: AdminColors.navy,
-                  minimumSize: const Size(0, 44),
+                  minimumSize: const Size(0, 48),
                   side: const BorderSide(color: AdminColors.border),
                   shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(14)),
@@ -419,7 +417,7 @@ class _KelolaFasilitasScreenState extends State<KelolaFasilitasScreen> {
                 const Text(
                     'Cari dan atur fasilitas yang dapat digunakan destinasi.',
                     style: TextStyle(
-                        color: AdminColors.textMuted, fontSize: 12.5)),
+                        color: AdminColors.textMuted, fontSize: 12)),
                 const SizedBox(height: 14),
                 _searchField(),
                 const SizedBox(height: 16),
@@ -514,8 +512,6 @@ class _FacilityCard extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const _FacilityIcon(),
-          const SizedBox(width: 14),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -527,12 +523,6 @@ class _FacilityCard extends StatelessWidget {
                         color: AdminColors.text,
                         fontSize: 15,
                         fontWeight: FontWeight.w800)),
-                const SizedBox(height: 3),
-                Text('Slug: ${facility.slug}',
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                        color: AdminColors.textMuted, fontSize: 12)),
                 const SizedBox(height: 8),
                 AdminBadge(
                   active ? 'Aktif' : 'Nonaktif',
@@ -599,7 +589,7 @@ class _FacilityActionSheet extends StatelessWidget {
                 child: Text(label,
                     style: TextStyle(
                         color: color,
-                        fontSize: 13.5,
+                        fontSize: 13,
                         fontWeight: FontWeight.w700))),
             const Icon(PhosphorIconsRegular.caretRight,
                 size: 14, color: AdminColors.textMuted),
@@ -649,10 +639,6 @@ class _FacilityActionSheet extends StatelessWidget {
                               color: AdminColors.navy,
                               fontSize: 15,
                               fontWeight: FontWeight.w800)),
-                      const SizedBox(height: 2),
-                      Text('Slug: ${facility.slug}',
-                          style: const TextStyle(
-                              color: AdminColors.textMuted, fontSize: 12.5)),
                     ]),
               ),
             ]),
@@ -682,7 +668,7 @@ class _FacilityActionSheet extends StatelessWidget {
 }
 
 /// Create / edit bottom sheet. [onSubmit] returns an error message, or null on
-/// success. The slug is derived by the server on create and fixed on edit.
+/// success. The slug is derived by the server and never entered by the user.
 class _FacilityFormSheet extends StatefulWidget {
   final Facility? facility;
   final Future<String?> Function(Json fields) onSubmit;
@@ -697,7 +683,6 @@ class _FacilityFormSheet extends StatefulWidget {
 class _FacilityFormSheetState extends State<_FacilityFormSheet> {
   final _formKey = GlobalKey<FormState>();
   late final _name = TextEditingController(text: widget.facility?.name ?? '');
-  late final _slug = TextEditingController(text: widget.facility?.slug ?? '');
   late final int _generation = widget.session.sessionGeneration;
   late bool _active = widget.facility?.isActive ?? true;
   bool _saving = false;
@@ -707,7 +692,6 @@ class _FacilityFormSheetState extends State<_FacilityFormSheet> {
   void dispose() {
     widget.session.sessionChanges.removeListener(_sessionChanged);
     _name.dispose();
-    _slug.dispose();
     super.dispose();
   }
 
@@ -731,8 +715,6 @@ class _FacilityFormSheetState extends State<_FacilityFormSheet> {
     });
     final error = await widget.onSubmit({
       'name': _name.text.trim(),
-      if (widget.facility == null && _slug.text.trim().isNotEmpty)
-        'slug': _slug.text.trim(),
       'icon_key': null,
       'is_active': _active,
     });
@@ -747,32 +729,13 @@ class _FacilityFormSheetState extends State<_FacilityFormSheet> {
     }
   }
 
-  InputDecoration _decoration(String hint, String helper) =>
-      adminInputDecoration(null, hint: hint).copyWith(
-        hintStyle: const TextStyle(color: AdminColors.textDim, fontSize: 14),
-        helperText: helper,
-        helperMaxLines: 2,
-        helperStyle:
-            const TextStyle(color: AdminColors.textMuted, fontSize: 12),
-        errorMaxLines: 2,
-      );
-
-  Widget _label(String text, {String? hint}) => Padding(
+  Widget _label(String text) => Padding(
         padding: const EdgeInsets.only(bottom: 8),
-        child: Text.rich(TextSpan(
-            text: text,
+        child: Text(text,
             style: const TextStyle(
                 color: AdminColors.text,
                 fontSize: 13,
-                fontWeight: FontWeight.w700),
-            children: [
-              if (hint != null)
-                TextSpan(
-                    text: ' $hint',
-                    style: const TextStyle(
-                        color: AdminColors.textMuted,
-                        fontWeight: FontWeight.w500)),
-            ])),
+                fontWeight: FontWeight.w700)),
       );
 
   @override
@@ -824,7 +787,8 @@ class _FacilityFormSheetState extends State<_FacilityFormSheet> {
                 enabled: !_saving,
                 autofocus: !editing,
                 textCapitalization: TextCapitalization.words,
-                textInputAction: TextInputAction.next,
+                textInputAction: TextInputAction.done,
+                onFieldSubmitted: (_) => _submit(),
                 decoration: adminInputDecoration(null, hint: 'Contoh: Area Parkir')
                     .copyWith(
                         hintStyle: const TextStyle(
@@ -834,20 +798,6 @@ class _FacilityFormSheetState extends State<_FacilityFormSheet> {
                     (v == null || v.trim().isEmpty) ? 'Nama wajib diisi' : null,
               ),
               const SizedBox(height: 16),
-              _label('Slug', hint: editing ? '(tetap)' : '(opsional)'),
-              TextFormField(
-                key: const ValueKey('facility-slug'),
-                controller: _slug,
-                enabled: !_saving && !editing,
-                textInputAction: TextInputAction.done,
-                onFieldSubmitted: (_) => _submit(),
-                decoration: _decoration(
-                    'Terisi otomatis dari nama',
-                    editing
-                        ? 'Slug tidak dapat diubah setelah dibuat.'
-                        : 'Slug akan dibuat otomatis dari nama fasilitas.'),
-              ),
-              const SizedBox(height: 8),
               Container(
                 padding: const EdgeInsets.fromLTRB(14, 10, 8, 10),
                 decoration: BoxDecoration(
@@ -863,7 +813,7 @@ class _FacilityFormSheetState extends State<_FacilityFormSheet> {
                           Text('Status fasilitas',
                               style: TextStyle(
                                   color: AdminColors.text,
-                                  fontSize: 13.5,
+                                  fontSize: 13,
                                   fontWeight: FontWeight.w800)),
                           SizedBox(height: 2),
                           Text('Fasilitas dapat dipilih oleh admin destinasi.',

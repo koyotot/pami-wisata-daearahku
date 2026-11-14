@@ -27,7 +27,7 @@ Future<Map<String, String>?> showOperationsFilters(BuildContext context,
         shape: const RoundedRectangleBorder(
             borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
         builder: (_) => Theme(
-            data: session.role == 1
+            data: session.role == 1 || home
                 ? AppColors.operationsTheme
                 : Theme.of(context),
             child: _OperationsFilters(
@@ -89,7 +89,7 @@ class _OperationsFiltersState extends State<_OperationsFilters> {
     super.initState();
     widget.session.sessionChanges.addListener(_changed);
     if (widget.financial) operationsDataChanges.addListener(_changed);
-    if (_role != 1) _load();
+    if (_role != 1 && !widget.home) _load();
   }
 
   void _changed() {
@@ -157,7 +157,7 @@ class _OperationsFiltersState extends State<_OperationsFilters> {
 
   Future<void> _dates() async {
     final now = DateTime.now();
-    final range = _role == 1
+    final range = _role == 1 || widget.home
         ? await showOperationsDateRangeCalendar(context,
             from: _from,
             to: _to,
@@ -195,7 +195,7 @@ class _OperationsFiltersState extends State<_OperationsFilters> {
   }
 
   @override
-  Widget build(BuildContext context) => _role == 1
+  Widget build(BuildContext context) => _role == 1 || widget.home
       ? widget.home
           ? _homeFilters(context)
           : _roleOneFilters(context)

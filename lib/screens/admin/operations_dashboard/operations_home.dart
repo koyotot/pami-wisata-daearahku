@@ -1,15 +1,20 @@
 part of 'operations_dashboard.dart';
 
 class _AdminPersonalSummary extends StatelessWidget {
-  const _AdminPersonalSummary({required this.approvalRate});
+  const _AdminPersonalSummary(
+      {required this.approvalRate,
+      this.title = 'KINERJA INDIVIDU',
+      this.subtitle = 'Ringkasan keputusan Admin pada periode aktif.'});
   final String approvalRate;
+  final String title;
+  final String subtitle;
 
   @override
   Widget build(BuildContext context) => _DashboardCard(
           child:
               Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-        const Text('KINERJA INDIVIDU',
-            style: TextStyle(
+        Text(title,
+            style: const TextStyle(
                 fontSize: 11,
                 letterSpacing: .8,
                 fontWeight: FontWeight.w700,
@@ -31,8 +36,8 @@ class _AdminPersonalSummary extends StatelessWidget {
                   color: AppColors.textSecondary)),
         ])),
         const SizedBox(height: AppSpacing.xs),
-        const Text('Ringkasan keputusan Admin pada periode aktif.',
-            style: TextStyle(
+        Text(subtitle,
+            style: const TextStyle(
                 fontSize: 12, height: 1.5, color: AppColors.textSecondary)),
       ]));
 }
@@ -221,6 +226,60 @@ class _AdminAttentionTile extends StatelessWidget {
                 color: AppColors.warningText),
             onTap: row.bookingGuid == null ? null : onTap));
   }
+}
+
+/// Full-width link card on the superadmin home: tinted icon, title, subtitle
+/// and an up-right arrow.
+class _HomeLinkCard extends StatelessWidget {
+  const _HomeLinkCard(
+      {required this.icon,
+      required this.title,
+      required this.subtitle,
+      required this.onTap});
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) => Material(
+      color: AppColors.surface,
+      shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(18),
+          side: const BorderSide(color: AppColors.border)),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+          key: ValueKey('home-link-$title'),
+          onTap: onTap,
+          child: Padding(
+              padding: const EdgeInsets.all(AppSpacing.lg),
+              child: Row(children: [
+                Container(
+                    width: 48,
+                    height: 48,
+                    decoration: BoxDecoration(
+                        color: AppColors.blueTint,
+                        borderRadius: BorderRadius.circular(14)),
+                    child: Icon(icon, color: AppColors.blue, size: 22)),
+                const SizedBox(width: AppSpacing.md),
+                Expanded(
+                    child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                      Text(title,
+                          style: const TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w800,
+                              color: AppColors.navy)),
+                      const SizedBox(height: AppSpacing.xs),
+                      Text(subtitle,
+                          style: const TextStyle(
+                              fontSize: 12, color: AppColors.textSecondary)),
+                    ])),
+                const SizedBox(width: AppSpacing.sm),
+                const Icon(PhosphorIconsRegular.arrowUpRight,
+                    size: 18, color: AppColors.textSecondary),
+              ]))));
 }
 
 class _AdminHomeShortcut extends StatelessWidget {

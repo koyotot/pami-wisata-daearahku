@@ -136,8 +136,71 @@ class _DashboardActionCenter extends StatelessWidget {
   final bool executive;
   final bool hasActions;
   final VoidCallback onOpen;
+
+  Widget _executiveCard() => Material(
+      color: Colors.white,
+      clipBehavior: Clip.antiAlias,
+      shape: RoundedRectangleBorder(
+          side: const BorderSide(color: AppColors.border),
+          borderRadius: BorderRadius.circular(17)),
+      child: InkWell(
+          key: const ValueKey('executive-attention-card'),
+          onTap: onOpen,
+          child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Row(children: [
+                      Container(
+                          width: 48,
+                          height: 48,
+                          decoration: BoxDecoration(
+                              color: const Color(0xFFFFF0D6),
+                              borderRadius: BorderRadius.circular(14)),
+                          child: const Icon(PhosphorIconsRegular.clipboardText,
+                              color: Color(0xFF98621E), size: 24)),
+                      const SizedBox(width: 14),
+                      const Expanded(
+                          child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                            Text('Perhatian Eksekutif',
+                                style: TextStyle(
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.w800,
+                                    color: AppColors.navy)),
+                            SizedBox(height: 4),
+                            Text('Antrean persetujuan operasional',
+                                style: TextStyle(
+                                    fontSize: 13, color: Color(0xFF526787))),
+                          ])),
+                      const SizedBox(width: 8),
+                      const Icon(PhosphorIconsRegular.caretRight,
+                          color: AppColors.textMuted, size: 18),
+                    ]),
+                    const SizedBox(height: 14),
+                    const Divider(height: 1, color: AppColors.border),
+                    const SizedBox(height: 14),
+                    Row(children: [
+                      const Expanded(
+                          child: Text('Menunggu persetujuan',
+                              style: TextStyle(
+                                  fontSize: 13, color: Color(0xFF526787)))),
+                      Text('$pending permintaan',
+                          style: const TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w800,
+                              color: AppColors.navy)),
+                    ]),
+                  ]))));
+
   @override
-  Widget build(BuildContext context) => Material(
+  Widget build(BuildContext context) => executive
+      ? _executiveCard()
+      : _adminAttention(context);
+
+  Widget _adminAttention(BuildContext context) => Material(
       color: const Color(0xFFFFF0D6),
       borderRadius: BorderRadius.circular(15),
       clipBehavior: Clip.antiAlias,
@@ -515,10 +578,12 @@ class OperationsTrend extends StatelessWidget {
 }
 
 class _TrendPainter extends CustomPainter {
-  const _TrendPainter(this.first, this.second, {this.bars = false});
+  const _TrendPainter(this.first, this.second,
+      {this.bars = false, this.dots = false});
   final List<double> first;
   final List<double> second;
   final bool bars;
+  final bool dots;
   @override
   void paint(Canvas canvas, Size size) {
     final grid = Paint()
@@ -552,6 +617,15 @@ class _TrendPainter extends CustomPainter {
             ..color = color
             ..style = PaintingStyle.stroke
             ..strokeWidth = 2);
+      if (dots && values.length > 1) {
+        for (var i = 0; i < values.length; i++) {
+          canvas.drawCircle(
+              Offset(size.width * i / (values.length - 1),
+                  size.height * (1 - values[i] / maxValue)),
+              4,
+              Paint()..color = color);
+        }
+      }
     }
 
     if (bars) {
@@ -576,7 +650,183 @@ class _TrendPainter extends CustomPainter {
   bool shouldRepaint(_TrendPainter oldDelegate) =>
       first != oldDelegate.first ||
       second != oldDelegate.second ||
-      bars != oldDelegate.bars;
+      bars != oldDelegate.bars ||
+      dots != oldDelegate.dots;
+}
+
+const _trendMonths = [
+  'Januari',
+  'Februari',
+  'Maret',
+  'April',
+  'Mei',
+  'Juni',
+  'Juli',
+  'Agustus',
+  'September',
+  'Oktober',
+  'November',
+  'Desember'
+];
+
+/// `11–12 November 2026`, or `28 Okt–2 Nov 2026` across months.
+String _trendRangeLabel(DateTime from, DateTime to) {
+  if (from.year != to.year) {
+    return '${from.day} ${_trendMonths[from.month - 1].substring(0, 3)} ${from.year}'
+        '–${to.day} ${_trendMonths[to.month - 1].substring(0, 3)} ${to.year}';
+  }
+  if (from.month != to.month) {
+    return '${from.day} ${_trendMonths[from.month - 1].substring(0, 3)}'
+        '–${to.day} ${_trendMonths[to.month - 1].substring(0, 3)} ${to.year}';
+  }
+  final month = _trendMonths[to.month - 1];
+  return from.day == to.day
+      ? '${to.day} $month ${to.year}'
+      : '${from.day}–${to.day} $month ${to.year}';
+}
+
+/// Executive "Tren Keputusan Tim" card: approved/rejected decisions per day.
+class _DecisionTrendCard extends StatelessWidget {
+  const _DecisionTrendCard(
+      {required this.rows, required this.period, required this.onOpen});
+  final List<Json> rows;
+  final Map<String, dynamic> period;
+  final VoidCallback onOpen;
+
+  Widget _stat(String label, String value, Color tint) => Expanded(
+      child: Container(
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+              color: tint, borderRadius: BorderRadius.circular(14)),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(label,
+                style: const TextStyle(fontSize: 12, color: Color(0xFF526787))),
+            const SizedBox(height: 6),
+            Text(value,
+                style: const TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w800,
+                    color: AppColors.blueDeep,
+                    fontFeatures: [FontFeature.tabularFigures()])),
+          ])));
+
+  Widget _legend(String label, Color color) =>
+      Row(mainAxisSize: MainAxisSize.min, children: [
+        Container(
+            width: 8,
+            height: 8,
+            decoration: BoxDecoration(shape: BoxShape.circle, color: color)),
+        const SizedBox(width: 6),
+        Text(label,
+            style: const TextStyle(fontSize: 12, color: Color(0xFF526787))),
+      ]);
+
+  @override
+  Widget build(BuildContext context) {
+    final approved =
+        rows.map((r) => _number(r['approved_decisions'])?.toDouble() ?? 0).toList();
+    final rejected =
+        rows.map((r) => _number(r['rejected_decisions'])?.toDouble() ?? 0).toList();
+    final first = rows.isEmpty ? null : DateTime.tryParse('${rows.first['date']}');
+    final last = rows.isEmpty ? null : DateTime.tryParse('${rows.last['date']}');
+    final from = first ?? DateTime.tryParse('${period['from']}');
+    final to = last ?? DateTime.tryParse('${period['to']}');
+    final perDay = approved.isEmpty
+        ? '0'
+        : approved.length == 1
+            ? _value(approved.first.round())
+            : '${_value(approved.first.round())} → ${_value(approved.last.round())}';
+    final rejectedTotal = rejected.fold<double>(0, (sum, v) => sum + v);
+    String dayLabel(DateTime? date) => date == null
+        ? ''
+        : operationsPeriodLabel({
+            'from': isoDay(date),
+            'to': isoDay(date),
+          });
+    return _DashboardCard(
+        child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+      Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Expanded(
+            child:
+                Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          const Text('Tren Keputusan Tim',
+              style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w800,
+                  color: AppColors.navy)),
+          const SizedBox(height: 4),
+          Text(
+              from == null || to == null
+                  ? 'Keputusan tim · UTC'
+                  : '${_trendRangeLabel(from, to)} · UTC',
+              style: const TextStyle(fontSize: 12, color: Color(0xFF526787))),
+        ])),
+        const SizedBox(width: 8),
+        Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(
+                color: AppColors.blueTint,
+                borderRadius: BorderRadius.circular(12)),
+            child: const Icon(PhosphorIconsRegular.chartLineUp,
+                color: AppColors.blue, size: 20)),
+      ]),
+      const SizedBox(height: 14),
+      Row(children: [
+        _stat('Disetujui per hari', perDay, const Color(0xFFEEF4FD)),
+        const SizedBox(width: 12),
+        _stat('Ditolak', _value(rejectedTotal.round()), const Color(0xFFF1F4F9)),
+      ]),
+      const SizedBox(height: 18),
+      if (rows.isEmpty)
+        const _Notice('Belum ada keputusan pada periode ini.')
+      else ...[
+        Semantics(
+            label: 'Tren keputusan tim. '
+                '${rows.map((r) => "${r['date']}: disetujui ${r['approved_decisions']}, ditolak ${r['rejected_decisions']}").join('; ')}',
+            excludeSemantics: true,
+            child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 6),
+                child: SizedBox(
+                    height: 120,
+                    width: double.infinity,
+                    child: CustomPaint(
+                        painter:
+                            _TrendPainter(approved, rejected, dots: true))))),
+        const SizedBox(height: 10),
+        Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+          Text(dayLabel(first),
+              style: const TextStyle(fontSize: 12, color: Color(0xFF526787))),
+          if (rows.length > 1)
+            Text(dayLabel(last),
+                style: const TextStyle(fontSize: 12, color: Color(0xFF526787))),
+        ]),
+        const SizedBox(height: 14),
+        Row(children: [
+          _legend('Disetujui', AppColors.blue),
+          const SizedBox(width: 16),
+          _legend('Ditolak', AppColors.textMuted),
+        ]),
+      ],
+      const SizedBox(height: 14),
+      const Divider(height: 1, color: AppColors.border),
+      InkWell(
+          key: const ValueKey('decision-trend-open'),
+          onTap: onOpen,
+          child: const Padding(
+              padding: EdgeInsets.symmetric(vertical: 14),
+              child: Row(children: [
+                Expanded(
+                    child: Text('Lihat kinerja tim',
+                        style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w800,
+                            color: AppColors.blueDeep))),
+                Icon(PhosphorIconsRegular.arrowRight,
+                    size: 18, color: AppColors.blueDeep),
+              ]))),
+    ]));
+  }
 }
 
 class _Notice extends StatelessWidget {

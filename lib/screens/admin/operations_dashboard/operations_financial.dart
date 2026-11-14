@@ -23,7 +23,10 @@ class _OperationsFinancialState extends State<OperationsFinancialScreen>
       widget.repository ?? BusinessRepository(ApiClient(_session));
   late final _generation = _session.sessionGeneration;
   late final _role = _session.role;
-  String _environment = 'demo';
+  // Fixed (no selector): the full page always reads SANDBOX; the home preview
+  // keeps its DEMO source.
+  late String _environment = _defaultEnvironment;
+  String get _defaultEnvironment => widget.preview ? 'demo' : 'sandbox';
   bool _analytics = false;
   Map<String, String> _filters = {};
   Json? _financial;
@@ -43,9 +46,14 @@ class _OperationsFinancialState extends State<OperationsFinancialScreen>
       _session.role == _role &&
       (_role == 1 || _role == 2);
 
+  /// Superadmin opens on the current UTC month, like the home summary.
+  Map<String, String> get _defaultFilters =>
+      _role == 2 && !widget.preview ? _homeMonthFilters() : {};
+
   @override
   void initState() {
     super.initState();
+    _filters = _defaultFilters;
     _session.sessionChanges.addListener(_changed);
     operationsDataChanges.addListener(_changed);
     WidgetsBinding.instance.addObserver(this);
@@ -62,8 +70,8 @@ class _OperationsFinancialState extends State<OperationsFinancialScreen>
       _activityLoading = false;
       _destinationLabel = null;
       _receivedAt = null;
-      _filters = {};
-      _environment = 'demo';
+      _filters = _defaultFilters;
+      _environment = _defaultEnvironment;
       _loading = false;
       _error = const ApiException(
           'Akses diperbarui. Muat ulang keuangan sesuai penugasan terbaru.');
@@ -94,6 +102,11 @@ class _OperationsFinancialState extends State<OperationsFinancialScreen>
 
   Future<void> _load() async {
     if (!_valid || !widget.active) return;
+    // The superadmin home card is just a menu entry; it shows no figures.
+    if (widget.preview && _role == 2) {
+      _loading = false;
+      return;
+    }
     final request = ++_request;
     final environment = _environment;
     final filters = Map<String, String>.of(_filters);
@@ -158,7 +171,7 @@ class _OperationsFinancialState extends State<OperationsFinancialScreen>
         _loading = false;
         _activityLoading = false;
         if (_scopeError(e)) {
-          _filters = {};
+          _filters = _defaultFilters;
           _destinationLabel = null;
         }
       });
@@ -200,11 +213,11 @@ class _OperationsFinancialState extends State<OperationsFinancialScreen>
         repository: _repository,
         session: _session,
         initial: {
-          if (_role == 1 && period is Json)
+          if (period is Json)
             for (final key in ['from', 'to']) key: '${period[key]}',
           ..._filters,
         },
-        home: _role == 1,
+        home: true,
         destinationLabel: _destinationLabel,
         onDestinationLabelSelected: (label) => destinationLabel = label,
         financial: true);
@@ -236,145 +249,7 @@ class _OperationsFinancialState extends State<OperationsFinancialScreen>
     if (!_valid) return const SizedBox.shrink();
     if (widget.preview) return _preview();
     if (_role == 1) return _adminPage();
-    final financial = _financial;
-    final period = financial?['period'];
-    return Theme(
-        data: AppColors.visitorTheme,
-        child: OperationsPage(
-            role: _role,
-            title: 'Ringkasan Keuangan',
-            subtitle: _role == 2
-                ? 'Seluruh destinasi · scope global'
-                : 'Destinasi yang ditugaskan kepada Anda',
-            embedded: false,
-            onRefresh: _load,
-            children: [
-              _provenance(),
-              const SizedBox(height: 12),
-              SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  child: SegmentedButton<String>(
-                      style: SegmentedButton.styleFrom(
-                          minimumSize: const Size(44, 44)),
-                      showSelectedIcon: false,
-                      segments: const [
-                        ButtonSegment(value: 'demo', label: Text('DEMO')),
-                        ButtonSegment(value: 'sandbox', label: Text('Sandbox')),
-                        ButtonSegment(
-                            value: 'production', label: Text('Production')),
-                      ],
-                      selected: {_environment},
-                      onSelectionChanged: (values) {
-                        _environment = values.first;
-                        _load();
-                      })),
-              const SizedBox(height: 8),
-              Row(children: [
-                Expanded(
-                    child: Text(
-                        '${period is Json ? _period(period) : _filters['from'] == null ? 'Bulan ini · UTC' : '${_filters['from']} — ${_filters['to']}'}\n'
-                        '${_filters['destination_guid'] == null ? _role == 2 ? 'Semua destinasi' : 'Semua destinasi saya' : 'Destinasi terpilih'}',
-                        style: const TextStyle(
-                            fontSize: 12,
-                            height: 1.6,
-                            color: Color(0xFF526787)))),
-                OutlinedButton.icon(
-                    onPressed: _filter,
-                    icon: const Icon(PhosphorIconsRegular.slidersHorizontal,
-                        size: 18),
-                    label: const Text('Filter')),
-              ]),
-              const SizedBox(height: 12),
-              SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  child: SegmentedButton<bool>(
-                      style: SegmentedButton.styleFrom(
-                          minimumSize: const Size(44, 44)),
-                      showSelectedIcon: false,
-                      segments: const [
-                        ButtonSegment(value: false, label: Text('Ringkasan')),
-                        ButtonSegment(
-                            value: true, label: Text('Analitik Pembayaran')),
-                      ],
-                      selected: {_analytics},
-                      onSelectionChanged: (values) =>
-                          setState(() => _analytics = values.first))),
-              const SizedBox(height: 16),
-              if (_loading) const OperationsSkeleton(),
-              if (_error != null)
-                _errorBlock(_error!, _scopeError(_error) ? _filter : _load,
-                    role: _role),
-              if (!_loading && financial != null) ...[
-                if (!_available) ...[
-                  _DashboardCard(
-                      child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                        const _SectionTitle(
-                            'Belum ada sumber pembayaran tersedia'),
-                        Text(_financialReason(financial['reason']),
-                            style: const TextStyle(
-                                fontSize: 14,
-                                height: 1.6,
-                                color: Color(0xFF526787))),
-                      ])),
-                  const SizedBox(height: 12),
-                ],
-                if (financial['availability'] == 'partial') ...[
-                  _Notice(_financialReason(financial['reason'])),
-                  const SizedBox(height: 12),
-                ],
-                if (_analytics)
-                  ..._analyticsContent(financial)
-                else
-                  ..._summaryContent(financial),
-                const SizedBox(height: 16),
-                _DashboardCard(
-                    child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                      const _SectionTitle('Sumber & kelengkapan'),
-                      _financialRow('Lingkungan',
-                          _financialEnvironmentLabel(financial['environment'])),
-                      _financialRow('Penyedia', '${financial['provider']}'),
-                      _financialRow('Label', '${financial['label'] ?? '—'}'),
-                      _financialRow(
-                          'Sumber', _financialSourceLabel(financial['source'])),
-                      _financialRow(
-                          'Kelengkapan',
-                          _financialAvailabilityLabel(
-                              financial['availability'])),
-                      _financialRow('Nominal dihitung menurut',
-                          _financialDateBasisLabel(financial['date_basis'])),
-                      Text(_financialReason(financial['reason']),
-                          style: const TextStyle(
-                              fontSize: 12,
-                              height: 1.6,
-                              color: Color(0xFF526787))),
-                      if (financial['missing_fields'] is List &&
-                          (financial['missing_fields'] as List).isNotEmpty)
-                        Text(
-                            'Belum tersedia: ${(financial['missing_fields'] as List).map(_financialFieldLabel).join(', ')}',
-                            style: const TextStyle(
-                                fontSize: 12,
-                                height: 1.6,
-                                color: Color(0xFF526787))),
-                    ])),
-                if (_receivedAt != null)
-                  Row(children: [
-                    Expanded(
-                        child: Text('Diterima: ${formatDateTime(_receivedAt!)}',
-                            style: const TextStyle(
-                                fontSize: 12, color: Color(0xFF526787)))),
-                    if (_role != 1)
-                      IconButton(
-                          tooltip: 'Perbarui keuangan',
-                          onPressed: _load,
-                          icon: const Icon(PhosphorIconsRegular.arrowsClockwise,
-                              size: 20)),
-                  ]),
-              ],
-            ]));
+    return _superadminPage();
   }
 
   Widget _adminPage() {
@@ -547,65 +422,69 @@ class _OperationsFinancialState extends State<OperationsFinancialScreen>
         ]);
   }
 
-  Widget _provenance() => Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-          color: const Color(0xFFFFF7E9),
-          borderRadius: BorderRadius.circular(12)),
-      child: Text(
-          _environment == 'demo'
-              ? 'DEMO / TEST_ONLY · Simulasi, bukan uang nyata atau pendapatan Production.'
-              : _environment == 'sandbox'
-                  ? 'SANDBOX / TEST_ONLY · Data uji terpisah dari Production.'
-                  : 'PRODUCTION · Hanya sumber pembayaran terverifikasi.',
-          style: const TextStyle(
-              fontSize: 12,
-              height: 1.5,
-              fontWeight: FontWeight.w600,
-              color: Color(0xFF795018))));
-
   Widget _preview() => _role == 1
       ? _adminPreview()
-      : _DashboardCard(
-          child:
-              Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-          const _SectionTitle('Ringkasan Keuangan'),
-          const Text('DEMO / TEST_ONLY · Bukan uang nyata',
-              style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w700,
-                  color: AppColors.blueDeep)),
-          const SizedBox(height: 12),
-          if (_loading)
-            const SizedBox(
-                height: 40, child: Center(child: LinearProgressIndicator()))
-          else if (_error != null) ...[
-            Text(adminErrorMessage(_error!),
-                style: const TextStyle(fontSize: 13, height: 1.5)),
-            if (_role != 1)
-              TextButton(
-                  onPressed: _load, child: const Text('Muat ulang keuangan')),
-          ] else if (!_available)
-            Text(_financialReason(_financial?['reason']),
-                style: const TextStyle(
-                    fontSize: 13, height: 1.5, color: Color(0xFF526787)))
-          else
-            Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Expanded(
-                  child: _financialFigure(
-                      'Gross tercatat', _metric('gross_revenue', money: true))),
-              const SizedBox(width: 12),
-              Expanded(
-                  child: _financialFigure(
-                      'Transaksi sukses', _metric('successful_transactions'))),
-            ]),
-          const SizedBox(height: 8),
-          if (_financial != null)
-            Text('Sumber: ${_financialSourceLine(_financial)}',
-                style: const TextStyle(
-                    fontSize: 12, height: 1.5, color: Color(0xFF526787))),
-          _routeLink('Buka Financial Dashboard', _open),
-        ]));
+      : _financeMenuCard();
+
+  /// Superadmin home entry point to the full finance page (no figures here).
+  Widget _financeMenuCard() => Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+          color: AppColors.navy, borderRadius: BorderRadius.circular(24)),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          const Expanded(
+              child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                Text('MENU KEUANGAN',
+                    style: TextStyle(
+                        fontSize: 11,
+                        letterSpacing: .8,
+                        fontWeight: FontWeight.w700,
+                        color: Color(0xFFB9CCEA))),
+                SizedBox(height: 10),
+                Text('Ringkasan Keuangan',
+                    style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.w800,
+                        color: Colors.white)),
+                SizedBox(height: 8),
+                Text('Kelola dan pantau laporan keuangan dalam satu tempat.',
+                    style: TextStyle(
+                        fontSize: 14, height: 1.5, color: Color(0xFFDCE6F7))),
+              ])),
+          const SizedBox(width: 12),
+          Container(
+              width: 48,
+              height: 48,
+              decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: .12),
+                  borderRadius: BorderRadius.circular(14)),
+              child: const Icon(PhosphorIconsRegular.chartBar,
+                  color: Colors.white, size: 24)),
+        ]),
+        const SizedBox(height: 20),
+        Material(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(14),
+            child: InkWell(
+                key: const ValueKey('finance-menu-open'),
+                borderRadius: BorderRadius.circular(14),
+                onTap: _open,
+                child: const Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                    child: Row(children: [
+                      Expanded(
+                          child: Text('Buka Financial Dashboard',
+                              style: TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w700,
+                                  color: AppColors.navy))),
+                      Icon(PhosphorIconsRegular.arrowRight,
+                          size: 18, color: AppColors.navy),
+                    ])))),
+      ]));
 
   Widget _adminPreview() => _DashboardCard(
           child:
@@ -667,174 +546,387 @@ class _OperationsFinancialState extends State<OperationsFinancialScreen>
                         TextStyle(fontSize: 12, fontWeight: FontWeight.w700)))),
       ]));
 
-  List<Widget> _summaryContent(Json financial) => [
-        Container(
-            padding: const EdgeInsets.all(18),
-            decoration: BoxDecoration(
-                color: AppColors.blueDeep,
-                borderRadius: BorderRadius.circular(18)),
-            child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Text(
-                      _environment == 'demo'
-                          ? 'Gross revenue · Simulasi DEMO'
-                          : 'Gross revenue · ${_environment.toUpperCase()}',
-                      style:
-                          const TextStyle(fontSize: 13, color: Colors.white)),
-                  const SizedBox(height: 8),
-                  Text(_metric('gross_revenue', money: true),
-                      style: TextStyle(
-                          fontSize: _available ? 28 : 18,
-                          fontWeight: FontWeight.w800,
-                          color: Colors.white,
-                          fontFeatures: const [FontFeature.tabularFigures()])),
-                  const SizedBox(height: 6),
-                  Text(
-                      'Nominal diakui menurut '
-                      '${_financialDateBasisLabel('paid_utc')}',
-                      style:
-                          const TextStyle(fontSize: 12, color: Colors.white)),
+  // ── Superadmin finance page ─────────────────────────────────────────────
+  bool _sourceOpen = false;
+
+  Widget _superadminPage() {
+    final financial = _financial;
+    final period = financial?['period'];
+    final filters = {
+      if (period is Json)
+        for (final key in ['from', 'to']) key: '${period[key]}',
+      ..._filters,
+    };
+    return Theme(
+        data: AppColors.visitorTheme,
+        child: OperationsPage(
+            role: _role,
+            title: 'Ringkasan Keuangan',
+            subtitle: 'Seluruh destinasi · scope global',
+            embedded: false,
+            onRefresh: _load,
+            children: [
+              Row(children: [
+                Expanded(
+                    child: _FinanceFilterCard(
+                        key: const ValueKey('financial-destination-filter'),
+                        icon: PhosphorIconsRegular.mapPin,
+                        caption: 'DESTINASI',
+                        value: filters['destination_guid'] == null
+                            ? 'Semua destinasi'
+                            : _destinationLabel ?? 'Destinasi terpilih',
+                        onTap: _filter)),
+                const SizedBox(width: 12),
+                Expanded(
+                    child: _FinanceFilterCard(
+                        key: const ValueKey('financial-date-filter'),
+                        icon: PhosphorIconsRegular.calendarBlank,
+                        caption: 'PERIODE',
+                        value: operationsPeriodLabel(filters),
+                        onTap: _filter)),
+              ]),
+              const SizedBox(height: 16),
+              _FinanceTabs(
+                  analytics: _analytics,
+                  onChanged: (value) => setState(() => _analytics = value)),
+              const SizedBox(height: 20),
+              if (_loading) const OperationsSkeleton(),
+              if (_error != null)
+                _errorBlock(_error!, _scopeError(_error) ? _filter : _load,
+                    role: _role),
+              if (!_loading && financial != null) ...[
+                if (!_available) ...[
+                  _DashboardCard(
+                      child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                        const _SectionTitle(
+                            'Belum ada sumber pembayaran tersedia'),
+                        Text(_financialReason(financial['reason']),
+                            style: const TextStyle(
+                                fontSize: 14,
+                                height: 1.6,
+                                color: Color(0xFF526787))),
+                      ])),
+                  const SizedBox(height: 16),
+                ],
+                if (_analytics)
+                  ..._analyticsContent(financial)
+                else
+                  ..._summaryContent(financial),
+                const SizedBox(height: 16),
+                _sourceCard(financial),
+              ],
+            ]));
+  }
+
+  List<Widget> _summaryContent(Json financial) {
+    final figures = [
+      ('Transaksi sukses', _metric('successful_transactions'),
+          'Pembayaran berhasil'),
+      ('Tiket terjual', _metric('tickets_sold'), 'Total tiket'),
+      ('Payment attempts', _metric('payment_attempts'), 'Percobaan pembayaran'),
+      ('Gross collected', _metric('gross_collected', money: true),
+          'Nominal terkumpul'),
+    ];
+    final unapplied = _number(financial['unapplied_collected']);
+    final components = [
+      ('Gateway fees', 'gateway_fees'),
+      ('Net revenue', 'net_revenue'),
+      ('Settlement', 'settlement'),
+      ('Refund tercatat', 'refunds'),
+    ];
+    final missing = !_available ||
+        components.any((c) => _number(financial[c.$2]) == null) ||
+        financial['refunds_complete'] != true;
+    return [
+      _financeHeading('Performa Keuangan',
+          'Ringkasan pembayaran berhasil pada periode terpilih.'),
+      const SizedBox(height: 14),
+      Container(
+          clipBehavior: Clip.antiAlias,
+          decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(22),
+              gradient: const LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [AppColors.blueDeep, Color(0xFF2077D6)])),
+          child: Stack(children: [
+            Positioned(
+                right: -36,
+                top: -28,
+                child: Container(
+                    width: 170,
+                    height: 170,
+                    decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: Colors.white.withValues(alpha: .06)))),
+            Padding(
+                padding: const EdgeInsets.all(20),
+                child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Row(children: [
+                        Expanded(
+                            child: Text(
+                                'Gross revenue - ${_environment.toUpperCase()}',
+                                style: const TextStyle(
+                                    fontSize: 13, color: Colors.white))),
+                        _financeInfo(
+                            'Total nominal pembayaran berhasil pada periode '
+                            'terpilih, diakui menurut tanggal pembayaran '
+                            'berhasil (UTC).',
+                            onDark: true),
+                      ]),
+                      const SizedBox(height: 18),
+                      Text(_metric('gross_revenue', money: true),
+                          style: TextStyle(
+                              fontSize: _available ? 36 : 20,
+                              height: 1.15,
+                              fontWeight: FontWeight.w800,
+                              color: Colors.white,
+                              fontFeatures: const [
+                                FontFeature.tabularFigures()
+                              ])),
+                      const SizedBox(height: 14),
+                      Text(
+                          'Nominal pembayaran berhasil yang diakui berdasarkan '
+                          '${_financialDateBasisLabel(financial['date_basis'] ?? 'paid_utc')}.',
+                          style: const TextStyle(
+                              fontSize: 13, height: 1.5, color: Colors.white)),
+                    ])),
+          ])),
+      const SizedBox(height: 12),
+      LayoutBuilder(builder: (context, constraints) {
+        final columns = constraints.maxWidth < 280 ||
+                MediaQuery.textScalerOf(context).scale(14) > 18
+            ? 1
+            : 2;
+        return Column(children: [
+          for (var i = 0; i < figures.length; i += columns) ...[
+            if (i > 0) const SizedBox(height: 12),
+            IntrinsicHeight(
+                child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                  for (var j = i; j < i + columns; j++) ...[
+                    if (j > i) const SizedBox(width: 12),
+                    Expanded(
+                        child: _financeFigureCard(
+                            figures[j].$1, figures[j].$2, figures[j].$3)),
+                  ],
                 ])),
-        const SizedBox(height: 12),
-        LayoutBuilder(builder: (context, constraints) {
-          final figures = [
-            ('Transaksi sukses', _metric('successful_transactions')),
-            ('Tiket terjual', _metric('tickets_sold')),
-            ('Gross collected', _metric('gross_collected', money: true)),
-            ('Payment attempts', _metric('payment_attempts')),
-          ];
-          final columns = constraints.maxWidth < 280 ||
-                  MediaQuery.textScalerOf(context).scale(14) > 18
-              ? 1
-              : 2;
-          return Column(children: [
-            for (var i = 0; i < figures.length; i += columns) ...[
-              if (i > 0) const SizedBox(height: 12),
-              IntrinsicHeight(
-                  child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                    for (var j = i; j < i + columns; j++) ...[
-                      if (j > i) const SizedBox(width: 12),
-                      Expanded(
-                          child: _DashboardCard(
-                              child: _financialFigure(
-                                  figures[j].$1, figures[j].$2))),
-                    ],
-                  ])),
+          ],
+        ]);
+      }),
+      const SizedBox(height: 12),
+      _DashboardCard(
+          child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+            _financeCardHeader('Rekonsiliasi collected',
+                trailing: _financeInfo(
+                    'Membandingkan nominal yang terkumpul dengan nominal yang '
+                    'sudah diterapkan ke booking.')),
+            const SizedBox(height: 14),
+            Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                    color: const Color(0xFFF1F6FE),
+                    borderRadius: BorderRadius.circular(14)),
+                child: IntrinsicHeight(
+                    child: Row(children: [
+                  Expanded(
+                      child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                        const Text('Gross collected',
+                            style: TextStyle(
+                                fontSize: 12, color: Color(0xFF526787))),
+                        const SizedBox(height: 6),
+                        Text(_metric('gross_collected', money: true),
+                            style: _financeValueStyle(18)),
+                      ])),
+                  const VerticalDivider(width: 24, color: AppColors.border),
+                  Expanded(
+                      child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.end,
+                          children: [
+                        const Text('Belum diterapkan',
+                            style: TextStyle(
+                                fontSize: 12, color: Color(0xFF526787))),
+                        const SizedBox(height: 6),
+                        Text(_metric('unapplied_collected', money: true),
+                            style: _financeValueStyle(18)),
+                      ])),
+                ]))),
+            const SizedBox(height: 12),
+            Text(
+                _available && unapplied == 0
+                    ? 'Angka Rp0 di sini memang tersedia pada snapshot. '
+                        'Metrik yang tidak tersedia tetap ditandai terpisah.'
+                    : 'Metrik yang tidak tersedia ditandai terpisah dan tidak '
+                        'dihitung sebagai Rp0.',
+                style: const TextStyle(
+                    fontSize: 12, height: 1.6, color: Color(0xFF526787))),
+          ])),
+      const SizedBox(height: 12),
+      _DashboardCard(
+          child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+            _financeCardHeader('Komponen Keuangan',
+                trailing: _financeInfo(
+                    'Komponen yang belum tersedia tidak dihitung sebagai Rp0.')),
+            const SizedBox(height: 6),
+            for (final component in components) ...[
+              _financeComponentRow(
+                  component.$1,
+                  _available && _number(financial[component.$2]) != null
+                      ? Text(_financialMoney(financial[component.$2]),
+                          style: _financeValueStyle(13))
+                      : _financeChip('Belum tersedia')),
+              const Divider(height: 1, color: AppColors.border),
             ],
-          ]);
-        }),
+            _financeComponentRow(
+                'Kelengkapan refund',
+                !_available
+                    ? _financeChip('Belum tersedia')
+                    : financial['refunds_complete'] == true
+                        ? _financeChip('Lengkap', good: true)
+                        : _financeChip('Belum lengkap')),
+            const SizedBox(height: 6),
+            Text(
+                missing
+                    ? 'Tidak dihitung sebagai Rp0. Informasi biaya gateway, '
+                        'settlement, dan refund belum lengkap.'
+                    : 'Seluruh komponen keuangan tersedia pada snapshot ini.',
+                style: const TextStyle(
+                    fontSize: 12, height: 1.6, color: Color(0xFF526787))),
+          ])),
+    ];
+  }
+
+  Widget _sourceCard(Json financial) {
+    final reason = financial['reason'];
+    final missingFields = financial['missing_fields'];
+    final rows = [
+      ('Lingkungan snapshot', _financialCap('${financial['environment']}')),
+      ('Provider', '${financial['provider'] ?? '—'}'),
+      ('Label', '${financial['label'] ?? '—'}'),
+      ('Sumber', _financialSourceLabel(financial['source'])),
+      (
+        'Kelengkapan',
+        _financialCap(_financialAvailabilityLabel(financial['availability']))
+      ),
+      (
+        'Pengakuan nominal',
+        _financialCap(_financialDateBasisLabel(financial['date_basis']))
+      ),
+    ];
+    return _DashboardCard(
+        child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+      InkWell(
+          key: const ValueKey('financial-source-toggle'),
+          borderRadius: BorderRadius.circular(12),
+          onTap: () => setState(() => _sourceOpen = !_sourceOpen),
+          child: Row(children: [
+            const Expanded(
+                child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                  Text('Sumber & Kelengkapan Data',
+                      style: TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w800,
+                          color: AppColors.navy)),
+                  SizedBox(height: 4),
+                  Text('Rincian asal data dan batasan pelaporan',
+                      style:
+                          TextStyle(fontSize: 12, color: Color(0xFF526787))),
+                ])),
+            const SizedBox(width: 12),
+            Icon(
+                _sourceOpen
+                    ? PhosphorIconsRegular.caretUp
+                    : PhosphorIconsRegular.caretDown,
+                size: 18,
+                color: AppColors.textSecondary),
+          ])),
+      if (_sourceOpen) ...[
         const SizedBox(height: 12),
-        _DashboardCard(
-            child: _financialRow('Collected belum diterapkan',
-                _metric('unapplied_collected', money: true))),
+        for (final row in rows) ...[
+          const Divider(height: 1, color: AppColors.border),
+          _financeComponentRow(
+              row.$1,
+              Text(row.$2,
+                  textAlign: TextAlign.right, style: _financeValueStyle(13))),
+        ],
+        const Divider(height: 1, color: AppColors.border),
         const SizedBox(height: 12),
-        _DashboardCard(
-            child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-              const _SectionTitle('Komponen keuangan'),
-              _financialRow(
-                  'Gateway fees', _metric('gateway_fees', money: true)),
-              _financialRow('Net revenue', _metric('net_revenue', money: true)),
-              _financialRow('Settlement', _metric('settlement', money: true)),
-              _financialRow('Refund tercatat', _metric('refunds', money: true)),
-              _financialRow(
-                  'Kelengkapan refund',
-                  financial['refunds_complete'] == true
-                      ? 'Lengkap'
-                      : 'Belum lengkap'),
-              Text(
-                  'Dasar refund: ${_financialDateBasisLabel(financial['refunds_basis'])} · '
-                  '${_financialDateBasisLabel(financial['refund_date_basis'])}',
-                  style: const TextStyle(
-                      fontSize: 12, height: 1.5, color: Color(0xFF526787))),
-              const Text('Data yang belum tersedia tidak dihitung sebagai Rp0.',
-                  style: TextStyle(
-                      fontSize: 12, height: 1.5, color: Color(0xFF526787))),
-            ])),
-      ];
+        if (reason != null)
+          Text(_financialReason(reason),
+              style: const TextStyle(
+                  fontSize: 12, height: 1.6, color: Color(0xFF526787))),
+        if (missingFields is List && missingFields.isNotEmpty)
+          Text(
+              'Belum tersedia: ${missingFields.map(_financialFieldLabel).join(', ')}',
+              style: const TextStyle(
+                  fontSize: 12, height: 1.6, color: Color(0xFF526787))),
+      ],
+    ]));
+  }
 
   List<Widget> _analyticsContent(Json financial) {
     final attempt = financial['attempt_conversion'];
     final booking = financial['booking_conversion'];
-    final mix = financial['method_mix'];
     return [
-      _conversionCard('Konversi per attempt', attempt, 'successful_attempts',
-          'completed_attempts', 'Attempt sukses / selesai'),
+      _financeHeading('Analitik Pembayaran',
+          'Evaluasi performa proses pembayaran dan konversi.'),
+      const SizedBox(height: 14),
+      _conversionCard(
+          'Konversi per attempt',
+          attempt,
+          'successful_attempts',
+          'completed_attempts',
+          'Attempts sukses / selesai',
+          'Persentase percobaan pembayaran yang berhasil dari seluruh '
+              'percobaan yang sudah selesai.'),
       const SizedBox(height: 12),
-      _conversionCard('Konversi per booking', booking, 'paid_bookings',
-          'payment_eligible_bookings', 'Booking paid / eligible'),
+      _conversionCard(
+          'Konversi per booking',
+          booking,
+          'paid_bookings',
+          'payment_eligible_bookings',
+          'Booking paid / eligible',
+          'Persentase booking yang sudah dibayar dari booking yang memenuhi '
+              'syarat pembayaran.'),
       const SizedBox(height: 12),
-      _DashboardCard(
-          child:
-              Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-        const _SectionTitle('Percobaan pembayaran'),
-        Text(
-            'Berhasil dihitung menurut ${_financialDateBasisLabel('paid_utc')}; '
-            'lainnya menurut ${_financialDateBasisLabel('attempt_started_utc')}.',
-            style: const TextStyle(
-                fontSize: 12, height: 1.5, color: Color(0xFF526787))),
-        const SizedBox(height: 4),
-        _financialRow('Total percobaan', _metric('payment_attempts')),
-        _financialRow('Berhasil', _metric('successful_payment_attempts')),
-        _financialRow('Gagal', _metric('failed_attempts')),
-        _financialRow('Kedaluwarsa', _metric('expired_attempts')),
-        _financialRow('Status belum diketahui', _metric('unknown_attempts')),
-        _financialRow(
-            'Rata-rata durasi',
-            !_available || financial['avg_payment_seconds'] == null
-                ? 'Belum Tersedia'
-                : '${_financialNumber(financial['avg_payment_seconds'])} detik'),
-      ])),
+      _attemptsCard(financial),
       const SizedBox(height: 12),
-      _DashboardCard(
-          child:
-              Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-        const _SectionTitle('Metode & channel'),
-        if (!_available || mix is! List)
-          const Text('Belum Tersedia', style: TextStyle(fontSize: 14))
-        else if (mix.isEmpty)
-          const Text('Belum ada capture pada periode ini.',
-              style: TextStyle(fontSize: 14))
-        else
-          for (final item in mix.whereType<Json>()) ...[
-            _financialRow(
-                '${item['method'] ?? '—'} · ${item['channel'] ?? '—'}',
-                _financialMoney(item['gross_collected'])),
-            Text(
-                '${_financialNumber(item['successful_attempts'])} pembayaran berhasil',
-                style: const TextStyle(fontSize: 12, color: Color(0xFF526787))),
-            const SizedBox(height: 8),
-          ],
-        if (financial['method_mix_truncated'] == true)
-          Text(
-              'Rincian dibatasi ${financial['method_mix_limit']} grup; total tetap mencakup seluruh grup.',
-              style: const TextStyle(
-                  fontSize: 12, height: 1.5, color: Color(0xFF795018))),
-      ])),
+      _methodCard(financial),
     ];
   }
 
   Widget _conversionCard(String title, dynamic value, String numerator,
-      String denominator, String countLabel) {
+      String denominator, String countLabel, String info) {
     final conversion =
         _available && value is Json ? value : <String, dynamic>{};
     final percent = _number(conversion['percent']);
     return _DashboardCard(
         child:
             Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-      _SectionTitle(title),
+      _financeCardHeader(title, trailing: _financeInfo(info)),
+      const SizedBox(height: 10),
       Text(percent == null ? 'Belum Tersedia' : '${_financialNumber(percent)}%',
           style: TextStyle(
-              fontSize: percent == null ? 14 : 24,
-              fontWeight: FontWeight.w700,
-              color: AppColors.navy,
+              fontSize: percent == null ? 14 : 36,
+              height: 1.1,
+              fontWeight: FontWeight.w800,
+              color: AppColors.blueDeep,
               fontFeatures: const [FontFeature.tabularFigures()])),
       if (percent != null) ...[
-        const SizedBox(height: 8),
+        const SizedBox(height: 12),
         LinearProgressIndicator(
             value: (percent / 100).clamp(0.0, 1.0).toDouble(),
             minHeight: 8,
@@ -842,23 +934,405 @@ class _OperationsFinancialState extends State<OperationsFinancialScreen>
             backgroundColor: AppColors.border,
             color: AppColors.blue),
       ],
+      const SizedBox(height: 12),
+      Row(children: [
+        Expanded(
+            child: Text(countLabel,
+                style:
+                    const TextStyle(fontSize: 12, color: Color(0xFF526787)))),
+        Text(
+            '${_financialNumber(conversion[numerator])} / ${_financialNumber(conversion[denominator])}',
+            style: _financeValueStyle(12)),
+      ]),
       const SizedBox(height: 8),
-      _financialRow(countLabel,
-          '${_financialNumber(conversion[numerator])} / ${_financialNumber(conversion[denominator])}'),
       Text(
-          conversion['date_basis'] == null
-              ? 'Dasar tanggal: Belum Tersedia'
-              : 'Dasar tanggal: ${_financialDateBasisLabel(conversion['date_basis'])}',
+          [
+            conversion['date_basis'] == null
+                ? 'Basis tanggal: Belum Tersedia.'
+                : 'Basis tanggal: ${_financialDateBasisLabel(conversion['date_basis'])}.',
+            if (conversion['denominator_scope'] != null)
+              'Pembagi: booking yang disetujui dan memiliki intent pada '
+                  'environment ini.',
+          ].join(' '),
           style: const TextStyle(
-              fontSize: 12, height: 1.5, color: Color(0xFF526787))),
-      if (conversion['denominator_scope'] != null)
-        const Text(
-            'Pembagi: booking berbayar yang disetujui dan memiliki intent pada environment ini.',
-            style:
-                TextStyle(fontSize: 12, height: 1.5, color: Color(0xFF526787))),
+              fontSize: 12, height: 1.6, color: Color(0xFF526787))),
     ]));
   }
+
+  Widget _attemptsCard(Json financial) {
+    final total = _number(financial['payment_attempts']);
+    final rows = [
+      ('Berhasil', 'successful_payment_attempts', AppColors.blue),
+      ('Gagal', 'failed_attempts', const Color(0xFFE5484D)),
+      ('Kedaluwarsa', 'expired_attempts', AppColors.orange),
+      ('Status belum diketahui', 'unknown_attempts', AppColors.textMuted),
+    ];
+    final average = _number(financial['avg_payment_seconds']);
+    return _DashboardCard(
+        child:
+            Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+      _financeCardHeader('Percobaan Pembayaran',
+          trailing: _available && total != null
+              ? Text('${_financialNumber(total)} attempts',
+                  style:
+                      const TextStyle(fontSize: 12, color: Color(0xFF526787)))
+              : null),
+      const SizedBox(height: 14),
+      if (!_available)
+        const Text('Belum Tersedia', style: TextStyle(fontSize: 14))
+      else ...[
+        for (final row in rows)
+          _financeAttemptBar(
+              row.$1, _number(financial[row.$2]) ?? 0, total ?? 0, row.$3),
+        const SizedBox(height: 4),
+        Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+                color: const Color(0xFFF1F6FE),
+                borderRadius: BorderRadius.circular(14)),
+            child: Row(children: [
+              Expanded(
+                  child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                    const Text('Rata-rata durasi pembayaran',
+                        style:
+                            TextStyle(fontSize: 12, color: Color(0xFF526787))),
+                    const SizedBox(height: 6),
+                    Text(
+                        average == null
+                            ? 'Belum Tersedia'
+                            : '${_financialNumber(average)} detik',
+                        style: _financeValueStyle(18)),
+                  ])),
+              _financeInfo('Rata-rata waktu dari percobaan dimulai sampai '
+                  'pembayaran berhasil.'),
+            ])),
+      ],
+      const SizedBox(height: 12),
+      Text(
+          'Berhasil dihitung menurut ${_financialDateBasisLabel('paid_utc')}; '
+          'status lainnya menurut ${_financialDateBasisLabel('attempt_started_utc')}.',
+          style: const TextStyle(
+              fontSize: 12, height: 1.6, color: Color(0xFF526787))),
+    ]));
+  }
+
+  Widget _financeAttemptBar(String label, num count, num total, Color color) {
+    final share = total > 0 ? (count / total).clamp(0.0, 1.0).toDouble() : 0.0;
+    return Padding(
+        padding: const EdgeInsets.only(bottom: 14),
+        child: Row(crossAxisAlignment: CrossAxisAlignment.center, children: [
+          Expanded(
+              child:
+                  Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+            Row(children: [
+              Expanded(
+                  child: Text(label,
+                      style: const TextStyle(
+                          fontSize: 12, color: Color(0xFF526787)))),
+              Text('${(share * 100).round()}%',
+                  style: const TextStyle(
+                      fontSize: 12, color: Color(0xFF526787))),
+            ]),
+            const SizedBox(height: 6),
+            LinearProgressIndicator(
+                value: share,
+                minHeight: 8,
+                borderRadius: BorderRadius.circular(8),
+                backgroundColor: const Color(0xFFEEF2F8),
+                color: color),
+          ])),
+          SizedBox(
+              width: 36,
+              child: Text(_financialNumber(count),
+                  textAlign: TextAlign.right, style: _financeValueStyle(13))),
+        ]));
+  }
+
+  Widget _methodCard(Json financial) {
+    final mix = financial['method_mix'];
+    final items = mix is List ? mix.whereType<Json>().toList() : <Json>[];
+    final total = items.fold<num>(
+        0, (sum, item) => sum + (_number(item['gross_collected']) ?? 0));
+    const palette = [
+      AppColors.blue,
+      AppColors.orange,
+      AppColors.success,
+      AppColors.blueDeep,
+    ];
+    return _DashboardCard(
+        child:
+            Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+      _financeCardHeader('Metode & Channel',
+          trailing: const Text('Distribusi nominal',
+              style: TextStyle(fontSize: 12, color: Color(0xFF526787)))),
+      const SizedBox(height: 14),
+      if (!_available || mix is! List)
+        const Text('Belum Tersedia', style: TextStyle(fontSize: 14))
+      else if (items.isEmpty)
+        const Text('Belum ada capture pada periode ini.',
+            style: TextStyle(fontSize: 14))
+      else
+        for (var i = 0; i < items.length; i++) ...[
+          if (i > 0) const SizedBox(height: 18),
+          _financeMethodItem(items[i], palette[i % palette.length],
+              total > 0 ? (_number(items[i]['gross_collected']) ?? 0) / total : 0,
+              single: items.length == 1),
+        ],
+      if (financial['method_mix_truncated'] == true) ...[
+        const SizedBox(height: 12),
+        Text(
+            'Rincian dibatasi ${financial['method_mix_limit']} grup; total tetap mencakup seluruh grup.',
+            style: const TextStyle(
+                fontSize: 12, height: 1.5, color: Color(0xFF795018))),
+      ],
+    ]));
+  }
+
+  Widget _financeMethodItem(Json item, Color color, num share,
+      {required bool single}) {
+    final method = '${item['method'] ?? '—'}';
+    final channel = '${item['channel'] ?? '—'}';
+    final name =
+        '${channel == '—' ? '' : '${channel.toUpperCase()} '}${method.split('_').map(_financialCap).join(' ')}';
+    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+      Row(children: [
+        Container(
+            width: 10,
+            height: 10,
+            decoration: BoxDecoration(
+                color: color, borderRadius: BorderRadius.circular(3))),
+        const SizedBox(width: 8),
+        Expanded(
+            child: Text(name,
+                style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.navy))),
+      ]),
+      const SizedBox(height: 10),
+      LinearProgressIndicator(
+          value: share.clamp(0.0, 1.0).toDouble(),
+          minHeight: 10,
+          borderRadius: BorderRadius.circular(8),
+          backgroundColor: const Color(0xFFEEF2F8),
+          color: color),
+      const SizedBox(height: 10),
+      Row(children: [
+        Expanded(
+            child: Text(
+                '${_financialNumber(item['successful_attempts'])} pembayaran berhasil',
+                style:
+                    const TextStyle(fontSize: 12, color: Color(0xFF526787)))),
+        Text(_financialMoney(item['gross_collected']),
+            style: _financeValueStyle(13)),
+      ]),
+      const SizedBox(height: 8),
+      Text(
+          'Channel: $method - $channel.'
+          '${single ? ' Seluruh nominal yang teridentifikasi pada snapshot berasal dari channel ini.' : ''}',
+          style: const TextStyle(
+              fontSize: 12, height: 1.6, color: Color(0xFF526787))),
+    ]);
+  }
 }
+
+// ── Superadmin finance page building blocks ───────────────────────────────
+
+class _FinanceFilterCard extends StatelessWidget {
+  const _FinanceFilterCard(
+      {super.key,
+      required this.icon,
+      required this.caption,
+      required this.value,
+      required this.onTap});
+  final IconData icon;
+  final String caption;
+  final String value;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) => Material(
+      color: Colors.white,
+      clipBehavior: Clip.antiAlias,
+      shape: RoundedRectangleBorder(
+          side: const BorderSide(color: AppColors.border),
+          borderRadius: BorderRadius.circular(16)),
+      child: InkWell(
+          onTap: onTap,
+          child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+              child: Row(children: [
+                Icon(icon, size: 20, color: AppColors.blue),
+                const SizedBox(width: 10),
+                Expanded(
+                    child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                      Text(caption,
+                          style: const TextStyle(
+                              fontSize: 9.5,
+                              letterSpacing: .5,
+                              color: AppColors.textSecondary)),
+                      const SizedBox(height: 2),
+                      Text(value,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w700,
+                              color: AppColors.navy)),
+                    ])),
+                const SizedBox(width: 6),
+                const Icon(PhosphorIconsRegular.caretDown,
+                    size: 16, color: AppColors.blue),
+              ]))));
+}
+
+class _FinanceTabs extends StatelessWidget {
+  const _FinanceTabs({required this.analytics, required this.onChanged});
+  final bool analytics;
+  final ValueChanged<bool> onChanged;
+
+  @override
+  Widget build(BuildContext context) => Container(
+      padding: const EdgeInsets.all(4),
+      decoration: BoxDecoration(
+          color: const Color(0xFFE6EDF8),
+          borderRadius: BorderRadius.circular(16)),
+      child: Row(children: [
+        for (final tab in <(String, bool)>[
+          ('Ringkasan', false),
+          ('Analitik Pembayaran', true),
+        ])
+          Expanded(
+              child: Semantics(
+                  selected: analytics == tab.$2,
+                  button: true,
+                  child: Material(
+                      color: analytics == tab.$2
+                          ? Colors.white
+                          : Colors.transparent,
+                      borderRadius: BorderRadius.circular(12),
+                      child: InkWell(
+                          key: ValueKey(
+                              'financial-tab-${tab.$2 ? 'analytics' : 'summary'}'),
+                          borderRadius: BorderRadius.circular(12),
+                          onTap: () => onChanged(tab.$2),
+                          child: SizedBox(
+                              height: 44,
+                              child: Center(
+                                  child: Text(tab.$1,
+                                      textAlign: TextAlign.center,
+                                      style: TextStyle(
+                                          fontSize: 13,
+                                          fontWeight: FontWeight.w700,
+                                          color: analytics == tab.$2
+                                              ? AppColors.blue
+                                              : const Color(0xFF7F90AD))))))))),
+      ]));
+}
+
+Widget _financeHeading(String title, String subtitle) =>
+    Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Text(title,
+          style: const TextStyle(
+              fontSize: 18, fontWeight: FontWeight.w800, color: AppColors.navy)),
+      const SizedBox(height: 4),
+      Text(subtitle,
+          style: const TextStyle(
+              fontSize: 13, height: 1.5, color: Color(0xFF526787))),
+    ]);
+
+Widget _financeCardHeader(String title, {Widget? trailing}) => Row(children: [
+      Expanded(
+          child: Text(title,
+              style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w800,
+                  color: AppColors.navy))),
+      if (trailing != null) ...[const SizedBox(width: 8), trailing],
+    ]);
+
+/// Small "i" badge; tap to read what the figure means.
+Widget _financeInfo(String message, {bool onDark = false}) => Tooltip(
+    message: message,
+    triggerMode: TooltipTriggerMode.tap,
+    showDuration: const Duration(seconds: 5),
+    margin: const EdgeInsets.symmetric(horizontal: 24),
+    child: SizedBox(
+        width: 32,
+        height: 32,
+        child: Center(
+            child: Container(
+                width: 24,
+                height: 24,
+                decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: onDark
+                        ? Colors.white.withValues(alpha: .2)
+                        : AppColors.blueTint),
+                child: Icon(PhosphorIconsRegular.info,
+                    size: 14,
+                    color: onDark ? Colors.white : AppColors.blue)))));
+
+TextStyle _financeValueStyle(double size) => TextStyle(
+    fontSize: size,
+    fontWeight: FontWeight.w800,
+    color: AppColors.navy,
+    fontFeatures: const [FontFeature.tabularFigures()]);
+
+Widget _financeFigureCard(String label, String value, String caption) {
+  final money = value.startsWith('Rp');
+  return _DashboardCard(
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+    Text(label,
+        style: const TextStyle(fontSize: 12, color: Color(0xFF526787))),
+    const SizedBox(height: 10),
+    Text(value, style: _financeValueStyle(money ? 20 : 28)),
+    const SizedBox(height: 6),
+    Text(caption,
+        style: const TextStyle(fontSize: 12, color: Color(0xFF526787))),
+  ]));
+}
+
+Widget _financeComponentRow(String label, Widget value) => Padding(
+    padding: const EdgeInsets.symmetric(vertical: 12),
+    child: Row(crossAxisAlignment: CrossAxisAlignment.center, children: [
+      Expanded(
+          flex: 4,
+          child: Text(label,
+              style: const TextStyle(fontSize: 13, color: Color(0xFF526787)))),
+      const SizedBox(width: 12),
+      // Value sits flush right (space-between), wrapping right-aligned.
+      Expanded(
+          flex: 5, child: Align(alignment: Alignment.centerRight, child: value)),
+    ]));
+
+Widget _financeChip(String text, {bool good = false}) => Container(
+    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+    decoration: BoxDecoration(
+        color: good ? AppColors.successTint : const Color(0xFFF0F3F8),
+        borderRadius: BorderRadius.circular(8)),
+    child: Row(mainAxisSize: MainAxisSize.min, children: [
+      Container(
+          width: 6,
+          height: 6,
+          decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: good ? AppColors.success : AppColors.textMuted)),
+      const SizedBox(width: 6),
+      Flexible(
+          child: Text(text,
+              style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                  color: good ? AppColors.success : AppColors.textSecondary))),
+    ]));
+
+String _financialCap(String text) =>
+    text.isEmpty ? text : '${text[0].toUpperCase()}${text.substring(1)}';
 
 class _FinancialBookingChart extends StatelessWidget {
   const _FinancialBookingChart({required this.rows});
@@ -937,19 +1411,6 @@ class _FinancialBookingChart extends StatelessWidget {
   }
 }
 
-Widget _financialFigure(String label, String value) =>
-    Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      Text(label,
-          style: const TextStyle(fontSize: 12, color: Color(0xFF526787))),
-      const SizedBox(height: 6),
-      Text(value,
-          style: const TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.w800,
-              color: AppColors.navy,
-              fontFeatures: [FontFeature.tabularFigures()])),
-    ]);
-
 Widget _financialRow(String label, String value) => Padding(
     padding: const EdgeInsets.symmetric(vertical: 8),
     child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -1007,14 +1468,6 @@ String _financialAvailabilityLabel(dynamic availability) =>
       'unavailable' => 'belum tersedia',
       null => '—',
       _ => '$availability',
-    };
-
-String _financialEnvironmentLabel(dynamic environment) => switch (environment) {
-      'demo' => 'Demo (simulasi)',
-      'sandbox' => 'Sandbox (uji coba)',
-      'production' => 'Produksi',
-      null => '—',
-      _ => '$environment',
     };
 
 /// Which date places a figure in the period; all bases are in UTC.

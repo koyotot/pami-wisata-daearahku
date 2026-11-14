@@ -103,7 +103,9 @@ class OperationsTheme extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) =>
-      role == 1 ? Theme(data: AppColors.operationsTheme, child: child) : child;
+      role == 1 || role == 2
+          ? Theme(data: AppColors.operationsTheme, child: child)
+          : child;
 }
 
 class OperationsScenicHeader extends StatelessWidget {

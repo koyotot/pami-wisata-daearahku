@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:phosphor_icons/phosphor_icons.dart';
 import '../../data/app_data.dart';
 import '../../data/admin_state.dart';
@@ -8,6 +9,7 @@ import '../../services/auth_session.dart';
 import '../../services/api_client.dart';
 import '../../theme/app_colors.dart';
 import '../../widgets/floating_bottom_nav.dart';
+import '../../widgets/operations_status.dart';
 import 'admin_ticket_scanner_screen.dart';
 import 'daftar_wisata_screen.dart';
 import '../superadmin/destination_admin_assignments_screen.dart';
@@ -336,33 +338,120 @@ class _OperationsProfileState extends State<_OperationsProfile> {
     if (_busy || _logoutDialogOpen) return;
     final generation = widget.session.sessionGeneration;
     _logoutDialogOpen = true;
-    final confirmed = await showDialog<bool>(
+    final name = currentUser?.namaLengkap;
+    const danger = Color(0xFFC85252);
+    final confirmed = await showModalBottomSheet<bool>(
         context: context,
-        builder: (dialogContext) => AlertDialog(
-              backgroundColor: AppColors.surface,
-              surfaceTintColor: Colors.transparent,
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(AppSpacing.lg),
-                  side: const BorderSide(color: AppColors.border)),
-              title: const Text('Keluar dari akun?',
-                  style: TextStyle(
-                      color: AppColors.navy, fontWeight: FontWeight.w700)),
-              content: const Text(
-                  'Anda perlu masuk kembali untuk mengakses akun ini.',
-                  style:
-                      TextStyle(color: AppColors.textSecondary, height: 1.5)),
-              actions: [
-                TextButton(
-                    key: const ValueKey('operations-logout-cancel'),
-                    onPressed: () => Navigator.pop(dialogContext, false),
-                    child: const Text('Batal')),
-                TextButton(
-                    key: const ValueKey('operations-logout-confirm'),
-                    onPressed: () => Navigator.pop(dialogContext, true),
-                    child: const Text('Keluar',
-                        style: TextStyle(fontWeight: FontWeight.w700))),
-              ],
-            ));
+        showDragHandle: true,
+        backgroundColor: AppColors.surface,
+        shape: const RoundedRectangleBorder(
+            borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+        builder: (sheetContext) => SafeArea(
+            top: false,
+            child: Padding(
+                padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+                child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Row(children: [
+                        const Expanded(
+                            child: Text('Keluar dari Akun',
+                                style: TextStyle(
+                                    fontSize: 20,
+                                    fontWeight: FontWeight.w800,
+                                    color: AppColors.navy))),
+                        IconButton(
+                            tooltip: 'Tutup',
+                            onPressed: () => Navigator.pop(sheetContext, false),
+                            style: IconButton.styleFrom(
+                                backgroundColor: const Color(0xFFEEF3FA),
+                                foregroundColor: AppColors.textSecondary,
+                                shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(12))),
+                            icon: const Icon(PhosphorIconsRegular.x, size: 18)),
+                      ]),
+                      const SizedBox(height: 12),
+                      const Divider(height: 1, color: AppColors.border),
+                      const SizedBox(height: 16),
+                      Row(children: [
+                        Container(
+                            width: 48,
+                            height: 48,
+                            decoration: BoxDecoration(
+                                color: const Color(0xFFFDECEC),
+                                border:
+                                    Border.all(color: const Color(0xFFF3C9C9)),
+                                borderRadius: BorderRadius.circular(14)),
+                            child: const Icon(PhosphorIconsRegular.signOut,
+                                size: 22, color: danger)),
+                        const SizedBox(width: 12),
+                        const Expanded(
+                            child: Text('Akhiri sesi operasional?',
+                                style: TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w800,
+                                    color: AppColors.navy))),
+                      ]),
+                      const SizedBox(height: 16),
+                      Text.rich(
+                          TextSpan(children: [
+                            const TextSpan(text: 'Anda akan keluar dari akun '),
+                            if (name != null && name.isNotEmpty)
+                              TextSpan(
+                                  text: name,
+                                  style: const TextStyle(
+                                      fontWeight: FontWeight.w800,
+                                      color: AppColors.navy)),
+                            if (name == null || name.isEmpty)
+                              const TextSpan(text: 'ini'),
+                            const TextSpan(
+                                text:
+                                    '. Pastikan pekerjaan yang sedang dilakukan sudah selesai.'),
+                          ]),
+                          style: const TextStyle(
+                              fontSize: 13,
+                              height: 1.5,
+                              color: AppColors.textSecondary)),
+                      const SizedBox(height: 20),
+                      Row(children: [
+                        Expanded(
+                            child: OutlinedButton(
+                                key: const ValueKey('operations-logout-cancel'),
+                                onPressed: () =>
+                                    Navigator.pop(sheetContext, false),
+                                style: OutlinedButton.styleFrom(
+                                    minimumSize: const Size.fromHeight(52),
+                                    foregroundColor: AppColors.blue,
+                                    side: const BorderSide(
+                                        color: AppColors.border),
+                                    shape: RoundedRectangleBorder(
+                                        borderRadius:
+                                            BorderRadius.circular(14))),
+                                child: const Text('Batal',
+                                    style: TextStyle(
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.w800)))),
+                        const SizedBox(width: 12),
+                        Expanded(
+                            child: FilledButton(
+                                key:
+                                    const ValueKey('operations-logout-confirm'),
+                                onPressed: () =>
+                                    Navigator.pop(sheetContext, true),
+                                style: FilledButton.styleFrom(
+                                    minimumSize: const Size.fromHeight(52),
+                                    backgroundColor: danger,
+                                    foregroundColor: Colors.white,
+                                    shape: RoundedRectangleBorder(
+                                        borderRadius:
+                                            BorderRadius.circular(14))),
+                                child: const Text('Ya, Keluar',
+                                    style: TextStyle(
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.w800)))),
+                      ]),
+                    ]))));
     _logoutDialogOpen = false;
     if (confirmed != true ||
         !mounted ||
@@ -384,8 +473,325 @@ class _OperationsProfileState extends State<_OperationsProfile> {
         .join(' & ');
   }
 
+  String get _initials {
+    final words = (currentUser?.namaLengkap ?? '')
+        .trim()
+        .split(RegExp(r'\s+'))
+        .where((word) => word.isNotEmpty)
+        .toList();
+    if (words.isEmpty) return 'SA';
+    final letters = words.length == 1
+        ? words.first.substring(0, words.first.length > 1 ? 2 : 1)
+        : '${words.first[0]}${words[1][0]}';
+    return letters.toUpperCase();
+  }
+
+  Future<void> _copyEmail(String email) async {
+    await Clipboard.setData(ClipboardData(text: email));
+    if (!mounted) return;
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(const SnackBar(content: Text('Email disalin')));
+  }
+
+  void _showAccessDetail() {
+    const items = <(String, String)>[
+      ('Cakupan data', 'Seluruh destinasi, tanpa batas penugasan'),
+      ('Persetujuan booking',
+          'Antrean global, termasuk mengalihkan ke admin lain'),
+      ('Pengelolaan', 'Destinasi, kuota, akun admin, kategori, dan fasilitas'),
+      ('Laporan', 'Perbandingan destinasi, kinerja admin, dan keuangan'),
+    ];
+    showModalBottomSheet<void>(
+        context: context,
+        showDragHandle: true,
+        backgroundColor: AppColors.surface,
+        shape: const RoundedRectangleBorder(
+            borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+        builder: (sheetContext) => SafeArea(
+            top: false,
+            child: Padding(
+                padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+                child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Row(children: [
+                        const Expanded(
+                            child: Text('Rincian Akses',
+                                style: TextStyle(
+                                    fontSize: 20,
+                                    fontWeight: FontWeight.w800,
+                                    color: AppColors.navy))),
+                        IconButton(
+                            tooltip: 'Tutup',
+                            onPressed: () => Navigator.pop(sheetContext),
+                            style: IconButton.styleFrom(
+                                backgroundColor: const Color(0xFFEEF3FA),
+                                foregroundColor: AppColors.textSecondary,
+                                shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(12))),
+                            icon: const Icon(PhosphorIconsRegular.x, size: 18)),
+                      ]),
+                      const SizedBox(height: 12),
+                      const Divider(height: 1, color: AppColors.border),
+                      for (final item in items) ...[
+                        Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(item.$1,
+                                      style: const TextStyle(
+                                          fontSize: 12,
+                                          color: AppColors.textSecondary)),
+                                  const SizedBox(height: 4),
+                                  Text(item.$2,
+                                      style: const TextStyle(
+                                          fontSize: 14,
+                                          height: 1.4,
+                                          fontWeight: FontWeight.w700,
+                                          color: AppColors.navy)),
+                                ])),
+                        const Divider(height: 1, color: AppColors.border),
+                      ],
+                    ]))));
+  }
+
+  Widget _card({required Widget child, EdgeInsets? padding}) => Container(
+      padding: padding ?? const EdgeInsets.all(AppSpacing.lg),
+      decoration: BoxDecoration(
+          color: AppColors.surface,
+          border: Border.all(color: AppColors.border),
+          borderRadius: BorderRadius.circular(20)),
+      child: child);
+
+  Widget _sectionTitle(String title, [String? trailing]) => Row(children: [
+        Expanded(
+            child: Text(title,
+                style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w800,
+                    color: AppColors.navy))),
+        if (trailing != null)
+          Text(trailing,
+              style: const TextStyle(
+                  fontSize: 12, color: AppColors.textSecondary)),
+      ]);
+
+  Widget _superadminProfile() {
+    final name = currentUser?.namaLengkap ?? 'Superadmin';
+    final email = currentUser?.email ?? '';
+    return OperationsPage(
+        role: 2,
+        title: 'Profil',
+        subtitle: 'Akun operasional Wisata Daerahku',
+        children: [
+          _card(
+              child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                Row(children: [
+                  Container(
+                      width: 72,
+                      height: 72,
+                      alignment: Alignment.center,
+                      decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(22),
+                          gradient: const LinearGradient(
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                              colors: [
+                                AppColors.blueDeep,
+                                Color(0xFF2077D6)
+                              ])),
+                      child: Text(_initials,
+                          style: const TextStyle(
+                              fontSize: 26,
+                              fontWeight: FontWeight.w800,
+                              color: Colors.white))),
+                  const SizedBox(width: AppSpacing.lg),
+                  Expanded(
+                      child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                        const Text('AKUN OPERASIONAL',
+                            style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w800,
+                                letterSpacing: .8,
+                                color: AppColors.textMuted)),
+                        const SizedBox(height: AppSpacing.xs),
+                        Text(name,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                                fontSize: 18,
+                                height: 1.25,
+                                fontWeight: FontWeight.w800,
+                                color: AppColors.navy)),
+                      ])),
+                ]),
+                const SizedBox(height: AppSpacing.lg),
+                Align(
+                    alignment: Alignment.centerLeft,
+                    child: Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 12, vertical: 8),
+                        decoration: BoxDecoration(
+                            color: AppColors.blueTint,
+                            border: Border.all(color: const Color(0xFFC9DDF7)),
+                            borderRadius: BorderRadius.circular(12)),
+                        child: const Row(mainAxisSize: MainAxisSize.min, children: [
+                          Icon(PhosphorIconsRegular.shieldCheck,
+                              size: 16, color: AppColors.blueDeep),
+                          SizedBox(width: 6),
+                          Text('Superadmin',
+                              style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w800,
+                                  color: AppColors.blueDeep)),
+                        ]))),
+                const SizedBox(height: AppSpacing.lg),
+                const Divider(height: 1, color: AppColors.border),
+                const SizedBox(height: AppSpacing.md),
+                Row(children: [
+                  Expanded(
+                      child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                        const Text('Email akun',
+                            style: TextStyle(
+                                fontSize: 11, color: AppColors.textSecondary)),
+                        const SizedBox(height: AppSpacing.xs),
+                        Text(email.isEmpty ? '—' : email,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w700,
+                                color: AppColors.navy)),
+                      ])),
+                  const SizedBox(width: AppSpacing.md),
+                  IconButton(
+                      key: const ValueKey('operations-profile-copy-email'),
+                      tooltip: 'Salin email',
+                      onPressed: email.isEmpty ? null : () => _copyEmail(email),
+                      style: IconButton.styleFrom(
+                          minimumSize: const Size(48, 48),
+                          backgroundColor: AppColors.blueTint,
+                          foregroundColor: AppColors.blue,
+                          side: const BorderSide(color: Color(0xFFC9DDF7)),
+                          shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(14))),
+                      icon: const Icon(PhosphorIconsRegular.copy, size: 20)),
+                ]),
+              ])),
+          const SizedBox(height: AppSpacing.xl),
+          _sectionTitle('Hak Akses', 'Peran akun'),
+          const SizedBox(height: AppSpacing.md),
+          _card(
+              child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Container(
+                      width: 48,
+                      height: 48,
+                      decoration: BoxDecoration(
+                          color: AppColors.blueTint,
+                          borderRadius: BorderRadius.circular(14)),
+                      child: const Icon(PhosphorIconsRegular.globe,
+                          size: 22, color: AppColors.blue)),
+                  const SizedBox(width: AppSpacing.md),
+                  const Expanded(
+                      child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                        Text('Akses Global',
+                            style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w800,
+                                color: AppColors.navy)),
+                        SizedBox(height: AppSpacing.xs),
+                        Text(
+                            'Superadmin dapat mengakses cakupan operasional seluruh destinasi sesuai kebijakan sistem.',
+                            style: TextStyle(
+                                fontSize: 12,
+                                height: 1.5,
+                                color: AppColors.textSecondary)),
+                      ])),
+                ]),
+                const SizedBox(height: AppSpacing.md),
+                const Divider(height: 1, color: AppColors.border),
+                const SizedBox(height: AppSpacing.sm),
+                Row(children: [
+                  const OperationsStatusBadge(
+                      'Akses berdasarkan peran', OperationsTone.green,
+                      small: true),
+                  const Spacer(),
+                  TextButton(
+                      key: const ValueKey('operations-profile-access-detail'),
+                      onPressed: _showAccessDetail,
+                      style: TextButton.styleFrom(
+                          minimumSize: const Size(48, 48),
+                          foregroundColor: AppColors.blue),
+                      child: const Text('Lihat rincian →',
+                          style: TextStyle(
+                              fontSize: 12, fontWeight: FontWeight.w800))),
+                ]),
+              ])),
+          const SizedBox(height: AppSpacing.xl),
+          _sectionTitle('Informasi Akun'),
+          const SizedBox(height: AppSpacing.md),
+          _card(
+              padding: const EdgeInsets.symmetric(
+                  horizontal: AppSpacing.lg, vertical: AppSpacing.xs),
+              child: Column(children: [
+                for (final (i, detail) in const [
+                  ('Tipe akun', 'Operasional'),
+                  ('Peran', 'Superadmin'),
+                  ('Cakupan', 'Global'),
+                ].indexed) ...[
+                  if (i > 0) const Divider(height: 1, color: AppColors.border),
+                  Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      child: Row(children: [
+                        Expanded(
+                            child: Text(detail.$1,
+                                style: const TextStyle(
+                                    fontSize: 12,
+                                    color: AppColors.textSecondary))),
+                        Text(detail.$2,
+                            style: const TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w800,
+                                color: AppColors.navy)),
+                      ])),
+                ],
+              ])),
+          const SizedBox(height: AppSpacing.lg),
+          OutlinedButton.icon(
+              key: const ValueKey('operations-profile-logout'),
+              onPressed: _busy ? null : _logout,
+              style: OutlinedButton.styleFrom(
+                  foregroundColor: const Color(0xFFB23B3B),
+                  backgroundColor: const Color(0xFFFDF1F1),
+                  minimumSize: const Size.fromHeight(52),
+                  side: const BorderSide(color: Color(0xFFF3C9C9)),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14))),
+              icon: const Icon(PhosphorIconsRegular.signOut, size: 20),
+              label: Text(_busy ? 'Keluar…' : 'Keluar dari Akun',
+                  style: const TextStyle(
+                      fontSize: 14, fontWeight: FontWeight.w800))),
+        ]);
+  }
+
   @override
-  Widget build(BuildContext context) => OperationsPage(
+  Widget build(BuildContext context) => widget.session.role == 2
+      ? _superadminProfile()
+      : OperationsPage(
           role: widget.session.role,
           onRefresh: widget.session.role == 1 ? _refresh : null,
           title: 'Profil',
@@ -490,24 +896,6 @@ class _OperationsProfileState extends State<_OperationsProfile> {
                   label: Text(_busy ? 'Keluar…' : 'Keluar akun',
                       style: const TextStyle(
                           fontSize: 12, fontWeight: FontWeight.bold))),
-            ],
-            if (widget.session.role != 1) ...[
-              Text(currentUser?.namaLengkap ?? 'Akun operasional',
-                  style: const TextStyle(
-                      fontSize: 24, fontWeight: FontWeight.w700)),
-              const SizedBox(height: 8),
-              Text(currentUser?.email ?? ''),
-              const SizedBox(height: 8),
-              Text(widget.session.role == 2
-                  ? 'Superadmin · akses global'
-                  : 'Admin · destinasi yang ditugaskan'),
-            ],
-            if (widget.session.role != 1) ...[
-              const SizedBox(height: 32),
-              ElevatedButton.icon(
-                  onPressed: _busy ? null : _logout,
-                  icon: const Icon(PhosphorIconsRegular.signOut),
-                  label: Text(_busy ? 'Keluar…' : 'Keluar akun')),
             ],
           ]);
 }

@@ -12,7 +12,9 @@ import '../../../theme/app_colors.dart';
 import '../../../widgets/operations_chrome.dart';
 import '../../../widgets/operations_tabs.dart';
 import '../../../widgets/scroll_aware_status_bar.dart';
-import '../../../widgets/visit_format.dart' show visitDateLabel;
+import '../../../widgets/operations_option_sheet.dart';
+import '../../../widgets/operations_status.dart';
+import '../../../widgets/visit_format.dart' show visitDateLabel, visitMonths;
 import '../admin_ticket_scanner_screen.dart';
 import '../daftar_wisata_screen.dart';
 import '../daftar_pendaftar_screen.dart';
@@ -24,6 +26,7 @@ part 'operations_filters.dart';
 part 'operations_presentation.dart';
 part 'operations_financial.dart';
 part 'operations_home.dart';
+part 'operations_comparison.dart';
 
 class OperationsPage extends StatelessWidget {
   const OperationsPage(
@@ -68,8 +71,9 @@ class OperationsPage extends StatelessWidget {
                   16,
                   16,
                   16,
-                  (role ?? AuthSession.instance.role) == 1 && !embedded
-                      ? 24
+                  // Pushed pages have no floating nav to clear.
+                  !embedded
+                      ? 24 + MediaQuery.paddingOf(context).bottom
                       : 128),
               child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -134,7 +138,7 @@ class _OperationsDashboardState extends State<OperationsDashboard>
   @override
   void initState() {
     super.initState();
-    if (_role == 1) _filters = _homeMonthFilters();
+    _filters = _homeMonthFilters();
     _session.sessionChanges.addListener(_sessionChanged);
     operationsDataChanges.addListener(_dataChanged);
     WidgetsBinding.instance.addObserver(this);
@@ -234,7 +238,7 @@ class _OperationsDashboardState extends State<OperationsDashboard>
         _error = e;
         _loading = false;
         if (_scopeError(e)) {
-          _filters = _role == 1 ? _homeMonthFilters() : {};
+          _filters = _homeMonthFilters();
           _destinationLabel = null;
         }
       });
@@ -255,7 +259,7 @@ class _OperationsDashboardState extends State<OperationsDashboard>
         repository: _repository,
         session: _session,
         initial: _filters,
-        home: _role == 1,
+        home: true,
         destinationLabel: _destinationLabel,
         onDestinationLabelSelected: (label) => destinationLabel = label,
         utc: true);
@@ -519,19 +523,7 @@ class _OperationsDashboardState extends State<OperationsDashboard>
                                       else if (_role == 1)
                                         ..._destinationHome(data)
                                       else ...[
-                                        _ScopeCard(
-                                          executive: _role == 2,
-                                          label: _filters['destination_guid'] !=
-                                                  null
-                                              ? 'Destinasi terpilih'
-                                              : _role == 2
-                                                  ? 'Seluruh destinasi'
-                                                  : 'Semua destinasi saya',
-                                          detail: _role == 2
-                                              ? 'Scope global · ${_period(data.period)}'
-                                              : 'Scope penugasan · ${_period(data.period)}',
-                                          onTap: _filter,
-                                        ),
+                                        _homeFilterBar(data),
                                         const SizedBox(height: 12),
                                         if (_role == 1) ...[
                                           _DashboardCard(
@@ -715,43 +707,15 @@ class _OperationsDashboardState extends State<OperationsDashboard>
                                               active: widget.active),
                                         const SizedBox(height: 12),
                                         if (_approvals != null) ...[
-                                          _DashboardCard(
-                                              child: Column(
-                                            crossAxisAlignment:
-                                                CrossAxisAlignment.stretch,
-                                            children: [
-                                              const _SectionTitle(
-                                                  'Tren Keputusan Tim'),
-                                              Text(
-                                                  'Keputusan tim · UTC · ${_period(_approvals!.period)}',
-                                                  style: const TextStyle(
-                                                      fontSize: 12,
-                                                      color:
-                                                          Color(0xFF526787))),
-                                              OperationsTrend(
-                                                  rows: _approvals!.series,
-                                                  valueKey:
-                                                      'approved_decisions',
-                                                  secondKey:
-                                                      'rejected_decisions'),
-                                              const Text(
-                                                  'Biru: disetujui · abu-abu: ditolak',
-                                                  style: TextStyle(
-                                                      fontSize: 12,
-                                                      color:
-                                                          Color(0xFF526787))),
-                                              _routeLink(
-                                                  'Lihat kinerja tim',
-                                                  () => _open(
-                                                      OperationsReportScreen(
-                                                          section: 'approvals',
-                                                          initialFilters:
-                                                              _filters,
-                                                          repository:
-                                                              _repository,
-                                                          session: _session))),
-                                            ],
-                                          )),
+                                          _DecisionTrendCard(
+                                              rows: _approvals!.series,
+                                              period: _approvals!.period,
+                                              onOpen: () => _open(
+                                                  OperationsReportScreen(
+                                                      section: 'approvals',
+                                                      initialFilters: _filters,
+                                                      repository: _repository,
+                                                      session: _session))),
                                           const SizedBox(height: 16),
                                         ],
                                         if (_role != 1 || !_personal)
@@ -782,21 +746,6 @@ class _OperationsDashboardState extends State<OperationsDashboard>
                                                   bars: true),
                                             ],
                                           )),
-                                        const SizedBox(height: 12),
-                                        if (_role != 1)
-                                          FilledButton.icon(
-                                              onPressed: () => _open(
-                                                  OperationsQueueScreen(
-                                                      repository: _repository,
-                                                      session: _session,
-                                                      filters: _filters)),
-                                              icon: const Icon(
-                                                  PhosphorIconsRegular
-                                                      .arrowRight),
-                                              iconAlignment: IconAlignment.end,
-                                              label: Text(_role == 2
-                                                  ? 'Buka Antrean Global'
-                                                  : 'Buka Antrean Approval')),
                                         if (_actions.isNotEmpty &&
                                             (_role != 1 || !_personal)) ...[
                                           const SizedBox(height: 16),
@@ -834,32 +783,41 @@ class _OperationsDashboardState extends State<OperationsDashboard>
                                           )),
                                         ],
                                         const SizedBox(height: 16),
-                                        _DashboardCard(
-                                            child: Column(children: [
-                                          _routeLink(
-                                              'Riwayat seluruh booking',
-                                              () => _open(DaftarPendaftarScreen(
-                                                  repository: _repository,
-                                                  session: _session))),
-                                          _routeLink(
-                                              'Kinerja destinasi',
-                                              () => _open(
-                                                  OperationsReportScreen(
-                                                      section: 'destinations',
-                                                      repository: _repository,
-                                                      session: _session,
-                                                      initialFilters:
-                                                          _filters))),
-                                          _routeLink(
-                                              'Kunjungan dan check-in',
-                                              () => _open(
-                                                  OperationsReportScreen(
-                                                      section: 'visitors',
-                                                      repository: _repository,
-                                                      session: _session,
-                                                      initialFilters:
-                                                          _filters))),
-                                        ])),
+                                        _HomeLinkCard(
+                                            icon: PhosphorIconsRegular
+                                                .calendarDots,
+                                            title: 'Riwayat seluruh booking',
+                                            subtitle:
+                                                'Lihat daftar dan status pemesanan',
+                                            onTap: () => _open(
+                                                DaftarPendaftarScreen(
+                                                    repository: _repository,
+                                                    session: _session))),
+                                        const SizedBox(height: 12),
+                                        _HomeLinkCard(
+                                            icon:
+                                                PhosphorIconsRegular.chartLineUp,
+                                            title: 'Kinerja destinasi',
+                                            subtitle:
+                                                'Pantau performa destinasi wisata',
+                                            onTap: () => _open(
+                                                OperationsReportScreen(
+                                                    section: 'destinations',
+                                                    repository: _repository,
+                                                    session: _session,
+                                                    initialFilters: _filters))),
+                                        const SizedBox(height: 12),
+                                        _HomeLinkCard(
+                                            icon: PhosphorIconsRegular.scan,
+                                            title: 'Kunjungan dan check-in',
+                                            subtitle:
+                                                'Lihat aktivitas kunjungan wisatawan',
+                                            onTap: () => _open(
+                                                OperationsReportScreen(
+                                                    section: 'visitors',
+                                                    repository: _repository,
+                                                    session: _session,
+                                                    initialFilters: _filters))),
                                       ],
                                     ],
                                   ]),

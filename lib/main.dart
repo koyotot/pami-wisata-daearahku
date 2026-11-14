@@ -96,13 +96,16 @@ class _WisataDaerahkuAppState extends State<WisataDaerahkuApp> {
         listenable: AuthSession.instance.sessionChanges,
         builder: (context, _) {
           final session = AuthSession.instance;
+          // Cap the system font scale so layouts keep the intended density.
+          final content = MediaQuery.withClampedTextScaling(
+              minScaleFactor: 1.0, maxScaleFactor: 1.15, child: child!);
           if (session.authenticated.value &&
               session.deviceSessionReady &&
-              session.role == 1) {
-            // Role-one dialogs, sheets and route flights share the operations shell theme.
-            return Theme(data: AppColors.operationsTheme, child: child!);
+              (session.role == 1 || session.role == 2)) {
+            // Admin and superadmin dialogs, sheets and route flights share the operations shell theme.
+            return Theme(data: AppColors.operationsTheme, child: content);
           }
-          return child!;
+          return content;
         },
       ),
       // Blue/navy + Plus Jakarta Sans root for every role, auth and overlay route.

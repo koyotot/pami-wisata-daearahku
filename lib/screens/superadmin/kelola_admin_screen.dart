@@ -241,7 +241,7 @@ class _KelolaAdminScreenState extends State<KelolaAdminScreen> {
                 overflow: TextOverflow.ellipsis,
                 style: const TextStyle(
                     color: AdminColors.textMuted,
-                    fontSize: 11.5,
+                    fontSize: 11,
                     fontWeight: FontWeight.w600)),
           ]),
         ),
@@ -333,7 +333,7 @@ class _KelolaAdminScreenState extends State<KelolaAdminScreen> {
                             color: _status == option.$1
                                 ? AdminColors.navy
                                 : AdminColors.textMuted,
-                            fontSize: 12.5,
+                            fontSize: 12,
                             fontWeight: FontWeight.w800)),
                   ),
                 ),
@@ -355,14 +355,14 @@ class _KelolaAdminScreenState extends State<KelolaAdminScreen> {
                     fontWeight: FontWeight.w800)),
             const SizedBox(height: 4),
             const Text('Coba kata kunci atau filter lain.',
-                style: TextStyle(color: AdminColors.textMuted, fontSize: 12.5)),
+                style: TextStyle(color: AdminColors.textMuted, fontSize: 12)),
             const SizedBox(height: 14),
             OutlinedButton(
               key: const ValueKey('reset-filter'),
               onPressed: _resetFilters,
               style: OutlinedButton.styleFrom(
                   foregroundColor: AdminColors.navy,
-                  minimumSize: const Size(0, 44),
+                  minimumSize: const Size(0, 48),
                   side: const BorderSide(color: AdminColors.border),
                   shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(14)),
@@ -424,7 +424,7 @@ class _KelolaAdminScreenState extends State<KelolaAdminScreen> {
                 const SizedBox(height: 2),
                 const Text('Cari dan kelola akses pengguna terdaftar.',
                     style: TextStyle(
-                        color: AdminColors.textMuted, fontSize: 12.5)),
+                        color: AdminColors.textMuted, fontSize: 12)),
                 const SizedBox(height: 14),
                 DecoratedBox(
                   decoration: BoxDecoration(
@@ -656,7 +656,7 @@ class _AccountCard extends StatelessWidget {
                     child: const Text('Kelola Akun →',
                         style: TextStyle(
                             color: AdminColors.blue,
-                            fontSize: 12.5,
+                            fontSize: 12,
                             fontWeight: FontWeight.w800)),
                   ),
                 ),
@@ -759,7 +759,7 @@ class _AccountDetailSheet extends StatelessWidget {
                       const SizedBox(height: 2),
                       Text(a.email,
                           style: const TextStyle(
-                              color: AdminColors.textMuted, fontSize: 12.5)),
+                              color: AdminColors.textMuted, fontSize: 12)),
                     ]),
               ),
             ]),
@@ -786,7 +786,7 @@ class _AccountDetailSheet extends StatelessWidget {
                 child: const Text(
                     'Akun superadmin yang sedang digunakan dilindungi.',
                     style: TextStyle(
-                        color: Color(0xFF98621E), fontSize: 12.5, height: 1.4)),
+                        color: Color(0xFF98621E), fontSize: 12, height: 1.4)),
               ),
             ],
             const SizedBox(height: 16),
@@ -919,7 +919,7 @@ class _CreateAdminSheetState extends State<_CreateAdminSheet> {
             child: Text(label,
                 style: const TextStyle(
                     color: AdminColors.navy,
-                    fontSize: 12.5,
+                    fontSize: 12,
                     fontWeight: FontWeight.w800))),
         field,
         const SizedBox(height: 16),
@@ -1041,7 +1041,7 @@ class _CreateAdminSheetState extends State<_CreateAdminSheet> {
                         'Admin hanya dapat mengakses destinasi yang ditugaskan kepadanya.',
                         style: TextStyle(
                             color: AdminColors.navy,
-                            fontSize: 12.5,
+                            fontSize: 12,
                             height: 1.45)),
                   ),
                   if (_error != null) ...[

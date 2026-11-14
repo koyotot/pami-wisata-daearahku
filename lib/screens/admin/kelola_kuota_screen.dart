@@ -11,6 +11,7 @@ import '../../data/business_repository.dart';
 import '../../services/api_client.dart';
 import '../../services/auth_session.dart';
 import 'admin_common.dart';
+import '../superadmin/kelola_kuota_view.dart';
 import '../../widgets/operations_chrome.dart';
 import 'operations_dashboard/operations_dashboard.dart'
     show showOperationsDateRangeCalendar;
@@ -107,10 +108,31 @@ class _KelolaKuotaScreenState extends State<KelolaKuotaScreen> {
     }
   }
 
+  Future<String?> _saveQuota(Json payload) async {
+    try {
+      await _repository.saveQuota(widget.destinationGuid, payload);
+    } catch (e) {
+      return adminErrorMessage(e);
+    }
+    if (mounted) _muat();
+    return null;
+  }
+
   @override
   Widget build(BuildContext context) {
     final items = _sorted;
     final allowed = canManageQuota(_session.role);
+    if (_session.role == 2) {
+      return SuperadminQuotaView(
+        destinationName: widget.destinationName,
+        timezone: widget.timezone,
+        items: items,
+        loaded: _list.hasLoaded,
+        error: _list.error == null ? null : adminErrorMessage(_list.error!),
+        onRefresh: _muat,
+        onSave: _saveQuota,
+      );
+    }
     return AdminPage(
       role: _session.role,
       title: 'Kelola Kuota',

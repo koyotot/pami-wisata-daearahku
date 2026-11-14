@@ -262,7 +262,7 @@ class _DestinationAdminAssignmentsScreenState
                 overflow: TextOverflow.ellipsis,
                 style: const TextStyle(
                     color: AdminColors.textMuted,
-                    fontSize: 11.5,
+                    fontSize: 11,
                     fontWeight: FontWeight.w600)),
           ]),
         ),
@@ -320,7 +320,7 @@ class _DestinationAdminAssignmentsScreenState
                             color: _perAdmin == tab.$1
                                 ? AdminColors.blue
                                 : AdminColors.textMuted,
-                            fontSize: 12.5,
+                            fontSize: 12,
                             fontWeight: FontWeight.w800)),
                   ),
                 ),
@@ -445,15 +445,15 @@ class _DestinationAdminAssignmentsScreenState
               Text(admin.isActive ? 'Aktif' : 'Nonaktif',
                   style: const TextStyle(
                       color: AdminColors.textMuted,
-                      fontSize: 11.5,
+                      fontSize: 11,
                       fontWeight: FontWeight.w600)),
               const Text('  ·  ',
                   style:
-                      TextStyle(color: AdminColors.textMuted, fontSize: 11.5)),
+                      TextStyle(color: AdminColors.textMuted, fontSize: 11)),
               Text(count == 0 ? 'Belum ditugaskan' : '$count destinasi',
                   style: const TextStyle(
                       color: AdminColors.textMuted,
-                      fontSize: 11.5,
+                      fontSize: 11,
                       fontWeight: FontWeight.w600)),
             ]),
           ]),
@@ -556,7 +556,7 @@ class _DestinationAdminAssignmentsScreenState
               child: Text(_perAdmin ? '$total admin' : '$total destinasi',
                   style: const TextStyle(
                       color: AdminColors.textMuted,
-                      fontSize: 11.5,
+                      fontSize: 11,
                       fontWeight: FontWeight.w700)),
             ),
           ]),
@@ -786,7 +786,7 @@ class _AssignmentSheetState extends State<_AssignmentSheet> {
                       Text(
                           '${admin.name} · pilih destinasi yang boleh dikelola',
                           style: const TextStyle(
-                              color: AdminColors.textMuted, fontSize: 12.5)),
+                              color: AdminColors.textMuted, fontSize: 12)),
                       if (!admin.isActive) ...[
                         const SizedBox(height: 8),
                         const AdminNotice(
@@ -877,7 +877,7 @@ class _AssignmentSheetState extends State<_AssignmentSheet> {
                                                 overflow: TextOverflow.ellipsis,
                                                 style: const TextStyle(
                                                     color: AdminColors.navy,
-                                                    fontSize: 13.5,
+                                                    fontSize: 13,
                                                     fontWeight:
                                                         FontWeight.w800)),
                                             const SizedBox(height: 2),
@@ -1003,7 +1003,7 @@ class _DestinationAccessSheet extends StatelessWidget {
               SizedBox(height: 2),
               Text('Informasi penugasan — hanya lihat',
                   style:
-                      TextStyle(color: AdminColors.textMuted, fontSize: 12.5)),
+                      TextStyle(color: AdminColors.textMuted, fontSize: 12)),
             ]),
           ),
           Flexible(
@@ -1059,7 +1059,7 @@ class _DestinationAccessSheet extends StatelessWidget {
                           TextSpan(text: '.'),
                         ]),
                     style: TextStyle(
-                        color: AdminColors.navy, fontSize: 12.5, height: 1.45),
+                        color: AdminColors.navy, fontSize: 12, height: 1.45),
                   ),
                 ),
                 const SizedBox(height: 16),
@@ -1099,7 +1099,7 @@ class _DestinationAccessSheet extends StatelessWidget {
                           child: Text(_initials(admin.name),
                               style: const TextStyle(
                                   color: AdminColors.blue,
-                                  fontSize: 12.5,
+                                  fontSize: 12,
                                   fontWeight: FontWeight.w800)),
                         ),
                         const SizedBox(width: 12),
@@ -1112,7 +1112,7 @@ class _DestinationAccessSheet extends StatelessWidget {
                                     overflow: TextOverflow.ellipsis,
                                     style: const TextStyle(
                                         color: AdminColors.navy,
-                                        fontSize: 13.5,
+                                        fontSize: 13,
                                         fontWeight: FontWeight.w800)),
                                 Text(
                                     admin.isActive
@@ -1140,7 +1140,7 @@ class _DestinationAccessSheet extends StatelessWidget {
                               child: const Text('Kelola',
                                   style: TextStyle(
                                       color: AdminColors.blue,
-                                      fontSize: 12.5,
+                                      fontSize: 12,
                                       fontWeight: FontWeight.w800)),
                             ),
                           ),
