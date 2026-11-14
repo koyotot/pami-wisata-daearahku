@@ -14,6 +14,12 @@ import '../../widgets/booking_refund_section.dart';
 import '../../widgets/booking_ticket_qr_section.dart';
 import '../../widgets/payment_deadline.dart';
 import '../auth/auth_presentation.dart';
+import 'payment_instruction_preview_screen.dart';
+
+/// When the real payment instruction cannot be created, open a preview of the
+/// instruction page (no VA number or QR, local countdown) instead of leaving
+/// the customer on the chooser. Set to false to show only the error.
+const kPaymentPreviewOnFailure = true;
 
 /// Native checkout for BCA/BNI virtual accounts and QRIS. Amounts, currency, deadlines and availability all
 /// come from Laravel; this page only sends the chosen method and channel, on an explicit tap.
@@ -55,6 +61,12 @@ class _BookingPaymentScreenState extends State<BookingPaymentScreen> {
   bool _exporting = false;
   bool _showTickets = false;
   bool _routeVisible = true;
+  bool _detail = false;
+
+  /// True while one of this page's own bottom sheets is open. A sheet sits on
+  /// top of the page but does not hide it, so the payment window must not
+  /// pause (pausing clears the server clock and blocks the create).
+  bool _ownSheet = false;
 
   @override
   void initState() {
@@ -66,7 +78,7 @@ class _BookingPaymentScreenState extends State<BookingPaymentScreen> {
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    final visible = ModalRoute.isCurrentOf(context) ?? true;
+    final visible = _ownSheet || (ModalRoute.isCurrentOf(context) ?? true);
     if (visible != _routeVisible) {
       _routeVisible = visible;
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -102,10 +114,32 @@ class _BookingPaymentScreenState extends State<BookingPaymentScreen> {
     return null;
   }
 
-  void _start() {
+  Future<void> _start() async {
     final choice = _effectiveChoice;
     if (choice == null || !_payment.canStartWith(choice)) return;
-    _payment.start(choice);
+    await _payment.start(choice);
+    if (!mounted) return;
+    final p = _payment;
+    final snapshot = p.snapshot;
+    // Success shows the real VA/QR inline (phase awaiting). The preview is only
+    // a fallback when the server refused to create the instruction.
+    if (kPaymentPreviewOnFailure &&
+        p.phase != PaymentPhase.awaiting &&
+        p.error != null &&
+        snapshot != null &&
+        p.booking != null) {
+      final total = snapshot.totalAmount;
+      final currency =
+          (snapshot.json['currency'] as String?) ?? p.booking!.currency;
+      await Navigator.of(context).push(MaterialPageRoute<void>(
+          builder: (_) => PaymentInstructionPreviewScreen(
+              methodTitle: _choiceTitle(choice),
+              isQris: choice.methodCode == 'qris',
+              totalLabel: total == null
+                  ? 'Belum tersedia'
+                  : formatMoney(total, currency),
+              failure: p.error)));
+    }
   }
 
   Future<void> _copyVa(String digits) async {
@@ -272,69 +306,297 @@ class _BookingPaymentScreenState extends State<BookingPaymentScreen> {
 
   // ── Sections ───────────────────────────────────────────────
 
+  Widget _caption(String text) => Text(text,
+      style: const TextStyle(
+          fontSize: 11,
+          fontWeight: FontWeight.w800,
+          letterSpacing: .8,
+          color: AppColors.textMuted));
+
+  bool get _deadlineElapsed {
+    final deadline = _payment.paymentDeadline;
+    final now = _payment.serverNow;
+    return deadline != null && now != null && !now.isBefore(deadline);
+  }
+
   Widget _summary() {
     final p = _payment;
     final s = p.snapshot!;
     final b = p.booking!;
     final total = s.totalAmount;
     final currency = (s.json['currency'] as String?) ?? b.currency;
+    final quantity = s.quantity ?? b.quantity;
     return _panel([
-      Text(b.destinationName,
-          style: const TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.w800,
-              color: AppColors.navy)),
-      const SizedBox(height: AppSpacing.sm),
-      _line('Nomor booking', s.bookingNumber ?? b.bookingNumber),
-      if (s.invoiceNumber != null) _line('Nomor invoice', s.invoiceNumber!),
-      _line('Tanggal kunjungan', formatLongDate(b.visitDate)),
+      _caption('RINGKASAN PESANAN'),
+      const SizedBox(height: AppSpacing.md),
+      Row(children: [
+        Container(
+            width: 48,
+            height: 48,
+            decoration: BoxDecoration(
+                color: AppColors.blueTint,
+                borderRadius: BorderRadius.circular(14)),
+            child: const Icon(PhosphorIconsRegular.mountains,
+                size: 22, color: AppColors.blue)),
+        const SizedBox(width: AppSpacing.md),
+        Expanded(
+            child:
+                Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text(b.destinationName,
+              style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w800,
+                  color: AppColors.navy)),
+          const SizedBox(height: 2),
+          Text('${formatLongDate(b.visitDate)} · $quantity tiket masuk',
+              style: const TextStyle(
+                  fontSize: 12, color: AppColors.textSecondary)),
+        ])),
+      ]),
+      const Divider(height: AppSpacing.xl + 4, color: AppColors.border),
       if (s.quantity != null && s.unitPrice != null)
-        _line(
-            'Tiket', '${s.quantity} × ${formatMoney(s.unitPrice!, currency)}'),
+        _line('Harga tiket',
+            '${s.quantity} × ${formatMoney(s.unitPrice!, currency)}'),
       if (s.subtotal != null)
         _line('Subtotal', formatMoney(s.subtotal!, currency)),
       if ((s.serviceFee ?? 0) > 0)
         _line('Biaya layanan', formatMoney(s.serviceFee!, currency)),
-      const Divider(height: AppSpacing.xl, color: AppColors.border),
-      _line('Total tagihan',
-          total == null ? 'Belum tersedia' : formatMoney(total, currency),
-          key: const Key('pay-total')),
+      const Divider(height: AppSpacing.xl + 4, color: AppColors.border),
+      Row(crossAxisAlignment: CrossAxisAlignment.end, children: [
+        Expanded(
+            child:
+                Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          const Text('Total tagihan',
+              style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+          const SizedBox(height: AppSpacing.xs),
+          Text(total == null ? 'Belum tersedia' : formatMoney(total, currency),
+              key: const Key('pay-total'),
+              style: TextStyle(
+                  fontSize: total == null ? 16 : 30,
+                  height: 1.1,
+                  fontWeight: FontWeight.w800,
+                  color: AppColors.blueDeep)),
+        ])),
+        TextButton(
+            key: const Key('pay-detail'),
+            onPressed: () => setState(() => _detail = !_detail),
+            style: TextButton.styleFrom(
+                minimumSize: const Size(48, 44),
+                foregroundColor: AppColors.blue,
+                backgroundColor: AppColors.blueTint,
+                padding: const EdgeInsets.symmetric(horizontal: 14),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12))),
+            child: Row(mainAxisSize: MainAxisSize.min, children: [
+              const Text('Detail',
+                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800)),
+              const SizedBox(width: 6),
+              AnimatedRotation(
+                  turns: _detail ? .5 : 0,
+                  duration: const Duration(milliseconds: 280),
+                  curve: Curves.easeInOut,
+                  child: const Icon(PhosphorIconsRegular.caretDown, size: 14)),
+            ])),
+      ]),
+      AnimatedSize(
+          duration: const Duration(milliseconds: 280),
+          curve: Curves.easeInOut,
+          alignment: Alignment.topCenter,
+          child: ClipRect(
+              child: Align(
+                  alignment: Alignment.topCenter,
+                  heightFactor: _detail ? 1 : 0,
+                  child: IgnorePointer(
+                      ignoring: !_detail,
+                      child: ExcludeSemantics(
+                          excluding: !_detail,
+                          child: AnimatedOpacity(
+                              opacity: _detail ? 1 : 0,
+                              duration: const Duration(milliseconds: 280),
+                              curve: Curves.easeInOut,
+                              child: Column(
+                                  key: const Key('pay-detail-body'),
+                                  crossAxisAlignment:
+                                      CrossAxisAlignment.stretch,
+                                  children: [
+                                    const SizedBox(height: AppSpacing.lg),
+                                    const SizedBox(
+                                        height: 1,
+                                        child: CustomPaint(
+                                            painter: _DashedLinePainter(
+                                                Color(0xFFC9D6E8)))),
+                                    const SizedBox(height: AppSpacing.lg),
+                                    _copyTile('Nomor booking',
+                                        s.bookingNumber ?? b.bookingNumber),
+                                    if (s.invoiceNumber != null) ...[
+                                      const SizedBox(height: AppSpacing.md),
+                                      _copyTile(
+                                          'Nomor invoice', s.invoiceNumber!),
+                                    ],
+                                  ]))))))),
     ]);
   }
+
+  Widget _copyTile(String label, String value) => Container(
+      padding: const EdgeInsets.fromLTRB(
+          AppSpacing.md + 2, AppSpacing.md, AppSpacing.md, AppSpacing.md),
+      decoration: BoxDecoration(
+          color: const Color(0xFFF5F9FE),
+          border: Border.all(color: AppColors.border),
+          borderRadius: BorderRadius.circular(14)),
+      child: Row(children: [
+        Expanded(
+            child:
+                Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text(label,
+              style: const TextStyle(
+                  fontSize: 11, color: AppColors.textSecondary)),
+          const SizedBox(height: AppSpacing.sm),
+          Text(value,
+              style: const TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.navy)),
+        ])),
+        const SizedBox(width: AppSpacing.sm),
+        IconButton(
+            key: Key('pay-copy-${label.toLowerCase().replaceAll(' ', '-')}'),
+            tooltip: 'Salin $label',
+            onPressed: () async {
+              await Clipboard.setData(ClipboardData(text: value));
+              if (!mounted) return;
+              ScaffoldMessenger.of(context)
+                ..hideCurrentSnackBar()
+                ..showSnackBar(SnackBar(content: Text('$label disalin')));
+            },
+            style: IconButton.styleFrom(
+                minimumSize: const Size(44, 44),
+                backgroundColor: AppColors.blueTint,
+                foregroundColor: AppColors.blue,
+                side: const BorderSide(color: Color(0xFFC9DDF7)),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12))),
+            icon: const Icon(PhosphorIconsRegular.copy, size: 18)),
+      ]));
 
   Widget _countdown() => Padding(
       padding: const EdgeInsets.only(bottom: AppSpacing.md),
       child: PaymentDeadline(
           key: const Key('pay-countdown'),
-          label: 'Batas waktu pembayaran',
+          banner: true,
+          label: 'Sisa waktu pembayaran',
+          caption: 'Selesaikan sebelum waktu habis',
           expiresAt:
               _payment.serverNow == null ? null : _payment.paymentDeadline,
           now: () => _payment.serverNow,
           onElapsed: _payment.onCountdownElapsed));
+
+  String _choiceTitle(PayChoice choice) => choice.methodCode == 'qris'
+      ? 'QRIS'
+      : '${choice.channel.toUpperCase()} Virtual Account';
+
+  String _choiceDescription(PayChoice choice) {
+    if (choice.methodCode == 'qris') {
+      return 'Bayar dengan aplikasi bank atau dompet digital yang mendukung QRIS.';
+    }
+    return switch (choice.channel) {
+      'bca' => 'Transfer melalui m-banking, internet banking, atau ATM.',
+      'bni' => 'Transfer melalui layanan BNI atau ATM yang mendukung.',
+      _ => choice.subtitle,
+    };
+  }
+
+  /// Official bank/QRIS marks (assets/images/payment) on a white tile.
+  Widget _choiceLogo(PayChoice choice, {required bool muted}) {
+    final asset = choice.methodCode == 'qris'
+        ? 'assets/images/payment/qris.png'
+        : switch (choice.channel) {
+            'bca' => 'assets/images/payment/bca.png',
+            'bni' => 'assets/images/payment/bni.png',
+            _ => null,
+          };
+    final tile = Container(
+        width: 72,
+        height: 52,
+        alignment: Alignment.center,
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+        decoration: BoxDecoration(
+            color: Colors.white,
+            border: Border.all(color: AppColors.border),
+            borderRadius: BorderRadius.circular(14)),
+        child: asset == null
+            ? Text(choice.channel.toUpperCase(),
+                style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w800,
+                    color: AppColors.blueDeep))
+            : Image.asset(asset,
+                fit: BoxFit.contain,
+                excludeFromSemantics: true,
+                filterQuality: FilterQuality.medium));
+    return muted ? Opacity(opacity: .4, child: tile) : tile;
+  }
 
   Widget _chooser() {
     final p = _payment;
     final choices = p.snapshot!.payChoices;
     final locked = p.lockedChoiceKey;
     final selected = _effectiveChoice;
-    final anyAvailable = choices.any((c) => c.available);
-    return _panel([
-      _heading('Metode pembayaran'),
+    final available = choices.where((c) => c.available).length;
+    final anyAvailable = available > 0;
+    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+      const SizedBox(height: AppSpacing.sm),
+      Row(crossAxisAlignment: CrossAxisAlignment.end, children: [
+        const Expanded(
+            child: Text('Metode Pembayaran',
+                style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w800,
+                    color: AppColors.navy))),
+        Text('$available pilihan',
+            style: const TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w800,
+                color: AppColors.blue)),
+      ]),
+      const SizedBox(height: AppSpacing.xs),
+      const Text('Pilih metode yang paling nyaman untuk Anda.',
+          style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+      const SizedBox(height: AppSpacing.md),
       for (final choice in choices) _choiceTile(choice, selected, locked),
       if (locked != null)
         Padding(
-            padding: const EdgeInsets.only(top: AppSpacing.sm),
+            padding: const EdgeInsets.only(bottom: AppSpacing.sm),
             child: _body(
                 'Percobaan sebelumnya belum pasti. Lanjutkan dengan metode yang sama agar tidak ada tagihan ganda.')),
       if (!anyAvailable)
         Padding(
-            padding: const EdgeInsets.only(top: AppSpacing.sm),
+            padding: const EdgeInsets.only(bottom: AppSpacing.sm),
             child: _body(
                 'Belum ada metode yang dapat dipakai. Tidak ada tagihan dibuat.')),
-      _button(p.creating ? 'Membuat instruksi pembayaran…' : 'Lanjut Bayar',
-          selected != null && p.canStartWith(selected) ? _start : null,
-          key: const Key('pay-start')),
+      _noteBox(
+          'Nomor Virtual Account atau kode QR pembayaran akan diterbitkan oleh penyedia pembayaran setelah permintaan diproses. Jangan transfer menggunakan nomor booking atau invoice.'),
+      const SizedBox(height: AppSpacing.md),
     ]);
+  }
+
+  Widget _noteBox(String text, {bool warning = false}) {
+    final bg = warning ? const Color(0xFFFFF7E6) : const Color(0xFFEEF5FD);
+    final border = warning ? const Color(0xFFF3DDAA) : const Color(0xFFC9DDF7);
+    final fg = warning ? const Color(0xFF80531B) : AppColors.blueDeep;
+    return Container(
+        padding: const EdgeInsets.all(AppSpacing.md),
+        decoration: BoxDecoration(
+            color: bg,
+            border: Border.all(color: border),
+            borderRadius: BorderRadius.circular(14)),
+        child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Icon(PhosphorIconsRegular.info, size: 18, color: fg),
+          const SizedBox(width: AppSpacing.sm),
+          Expanded(
+              child: Text(text,
+                  style: TextStyle(fontSize: 12, height: 1.5, color: fg))),
+        ]));
   }
 
   Widget _choiceTile(PayChoice choice, PayChoice? selected, String? locked) {
@@ -343,7 +605,7 @@ class _BookingPaymentScreenState extends State<BookingPaymentScreen> {
         !_payment.busy &&
         (locked == null || locked == choice.key);
     return Padding(
-        padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+        padding: const EdgeInsets.only(bottom: AppSpacing.md),
         child: Semantics(
             inMutuallyExclusiveGroup: true,
             checked: isSelected,
@@ -354,14 +616,14 @@ class _BookingPaymentScreenState extends State<BookingPaymentScreen> {
             child: Material(
                 color: isSelected ? AppColors.blueTint : AppColors.surface,
                 shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(14),
+                    borderRadius: BorderRadius.circular(18),
                     side: BorderSide(
                         color: isSelected ? AppColors.blue : AppColors.border,
-                        width: isSelected ? 2 : 1)),
+                        width: isSelected ? 1.5 : 1)),
+                clipBehavior: Clip.antiAlias,
                 child: InkWell(
                     key: Key(
                         'pay-choice-${choice.methodCode}-${choice.channel}'),
-                    borderRadius: BorderRadius.circular(14),
                     onTap: canPick
                         ? () => setState(() => _selected = choice)
                         : null,
@@ -369,34 +631,54 @@ class _BookingPaymentScreenState extends State<BookingPaymentScreen> {
                         constraints: const BoxConstraints(
                             minHeight: kMinInteractiveDimension),
                         child: Padding(
-                            padding: const EdgeInsets.all(AppSpacing.md),
+                            padding: const EdgeInsets.all(AppSpacing.lg),
                             child: Row(
-                                crossAxisAlignment: CrossAxisAlignment.start,
+                                crossAxisAlignment: CrossAxisAlignment.center,
                                 children: [
                                   ExcludeSemantics(
-                                      child: Icon(
-                                          isSelected
-                                              ? PhosphorIconsRegular.radioButton
-                                              : PhosphorIconsRegular.circle,
-                                          color: choice.available
-                                              ? AppColors.blue
-                                              : AppColors.textMuted)),
+                                      child: Container(
+                                          width: 24,
+                                          height: 24,
+                                          alignment: Alignment.center,
+                                          decoration: BoxDecoration(
+                                              shape: BoxShape.circle,
+                                              color: Colors.white,
+                                              border: Border.all(
+                                                  color: choice.available
+                                                      ? AppColors.blue
+                                                      : AppColors.border,
+                                                  width: 2)),
+                                          child: isSelected
+                                              ? Container(
+                                                  width: 12,
+                                                  height: 12,
+                                                  decoration:
+                                                      const BoxDecoration(
+                                                          shape:
+                                                              BoxShape.circle,
+                                                          color:
+                                                              AppColors.blue))
+                                              : null)),
+                                  const SizedBox(width: AppSpacing.md),
+                                  ExcludeSemantics(
+                                      child: _choiceLogo(choice,
+                                          muted: !choice.available)),
                                   const SizedBox(width: AppSpacing.md),
                                   Expanded(
                                       child: Column(
                                           crossAxisAlignment:
                                               CrossAxisAlignment.start,
                                           children: [
-                                        Text(choice.label,
+                                        Text(_choiceTitle(choice),
                                             style: TextStyle(
                                                 fontSize: 14,
-                                                fontWeight: FontWeight.w700,
+                                                fontWeight: FontWeight.w800,
                                                 color: choice.available
                                                     ? AppColors.navy
                                                     : AppColors.textMuted)),
                                         const SizedBox(height: AppSpacing.xs),
                                         if (choice.available)
-                                          Text(choice.subtitle,
+                                          Text(_choiceDescription(choice),
                                               style: const TextStyle(
                                                   fontSize: 12,
                                                   height: 1.5,
@@ -415,8 +697,308 @@ class _BookingPaymentScreenState extends State<BookingPaymentScreen> {
                                                   fontSize: 11,
                                                   color: AppColors.textMuted)),
                                         ],
+                                        if (isSelected) ...[
+                                          const SizedBox(height: AppSpacing.sm),
+                                          Container(
+                                              padding:
+                                                  const EdgeInsets.symmetric(
+                                                      horizontal: 8,
+                                                      vertical: 3),
+                                              decoration: BoxDecoration(
+                                                  color:
+                                                      const Color(0xFFDCEBFB),
+                                                  borderRadius:
+                                                      BorderRadius.circular(8)),
+                                              child: const Text('Terpilih',
+                                                  style: TextStyle(
+                                                      fontSize: 11,
+                                                      fontWeight:
+                                                          FontWeight.w800,
+                                                      color:
+                                                          AppColors.blueDeep))),
+                                        ],
                                       ])),
                                 ])))))));
+  }
+
+  Widget _checkButton() {
+    final p = _payment;
+    return FilledButton(
+        key: const Key('pay-check'),
+        onPressed: p.canCheckNow ? p.checkNow : null,
+        style: FilledButton.styleFrom(
+            minimumSize: const Size(48, 52),
+            backgroundColor: AppColors.blue,
+            foregroundColor: Colors.white,
+            disabledBackgroundColor: const Color(0xFFD5DEEC),
+            disabledForegroundColor: Colors.white,
+            padding: const EdgeInsets.symmetric(horizontal: 22),
+            shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(14))),
+        child: Text(p.checking ? 'Memeriksa status…' : 'Cek Status Pembayaran',
+            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800)));
+  }
+
+  Future<void> _explainSwitch(PaymentSnapshot s) => showModalBottomSheet<void>(
+      context: context,
+      useSafeArea: true,
+      showDragHandle: true,
+      backgroundColor: AppColors.surface,
+      shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+      builder: (sheet) => SafeArea(
+          top: false,
+          child: Padding(
+              padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+              child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Row(children: [
+                      const Expanded(
+                          child: Text('Ganti Metode',
+                              style: TextStyle(
+                                  fontSize: 20,
+                                  fontWeight: FontWeight.w800,
+                                  color: AppColors.navy))),
+                      IconButton(
+                          tooltip: 'Tutup',
+                          onPressed: () => Navigator.pop(sheet),
+                          style: IconButton.styleFrom(
+                              backgroundColor: const Color(0xFFEEF3FA),
+                              foregroundColor: AppColors.textSecondary,
+                              shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12))),
+                          icon: const Icon(PhosphorIconsRegular.x, size: 18)),
+                    ]),
+                    const SizedBox(height: 12),
+                    const Divider(height: 1, color: AppColors.border),
+                    const SizedBox(height: 16),
+                    KeyedSubtree(
+                        key: const Key('pay-switch-note'),
+                        child: _noteBox(switchReasonText(s.switchReason))),
+                    const SizedBox(height: 20),
+                    FilledButton(
+                        onPressed: () => Navigator.pop(sheet),
+                        style: FilledButton.styleFrom(
+                            minimumSize: const Size.fromHeight(52),
+                            backgroundColor: AppColors.blue,
+                            foregroundColor: Colors.white,
+                            shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(14))),
+                        child: const Text('Mengerti',
+                            style: TextStyle(
+                                fontSize: 14, fontWeight: FontWeight.w800))),
+                  ]))));
+
+  Future<void> _confirmStart() async {
+    final choice = _effectiveChoice;
+    final p = _payment;
+    if (choice == null || !p.canStartWith(choice) || p.snapshot == null) return;
+    final s = p.snapshot!;
+    final b = p.booking!;
+    final total = s.totalAmount;
+    final currency = (s.json['currency'] as String?) ?? b.currency;
+    final rows = <(String, String)>[
+      ('Destinasi', b.destinationName),
+      ('Metode', _choiceTitle(choice)),
+      (
+        'Total tagihan',
+        total == null ? 'Belum tersedia' : formatMoney(total, currency)
+      ),
+    ];
+    _ownSheet = true;
+    final bool? ok;
+    try {
+      ok = await showModalBottomSheet<bool>(
+          context: context,
+          useSafeArea: true,
+          isScrollControlled: true,
+          showDragHandle: true,
+          backgroundColor: AppColors.surface,
+          shape: const RoundedRectangleBorder(
+              borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+          builder: (sheet) => SafeArea(
+              top: false,
+              child: SingleChildScrollView(
+                  padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+                  child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Row(children: [
+                          const Expanded(
+                              child: Text('Konfirmasi Metode',
+                                  style: TextStyle(
+                                      fontSize: 20,
+                                      fontWeight: FontWeight.w800,
+                                      color: AppColors.navy))),
+                          IconButton(
+                              tooltip: 'Tutup',
+                              onPressed: () => Navigator.pop(sheet, false),
+                              style: IconButton.styleFrom(
+                                  backgroundColor: const Color(0xFFEEF3FA),
+                                  foregroundColor: AppColors.textSecondary,
+                                  shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(12))),
+                              icon:
+                                  const Icon(PhosphorIconsRegular.x, size: 18)),
+                        ]),
+                        const SizedBox(height: 12),
+                        const Divider(height: 1, color: AppColors.border),
+                        const SizedBox(height: 16),
+                        Text(_choiceTitle(choice),
+                            style: const TextStyle(
+                                fontSize: 20,
+                                fontWeight: FontWeight.w800,
+                                color: AppColors.navy)),
+                        const SizedBox(height: AppSpacing.sm),
+                        const Text(
+                            'Periksa pilihan pembayaran sebelum melanjutkan ke instruksi.',
+                            style: TextStyle(
+                                fontSize: 12, color: AppColors.textSecondary)),
+                        const SizedBox(height: AppSpacing.lg),
+                        for (final row in rows) ...[
+                          const Divider(height: 1, color: AppColors.border),
+                          Padding(
+                              padding: const EdgeInsets.symmetric(vertical: 14),
+                              child: Row(children: [
+                                Expanded(
+                                    child: Text(row.$1,
+                                        style: const TextStyle(
+                                            fontSize: 13,
+                                            color: AppColors.textSecondary))),
+                                const SizedBox(width: AppSpacing.md),
+                                Flexible(
+                                    child: Text(row.$2,
+                                        textAlign: TextAlign.end,
+                                        style: const TextStyle(
+                                            fontSize: 13,
+                                            fontWeight: FontWeight.w800,
+                                            color: AppColors.navy))),
+                              ])),
+                        ],
+                        const Divider(height: 1, color: AppColors.border),
+                        const SizedBox(height: AppSpacing.lg),
+                        _noteBox(
+                            'Melanjutkan akan membuat instruksi pembayaran untuk metode ini. Nominal dan batas waktu ditentukan oleh server.'),
+                        const SizedBox(height: AppSpacing.lg),
+                        Row(children: [
+                          Expanded(
+                              child: OutlinedButton(
+                                  key: const Key('pay-confirm-change'),
+                                  onPressed: () => Navigator.pop(sheet, false),
+                                  style: OutlinedButton.styleFrom(
+                                      minimumSize: const Size.fromHeight(52),
+                                      foregroundColor: AppColors.blue,
+                                      side: const BorderSide(
+                                          color: AppColors.border),
+                                      shape: RoundedRectangleBorder(
+                                          borderRadius:
+                                              BorderRadius.circular(14))),
+                                  child: const Text('Ubah Metode',
+                                      style: TextStyle(
+                                          fontSize: 14,
+                                          fontWeight: FontWeight.w800)))),
+                          const SizedBox(width: AppSpacing.md),
+                          Expanded(
+                              child: FilledButton(
+                                  key: const Key('pay-confirm'),
+                                  onPressed: () => Navigator.pop(sheet, true),
+                                  style: FilledButton.styleFrom(
+                                      minimumSize: const Size.fromHeight(52),
+                                      backgroundColor: AppColors.blue,
+                                      foregroundColor: Colors.white,
+                                      shape: RoundedRectangleBorder(
+                                          borderRadius:
+                                              BorderRadius.circular(14))),
+                                  child: const Text('Lihat Instruksi',
+                                      style: TextStyle(
+                                          fontSize: 14,
+                                          fontWeight: FontWeight.w800)))),
+                        ]),
+                      ]))));
+    } finally {
+      _ownSheet = false;
+    }
+    if (ok == true && mounted) _start();
+  }
+
+  Widget? _dock(PaymentPhase phase) {
+    final p = _payment;
+    if (!p.valid ||
+        phase == PaymentPhase.loading ||
+        phase == PaymentPhase.loadFailed ||
+        phase == PaymentPhase.paid ||
+        p.snapshot == null ||
+        p.booking == null ||
+        (phase != PaymentPhase.awaiting && !p.chooserVisible)) {
+      return null;
+    }
+    final awaiting = phase == PaymentPhase.awaiting;
+    final s = p.snapshot!;
+    final total = s.totalAmount;
+    final currency = (s.json['currency'] as String?) ?? p.booking!.currency;
+    final selected = _effectiveChoice;
+    final expired = _deadlineElapsed;
+    final enabled = selected != null && p.canStartWith(selected) && !expired;
+    return Material(
+        color: AppColors.surface,
+        elevation: 8,
+        shadowColor: Colors.black26,
+        child: SafeArea(
+            top: false,
+            child: Padding(
+                padding: const EdgeInsets.fromLTRB(20, 12, 20, 12),
+                child: Row(children: [
+                  Expanded(
+                      child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                        Text(awaiting ? 'Total tagihan' : 'Total pembayaran',
+                            style: const TextStyle(
+                                fontSize: 11, color: AppColors.textSecondary)),
+                        const SizedBox(height: 2),
+                        Text(
+                            total == null
+                                ? 'Belum tersedia'
+                                : formatMoney(total, currency),
+                            style: const TextStyle(
+                                fontSize: 20,
+                                fontWeight: FontWeight.w800,
+                                color: AppColors.navy)),
+                      ])),
+                  const SizedBox(width: AppSpacing.md),
+                  awaiting
+                      ? _checkButton()
+                      : FilledButton(
+                          key: const Key('pay-start'),
+                          onPressed: enabled ? _confirmStart : null,
+                          style: FilledButton.styleFrom(
+                              minimumSize: const Size(48, 52),
+                              backgroundColor: AppColors.blue,
+                              foregroundColor: Colors.white,
+                              disabledBackgroundColor: const Color(0xFFD5DEEC),
+                              disabledForegroundColor: Colors.white,
+                              padding:
+                                  const EdgeInsets.symmetric(horizontal: 22),
+                              shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(14))),
+                          child: Row(mainAxisSize: MainAxisSize.min, children: [
+                            Text(
+                                p.creating
+                                    ? 'Membuat instruksi…'
+                                    : expired
+                                        ? 'Waktu Habis'
+                                        : 'Lanjut Bayar',
+                                style: const TextStyle(
+                                    fontSize: 14, fontWeight: FontWeight.w800)),
+                            const SizedBox(width: 8),
+                            const Icon(PhosphorIconsRegular.arrowRight,
+                                size: 18),
+                          ])),
+                ]))));
   }
 
   String _groupDigits(String value) {
@@ -453,45 +1035,151 @@ class _BookingPaymentScreenState extends State<BookingPaymentScreen> {
     final isQris = s.attemptMethod == 'qris';
     return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
       _countdown(),
+      _methodCard(s, total),
       if (isQris) _qrisPanel(amount) else _vaPanel(s, amount),
-      if (!s.canSwitch)
-        _panel([
-          _heading('Ganti metode'),
-          _body(switchReasonText(s.switchReason)),
-        ], key: const Key('pay-switch-note')),
+      Center(
+          child: TextButton.icon(
+              key: const Key('pay-switch'),
+              onPressed: () => _explainSwitch(s),
+              style: TextButton.styleFrom(
+                  minimumSize: const Size(48, 48),
+                  foregroundColor: AppColors.blue),
+              icon: const Icon(PhosphorIconsRegular.arrowLeft, size: 16),
+              label: const Text('Pilih Metode Lain',
+                  style:
+                      TextStyle(fontSize: 12, fontWeight: FontWeight.w800)))),
+    ]);
+  }
+
+  Widget _methodCard(PaymentSnapshot s, int? total) {
+    final isQris = s.attemptMethod == 'qris';
+    final currency =
+        (s.json['currency'] as String?) ?? _payment.booking?.currency;
+    return _panel([
+      _caption('METODE YANG DIPILIH'),
+      const SizedBox(height: AppSpacing.md),
+      Row(children: [
+        Container(
+            width: 48,
+            height: 48,
+            decoration: BoxDecoration(
+                color: AppColors.blueTint,
+                borderRadius: BorderRadius.circular(14)),
+            child: Icon(
+                isQris
+                    ? PhosphorIconsRegular.qrCode
+                    : PhosphorIconsRegular.creditCard,
+                size: 22,
+                color: AppColors.blue)),
+        const SizedBox(width: AppSpacing.md),
+        Expanded(
+            child:
+                Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text(paymentMethodLabel(s.attemptMethod, s.attemptChannel),
+              style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w800,
+                  color: AppColors.navy)),
+          const SizedBox(height: 2),
+          const Text('Instruksi pembayaran aktif',
+              style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+        ])),
+      ]),
+      const Divider(height: AppSpacing.xl + 4, color: AppColors.border),
+      const Text('Total tagihan',
+          style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+      const SizedBox(height: AppSpacing.xs),
+      Text(
+          total == null
+              ? 'Belum tersedia'
+              : formatMoney(total, currency ?? 'IDR'),
+          key: const Key('pay-total'),
+          style: TextStyle(
+              fontSize: total == null ? 16 : 30,
+              height: 1.1,
+              fontWeight: FontWeight.w800,
+              color: AppColors.blueDeep)),
     ]);
   }
 
   Widget _vaPanel(PaymentSnapshot s, String? amount) {
-    final digits = s.vaNumber!;
-    final bank = s.bankCode!.toUpperCase();
-    final grouped = _groupDigits(digits);
+    final digits = s.vaNumber;
+    final bank = (s.bankCode ?? s.attemptChannel ?? '').toUpperCase();
+    final grouped = digits == null ? '' : _groupDigits(digits);
     return _panel([
-      _heading('Virtual Account Bank $bank'),
-      Semantics(
-          label: 'Nomor virtual account $bank ${digits.split('').join(' ')}',
-          excludeSemantics: true,
-          child: Text(grouped,
-              key: const Key('pay-va-number'),
-              style: const TextStyle(
-                  fontSize: 24,
-                  fontWeight: FontWeight.w800,
-                  color: AppColors.navy,
-                  fontFeatures: [FontFeature.tabularFigures()]))),
-      if (amount != null) ...[
-        const SizedBox(height: AppSpacing.sm),
-        _body('Nominal tetap $amount. Jumlah yang dibayar harus sama persis.'),
-      ],
-      _button('Salin Nomor VA', () => _copyVa(digits),
-          key: const Key('pay-va-copy'),
-          primary: false,
-          icon: PhosphorIconsRegular.copy),
+      _caption('INSTRUKSI PEMBAYARAN'),
+      const SizedBox(height: AppSpacing.md),
+      CustomPaint(
+          painter: const DashedBorderPainter(Color(0xFFB9D3F2)),
+          child: Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(AppSpacing.lg),
+              decoration: BoxDecoration(
+                  color: const Color(0xFFF5F9FE),
+                  borderRadius: BorderRadius.circular(18)),
+              child: Column(children: [
+                Container(
+                    width: 52,
+                    height: 52,
+                    decoration: BoxDecoration(
+                        color: AppColors.blueTint,
+                        borderRadius: BorderRadius.circular(14)),
+                    child: const Icon(PhosphorIconsRegular.creditCard,
+                        size: 24, color: AppColors.blue)),
+                const SizedBox(height: AppSpacing.md),
+                Text(
+                    digits == null
+                        ? 'Nomor VA belum diterbitkan'
+                        : 'Virtual Account Bank $bank',
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w800,
+                        color: AppColors.navy)),
+                const SizedBox(height: AppSpacing.sm),
+                if (digits == null)
+                  const Text(
+                      'Nomor Virtual Account asli hanya ditampilkan dari respons penyedia pembayaran.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                          fontSize: 12,
+                          height: 1.5,
+                          color: AppColors.textSecondary))
+                else
+                  Semantics(
+                      label:
+                          'Nomor virtual account $bank ${digits.split('').join(' ')}',
+                      excludeSemantics: true,
+                      child: Text(grouped,
+                          key: const Key('pay-va-number'),
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(
+                              fontSize: 24,
+                              fontWeight: FontWeight.w800,
+                              color: AppColors.navy,
+                              fontFeatures: [FontFeature.tabularFigures()]))),
+                if (digits != null && amount != null) ...[
+                  const SizedBox(height: AppSpacing.sm),
+                  Text(
+                      'Nominal tetap $amount. Jumlah yang dibayar harus sama persis.',
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                          fontSize: 12,
+                          height: 1.5,
+                          color: AppColors.textSecondary)),
+                ],
+              ]))),
+      if (digits != null)
+        _button('Salin Nomor VA', () => _copyVa(digits),
+            key: const Key('pay-va-copy'),
+            primary: false,
+            icon: PhosphorIconsRegular.copy),
       if (_feedback != null) ...[
         const SizedBox(height: AppSpacing.md),
         _live(_feedback!),
       ],
-      const SizedBox(height: AppSpacing.md),
-      _heading('Cara membayar'),
+      const SizedBox(height: AppSpacing.lg),
+      _heading('Cara pembayaran'),
       _steps([
         'Buka m-banking, internet banking, atau ATM $bank.',
         bank == 'BCA'
@@ -499,8 +1187,10 @@ class _BookingPaymentScreenState extends State<BookingPaymentScreen> {
             : 'Pilih Virtual Account Billing, lalu masukkan nomor di atas.',
         'Periksa nama dan nominal, lalu konfirmasi pembayaran.',
       ]),
-      _body(
-          'Pembayaran dikonfirmasi otomatis setelah diterima. Jangan membayar dua kali.'),
+      const SizedBox(height: AppSpacing.xs),
+      _noteBox(
+          'Pembayaran dikonfirmasi otomatis setelah diterima. Jangan membayar dua kali.',
+          warning: true),
     ]);
   }
 
@@ -508,6 +1198,8 @@ class _BookingPaymentScreenState extends State<BookingPaymentScreen> {
     final p = _payment;
     final png = p.qrPng;
     return _panel([
+      _caption('INSTRUKSI PEMBAYARAN'),
+      const SizedBox(height: AppSpacing.md),
       _heading('QR Pembayaran QRIS'),
       _body('Kode ini hanya untuk membayar, bukan tiket masuk.'),
       const SizedBox(height: AppSpacing.md),
@@ -584,9 +1276,10 @@ class _BookingPaymentScreenState extends State<BookingPaymentScreen> {
             'Tidak ada koneksi. Pembayaran Anda tidak terpengaruh; pemeriksaan dilanjutkan otomatis saat koneksi kembali.',
             key: const Key('pay-offline'),
             color: AppColors.warningText),
-      _button(p.checking ? 'Memeriksa status…' : 'Cek Status Pembayaran',
-          p.canCheckNow ? p.checkNow : null,
-          key: const Key('pay-check'), primary: false),
+      if (p.phase != PaymentPhase.awaiting)
+        _button(p.checking ? 'Memeriksa status…' : 'Cek Status Pembayaran',
+            p.canCheckNow ? p.checkNow : null,
+            key: const Key('pay-check'), primary: false),
       const Padding(
           padding: EdgeInsets.only(top: AppSpacing.sm),
           child: Text(
@@ -815,6 +1508,7 @@ class _BookingPaymentScreenState extends State<BookingPaymentScreen> {
         data: AppColors.visitorTheme,
         child: Scaffold(
             backgroundColor: AppColors.bg,
+            bottomNavigationBar: _dock(phase),
             body: SafeArea(
                 top: false,
                 child: RefreshIndicator(
@@ -906,7 +1600,7 @@ class _BookingPaymentScreenState extends State<BookingPaymentScreen> {
       if (p.error != null)
         _live(p.error!,
             key: const Key('pay-error'), color: const Color(0xFF9C493D)),
-      _summary(),
+      if (phase != PaymentPhase.awaiting) _summary(),
       if (phase == PaymentPhase.verifying &&
           s.attemptExpiresAt != null &&
           !s.verificationPending &&
@@ -918,8 +1612,6 @@ class _BookingPaymentScreenState extends State<BookingPaymentScreen> {
       else if (!p.chooserVisible)
         _inline(phase),
       if (pollable) _statusChecks(),
-      _button('Kembali ke Detail Booking', () => Navigator.maybePop(context),
-          primary: false),
     ]);
   }
 }
@@ -946,4 +1638,51 @@ String formatLongDate(String value) {
     'Desember',
   ];
   return '${date.day} ${months[date.month - 1]} ${date.year}';
+}
+
+/// Dashed rounded border for the empty/instruction placeholder box.
+class DashedBorderPainter extends CustomPainter {
+  const DashedBorderPainter(this.color);
+  final Color color;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final path = Path()
+      ..addRRect(RRect.fromRectAndRadius(
+          Offset.zero & size, const Radius.circular(18)));
+    final paint = Paint()
+      ..color = color
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.5;
+    for (final metric in path.computeMetrics()) {
+      var distance = 0.0;
+      while (distance < metric.length) {
+        canvas.drawPath(metric.extractPath(distance, distance + 6), paint);
+        distance += 10;
+      }
+    }
+  }
+
+  @override
+  bool shouldRepaint(DashedBorderPainter old) => old.color != color;
+}
+
+/// Horizontal dashed rule.
+class _DashedLinePainter extends CustomPainter {
+  const _DashedLinePainter(this.color);
+  final Color color;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = color
+      ..strokeWidth = 1.2;
+    for (var x = 0.0; x < size.width; x += 8) {
+      canvas.drawLine(
+          Offset(x, 0), Offset((x + 4).clamp(0, size.width), 0), paint);
+    }
+  }
+
+  @override
+  bool shouldRepaint(_DashedLinePainter old) => old.color != color;
 }

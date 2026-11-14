@@ -492,6 +492,19 @@ void main() {
     }
   }
 
+  /// "Lanjut Bayar" then "Lihat Instruksi" in the confirm sheet, when it opens.
+  Future<void> startPay(WidgetTester tester, {int times = 1}) async {
+    await tap(tester, start(), times: times);
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
+    final confirm = find.byKey(const Key('pay-confirm'));
+    if (confirm.evaluate().isNotEmpty) {
+      await tester.tap(confirm);
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 400));
+    }
+  }
+
   bool enabled(WidgetTester tester, Finder finder) =>
       tester.widget<ButtonStyleButton>(finder).onPressed != null;
 
@@ -584,7 +597,7 @@ void main() {
       await tap(tester, choice('virtual_account', 'bni'));
       await tester.pump();
       expect(enabled(tester, start()), isFalse);
-      await tap(tester, start());
+      await startPay(tester);
       await tester.pump();
       expect(server.createPosts, 0);
     });
@@ -596,9 +609,7 @@ void main() {
       await tap(tester, choice('qris', 'qris'));
       await tester.pump();
       expect(enabled(tester, start()), isTrue);
-      await tap(tester, start(), times: 2);
-      await tester.pump();
-      await tester.pump();
+      await startPay(tester, times: 2);
       await tester.pump();
       expect(server.createPosts, 1);
       expect(server.createBodies.single, {
@@ -622,7 +633,7 @@ void main() {
       await pumpScreen(tester);
       await tap(tester, choice('virtual_account', 'bni'));
       await tester.pump();
-      await tap(tester, start());
+      await startPay(tester);
       await tester.pump();
       await tester.pump();
       expect(server.createPosts, 1);
@@ -637,7 +648,7 @@ void main() {
       expect(server.createPosts, 1);
       await tap(tester, choice('virtual_account', 'bni'));
       await tester.pump();
-      await tap(tester, start());
+      await startPay(tester);
       await tester.pump();
       await tester.pump();
       expect(server.createPosts, 2);
@@ -651,7 +662,7 @@ void main() {
       await pumpScreen(tester);
       await tap(tester, choice('virtual_account', 'bni'));
       await tester.pump();
-      await tap(tester, start());
+      await startPay(tester);
       await tester.pump();
       await tester.pump();
       expect(server.createPosts, 1);
@@ -806,7 +817,7 @@ void main() {
     server.committedStatus = 'unknown';
     await pumpScreen(tester);
     await tap(tester, choice('virtual_account', 'bca'));
-    await tap(tester, start());
+    await startPay(tester);
     await tester.pump();
     final stored = await const FlutterSecureStorage().read(key: _operationKey);
     expect(stored, isNotNull);
@@ -1040,7 +1051,7 @@ void main() {
       await pumpScreen(tester);
       await tap(tester, choice('qris', 'qris'));
       await tester.pump();
-      await tap(tester, start());
+      await startPay(tester);
       await tester.pump();
       await tester.pump();
       expect(find.byKey(const Key('pay-qr-image')), findsOneWidget);
@@ -1062,7 +1073,7 @@ void main() {
       expect(server.createPosts, 0);
       await tap(tester, choice('virtual_account', 'bni'));
       await tester.pump();
-      await tap(tester, start(), times: 2);
+      await startPay(tester, times: 2);
       await tester.pump();
       await tester.pump();
       expect(server.createPosts, 1);
