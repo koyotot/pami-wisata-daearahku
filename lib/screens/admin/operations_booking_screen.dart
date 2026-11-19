@@ -300,7 +300,7 @@ class _OperationsBookingScreenState extends State<OperationsBookingScreen>
         'Claim aktif hingga ${formatDeadline(claim?.raw['expires_at'])}. '
             'Berlaku maksimal 15 menit, serta tetap tunduk pada batas persetujuan booking.',
       _BookingView.reassigned =>
-        'Penanganan ditujukan kepada $_reassignedName. Status aktual harus dikonfirmasi server.',
+        'Penanganan ditujukan kepada $_reassignedName. Periksa status terbaru untuk memastikan siapa yang menangani pendaftaran ini.',
       _ =>
         'Booking sedang ditinjau Admin lain hingga ${formatDeadline(claim?.raw['expires_at'])}. '
             'Batas persetujuan asli tidak berubah.',
@@ -347,8 +347,8 @@ class _OperationsBookingScreenState extends State<OperationsBookingScreen>
             icon: PhosphorIconsRegular.info,
             title: 'Booking sedang dalam claim Anda',
             body: _superadmin
-                ? 'Anda dapat menyetujui, menolak, melepaskan claim, atau mengalihkan penanganan. Server menentukan apakah claim masih valid.'
-                : 'Anda dapat menyetujui, menolak, atau melepaskan claim. Server menentukan apakah claim masih valid.'),
+                ? 'Selama Anda menangani pendaftaran ini, Anda dapat menyetujui, menolak, melepas, atau mengalihkan penanganannya.'
+                : 'Selama Anda menangani pendaftaran ini, Anda dapat menyetujui, menolak, atau melepas penanganannya.'),
         _BookingView.rejected => const _NoticeCard(
             tone: OperationsTone.red,
             icon: PhosphorIconsRegular.info,
@@ -421,7 +421,7 @@ class _OperationsBookingScreenState extends State<OperationsBookingScreen>
                       color: const Color(0xFFFFF0D6),
                       borderRadius: BorderRadius.circular(14)),
                   child: const Text(
-                      'Snapshot lama · belum tersinkron\nTarik turun sebelum melakukan tindakan.',
+                      'Data lama · belum tersinkron\nTarik turun sebelum melakukan tindakan.',
                       style: TextStyle(
                           fontSize: 13, height: 1.5, color: Color(0xFF795018))),
                 ),
@@ -616,7 +616,7 @@ class _OperationsBookingScreenState extends State<OperationsBookingScreen>
               ],
               const SizedBox(height: AppSpacing.lg),
               const Text(
-                  'Status yang ditampilkan mengikuti data server. Validasi persetujuan, kepemilikan claim, dan deadline tetap menjadi tanggung jawab backend.',
+                  'Persetujuan bergantung pada status pendaftaran, petugas yang menangani, dan batas waktu.',
                   style: TextStyle(
                       fontSize: 12,
                       height: 1.5,
@@ -995,7 +995,7 @@ class _BookingActionSheetState extends State<_BookingActionSheet> {
   }
 
   static const _serverCheck =
-      'Server akan memverifikasi status terbaru, kepemilikan claim, serta deadline sebelum tindakan diproses.';
+      'Status pendaftaran, petugas yang menangani, dan batas waktu akan diperiksa sebelum perubahan disimpan.';
 
   List<Widget> _content() {
     switch (_step) {

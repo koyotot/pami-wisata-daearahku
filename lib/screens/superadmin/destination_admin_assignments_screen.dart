@@ -174,7 +174,8 @@ class _DestinationAdminAssignmentsScreenState
       } catch (_) {
         failures.add(_destinations
             .firstWhere((d) => d.guid == guid,
-                orElse: () => Destination({'guid': guid, 'name': guid}))
+                orElse: () =>
+                    Destination({'guid': guid, 'name': 'Destinasi tanpa nama'}))
             .name);
       }
     }

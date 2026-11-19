@@ -362,7 +362,7 @@ class _OperationsReportScreenState extends State<OperationsReportScreen>
             widget.section == 'destinations' || widget.section == 'visitors'
                 ? 'Basis tanggal kunjungan · kalender lokal destinasi'
                 : widget.section == 'action-center'
-                    ? 'Prioritas operasional dari server'
+                    ? 'Prioritas operasional'
                     : 'Basis tanggal keputusan · UTC',
         embedded: widget.embedded,
         bottomBar: _manage && _role == 1 && widget.section == 'destinations'

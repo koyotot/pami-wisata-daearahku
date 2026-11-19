@@ -144,7 +144,7 @@ class _OperationsFinancialState extends State<OperationsFinancialScreen>
           scope['mode'] != (_role == 2 ? 'global' : 'assigned_destinations') ||
           scope['destination_guid'] != filters['destination_guid']) {
         throw const ApiException(
-            'Sumber atau scope data keuangan tidak sesuai. Muat ulang data.',
+            'Laporan yang diterima tidak sesuai dengan pilihan Anda. Muat ulang laporan.',
             null,
             'invalid_response');
       }
@@ -252,6 +252,27 @@ class _OperationsFinancialState extends State<OperationsFinancialScreen>
     return _superadminPage();
   }
 
+  Widget _sandboxNotice() => Container(
+      padding: const EdgeInsets.all(AppSpacing.md),
+      decoration: BoxDecoration(
+          color: AppColors.warningTint,
+          border: Border.all(color: AppColors.warningBorder),
+          borderRadius: BorderRadius.circular(AppSpacing.lg)),
+      child: const Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text('SANDBOX / TEST_ONLY',
+                style: TextStyle(
+                    fontSize: 13,
+                    height: 1.5,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.warningText)),
+            SizedBox(height: AppSpacing.sm),
+            Text('Laporan ini menampilkan pembayaran uji.',
+                style: TextStyle(
+                    fontSize: 12, height: 1.6, color: AppColors.warningText)),
+          ]));
+
   Widget _adminPage() {
     final financial = _financial;
     final period = financial?['period'];
@@ -294,7 +315,7 @@ class _OperationsFinancialState extends State<OperationsFinancialScreen>
                               ? 'Memuat data…'
                               : _receivedAt == null
                                   ? 'Data belum tersinkron'
-                                  : 'Snapshot · ${formatDateTime(_receivedAt!)}',
+                                  : 'Diperbarui · ${formatDateTime(_receivedAt!)}',
                           style: const TextStyle(
                               fontSize: 11, color: AppColors.textSecondary))),
                 ]),
@@ -303,30 +324,7 @@ class _OperationsFinancialState extends State<OperationsFinancialScreen>
                         fontSize: 11, color: AppColors.textSecondary)),
               ]),
           const SizedBox(height: AppSpacing.md),
-          Container(
-              padding: const EdgeInsets.all(AppSpacing.md),
-              decoration: BoxDecoration(
-                  color: AppColors.warningTint,
-                  border: Border.all(color: AppColors.warningBorder),
-                  borderRadius: BorderRadius.circular(AppSpacing.lg)),
-              child: const Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Text('DEMO / TEST_ONLY · Bukan uang nyata',
-                        style: TextStyle(
-                            fontSize: 13,
-                            height: 1.5,
-                            fontWeight: FontWeight.w700,
-                            color: AppColors.warningText)),
-                    SizedBox(height: AppSpacing.sm),
-                    Text(
-                        'Angka berasal dari simulasi pembayaran DEMO, '
-                        'bukan transaksi uang nyata atau settlement gateway.',
-                        style: TextStyle(
-                            fontSize: 12,
-                            height: 1.6,
-                            color: AppColors.warningText)),
-                  ])),
+          if (financial?['test_only'] == true) _sandboxNotice(),
           const SizedBox(height: AppSpacing.md),
           if (_loading)
             const OperationsSkeleton()
@@ -574,7 +572,7 @@ class _OperationsFinancialState extends State<OperationsFinancialScreen>
         child: OperationsPage(
             role: _role,
             title: 'Ringkasan Keuangan',
-            subtitle: 'Seluruh destinasi · scope global',
+            subtitle: 'Seluruh destinasi',
             embedded: false,
             onRefresh: _load,
             children: [
@@ -595,6 +593,7 @@ class _OperationsFinancialState extends State<OperationsFinancialScreen>
                 _errorBlock(_error!, _scopeError(_error) ? _filter : _load,
                     role: _role),
               if (!_loading && financial != null) ...[
+                if (financial['test_only'] == true) _sandboxNotice(),
                 if (!_available) ...[
                   _DashboardCard(
                       child: Column(
@@ -628,7 +627,11 @@ class _OperationsFinancialState extends State<OperationsFinancialScreen>
         'Pembayaran berhasil'
       ),
       ('Tiket terjual', _metric('tickets_sold'), 'Total tiket'),
-      ('Payment attempts', _metric('payment_attempts'), 'Percobaan pembayaran'),
+      (
+        'Percobaan pembayaran',
+        _metric('payment_attempts'),
+        'Percobaan pembayaran'
+      ),
       (
         'Gross collected',
         _metric('gross_collected', money: true),
@@ -637,8 +640,8 @@ class _OperationsFinancialState extends State<OperationsFinancialScreen>
     ];
     final unapplied = _number(financial['unapplied_collected']);
     final components = [
-      ('Gateway fees', 'gateway_fees'),
-      ('Net revenue', 'net_revenue'),
+      ('Biaya layanan pembayaran', 'gateway_fees'),
+      ('Pendapatan bersih', 'net_revenue'),
       ('Settlement', 'settlement'),
       ('Refund tercatat', 'refunds'),
     ];
@@ -768,7 +771,7 @@ class _OperationsFinancialState extends State<OperationsFinancialScreen>
         const SizedBox(height: AppSpacing.md),
         Text(
             _available && unapplied == 0
-                ? 'Angka Rp0 di sini memang tersedia pada snapshot. '
+                ? 'Laporan mencatat Rp0. '
                     'Metrik yang tidak tersedia tetap ditandai terpisah.'
                 : 'Metrik yang tidak tersedia ditandai terpisah dan tidak '
                     'dihitung sebagai Rp0.',
@@ -802,9 +805,9 @@ class _OperationsFinancialState extends State<OperationsFinancialScreen>
         const SizedBox(height: AppSpacing.sm),
         Text(
             missing
-                ? 'Tidak dihitung sebagai Rp0. Informasi biaya gateway, '
+                ? 'Tidak dihitung sebagai Rp0. Informasi biaya layanan pembayaran, '
                     'settlement, dan refund belum lengkap.'
-                : 'Seluruh komponen keuangan tersedia pada snapshot ini.',
+                : 'Seluruh komponen keuangan tersedia dalam laporan ini.',
             style: const TextStyle(
                 fontSize: 12, height: 1.6, color: Color(0xFF526787))),
       ])),
@@ -815,8 +818,8 @@ class _OperationsFinancialState extends State<OperationsFinancialScreen>
     final reason = financial['reason'];
     final missingFields = financial['missing_fields'];
     final rows = [
-      ('Lingkungan snapshot', _financialCap('${financial['environment']}')),
-      ('Provider', '${financial['provider'] ?? '—'}'),
+      ('Lingkungan pembayaran', _financialCap('${financial['environment']}')),
+      ('Penyedia pembayaran', '${financial['provider'] ?? '—'}'),
       ('Label', '${financial['label'] ?? '—'}'),
       ('Sumber', _financialSourceLabel(financial['source'])),
       (
@@ -889,11 +892,11 @@ class _OperationsFinancialState extends State<OperationsFinancialScreen>
           'Evaluasi performa proses pembayaran dan konversi.'),
       const SizedBox(height: AppSpacing.lg),
       _conversionCard(
-          'Konversi per attempt',
+          'Konversi per percobaan pembayaran',
           attempt,
           'successful_attempts',
           'completed_attempts',
-          'Attempts sukses / selesai',
+          'Percobaan berhasil / selesai',
           'Persentase percobaan pembayaran yang berhasil dari seluruh '
               'percobaan yang sudah selesai.'),
       const SizedBox(height: AppSpacing.md),
@@ -955,8 +958,8 @@ class _OperationsFinancialState extends State<OperationsFinancialScreen>
                 ? 'Basis tanggal: Belum Tersedia.'
                 : 'Basis tanggal: ${_financialDateBasisLabel(conversion['date_basis'])}.',
             if (conversion['denominator_scope'] != null)
-              'Pembagi: booking yang disetujui dan memiliki intent pada '
-                  'environment ini.',
+              'Pembagi: pendaftaran yang disetujui dan memiliki tagihan pada '
+                  'lingkungan pembayaran ini.',
           ].join(' '),
           style: const TextStyle(
               fontSize: 12, height: 1.6, color: Color(0xFF526787))),
@@ -977,7 +980,7 @@ class _OperationsFinancialState extends State<OperationsFinancialScreen>
             Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
       _financeCardHeader('Percobaan Pembayaran',
           trailing: _available && total != null
-              ? Text('${_financialNumber(total)} attempts',
+              ? Text('${_financialNumber(total)} percobaan',
                   style:
                       const TextStyle(fontSize: 12, color: Color(0xFF526787)))
               : null),
@@ -1140,7 +1143,7 @@ class _OperationsFinancialState extends State<OperationsFinancialScreen>
       const SizedBox(height: AppSpacing.sm),
       Text(
           'Channel: $method - $channel.'
-          '${single ? ' Seluruh nominal yang teridentifikasi pada snapshot berasal dari channel ini.' : ''}',
+          '${single ? ' Seluruh nominal yang teridentifikasi dalam laporan berasal dari metode ini.' : ''}',
           style: const TextStyle(
               fontSize: 12, height: 1.6, color: Color(0xFF526787))),
     ]);
@@ -1412,15 +1415,14 @@ String _financialMoney(dynamic value) {
       : 'Rp${_financialNumber(number)}';
 }
 
-// Operational wording for server codes. Unknown codes are shown as received
-// rather than guessed, so a new backend value is never mislabelled.
+// Operational wording for report metadata.
 
 String _financialSourceLabel(dynamic source) => switch (source) {
       'simulated_demo_events' => 'Simulasi DEMO',
       'verified_sandbox_events' => 'Pembayaran sandbox terverifikasi',
       'verified_production_events' => 'Pembayaran produksi terverifikasi',
       null || 'unavailable' => 'Belum tersedia',
-      _ => '$source',
+      _ => 'Sumber belum dikenali',
     };
 
 String _financialAvailabilityLabel(dynamic availability) =>
@@ -1439,17 +1441,17 @@ String _financialDateBasisLabel(dynamic basis) => switch (basis) {
       'refund_utc' => 'tanggal refund (UTC)',
       'verified_receipts' => 'bukti refund terverifikasi',
       null => '—',
-      _ => '$basis',
+      _ => 'Dasar tanggal belum diketahui',
     };
 
 /// Names of server fields that are not available yet.
 String _financialFieldLabel(dynamic field) => switch (field) {
       'verified_capture_source' => 'sumber pembayaran terverifikasi',
-      'gateway_fees' => 'biaya gateway',
-      'net_revenue' => 'net revenue',
+      'gateway_fees' => 'biaya layanan pembayaran',
+      'net_revenue' => 'pendapatan bersih',
       'settlement' => 'settlement',
       'refunds' => 'refund',
-      _ => '$field',
+      _ => 'Komponen lain',
     };
 
 /// `Sumber · kelengkapan`, said once when both mean "not available".
@@ -1466,9 +1468,9 @@ String _financialReason(dynamic reason) => switch (reason) {
       'no_verified_payment_source' =>
         'Belum ada pembayaran terverifikasi untuk lingkungan dan cakupan ini.',
       'fees_and_refunds_unavailable' =>
-        'Data tersedia sebagian. Biaya gateway, net, settlement, dan kelengkapan refund belum tersedia.',
+        'Data tersedia sebagian. Biaya layanan pembayaran, pendapatan bersih, pencairan dana, dan kelengkapan refund belum tersedia.',
       'fees_unavailable_refunds_incomplete' =>
-        'Data tersedia sebagian. Refund tercatat belum membuktikan kelengkapan; biaya gateway, net, dan settlement belum tersedia.',
+        'Data tersedia sebagian. Refund tercatat belum membuktikan kelengkapan; biaya layanan pembayaran, net, dan settlement belum tersedia.',
       null => 'Sumber pembayaran belum tersedia.',
-      _ => 'Keterangan sumber: $reason',
+      _ => 'Keterangan sumber belum tersedia.',
     };

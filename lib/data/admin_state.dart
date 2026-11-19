@@ -455,7 +455,7 @@ class AdminBookingDecider extends InFlightGuard {
         'awaiting_payment' =>
           'Pendaftaran disetujui. Status: Menunggu pembayaran.',
         'rejected' => 'Pendaftaran ditolak. Status: Ditolak.',
-        _ => 'Status dari server: ${bookingStatusLabel(status)}.',
+        _ => 'Status terakhir: ${bookingStatusLabel(status)}.',
       };
 
   Future<BookingDecisionResult> _reconcile(String guid, ApiException e) async {
@@ -485,9 +485,9 @@ class AdminBookingDecider extends InFlightGuard {
       return BookingDecisionResult(
           DecisionKind.reconciled,
           status == 'pending_approval'
-              ? 'Keputusan belum terkonfirmasi: status di server masih '
+              ? 'Keputusan belum terkonfirmasi: status pendaftaran masih '
                   'Menunggu. Periksa kembali sebelum mengulang.'
-              : 'Status terkini dari server: ${bookingStatusLabel(status)}.',
+              : 'Status terkini: ${bookingStatusLabel(status)}.',
           current);
     }
     final status = current?.status ?? e.context?['status'] as String?;
@@ -593,6 +593,5 @@ Duration? destinationZoneOffset(String? zone) => switch (zone) {
     };
 
 /// [instant] in the destination's own zone (WIB/WITA/WIT); the device zone only when the destination zone is unknown.
-String formatInstantInZone(DateTime instant, String? zone) =>
-    formatInstantAt(instant,
-        destinationZoneOffset(zone) ?? instant.toLocal().timeZoneOffset);
+String formatInstantInZone(DateTime instant, String? zone) => formatInstantAt(
+    instant, destinationZoneOffset(zone) ?? instant.toLocal().timeZoneOffset);

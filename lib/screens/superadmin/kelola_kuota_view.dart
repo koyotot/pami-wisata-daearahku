@@ -894,7 +894,7 @@ class _DetailSheet extends StatelessWidget {
           const Divider(height: 1, color: AppColors.border),
           const SizedBox(height: AppSpacing.lg),
           _notice(
-              'Perubahan kuota harus menjaga seluruh alokasi yang sudah terpakai. Status booking dan batas tanggal tetap harus diverifikasi oleh backend.'),
+              'Perubahan kuota harus menjaga seluruh alokasi yang sudah terpakai. Status pendaftaran dan batas tanggal akan diperiksa saat perubahan disimpan.'),
           const SizedBox(height: AppSpacing.lg),
           Row(children: [
             Expanded(

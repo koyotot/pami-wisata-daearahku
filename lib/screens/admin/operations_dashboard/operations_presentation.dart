@@ -251,7 +251,7 @@ class OperationsUnavailableScreen extends StatelessWidget {
                                 color: AppColors.blue,
                                 size: 33)),
                         const SizedBox(height: AppSpacing.xl),
-                        const Text('Audit Timeline Belum Tersedia',
+                        const Text('Riwayat audit',
                             textAlign: TextAlign.center,
                             style: TextStyle(
                                 fontSize: 20,
@@ -259,8 +259,7 @@ class OperationsUnavailableScreen extends StatelessWidget {
                                 color: AppColors.navy)),
                         const SizedBox(height: AppSpacing.md),
                         const Text(
-                            'Riwayat aktivitas global belum tersedia. '
-                            'Data audit akan tampil setelah layanan tersedia.',
+                            'Riwayat aktivitas global belum tersedia.',
                             textAlign: TextAlign.center,
                             style: TextStyle(
                                 fontSize: 13,
@@ -298,7 +297,7 @@ class FinancialUnavailablePanel extends StatelessWidget {
                       color: AppColors.navy))),
         ]),
         const SizedBox(height: AppSpacing.md),
-        const Text('Gateway pembayaran belum terhubung',
+        const Text('Data keuangan belum tersedia untuk laporan ini.',
             style: TextStyle(fontSize: 13, color: Color(0xFF526787))),
         const SizedBox(height: AppSpacing.md),
         for (final label in [

@@ -219,7 +219,7 @@ class _OperationsFiltersState extends State<_OperationsFilters> {
                 const SizedBox(height: AppSpacing.sm),
                 Text(
                     widget.financial
-                        ? 'Periode UTC, maksimal 366 hari inklusif. Scope mengikuti akses Anda.'
+                        ? 'Periode UTC, maksimal 366 hari inklusif. Pilihan destinasi mengikuti hak akses Anda.'
                         : 'Sesuaikan destinasi dan periode operasional.',
                     style: const TextStyle(
                         fontSize: 13, height: 1.5, color: Color(0xFF526787))),
@@ -509,7 +509,7 @@ class _OperationsFiltersState extends State<_OperationsFilters> {
                         title: 'Filter destinasi & periode',
                         subtitle: widget.financial
                             ? 'Periode UTC · maksimal 366 hari inklusif'
-                            : 'Scope mengikuti penugasan. Tanggal mengikuti basis laporan.'),
+                            : 'Pilih destinasi yang Anda tangani dan periode laporan.'),
                     const SizedBox(height: AppSpacing.xl),
                     const Text('Destinasi',
                         style: TextStyle(fontWeight: FontWeight.w700)),

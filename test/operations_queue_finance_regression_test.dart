@@ -50,9 +50,12 @@ void main() {
               body: OperationsFinancialScreen(
                   repository: repositoryFor(session), session: session))));
       await tester.pumpAndSettle();
-      await _tap(tester, find.text('Sandbox'));
-      final invalid =
-          find.textContaining('Sumber atau scope data keuangan tidak sesuai');
+      expect(
+          find.text('SANDBOX / TEST_ONLY'),
+          ['doku', 'midtrans', 'mixed'].contains(provider)
+              ? findsOneWidget
+              : findsNothing);
+      final invalid = find.textContaining('Laporan yang diterima tidak sesuai');
       expect(
           invalid,
           ['doku', 'midtrans', 'mixed'].contains(provider)
@@ -228,8 +231,7 @@ void main() {
       expect(requests.single.url.queryParameters['environment'], 'demo');
       expect(find.text('DEMO / TEST_ONLY · Bukan uang nyata'), findsOneWidget);
       if (foreignScope) {
-        expect(
-            find.textContaining('Sumber atau scope data keuangan tidak sesuai'),
+        expect(find.textContaining('Laporan yang diterima tidak sesuai'),
             findsOneWidget);
         expect(find.text('Gross tercatat'), findsNothing);
       } else {

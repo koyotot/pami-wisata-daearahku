@@ -222,7 +222,7 @@ class ApprovalDetailState extends ChangeNotifier {
       claim = result;
       uncertain = false;
       _key = null;
-      message = 'Status claim dikonfirmasi server.';
+      message = 'Status penanganan telah dikonfirmasi.';
       operationsDataChanges.value++;
     } catch (e) {
       if (!valid) return;

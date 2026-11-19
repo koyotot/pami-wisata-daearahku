@@ -138,7 +138,7 @@ class DestinationFacilitiesState extends ChangeNotifier {
       if (!setEquals(desired, actual)) {
         selected = desired;
         failure ??= const ApiException(
-            'Pilihan fasilitas belum tersimpan sesuai data server. Periksa pilihan lalu simpan kembali.');
+            'Pilihan fasilitas yang tersimpan berbeda. Periksa pilihan lalu simpan kembali.');
       } else {
         selected = actual;
         failure = null;

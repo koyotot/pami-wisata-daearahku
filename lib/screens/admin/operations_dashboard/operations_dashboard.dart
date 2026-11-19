@@ -683,7 +683,7 @@ class _OperationsDashboardState extends State<OperationsDashboard>
                                               : _personal
                                                   ? null
                                                   : [
-                                                      'Snapshot saat ini',
+                                                      'Data terkini',
                                                       _role == 2
                                                           ? 'Seluruh destinasi'
                                                           : 'Dalam penugasan',
@@ -853,7 +853,7 @@ class OperationsAnalyticsHub extends StatelessWidget {
   @override
   Widget build(BuildContext context) => OperationsPage(
           title: 'Analitik',
-          subtitle: 'Perbandingan berbasis data Laravel',
+          subtitle: 'Bandingkan destinasi, kinerja admin, dan kunjungan',
           children: [
             for (final entry in [
               (
