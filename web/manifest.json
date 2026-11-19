@@ -1,11 +1,11 @@
 {
-    "name": "wisata_daerahku",
-    "short_name": "wisata_daerahku",
+    "name": "Wisata Daerahku",
+    "short_name": "Wisata Daerahku",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",
     "theme_color": "#0175C2",
-    "description": "A new Flutter project.",
+    "description": "Temukan destinasi wisata, daftarkan kunjungan, dan lihat tiket Anda.",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [
