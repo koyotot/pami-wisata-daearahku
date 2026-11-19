@@ -271,7 +271,7 @@ class _BerandaUserScreenState extends State<BerandaUserScreen>
                                     _loading('Memuat inspirasi…',
                                         minHeight: 210)
                                   else if ((_inspiration.data ?? []).isEmpty)
-                                    Text('Destinasi baru akan hadir di sini.',
+                                    Text('Belum ada destinasi untuk ditampilkan.',
                                         style: _text(14,
                                             color: AppColors.textMuted))
                                   else

@@ -354,7 +354,8 @@ class _DaftarKunjunganScreenState extends State<DaftarKunjunganScreen>
     final user = currentUser;
     if (user == null || !user.isLaravel || !widget.wisata.isLaravel) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-          content: Text('Pendaftaran memerlukan akun dan destinasi Laravel.')));
+          content: Text(
+              'Masuk ke akun Anda dan pilih kembali destinasi untuk mendaftar.')));
       return;
     }
     // An unresolved earlier attempt blocks a new one until it is checked or abandoned.
@@ -463,14 +464,14 @@ class _DaftarKunjunganScreenState extends State<DaftarKunjunganScreen>
           setState(() {
             _resolution = result;
             _intentMessage = replaySafe
-                ? 'Server belum menerima pendaftaran sebelumnya. Anda dapat mengirim ulang dengan data yang sama, atau membatalkan percobaan.'
+                ? 'Pendaftaran sebelumnya belum diterima. Anda dapat mengirim ulang dengan data yang sama, atau membatalkan percobaan.'
                 : 'Pendaftaran sebelumnya tidak dapat dikirim ulang. Batalkan percobaan tersebut.';
           });
         case IntentUnusable():
           setState(() {
             _resolution = result;
             _intentMessage =
-                'Percobaan sebelumnya sudah ditutup di server dan tidak dapat dikirim ulang. Batalkan percobaan untuk membersihkannya.';
+                'Percobaan sebelumnya sudah ditutup dan tidak dapat dikirim ulang. Batalkan percobaan untuk membersihkannya.';
           });
         case IntentNone() || IntentAbandoned():
           setState(() {

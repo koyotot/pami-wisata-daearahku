@@ -167,12 +167,11 @@ class _TicketLinkScreenState extends State<TicketLinkScreen> {
               'ticket-link-resolving',
               PhosphorIconsRegular.hourglassHigh,
               'Memuat Tiket',
-              'Kami sedang memeriksa tiket Anda ke server. Mohon tunggu.',
-              const [
-                Padding(
-                    padding: EdgeInsets.only(top: AppSpacing.lg),
-                    child: LinearProgressIndicator())
-              ]),
+              'Sedang memeriksa tiket Anda.', const [
+            Padding(
+                padding: EdgeInsets.only(top: AppSpacing.lg),
+                child: LinearProgressIndicator())
+          ]),
         _LinkState.needsLogin => _panel(
               'ticket-link-needs-login',
               PhosphorIconsRegular.lock,

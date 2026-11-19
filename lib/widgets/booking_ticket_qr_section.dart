@@ -339,7 +339,7 @@ class _BookingTicketQrSectionState extends State<BookingTicketQrSection>
                             style: _text(14, FontWeight.w800)),
                         if (selected.checkedInAt != null) ...[
                           const SizedBox(height: AppSpacing.xs),
-                          Text('Waktu server: ${selected.checkedInAt}',
+                          Text('Waktu check-in: ${selected.checkedInAt}',
                               textAlign: TextAlign.center,
                               style: _text(12, FontWeight.w500,
                                   color: AppColors.textSecondary)),

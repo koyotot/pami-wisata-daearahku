@@ -84,8 +84,7 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text('Hapus Akun'));
     await tester.pumpAndSettle();
-    expect(
-        find.text('Fitur ini belum tersedia untuk akun API.'), findsOneWidget);
+    expect(find.text('Penghapusan akun belum tersedia.'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 

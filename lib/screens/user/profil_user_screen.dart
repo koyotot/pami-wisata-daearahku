@@ -201,7 +201,7 @@ class _ProfilUserScreenState extends State<ProfilUserScreen>
       if (context.mounted)
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
             content: Text(
-                'Sesi lokal dihapus. Pencabutan sesi server belum dapat dikonfirmasi.')));
+                'Anda sudah keluar di perangkat ini. Pengakhiran sesi akun belum dapat dipastikan.')));
     }
     if (AuthSession.instance.sessionGeneration != generation + 1 ||
         AuthSession.instance.authenticated.value) return;
@@ -276,7 +276,7 @@ class _ProfilUserScreenState extends State<ProfilUserScreen>
 
   void _bukaGantiPassword(BuildContext context) {
     ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-        content: Text('Fitur ini belum tersedia untuk akun API.')));
+        content: Text('Perubahan kata sandi belum tersedia di profil.')));
   }
 
   @override
@@ -449,8 +449,7 @@ class _ProfilUserScreenState extends State<ProfilUserScreen>
                                                         .key,
                                                     iconColor: _C.blue,
                                                     title: 'Ubah Password',
-                                                    subtitle:
-                                                        'Belum tersedia untuk akun API',
+                                                    subtitle: 'Belum tersedia',
                                                     onTap: () =>
                                                         _bukaGantiPassword(
                                                             context),
@@ -483,8 +482,7 @@ class _ProfilUserScreenState extends State<ProfilUserScreen>
                                                         .trash,
                                                     iconColor: _C.danger,
                                                     title: 'Hapus Akun',
-                                                    subtitle:
-                                                        'Belum tersedia untuk akun API',
+                                                    subtitle: 'Belum tersedia',
                                                     onTap: () =>
                                                         _konfirmasiHapusAkun(
                                                             context),
@@ -926,8 +924,8 @@ class _ProfilUserScreenState extends State<ProfilUserScreen>
   }
 
   void _konfirmasiHapusAkun(BuildContext context) {
-    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-        content: Text('Fitur ini belum tersedia untuk akun API.')));
+    ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Penghapusan akun belum tersedia.')));
   }
 
   Widget _buildLogoutButton(BuildContext context) {
