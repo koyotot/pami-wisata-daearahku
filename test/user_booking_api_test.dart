@@ -4,6 +4,7 @@ import 'dart:typed_data';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:wisata_daerahku/data/booking_state.dart';
+import 'package:wisata_daerahku/data/business_repository.dart';
 import 'package:wisata_daerahku/services/auth_session.dart';
 
 import 'user_support.dart';
@@ -60,6 +61,58 @@ void main() {
     expect(requests.single.headers['Authorization'], 'Bearer access');
     expect(booking.status, 'cancelled');
     expect(booking.cancellable, isFalse);
+  });
+
+  test('booking parses the countdown fields; a null deadline stays null', () {
+    final started = Booking({
+      ...bookingJson(status: 'awaiting_payment'),
+      'payment_started_at': '2026-11-14T08:00:00Z',
+      'payment_expires_at': '2026-11-14T08:15:00Z',
+      'payment_selection_expires_at': '2026-11-15T08:00:00Z',
+    });
+    expect(started.paymentStartedAt, DateTime.utc(2026, 11, 14, 8));
+    expect(started.paymentExpiresAt, DateTime.utc(2026, 11, 14, 8, 15));
+    expect(started.paymentSelectionExpiresAt, DateTime.utc(2026, 11, 15, 8));
+    final notStarted = Booking({
+      ...bookingJson(status: 'awaiting_payment'),
+      'payment_started_at': null,
+      'payment_expires_at': null,
+      'payment_selection_expires_at': '2026-11-15T08:00:00Z',
+    });
+    expect(notStarted.paymentStartedAt, isNull);
+    expect(notStarted.paymentExpiresAt, isNull);
+    expect(notStarted.paymentSelectionExpiresAt, isNotNull);
+  });
+
+  test('cancelPaymentAttempt POSTs the attempt cancel path with no body or key',
+      () async {
+    final requests = <http.Request>[];
+    final session = await signedInSession((request) async {
+      requests.add(request);
+      return jsonResponse({
+        'data': {
+          'booking_guid': 'booking-1',
+          'amount': 20000,
+          'currency': 'IDR',
+          'status': 'failed',
+          'expires_at': null,
+          'selection_expires_at': '2026-11-15T08:00:00Z',
+          'can_create': true,
+          'last_attempt': {'attempt_guid': 'att-1', 'status': 'failed'},
+        }
+      });
+    });
+    final snapshot = await repositoryFor(session)
+        .cancelPaymentAttempt('booking-1', 'att-1');
+    expect(requests.single.method, 'POST');
+    expect(requests.single.url.path,
+        '/api/v1/bookings/booking-1/payment-attempts/att-1/cancel');
+    expect(requests.single.headers['Authorization'], 'Bearer access');
+    expect(requests.single.headers.containsKey('Idempotency-Key'), isFalse);
+    expect(snapshot.attemptStatus, 'failed');
+    expect(snapshot.canCreate, isTrue);
+    expect(snapshot.bookingExpiresAt, isNull);
+    expect(snapshot.selectionExpiresAt, DateTime.utc(2026, 11, 15, 8));
   });
 
   test('booking-intent reconcile and abandon use the key path with Bearer',

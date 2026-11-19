@@ -51,14 +51,14 @@ class OperationsFilterBar extends StatelessWidget {
                     backgroundColor: AppColors.surface,
                     minimumSize: const Size(48, 48),
                     padding: const EdgeInsets.symmetric(
-                        horizontal: 12, vertical: 12),
+                        horizontal: AppSpacing.md, vertical: AppSpacing.md),
                     side: const BorderSide(color: AppColors.border),
                     shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12))),
                 child: Row(children: [
                   const Icon(PhosphorIconsRegular.mapPin,
                       size: 16, color: AppColors.blue),
-                  const SizedBox(width: 8),
+                  const SizedBox(width: AppSpacing.sm),
                   Expanded(
                       child: Text(
                           filters['destination_guid'] == null
@@ -67,11 +67,11 @@ class OperationsFilterBar extends StatelessWidget {
                           textAlign: TextAlign.center,
                           style: const TextStyle(
                               fontSize: 12, fontWeight: FontWeight.w600))),
-                  const SizedBox(width: 8),
+                  const SizedBox(width: AppSpacing.sm),
                   const Icon(PhosphorIconsRegular.caretDown,
                       size: 16, color: AppColors.blue),
                 ]))),
-        const SizedBox(width: 8),
+        const SizedBox(width: AppSpacing.sm),
         Expanded(
             child: Tooltip(
                 message: dateTooltip,
@@ -81,12 +81,15 @@ class OperationsFilterBar extends StatelessWidget {
                     style: TextButton.styleFrom(
                         foregroundColor: AppColors.navy,
                         minimumSize: const Size(48, 48),
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12)),
                         padding: const EdgeInsets.symmetric(
-                            horizontal: 8, vertical: 12)),
+                            horizontal: AppSpacing.sm,
+                            vertical: AppSpacing.md)),
                     child: Row(children: [
                       const Icon(PhosphorIconsRegular.calendarBlank,
                           size: 16, color: AppColors.blue),
-                      const SizedBox(width: 8),
+                      const SizedBox(width: AppSpacing.sm),
                       Expanded(
                           child: Text(_dateLabel,
                               textAlign: TextAlign.end,
@@ -102,10 +105,9 @@ class OperationsTheme extends StatelessWidget {
   final int? role;
 
   @override
-  Widget build(BuildContext context) =>
-      role == 1 || role == 2
-          ? Theme(data: AppColors.operationsTheme, child: child)
-          : child;
+  Widget build(BuildContext context) => role == 1 || role == 2
+      ? Theme(data: AppColors.operationsTheme, child: child)
+      : child;
 }
 
 class OperationsScenicHeader extends StatelessWidget {
@@ -125,7 +127,8 @@ class OperationsScenicHeader extends StatelessWidget {
         child: SafeArea(
             bottom: false,
             child: Padding(
-                padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
+                padding: const EdgeInsets.fromLTRB(
+                    AppSpacing.lg, AppSpacing.sm, AppSpacing.lg, 32),
                 child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
@@ -137,7 +140,7 @@ class OperationsScenicHeader extends StatelessWidget {
                               height: 48,
                               child: Icon(PhosphorIconsRegular.mountains,
                                   color: Colors.white)),
-                        const SizedBox(width: 8),
+                        const SizedBox(width: AppSpacing.sm),
                         const Expanded(
                             child: Text('Wisata Daerahku · Admin',
                                 style: TextStyle(
@@ -151,14 +154,14 @@ class OperationsScenicHeader extends StatelessWidget {
                                     minimumSize: const Size(48, 48))),
                             child: action)),
                       ]),
-                      const SizedBox(height: 12),
+                      const SizedBox(height: AppSpacing.md),
                       Text(title,
                           style: const TextStyle(
-                              fontSize: 24,
+                              fontSize: 22,
                               height: 1.25,
                               fontWeight: FontWeight.w800,
                               color: Colors.white)),
-                      const SizedBox(height: 8),
+                      const SizedBox(height: AppSpacing.sm),
                       Text(subtitle,
                           style: const TextStyle(
                               fontSize: 13, height: 1.5, color: Colors.white)),
@@ -189,7 +192,8 @@ class OperationsDayHeader extends StatelessWidget {
           child: SafeArea(
               bottom: false,
               child: Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 38),
+                  padding: const EdgeInsets.fromLTRB(
+                      AppSpacing.lg, AppSpacing.sm, AppSpacing.lg, 38),
                   child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
@@ -199,7 +203,7 @@ class OperationsDayHeader extends StatelessWidget {
                           else ...[
                             const Icon(PhosphorIconsRegular.mountains,
                                 color: Colors.white, size: 22),
-                            const SizedBox(width: 8),
+                            const SizedBox(width: AppSpacing.sm),
                           ],
                           Expanded(
                               child: Text(label,
@@ -215,15 +219,15 @@ class OperationsDayHeader extends StatelessWidget {
                                         minimumSize: const Size(48, 48))),
                                 child: action),
                         ]),
-                        const SizedBox(height: 10),
+                        const SizedBox(height: AppSpacing.sm),
                         Text(title,
                             style: const TextStyle(
-                                fontSize: 24,
+                                fontSize: 22,
                                 height: 1.2,
                                 fontWeight: FontWeight.w800,
                                 letterSpacing: -.6,
                                 color: Colors.white)),
-                        const SizedBox(height: 6),
+                        const SizedBox(height: AppSpacing.sm),
                         Text(subtitle,
                             style: const TextStyle(
                                 fontSize: 12,

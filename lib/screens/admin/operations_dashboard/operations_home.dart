@@ -65,7 +65,7 @@ class _AdminApprovalPerformance extends StatelessWidget {
             const Text('Performa approval',
                 style: TextStyle(
                     fontSize: 16,
-                    fontWeight: FontWeight.w700,
+                    fontWeight: FontWeight.w800,
                     color: AppColors.navy)),
             Container(
                 padding: const EdgeInsets.symmetric(
@@ -75,7 +75,7 @@ class _AdminApprovalPerformance extends StatelessWidget {
                     borderRadius: BorderRadius.circular(12)),
                 child: const Text('SLA 24 jam',
                     style: TextStyle(
-                        fontSize: 10,
+                        fontSize: 11,
                         fontWeight: FontWeight.w700,
                         color: AppColors.success))),
           ]),
@@ -268,7 +268,7 @@ class _HomeLinkCard extends StatelessWidget {
                         children: [
                       Text(title,
                           style: const TextStyle(
-                              fontSize: 15,
+                              fontSize: 16,
                               fontWeight: FontWeight.w800,
                               color: AppColors.navy)),
                       const SizedBox(height: AppSpacing.xs),

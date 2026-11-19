@@ -86,6 +86,28 @@ class NotificationState extends ChangeNotifier {
     await refresh();
   }
 
+  Future<void> markAllRead() async {
+    if (!_allowed) return;
+    final generation = api.session.sessionGeneration;
+    final items = inbox.data?.where((item) => item.unread).toList() ??
+        const <InboxItem>[];
+    if (items.isEmpty) return;
+    try {
+      // shortcut: one read request per item; use a bulk endpoint when the API provides one.
+      for (final item in items) {
+        if (_disposed ||
+            !_allowed ||
+            !api.session.isCurrentGeneration(generation)) return;
+        await api.object(
+            'PATCH', 'notifications/${Uri.encodeComponent(item.guid)}/read',
+            authenticated: true);
+      }
+    } finally {
+      if (!_disposed && _allowed && api.session.isCurrentGeneration(generation))
+        await refresh();
+    }
+  }
+
   @override
   void dispose() {
     _disposed = true;

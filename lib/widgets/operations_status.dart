@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../theme/app_colors.dart';
 
 /// Status palette shared by operational badges and notice cards.
 enum OperationsTone { orange, blue, red, grey, green }
@@ -17,9 +18,9 @@ enum OperationsTone { orange, blue, red, grey, green }
           fg: const Color(0xFF1558B0)
         ),
       OperationsTone.red => (
-          bg: const Color(0xFFFDECEC),
-          border: const Color(0xFFF3C9C9),
-          fg: const Color(0xFFB23B3B)
+          bg: AppColors.dangerTint,
+          border: AppColors.dangerBorder,
+          fg: AppColors.danger
         ),
       OperationsTone.green => (
           bg: const Color(0xFFE6F6EC),
@@ -46,7 +47,8 @@ class OperationsStatusBadge extends StatelessWidget {
     final c = operationsToneColors(tone);
     return Container(
         padding: EdgeInsets.symmetric(
-            horizontal: small ? 10 : 12, vertical: small ? 5 : 7),
+            horizontal: small ? AppSpacing.sm : AppSpacing.md,
+            vertical: small ? AppSpacing.xs : AppSpacing.sm),
         decoration: BoxDecoration(
             color: c.bg,
             border: Border.all(color: c.border),
@@ -57,7 +59,7 @@ class OperationsStatusBadge extends StatelessWidget {
                 width: 6,
                 height: 6,
                 decoration: BoxDecoration(color: c.fg, shape: BoxShape.circle)),
-            const SizedBox(width: 6),
+            const SizedBox(width: AppSpacing.sm),
           ],
           Text(label,
               style: TextStyle(

@@ -61,59 +61,6 @@ class _DashboardHero extends StatelessWidget {
             ]);
 }
 
-class _ScopeCard extends StatelessWidget {
-  const _ScopeCard(
-      {required this.label,
-      required this.detail,
-      this.onTap,
-      this.executive = false});
-  final String label;
-  final String detail;
-  final VoidCallback? onTap;
-  final bool executive;
-  @override
-  Widget build(BuildContext context) => Material(
-      color: Colors.white,
-      shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(14),
-          side: const BorderSide(color: AppColors.border)),
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-          onTap: onTap,
-          child: Padding(
-              padding: const EdgeInsets.all(12),
-              child: Row(children: [
-                Icon(
-                    executive
-                        ? PhosphorIconsRegular.buildings
-                        : PhosphorIconsRegular.mapPin,
-                    color: AppColors.blue,
-                    size: 22),
-                const SizedBox(width: 10),
-                Expanded(
-                    child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                      Text(label,
-                          style: const TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w700,
-                              color: AppColors.navy)),
-                      const SizedBox(height: 3),
-                      Text(detail,
-                          style: const TextStyle(
-                              fontSize: 12,
-                              height: 1.4,
-                              color: Color(0xFF526787))),
-                    ])),
-                if (onTap != null) ...[
-                  const SizedBox(width: 8),
-                  const Icon(PhosphorIconsRegular.caretDown,
-                      color: AppColors.blue, size: 22),
-                ]
-              ]))));
-}
-
 class _DashboardCard extends StatelessWidget {
   const _DashboardCard({required this.child});
   final Widget child;
@@ -123,7 +70,8 @@ class _DashboardCard extends StatelessWidget {
       shape: RoundedRectangleBorder(
           side: const BorderSide(color: AppColors.border),
           borderRadius: BorderRadius.circular(17)),
-      child: Padding(padding: const EdgeInsets.all(16), child: child));
+      child:
+          Padding(padding: const EdgeInsets.all(AppSpacing.lg), child: child));
 }
 
 class _DashboardActionCenter extends StatelessWidget {
@@ -147,7 +95,7 @@ class _DashboardActionCenter extends StatelessWidget {
           key: const ValueKey('executive-attention-card'),
           onTap: onOpen,
           child: Padding(
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsets.all(AppSpacing.lg),
               child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
@@ -160,28 +108,28 @@ class _DashboardActionCenter extends StatelessWidget {
                               borderRadius: BorderRadius.circular(14)),
                           child: const Icon(PhosphorIconsRegular.clipboardText,
                               color: Color(0xFF98621E), size: 24)),
-                      const SizedBox(width: 14),
+                      const SizedBox(width: AppSpacing.lg),
                       const Expanded(
                           child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                             Text('Perhatian Eksekutif',
                                 style: TextStyle(
-                                    fontSize: 15,
+                                    fontSize: 16,
                                     fontWeight: FontWeight.w800,
                                     color: AppColors.navy)),
-                            SizedBox(height: 4),
+                            SizedBox(height: AppSpacing.xs),
                             Text('Antrean persetujuan operasional',
                                 style: TextStyle(
                                     fontSize: 13, color: Color(0xFF526787))),
                           ])),
-                      const SizedBox(width: 8),
+                      const SizedBox(width: AppSpacing.sm),
                       const Icon(PhosphorIconsRegular.caretRight,
                           color: AppColors.textMuted, size: 18),
                     ]),
-                    const SizedBox(height: 14),
+                    const SizedBox(height: AppSpacing.lg),
                     const Divider(height: 1, color: AppColors.border),
-                    const SizedBox(height: 14),
+                    const SizedBox(height: AppSpacing.lg),
                     Row(children: [
                       const Expanded(
                           child: Text('Menunggu persetujuan',
@@ -196,9 +144,8 @@ class _DashboardActionCenter extends StatelessWidget {
                   ]))));
 
   @override
-  Widget build(BuildContext context) => executive
-      ? _executiveCard()
-      : _adminAttention(context);
+  Widget build(BuildContext context) =>
+      executive ? _executiveCard() : _adminAttention(context);
 
   Widget _adminAttention(BuildContext context) => Material(
       color: const Color(0xFFFFF0D6),
@@ -207,11 +154,11 @@ class _DashboardActionCenter extends StatelessWidget {
       child: InkWell(
           onTap: onOpen,
           child: Padding(
-              padding: const EdgeInsets.all(14),
+              padding: const EdgeInsets.all(AppSpacing.lg),
               child: Row(children: [
                 const Icon(PhosphorIconsRegular.warningCircle,
                     color: Color(0xFF98621E), size: 26),
-                const SizedBox(width: 12),
+                const SizedBox(width: AppSpacing.md),
                 Expanded(
                     child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -221,11 +168,11 @@ class _DashboardActionCenter extends StatelessWidget {
                               fontSize: 14,
                               fontWeight: FontWeight.w700,
                               color: Color(0xFF795018))),
-                      const SizedBox(height: 4),
+                      const SizedBox(height: AppSpacing.xs),
                       Text('$pending persetujuan menunggu',
                           style: const TextStyle(
                               fontSize: 13, color: Color(0xFF795018))),
-                      const SizedBox(height: 3),
+                      const SizedBox(height: AppSpacing.xs),
                       Text(
                           hasActions
                               ? 'Tinjau antrean & prioritas operasional'
@@ -235,7 +182,7 @@ class _DashboardActionCenter extends StatelessWidget {
                               height: 1.4,
                               color: Color(0xFF795018))),
                     ])),
-                const SizedBox(width: 8),
+                const SizedBox(width: AppSpacing.sm),
                 const Icon(PhosphorIconsRegular.caretRight,
                     color: Color(0xFF98621E), size: 22),
               ]))));
@@ -246,17 +193,17 @@ class _NoAssignmentState extends StatelessWidget {
   @override
   Widget build(BuildContext context) => _DashboardCard(
         child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 20),
+            padding: const EdgeInsets.symmetric(vertical: AppSpacing.xl),
             child: Column(children: [
               Container(
                   width: 70,
                   height: 70,
                   decoration: BoxDecoration(
-                      color: const Color(0xFFE8F3FF),
+                      color: AppColors.blueTint,
                       borderRadius: BorderRadius.circular(22)),
                   child: const Icon(PhosphorIconsRegular.mapPinLine,
                       color: AppColors.blue, size: 33)),
-              const SizedBox(height: 20),
+              const SizedBox(height: AppSpacing.xl),
               const Text('Belum ada destinasi',
                   textAlign: TextAlign.center,
                   style: TextStyle(
@@ -264,14 +211,14 @@ class _NoAssignmentState extends StatelessWidget {
                       fontWeight: FontWeight.w800,
                       height: 1.3,
                       color: AppColors.navy)),
-              const SizedBox(height: 12),
+              const SizedBox(height: AppSpacing.md),
               const Text(
                   'Akun Anda belum ditugaskan ke destinasi mana pun. '
                   'Hubungi Superadmin untuk mendapatkan penugasan. ',
                   textAlign: TextAlign.center,
                   style: TextStyle(
-                      fontSize: 14, height: 1.6, color: Color(0xFF526787))),
-              const SizedBox(height: 16),
+                      fontSize: 13, height: 1.6, color: Color(0xFF526787))),
+              const SizedBox(height: AppSpacing.lg),
               const Text('Tarik turun untuk memeriksa penugasan.',
                   style: TextStyle(fontSize: 13)),
             ])),
@@ -290,36 +237,42 @@ class OperationsUnavailableScreen extends StatelessWidget {
             if (audit)
               _DashboardCard(
                   child: Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 20),
+                      padding:
+                          const EdgeInsets.symmetric(vertical: AppSpacing.xl),
                       child: Column(children: [
                         Container(
                             width: 70,
                             height: 70,
                             decoration: BoxDecoration(
-                                color: const Color(0xFFE8F3FF),
+                                color: AppColors.blueTint,
                                 borderRadius: BorderRadius.circular(22)),
                             child: const Icon(
                                 PhosphorIconsRegular.clockCounterClockwise,
                                 color: AppColors.blue,
                                 size: 33)),
-                        const SizedBox(height: 20),
+                        const SizedBox(height: AppSpacing.xl),
                         const Text('Audit Timeline Belum Tersedia',
                             textAlign: TextAlign.center,
                             style: TextStyle(
                                 fontSize: 20,
                                 fontWeight: FontWeight.w800,
                                 color: AppColors.navy)),
-                        const SizedBox(height: 12),
+                        const SizedBox(height: AppSpacing.md),
                         const Text(
                             'Riwayat aktivitas global belum tersedia. '
                             'Data audit akan tampil setelah layanan tersedia.',
                             textAlign: TextAlign.center,
                             style: TextStyle(
-                                fontSize: 14,
+                                fontSize: 13,
                                 height: 1.6,
                                 color: Color(0xFF526787))),
-                        const SizedBox(height: 20),
+                        const SizedBox(height: AppSpacing.xl),
                         FilledButton(
+                            style: FilledButton.styleFrom(
+                                textStyle: const TextStyle(
+                                    fontSize: 13, fontWeight: FontWeight.w800),
+                                shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(14))),
                             onPressed: () => Navigator.maybePop(context),
                             child: const Text('Kembali')),
                       ])))
@@ -336,7 +289,7 @@ class FinancialUnavailablePanel extends StatelessWidget {
               Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
         const Row(children: [
           Icon(PhosphorIconsRegular.wallet, color: AppColors.blue, size: 24),
-          SizedBox(width: 10),
+          SizedBox(width: AppSpacing.sm),
           Expanded(
               child: Text('Keuangan Belum Tersedia',
                   style: TextStyle(
@@ -344,10 +297,10 @@ class FinancialUnavailablePanel extends StatelessWidget {
                       fontSize: 16,
                       color: AppColors.navy))),
         ]),
-        const SizedBox(height: 12),
+        const SizedBox(height: AppSpacing.md),
         const Text('Gateway pembayaran belum terhubung',
             style: TextStyle(fontSize: 13, color: Color(0xFF526787))),
-        const SizedBox(height: 12),
+        const SizedBox(height: AppSpacing.md),
         for (final label in [
           'Gross revenue',
           'Net revenue',
@@ -356,7 +309,7 @@ class FinancialUnavailablePanel extends StatelessWidget {
           'Settlement'
         ])
           Padding(
-              padding: const EdgeInsets.symmetric(vertical: 8),
+              padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
               child: Row(children: [
                 Expanded(
                     child: Text(label,
@@ -365,10 +318,10 @@ class FinancialUnavailablePanel extends StatelessWidget {
                 const Text('—',
                     style: TextStyle(
                         fontSize: 16,
-                        fontWeight: FontWeight.w700,
+                        fontWeight: FontWeight.w800,
                         color: AppColors.textMuted)),
               ])),
-        const SizedBox(height: 8),
+        const SizedBox(height: AppSpacing.sm),
         const Text('Belum tersedia · pembayaran belum terverifikasi',
             style:
                 TextStyle(fontSize: 12, height: 1.5, color: Color(0xFF526787))),
@@ -383,42 +336,47 @@ class OperationsSkeleton extends StatelessWidget {
       child: Column(children: [
         Container(
             height: 52,
-            margin: const EdgeInsets.only(bottom: 12),
+            margin: const EdgeInsets.only(bottom: AppSpacing.md),
             decoration: BoxDecoration(
                 color: AppColors.border,
                 borderRadius: BorderRadius.circular(14))),
         LayoutBuilder(
-            builder: (context, constraints) =>
-                Wrap(spacing: 12, runSpacing: 12, children: [
-                  for (var i = 0; i < 4; i++)
-                    Container(
-                        width: (constraints.maxWidth - 12) / 2,
-                        height: 120,
-                        padding: const EdgeInsets.all(14),
-                        decoration: BoxDecoration(
-                            color: Colors.white,
-                            border: Border.all(color: AppColors.border),
-                            borderRadius: BorderRadius.circular(16)),
-                        child: const Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              SizedBox(
-                                  width: 24,
-                                  height: 24,
-                                  child: ColoredBox(color: AppColors.border)),
-                              SizedBox(height: 12),
-                              SizedBox(
-                                  width: 64,
-                                  height: 24,
-                                  child: ColoredBox(color: AppColors.border)),
-                              SizedBox(height: 8),
-                              SizedBox(
-                                  width: 88,
-                                  height: 12,
-                                  child: ColoredBox(color: AppColors.border)),
-                            ])),
-                ])),
-        const SizedBox(height: 12),
+            builder: (context, constraints) => Wrap(
+                    spacing: AppSpacing.md,
+                    runSpacing: AppSpacing.md,
+                    children: [
+                      for (var i = 0; i < 4; i++)
+                        Container(
+                            width: (constraints.maxWidth - AppSpacing.md) / 2,
+                            height: 120,
+                            padding: const EdgeInsets.all(AppSpacing.lg),
+                            decoration: BoxDecoration(
+                                color: Colors.white,
+                                border: Border.all(color: AppColors.border),
+                                borderRadius: BorderRadius.circular(16)),
+                            child: const Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  SizedBox(
+                                      width: 24,
+                                      height: 24,
+                                      child:
+                                          ColoredBox(color: AppColors.border)),
+                                  SizedBox(height: AppSpacing.md),
+                                  SizedBox(
+                                      width: 64,
+                                      height: 24,
+                                      child:
+                                          ColoredBox(color: AppColors.border)),
+                                  SizedBox(height: AppSpacing.sm),
+                                  SizedBox(
+                                      width: 88,
+                                      height: 12,
+                                      child:
+                                          ColoredBox(color: AppColors.border)),
+                                ])),
+                    ])),
+        const SizedBox(height: AppSpacing.md),
         Container(
             height: 140,
             decoration: BoxDecoration(
@@ -445,64 +403,70 @@ class OperationsMetrics extends StatelessWidget {
       LayoutBuilder(builder: (context, constraints) {
         final stacked = MediaQuery.textScalerOf(context).scale(14) > 20 ||
             constraints.maxWidth < 250;
-        return Wrap(spacing: 12, runSpacing: 12, children: [
-          for (var i = 0; i < values.length; i++)
-            SizedBox(
-                width:
-                    stacked || (values.length.isOdd && i == values.length - 1)
+        return Wrap(
+            spacing: AppSpacing.md,
+            runSpacing: AppSpacing.md,
+            children: [
+              for (var i = 0; i < values.length; i++)
+                SizedBox(
+                    width: stacked ||
+                            (values.length.isOdd && i == values.length - 1)
                         ? constraints.maxWidth
-                        : (constraints.maxWidth - 12) / 2,
-                child: Container(
-                    padding: compact
-                        ? const EdgeInsets.all(4)
-                        : const EdgeInsets.all(14),
-                    decoration: compact
-                        ? null
-                        : BoxDecoration(
-                            color: Colors.white,
-                            border: Border.all(color: AppColors.border),
-                            borderRadius: BorderRadius.circular(16)),
-                    child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          if (icons != null) ...[
-                            Icon(icons![i], color: AppColors.blue, size: 22),
-                            const SizedBox(height: 10),
-                          ],
-                          if (icons == null)
-                            Text(values[i].$1,
-                                style: const TextStyle(
-                                    fontSize: 13, color: AppColors.navy)),
-                          if (icons == null) const SizedBox(height: 8),
-                          Text(values[i].$2,
-                              style: TextStyle(
-                                  fontSize:
-                                      compact || values[i].$2 == '—' ? 20 : 26,
-                                  fontFeatures: const [
-                                    FontFeature.tabularFigures()
-                                  ],
-                                  height: 1.2,
-                                  fontWeight: FontWeight.w800,
-                                  color: AppColors.navy)),
-                          if (icons != null) ...[
-                            const SizedBox(height: 4),
-                            Text(values[i].$1,
-                                style: labelStyle ??
-                                    const TextStyle(
-                                        fontSize: 13,
-                                        fontWeight: FontWeight.w600,
-                                        color: AppColors.navy)),
-                          ],
-                          if (metadata != null) ...[
-                            const SizedBox(height: 2),
-                            Text(metadata![i],
-                                style: const TextStyle(
-                                    fontSize: 12,
-                                    color: Color(0xFF526787),
-                                    height: 1.4)),
-                          ],
-                        ])))
-        ]);
+                        : (constraints.maxWidth - AppSpacing.md) / 2,
+                    child: Container(
+                        padding: compact
+                            ? const EdgeInsets.all(AppSpacing.xs)
+                            : const EdgeInsets.all(AppSpacing.lg),
+                        decoration: compact
+                            ? null
+                            : BoxDecoration(
+                                color: Colors.white,
+                                border: Border.all(color: AppColors.border),
+                                borderRadius: BorderRadius.circular(16)),
+                        child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              if (icons != null) ...[
+                                Icon(icons![i],
+                                    color: AppColors.blue, size: 22),
+                                const SizedBox(height: AppSpacing.sm),
+                              ],
+                              if (icons == null)
+                                Text(values[i].$1,
+                                    style: const TextStyle(
+                                        fontSize: 13, color: AppColors.navy)),
+                              if (icons == null)
+                                const SizedBox(height: AppSpacing.sm),
+                              Text(values[i].$2,
+                                  style: TextStyle(
+                                      fontSize: compact || values[i].$2 == '—'
+                                          ? 20
+                                          : 26,
+                                      fontFeatures: const [
+                                        FontFeature.tabularFigures()
+                                      ],
+                                      height: 1.2,
+                                      fontWeight: FontWeight.w800,
+                                      color: AppColors.navy)),
+                              if (icons != null) ...[
+                                const SizedBox(height: AppSpacing.xs),
+                                Text(values[i].$1,
+                                    style: labelStyle ??
+                                        const TextStyle(
+                                            fontSize: 11,
+                                            fontWeight: FontWeight.w500,
+                                            color: AppColors.navy)),
+                              ],
+                              if (metadata != null) ...[
+                                const SizedBox(height: AppSpacing.xs),
+                                Text(metadata![i],
+                                    style: const TextStyle(
+                                        fontSize: 12,
+                                        color: Color(0xFF526787),
+                                        height: 1.4)),
+                              ],
+                            ])))
+            ]);
       });
 }
 
@@ -695,13 +659,14 @@ class _DecisionTrendCard extends StatelessWidget {
 
   Widget _stat(String label, String value, Color tint) => Expanded(
       child: Container(
-          padding: const EdgeInsets.all(14),
+          padding: const EdgeInsets.all(AppSpacing.lg),
           decoration: BoxDecoration(
               color: tint, borderRadius: BorderRadius.circular(14)),
-          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          child:
+              Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Text(label,
                 style: const TextStyle(fontSize: 12, color: Color(0xFF526787))),
-            const SizedBox(height: 6),
+            const SizedBox(height: AppSpacing.sm),
             Text(value,
                 style: const TextStyle(
                     fontSize: 20,
@@ -716,19 +681,23 @@ class _DecisionTrendCard extends StatelessWidget {
             width: 8,
             height: 8,
             decoration: BoxDecoration(shape: BoxShape.circle, color: color)),
-        const SizedBox(width: 6),
+        const SizedBox(width: AppSpacing.sm),
         Text(label,
             style: const TextStyle(fontSize: 12, color: Color(0xFF526787))),
       ]);
 
   @override
   Widget build(BuildContext context) {
-    final approved =
-        rows.map((r) => _number(r['approved_decisions'])?.toDouble() ?? 0).toList();
-    final rejected =
-        rows.map((r) => _number(r['rejected_decisions'])?.toDouble() ?? 0).toList();
-    final first = rows.isEmpty ? null : DateTime.tryParse('${rows.first['date']}');
-    final last = rows.isEmpty ? null : DateTime.tryParse('${rows.last['date']}');
+    final approved = rows
+        .map((r) => _number(r['approved_decisions'])?.toDouble() ?? 0)
+        .toList();
+    final rejected = rows
+        .map((r) => _number(r['rejected_decisions'])?.toDouble() ?? 0)
+        .toList();
+    final first =
+        rows.isEmpty ? null : DateTime.tryParse('${rows.first['date']}');
+    final last =
+        rows.isEmpty ? null : DateTime.tryParse('${rows.last['date']}');
     final from = first ?? DateTime.tryParse('${period['from']}');
     final to = last ?? DateTime.tryParse('${period['to']}');
     final perDay = approved.isEmpty
@@ -744,7 +713,8 @@ class _DecisionTrendCard extends StatelessWidget {
             'to': isoDay(date),
           });
     return _DashboardCard(
-        child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        child:
+            Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
       Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Expanded(
             child:
@@ -754,14 +724,14 @@ class _DecisionTrendCard extends StatelessWidget {
                   fontSize: 16,
                   fontWeight: FontWeight.w800,
                   color: AppColors.navy)),
-          const SizedBox(height: 4),
+          const SizedBox(height: AppSpacing.xs),
           Text(
               from == null || to == null
                   ? 'Keputusan tim · UTC'
                   : '${_trendRangeLabel(from, to)} · UTC',
               style: const TextStyle(fontSize: 12, color: Color(0xFF526787))),
         ])),
-        const SizedBox(width: 8),
+        const SizedBox(width: AppSpacing.sm),
         Container(
             width: 40,
             height: 40,
@@ -771,13 +741,14 @@ class _DecisionTrendCard extends StatelessWidget {
             child: const Icon(PhosphorIconsRegular.chartLineUp,
                 color: AppColors.blue, size: 20)),
       ]),
-      const SizedBox(height: 14),
+      const SizedBox(height: AppSpacing.lg),
       Row(children: [
         _stat('Disetujui per hari', perDay, const Color(0xFFEEF4FD)),
-        const SizedBox(width: 12),
-        _stat('Ditolak', _value(rejectedTotal.round()), const Color(0xFFF1F4F9)),
+        const SizedBox(width: AppSpacing.md),
+        _stat(
+            'Ditolak', _value(rejectedTotal.round()), const Color(0xFFF1F4F9)),
       ]),
-      const SizedBox(height: 18),
+      const SizedBox(height: AppSpacing.lg),
       if (rows.isEmpty)
         const _Notice('Belum ada keputusan pada periode ini.')
       else ...[
@@ -793,7 +764,7 @@ class _DecisionTrendCard extends StatelessWidget {
                     child: CustomPaint(
                         painter:
                             _TrendPainter(approved, rejected, dots: true))))),
-        const SizedBox(height: 10),
+        const SizedBox(height: AppSpacing.sm),
         Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
           Text(dayLabel(first),
               style: const TextStyle(fontSize: 12, color: Color(0xFF526787))),
@@ -801,25 +772,25 @@ class _DecisionTrendCard extends StatelessWidget {
             Text(dayLabel(last),
                 style: const TextStyle(fontSize: 12, color: Color(0xFF526787))),
         ]),
-        const SizedBox(height: 14),
+        const SizedBox(height: AppSpacing.lg),
         Row(children: [
           _legend('Disetujui', AppColors.blue),
-          const SizedBox(width: 16),
+          const SizedBox(width: AppSpacing.lg),
           _legend('Ditolak', AppColors.textMuted),
         ]),
       ],
-      const SizedBox(height: 14),
+      const SizedBox(height: AppSpacing.lg),
       const Divider(height: 1, color: AppColors.border),
       InkWell(
           key: const ValueKey('decision-trend-open'),
           onTap: onOpen,
           child: const Padding(
-              padding: EdgeInsets.symmetric(vertical: 14),
+              padding: EdgeInsets.symmetric(vertical: AppSpacing.lg),
               child: Row(children: [
                 Expanded(
                     child: Text('Lihat kinerja tim',
                         style: TextStyle(
-                            fontSize: 14,
+                            fontSize: 13,
                             fontWeight: FontWeight.w800,
                             color: AppColors.blueDeep))),
                 Icon(PhosphorIconsRegular.arrowRight,
@@ -834,7 +805,7 @@ class _Notice extends StatelessWidget {
   final String message;
   @override
   Widget build(BuildContext context) => Padding(
-      padding: const EdgeInsets.symmetric(vertical: 12),
+      padding: const EdgeInsets.symmetric(vertical: AppSpacing.md),
       child: Text(message,
           style: const TextStyle(
               fontSize: 13, color: AppColors.textMuted, height: 1.5)));
@@ -845,32 +816,23 @@ class _SectionTitle extends StatelessWidget {
   final String title;
   @override
   Widget build(BuildContext context) => Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
+      padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
       child: Text(title,
           style: const TextStyle(
-              fontSize: 18,
+              fontSize: 14,
               fontWeight: FontWeight.w700,
               color: AppColors.navy)));
 }
 
 Widget _routeLink(String label, VoidCallback action) => ListTile(
     contentPadding: EdgeInsets.zero,
-    title: Text(label, style: const TextStyle(fontSize: 14)),
+    title: Text(label, style: const TextStyle(fontSize: 13)),
     trailing: const Icon(PhosphorIconsRegular.caretRight, size: 20),
     onTap: action);
-Widget _filterButton(Map<String, String> filters, VoidCallback action) =>
-    _ScopeCard(
-        label: filters['destination_guid'] == null
-            ? 'Semua destinasi yang dapat diakses'
-            : 'Destinasi terpilih',
-        detail: filters['from'] == null
-            ? 'Filter destinasi dan periode'
-            : "${filters['from']} — ${filters['to'] ?? '—'} · Filter aktif",
-        onTap: action);
 Widget _errorBlock(Object error, VoidCallback retry, {required int? role}) =>
     _DashboardCard(
         child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 12),
+            padding: const EdgeInsets.symmetric(vertical: AppSpacing.md),
             child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
@@ -881,8 +843,8 @@ Widget _errorBlock(Object error, VoidCallback retry, {required int? role}) =>
                       size: 36,
                       color: _scopeError(error)
                           ? const Color(0xFFAF4B48)
-                          : const Color(0xFF98621E)),
-                  const SizedBox(height: 16),
+                          : AppColors.warningText),
+                  const SizedBox(height: AppSpacing.lg),
                   Text(
                       _scopeError(error)
                           ? 'Akses telah berubah'
@@ -892,7 +854,7 @@ Widget _errorBlock(Object error, VoidCallback retry, {required int? role}) =>
                           fontSize: 18,
                           fontWeight: FontWeight.w700,
                           color: AppColors.navy)),
-                  const SizedBox(height: 10),
+                  const SizedBox(height: AppSpacing.sm),
                   Text(
                       _scopeError(error)
                           ? 'Akses destinasi berubah. Data lama telah dibersihkan. Pilih ulang destinasi yang dapat diakses.'
@@ -900,9 +862,14 @@ Widget _errorBlock(Object error, VoidCallback retry, {required int? role}) =>
                       textAlign: TextAlign.center,
                       style: const TextStyle(
                           fontSize: 13, height: 1.6, color: Color(0xFF526787))),
-                  const SizedBox(height: 20),
+                  const SizedBox(height: AppSpacing.xl),
                   if (role != 1)
                     FilledButton.icon(
+                        style: FilledButton.styleFrom(
+                            textStyle: const TextStyle(
+                                fontSize: 13, fontWeight: FontWeight.w800),
+                            shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(14))),
                         onPressed: retry,
                         icon: const Icon(PhosphorIconsRegular.arrowsClockwise,
                             size: 20),
@@ -915,7 +882,7 @@ Widget _errorBlock(Object error, VoidCallback retry, {required int? role}) =>
                         style: TextStyle(fontSize: 13)),
                 ])));
 Widget _actionTile(OperationalRow row, VoidCallback open) => Padding(
-    padding: const EdgeInsets.only(bottom: 8),
+    padding: const EdgeInsets.only(bottom: AppSpacing.sm),
     child: Material(
         color: Colors.white,
         shape: RoundedRectangleBorder(
@@ -923,15 +890,15 @@ Widget _actionTile(OperationalRow row, VoidCallback open) => Padding(
             side: const BorderSide(color: AppColors.border)),
         clipBehavior: Clip.antiAlias,
         child: ListTile(
-            contentPadding:
-                const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+            contentPadding: const EdgeInsets.symmetric(
+                horizontal: AppSpacing.lg, vertical: AppSpacing.sm),
             leading: Icon(
                 row.action == 'upcoming_visit'
                     ? PhosphorIconsRegular.calendarCheck
                     : PhosphorIconsRegular.clock,
                 color: row.action == 'upcoming_visit'
                     ? AppColors.blue
-                    : const Color(0xFF98621E)),
+                    : AppColors.warningText),
             title: Text(operationalActionLabel(row.action),
                 style: const TextStyle(
                     fontSize: 14,

@@ -5,6 +5,7 @@
 // ============================================================
 import 'package:flutter/material.dart';
 import 'package:phosphor_icons/phosphor_icons.dart';
+import '../../theme/app_colors.dart';
 import '../../data/admin_state.dart';
 import '../../data/app_data.dart';
 import '../../data/business_repository.dart';
@@ -222,7 +223,8 @@ class _KelolaAdminScreenState extends State<KelolaAdminScreen> {
   // ── Build blocks ─────────────────────────────────────────
   Widget _statCard(String value, String label) => Expanded(
         child: Container(
-          padding: const EdgeInsets.fromLTRB(14, 14, 10, 12),
+          padding: const EdgeInsets.fromLTRB(
+              AppSpacing.lg, AppSpacing.lg, AppSpacing.sm, AppSpacing.md),
           decoration: BoxDecoration(
               color: AdminColors.card,
               border: Border.all(color: AdminColors.border),
@@ -235,7 +237,7 @@ class _KelolaAdminScreenState extends State<KelolaAdminScreen> {
                     fontSize: 26,
                     height: 1.2,
                     fontWeight: FontWeight.w800)),
-            const SizedBox(height: 4),
+            const SizedBox(height: AppSpacing.xs),
             Text(label,
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
@@ -248,19 +250,19 @@ class _KelolaAdminScreenState extends State<KelolaAdminScreen> {
       );
 
   Widget _label(String text) => Padding(
-        padding: const EdgeInsets.only(bottom: 10),
+        padding: const EdgeInsets.only(bottom: AppSpacing.sm),
         child: Text(text,
             style: const TextStyle(
                 color: AdminColors.textMuted,
                 fontSize: 11,
                 fontWeight: FontWeight.w800,
-                letterSpacing: 1.2)),
+                letterSpacing: .8)),
       );
 
   Widget _roleChip(int? value, String label) {
     final selected = _role == value;
     return Padding(
-      padding: const EdgeInsets.only(right: 8),
+      padding: const EdgeInsets.only(right: AppSpacing.sm),
       child: Semantics(
         selected: selected,
         button: true,
@@ -270,12 +272,13 @@ class _KelolaAdminScreenState extends State<KelolaAdminScreen> {
           onTap: () => setState(() => _role = value),
           child: AnimatedContainer(
             duration: const Duration(milliseconds: 180),
-            constraints: const BoxConstraints(minHeight: 44),
+            constraints:
+                const BoxConstraints(minHeight: kMinInteractiveDimension),
             alignment: Alignment.center,
-            padding: const EdgeInsets.symmetric(horizontal: 18),
+            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
             decoration: BoxDecoration(
                 color: selected ? AdminColors.blue : Colors.white,
-                borderRadius: BorderRadius.circular(22),
+                borderRadius: BorderRadius.circular(14),
                 border: Border.all(
                     color: selected ? AdminColors.blue : AdminColors.border)),
             child: Text(label,
@@ -290,7 +293,7 @@ class _KelolaAdminScreenState extends State<KelolaAdminScreen> {
   }
 
   Widget _statusSegments() => Container(
-        padding: const EdgeInsets.all(4),
+        padding: const EdgeInsets.all(AppSpacing.xs),
         decoration: BoxDecoration(
             color: const Color(0xFFE9EFF8),
             borderRadius: BorderRadius.circular(16)),
@@ -310,23 +313,16 @@ class _KelolaAdminScreenState extends State<KelolaAdminScreen> {
                   onTap: () => setState(() => _status = option.$1),
                   child: AnimatedContainer(
                     duration: const Duration(milliseconds: 180),
-                    constraints: const BoxConstraints(minHeight: 46),
+                    constraints: const BoxConstraints(
+                        minHeight: kMinInteractiveDimension),
                     alignment: Alignment.center,
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 6, vertical: 10),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: AppSpacing.sm, vertical: AppSpacing.sm),
                     decoration: BoxDecoration(
                         color: _status == option.$1
                             ? Colors.white
                             : Colors.transparent,
-                        borderRadius: BorderRadius.circular(12),
-                        boxShadow: _status == option.$1
-                            ? const [
-                                BoxShadow(
-                                    color: Color(0x14102D59),
-                                    blurRadius: 6,
-                                    offset: Offset(0, 2))
-                              ]
-                            : null),
+                        borderRadius: BorderRadius.circular(12)),
                     child: Text(option.$2,
                         textAlign: TextAlign.center,
                         style: TextStyle(
@@ -346,23 +342,24 @@ class _KelolaAdminScreenState extends State<KelolaAdminScreen> {
         painter: _DashedBorderPainter(),
         child: Container(
           width: double.infinity,
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+          padding: const EdgeInsets.symmetric(
+              horizontal: AppSpacing.lg, vertical: AppSpacing.xl),
           child: Column(mainAxisSize: MainAxisSize.min, children: [
             const Text('Akun tidak ditemukan',
                 style: TextStyle(
                     color: AdminColors.navy,
                     fontSize: 14,
                     fontWeight: FontWeight.w800)),
-            const SizedBox(height: 4),
+            const SizedBox(height: AppSpacing.xs),
             const Text('Coba kata kunci atau filter lain.',
                 style: TextStyle(color: AdminColors.textMuted, fontSize: 12)),
-            const SizedBox(height: 14),
+            const SizedBox(height: AppSpacing.lg),
             OutlinedButton(
               key: const ValueKey('reset-filter'),
               onPressed: _resetFilters,
               style: OutlinedButton.styleFrom(
                   foregroundColor: AdminColors.navy,
-                  minimumSize: const Size(0, 48),
+                  minimumSize: const Size(48, 48),
                   side: const BorderSide(color: AdminColors.border),
                   shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(14)),
@@ -401,7 +398,8 @@ class _KelolaAdminScreenState extends State<KelolaAdminScreen> {
               'Kelola Admin hanya untuk Super Administrator.')
         else
           SliverPadding(
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+            padding: const EdgeInsets.fromLTRB(
+                AppSpacing.lg, AppSpacing.sm, AppSpacing.lg, AppSpacing.xl),
             sliver: SliverList(
               delegate: SliverChildListDelegate([
                 IntrinsicHeight(
@@ -409,23 +407,23 @@ class _KelolaAdminScreenState extends State<KelolaAdminScreen> {
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
                         _statCard('${items.length}', 'Total akun'),
-                        const SizedBox(width: 10),
+                        const SizedBox(width: AppSpacing.sm),
                         _statCard('$managers', 'Pengelola'),
-                        const SizedBox(width: 10),
+                        const SizedBox(width: AppSpacing.sm),
                         _statCard('$active', 'Akun aktif'),
                       ]),
                 ),
-                const SizedBox(height: 20),
+                const SizedBox(height: AppSpacing.xl),
                 const Text('Direktori Akun',
                     style: TextStyle(
                         color: AdminColors.navy,
                         fontSize: 16,
                         fontWeight: FontWeight.w800)),
-                const SizedBox(height: 2),
+                const SizedBox(height: AppSpacing.xs),
                 const Text('Cari dan kelola akses pengguna terdaftar.',
-                    style: TextStyle(
-                        color: AdminColors.textMuted, fontSize: 12)),
-                const SizedBox(height: 14),
+                    style:
+                        TextStyle(color: AdminColors.textMuted, fontSize: 12)),
+                const SizedBox(height: AppSpacing.lg),
                 DecoratedBox(
                   decoration: BoxDecoration(
                       color: Colors.white,
@@ -436,17 +434,17 @@ class _KelolaAdminScreenState extends State<KelolaAdminScreen> {
                     controller: _searchController,
                     onChanged: (value) => setState(() => _query = value),
                     style:
-                        const TextStyle(fontSize: 14, color: AdminColors.navy),
+                        const TextStyle(fontSize: 13, color: AdminColors.navy),
                     decoration: InputDecoration(
                         hintText: 'Cari nama atau email...',
                         hintStyle: const TextStyle(
-                            color: AdminColors.textMuted, fontSize: 14),
+                            color: AdminColors.textMuted, fontSize: 13),
                         border: InputBorder.none,
                         enabledBorder: InputBorder.none,
                         focusedBorder: InputBorder.none,
                         filled: false,
                         contentPadding:
-                            const EdgeInsets.symmetric(vertical: 16),
+                            const EdgeInsets.symmetric(vertical: AppSpacing.lg),
                         prefixIcon: const Icon(
                             PhosphorIconsRegular.magnifyingGlass,
                             color: AdminColors.blue,
@@ -463,7 +461,7 @@ class _KelolaAdminScreenState extends State<KelolaAdminScreen> {
                                     size: 18))),
                   ),
                 ),
-                const SizedBox(height: 20),
+                const SizedBox(height: AppSpacing.xl),
                 _label('PERAN AKUN'),
                 SingleChildScrollView(
                   scrollDirection: Axis.horizontal,
@@ -474,10 +472,10 @@ class _KelolaAdminScreenState extends State<KelolaAdminScreen> {
                     _roleChip(0, 'Pengguna'),
                   ]),
                 ),
-                const SizedBox(height: 20),
+                const SizedBox(height: AppSpacing.xl),
                 _label('STATUS AKUN'),
                 _statusSegments(),
-                const SizedBox(height: 24),
+                const SizedBox(height: AppSpacing.xl),
                 Row(children: [
                   const Expanded(
                       child: Text('Daftar Akun',
@@ -489,10 +487,10 @@ class _KelolaAdminScreenState extends State<KelolaAdminScreen> {
                       style: const TextStyle(
                           color: AdminColors.textMuted, fontSize: 12)),
                 ]),
-                const SizedBox(height: 12),
+                const SizedBox(height: AppSpacing.md),
                 if (_list.error != null)
                   Padding(
-                    padding: const EdgeInsets.only(bottom: 12),
+                    padding: const EdgeInsets.only(bottom: AppSpacing.md),
                     child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
@@ -500,12 +498,19 @@ class _KelolaAdminScreenState extends State<KelolaAdminScreen> {
                               ? adminErrorMessage(_list.error!)
                               : 'Gagal memuat ulang: ${adminErrorMessage(_list.error!)}'),
                           TextButton(
-                              onPressed: _muat, child: const Text('Coba lagi')),
+                              style: TextButton.styleFrom(
+                                  textStyle: const TextStyle(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w800),
+                                  shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(14))),
+                              onPressed: _muat,
+                              child: const Text('Coba lagi')),
                         ]),
                   ),
                 if (!_list.hasLoaded && _list.error == null)
                   const Padding(
-                      padding: EdgeInsets.symmetric(vertical: 24),
+                      padding: EdgeInsets.symmetric(vertical: AppSpacing.xl),
                       child: Center(
                           child: CircularProgressIndicator(
                               color: AdminColors.blue)))
@@ -555,7 +560,7 @@ class _Avatar extends StatelessWidget {
         child: Text(_initials(name),
             style: TextStyle(
                 color: Colors.white,
-                fontSize: size * .36,
+                fontSize: 16,
                 fontWeight: FontWeight.w800)),
       );
 }
@@ -594,15 +599,15 @@ class _AccountCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final a = account;
     return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(14),
+      margin: const EdgeInsets.only(bottom: AppSpacing.md),
+      padding: const EdgeInsets.all(AppSpacing.lg),
       decoration: adminCardDecoration(),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(children: [
             _Avatar(a.name),
-            const SizedBox(width: 12),
+            const SizedBox(width: AppSpacing.md),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -614,9 +619,9 @@ class _AccountCard extends StatelessWidget {
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
                           color: AdminColors.text,
-                          fontSize: 15,
+                          fontSize: 16,
                           fontWeight: FontWeight.w800)),
-                  const SizedBox(height: 2),
+                  const SizedBox(height: AppSpacing.xs),
                   Text(a.email,
                       style: const TextStyle(
                           color: AdminColors.textMuted, fontSize: 12)),
@@ -624,17 +629,20 @@ class _AccountCard extends StatelessWidget {
               ),
             ),
           ]),
-          const SizedBox(height: 12),
-          Wrap(spacing: 8, runSpacing: 6, children: _badges(a, own: own)),
-          const SizedBox(height: 12),
+          const SizedBox(height: AppSpacing.md),
+          Wrap(
+              spacing: AppSpacing.sm,
+              runSpacing: AppSpacing.sm,
+              children: _badges(a, own: own)),
+          const SizedBox(height: AppSpacing.md),
           const Divider(height: 1, color: AdminColors.border),
-          const SizedBox(height: 12),
+          const SizedBox(height: AppSpacing.md),
           Row(children: [
             Expanded(
                 child: Text(_note,
                     style: const TextStyle(
                         color: AdminColors.textMuted, fontSize: 12))),
-            const SizedBox(width: 8),
+            const SizedBox(width: AppSpacing.sm),
             if (busy)
               const SizedBox(
                   width: 24,
@@ -642,17 +650,18 @@ class _AccountCard extends StatelessWidget {
                   child: CircularProgressIndicator(strokeWidth: 2.5))
             else
               Material(
-                color: const Color(0xFFE8F3FF),
+                color: AppColors.blueTint,
                 borderRadius: BorderRadius.circular(12),
                 child: InkWell(
                   key: ValueKey('manage-${a.guid}'),
                   borderRadius: BorderRadius.circular(12),
                   onTap: onManage,
                   child: Container(
-                    constraints:
-                        const BoxConstraints(minHeight: 44, minWidth: 64),
+                    constraints: const BoxConstraints(
+                        minHeight: kMinInteractiveDimension, minWidth: 64),
                     alignment: Alignment.center,
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
                     child: const Text('Kelola Akun →',
                         style: TextStyle(
                             color: AdminColors.blue,
@@ -698,7 +707,7 @@ class _AccountDetailSheet extends StatelessWidget {
   final bool own;
 
   Widget _row(String label, String value) => Container(
-        padding: const EdgeInsets.symmetric(vertical: 14),
+        padding: const EdgeInsets.symmetric(vertical: AppSpacing.lg),
         decoration: const BoxDecoration(
             border: Border(bottom: BorderSide(color: AdminColors.border))),
         child: Row(children: [
@@ -722,7 +731,10 @@ class _AccountDetailSheet extends StatelessWidget {
           BoxConstraints(maxHeight: MediaQuery.sizeOf(context).height * .88),
       child: SingleChildScrollView(
         padding: EdgeInsets.fromLTRB(
-            20, 0, 20, 20 + MediaQuery.paddingOf(context).bottom),
+            AppSpacing.sheetPadding,
+            0,
+            AppSpacing.sheetPadding,
+            AppSpacing.sheetPadding + MediaQuery.paddingOf(context).bottom),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -732,21 +744,23 @@ class _AccountDetailSheet extends StatelessWidget {
                   child: Text('Detail Akun',
                       style: TextStyle(
                           color: AdminColors.navy,
-                          fontSize: 18,
+                          fontSize: 20,
                           fontWeight: FontWeight.w800))),
               IconButton(
                 tooltip: 'Tutup',
                 onPressed: () => Navigator.pop(context),
                 style: IconButton.styleFrom(
-                    backgroundColor: const Color(0xFFF0F3F8),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12)),
+                    backgroundColor: AppColors.sheetCloseBackground,
                     foregroundColor: AdminColors.textMuted),
                 icon: const Icon(PhosphorIconsRegular.x, size: 16),
               ),
             ]),
-            const SizedBox(height: 12),
+            const SizedBox(height: AppSpacing.md),
             Row(children: [
               _Avatar(a.name, size: 52),
-              const SizedBox(width: 12),
+              const SizedBox(width: AppSpacing.md),
               Expanded(
                 child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -754,18 +768,21 @@ class _AccountDetailSheet extends StatelessWidget {
                       Text(a.name,
                           style: const TextStyle(
                               color: AdminColors.navy,
-                              fontSize: 15,
+                              fontSize: 16,
                               fontWeight: FontWeight.w800)),
-                      const SizedBox(height: 2),
+                      const SizedBox(height: AppSpacing.xs),
                       Text(a.email,
                           style: const TextStyle(
                               color: AdminColors.textMuted, fontSize: 12)),
                     ]),
               ),
             ]),
-            const SizedBox(height: 12),
-            Wrap(spacing: 8, runSpacing: 6, children: _badges(a)),
-            const SizedBox(height: 8),
+            const SizedBox(height: AppSpacing.md),
+            Wrap(
+                spacing: AppSpacing.sm,
+                runSpacing: AppSpacing.sm,
+                children: _badges(a)),
+            const SizedBox(height: AppSpacing.sm),
             _row('Peran akun', adminRoleLabel(a.role)),
             _row('Status akses', a.isActive ? 'Aktif' : 'Ditangguhkan'),
             _row(
@@ -776,20 +793,20 @@ class _AccountDetailSheet extends StatelessWidget {
                   _ => 'Pengunjung',
                 }),
             if (own) ...[
-              const SizedBox(height: 16),
+              const SizedBox(height: AppSpacing.lg),
               Container(
-                padding: const EdgeInsets.all(12),
+                padding: const EdgeInsets.all(AppSpacing.md),
                 decoration: BoxDecoration(
-                    color: const Color(0xFFFFF7EA),
+                    color: AppColors.warningTint,
                     borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: const Color(0xFFFFE0AD))),
+                    border: Border.all(color: AppColors.warningBorder)),
                 child: const Text(
                     'Akun superadmin yang sedang digunakan dilindungi.',
                     style: TextStyle(
                         color: Color(0xFF98621E), fontSize: 12, height: 1.4)),
               ),
             ],
-            const SizedBox(height: 16),
+            const SizedBox(height: AppSpacing.lg),
             Row(children: [
               Expanded(
                 child: OutlinedButton(
@@ -797,16 +814,16 @@ class _AccountDetailSheet extends StatelessWidget {
                   onPressed: own ? null : () => Navigator.pop(context, 'role'),
                   style: OutlinedButton.styleFrom(
                       foregroundColor: AdminColors.blue,
-                      minimumSize: const Size.fromHeight(50),
+                      minimumSize: const Size.fromHeight(52),
                       side: const BorderSide(color: AdminColors.border),
                       shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(14)),
                       textStyle: const TextStyle(
-                          fontSize: 14, fontWeight: FontWeight.w800)),
+                          fontSize: 13, fontWeight: FontWeight.w800)),
                   child: const Text('Ubah Peran'),
                 ),
               ),
-              const SizedBox(width: 12),
+              const SizedBox(width: AppSpacing.md),
               Expanded(
                 child: OutlinedButton(
                   key: ValueKey('status-${a.guid}'),
@@ -819,8 +836,8 @@ class _AccountDetailSheet extends StatelessWidget {
                           ? null
                           : (a.isActive
                               ? const Color(0xFFFFF0F0)
-                              : const Color(0xFFE8F3FF)),
-                      minimumSize: const Size.fromHeight(50),
+                              : AppColors.blueTint),
+                      minimumSize: const Size.fromHeight(52),
                       side: BorderSide(
                           color: a.isActive
                               ? AdminColors.danger.withValues(alpha: .35)
@@ -828,7 +845,7 @@ class _AccountDetailSheet extends StatelessWidget {
                       shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(14)),
                       textStyle: const TextStyle(
-                          fontSize: 14, fontWeight: FontWeight.w800)),
+                          fontSize: 13, fontWeight: FontWeight.w800)),
                   child: Text(a.isActive ? 'Tangguhkan' : 'Aktifkan'),
                 ),
               ),
@@ -897,10 +914,11 @@ class _CreateAdminSheetState extends State<_CreateAdminSheet> {
         borderSide: const BorderSide(color: AdminColors.border));
     return InputDecoration(
       hintText: hint,
-      hintStyle: const TextStyle(color: AdminColors.textDim, fontSize: 14),
+      hintStyle: const TextStyle(color: AdminColors.textDim, fontSize: 13),
       filled: true,
       fillColor: const Color(0xFFF8FAFE),
-      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+      contentPadding: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.lg, vertical: AppSpacing.lg),
       border: border,
       enabledBorder: border,
       focusedBorder: border.copyWith(
@@ -915,14 +933,14 @@ class _CreateAdminSheetState extends State<_CreateAdminSheet> {
   Widget _field(String label, Widget field) =>
       Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Padding(
-            padding: const EdgeInsets.only(bottom: 8),
+            padding: const EdgeInsets.only(bottom: AppSpacing.sm),
             child: Text(label,
                 style: const TextStyle(
                     color: AdminColors.navy,
                     fontSize: 12,
                     fontWeight: FontWeight.w800))),
         field,
-        const SizedBox(height: 16),
+        const SizedBox(height: AppSpacing.lg),
       ]);
 
   @override
@@ -937,7 +955,10 @@ class _CreateAdminSheetState extends State<_CreateAdminSheet> {
               maxHeight: MediaQuery.sizeOf(context).height * .92),
           child: SingleChildScrollView(
             padding: EdgeInsets.fromLTRB(
-                20, 0, 20, 20 + MediaQuery.paddingOf(context).bottom),
+                AppSpacing.sheetPadding,
+                0,
+                AppSpacing.sheetPadding,
+                AppSpacing.sheetPadding + MediaQuery.paddingOf(context).bottom),
             child: Form(
               key: _formKey,
               child: Column(
@@ -949,19 +970,21 @@ class _CreateAdminSheetState extends State<_CreateAdminSheet> {
                         child: Text('Tambah Admin',
                             style: TextStyle(
                                 color: AdminColors.navy,
-                                fontSize: 18,
+                                fontSize: 20,
                                 fontWeight: FontWeight.w800))),
                     IconButton(
                       tooltip: 'Tutup',
                       onPressed:
                           _saving ? null : () => Navigator.pop(context, false),
                       style: IconButton.styleFrom(
-                          backgroundColor: const Color(0xFFF0F3F8),
+                          shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12)),
+                          backgroundColor: AppColors.sheetCloseBackground,
                           foregroundColor: AdminColors.textMuted),
                       icon: const Icon(PhosphorIconsRegular.x, size: 16),
                     ),
                   ]),
-                  const SizedBox(height: 12),
+                  const SizedBox(height: AppSpacing.md),
                   _field(
                       'Nama lengkap',
                       TextFormField(
@@ -970,7 +993,7 @@ class _CreateAdminSheetState extends State<_CreateAdminSheet> {
                         enabled: !_saving,
                         textCapitalization: TextCapitalization.words,
                         style: const TextStyle(
-                            color: AdminColors.navy, fontSize: 14),
+                            color: AdminColors.navy, fontSize: 13),
                         decoration: _decoration('Nama admin'),
                         validator: (v) => (v == null || v.trim().isEmpty)
                             ? 'Nama wajib diisi'
@@ -984,7 +1007,7 @@ class _CreateAdminSheetState extends State<_CreateAdminSheet> {
                         enabled: !_saving,
                         keyboardType: TextInputType.emailAddress,
                         style: const TextStyle(
-                            color: AdminColors.navy, fontSize: 14),
+                            color: AdminColors.navy, fontSize: 13),
                         decoration: _decoration('admin@contoh.com'),
                         validator: (v) => (v == null || !v.contains('@'))
                             ? 'Email tidak valid'
@@ -998,7 +1021,7 @@ class _CreateAdminSheetState extends State<_CreateAdminSheet> {
                         enabled: !_saving,
                         obscureText: true,
                         style: const TextStyle(
-                            color: AdminColors.navy, fontSize: 14),
+                            color: AdminColors.navy, fontSize: 13),
                         decoration: _decoration('Minimal 8 karakter'),
                         validator: (v) => (v == null || v.length < 8)
                             ? 'Minimal 8 karakter'
@@ -1012,7 +1035,7 @@ class _CreateAdminSheetState extends State<_CreateAdminSheet> {
                         enabled: !_saving,
                         obscureText: true,
                         style: const TextStyle(
-                            color: AdminColors.navy, fontSize: 14),
+                            color: AdminColors.navy, fontSize: 13),
                         decoration: _decoration('Ulangi password'),
                         validator: (v) => v != _password.text
                             ? 'Konfirmasi tidak cocok'
@@ -1029,10 +1052,10 @@ class _CreateAdminSheetState extends State<_CreateAdminSheet> {
                                 size: 18)),
                         child: const Text('Admin',
                             style: TextStyle(
-                                color: AdminColors.navy, fontSize: 14)),
+                                color: AdminColors.navy, fontSize: 13)),
                       )),
                   Container(
-                    padding: const EdgeInsets.all(12),
+                    padding: const EdgeInsets.all(AppSpacing.md),
                     decoration: BoxDecoration(
                         color: const Color(0xFFEAF3FF),
                         borderRadius: BorderRadius.circular(12),
@@ -1045,10 +1068,10 @@ class _CreateAdminSheetState extends State<_CreateAdminSheet> {
                             height: 1.45)),
                   ),
                   if (_error != null) ...[
-                    const SizedBox(height: 12),
+                    const SizedBox(height: AppSpacing.md),
                     AdminNotice(_error!),
                   ],
-                  const SizedBox(height: 20),
+                  const SizedBox(height: AppSpacing.xl),
                   Row(children: [
                     Expanded(
                       child: OutlinedButton(
@@ -1057,16 +1080,16 @@ class _CreateAdminSheetState extends State<_CreateAdminSheet> {
                             : () => Navigator.pop(context, false),
                         style: OutlinedButton.styleFrom(
                             foregroundColor: AdminColors.blue,
-                            minimumSize: const Size.fromHeight(50),
+                            minimumSize: const Size.fromHeight(52),
                             side: const BorderSide(color: AdminColors.border),
                             shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(14)),
                             textStyle: const TextStyle(
-                                fontSize: 14, fontWeight: FontWeight.w800)),
+                                fontSize: 13, fontWeight: FontWeight.w800)),
                         child: const Text('Batalkan'),
                       ),
                     ),
-                    const SizedBox(width: 12),
+                    const SizedBox(width: AppSpacing.md),
                     Expanded(
                       child: FilledButton(
                         key: const ValueKey('admin-save'),
@@ -1074,11 +1097,11 @@ class _CreateAdminSheetState extends State<_CreateAdminSheet> {
                         style: FilledButton.styleFrom(
                             backgroundColor: AdminColors.blue,
                             foregroundColor: Colors.white,
-                            minimumSize: const Size.fromHeight(50),
+                            minimumSize: const Size.fromHeight(52),
                             shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(14)),
                             textStyle: const TextStyle(
-                                fontSize: 14, fontWeight: FontWeight.w800)),
+                                fontSize: 13, fontWeight: FontWeight.w800)),
                         child: _saving
                             ? const SizedBox(
                                 width: 18,

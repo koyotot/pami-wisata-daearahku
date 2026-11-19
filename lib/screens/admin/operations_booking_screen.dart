@@ -211,11 +211,12 @@ class _OperationsBookingScreenState extends State<OperationsBookingScreen>
     return Material(
         color: AppColors.surface,
         elevation: 8,
-        shadowColor: const Color(0x22102D59),
+        shadowColor: AppColors.dockShadow,
         child: SafeArea(
             top: false,
             child: Padding(
-                padding: const EdgeInsets.fromLTRB(20, 14, 20, 14),
+                padding: const EdgeInsets.symmetric(
+                    horizontal: AppSpacing.lg, vertical: AppSpacing.md),
                 child: Row(children: [
                   Expanded(
                       child: Column(
@@ -227,25 +228,27 @@ class _OperationsBookingScreenState extends State<OperationsBookingScreen>
                                 fontSize: 13,
                                 fontWeight: FontWeight.w800,
                                 color: AppColors.navy)),
-                        const SizedBox(height: 2),
+                        const SizedBox(height: AppSpacing.xs),
                         Text(subtitle,
                             style: const TextStyle(
                                 fontSize: 12, color: AppColors.textSecondary)),
                       ])),
-                  const SizedBox(width: 12),
+                  const SizedBox(width: AppSpacing.md),
                   Opacity(
                       opacity: enabled ? 1 : .5,
                       child: FilledButton(
                           key: const ValueKey('booking-primary-action'),
                           onPressed: enabled ? _openActions : null,
                           style: FilledButton.styleFrom(
+                              textStyle: const TextStyle(
+                                  fontSize: 13, fontWeight: FontWeight.w800),
                               backgroundColor: AppColors.blue,
                               foregroundColor: Colors.white,
                               disabledBackgroundColor: AppColors.blue,
                               disabledForegroundColor: Colors.white,
-                              minimumSize: const Size(140, 48),
-                              padding:
-                                  const EdgeInsets.symmetric(horizontal: 20),
+                              minimumSize: const Size(140, 50),
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: AppSpacing.lg),
                               shape: RoundedRectangleBorder(
                                   borderRadius: BorderRadius.circular(14))),
                           child: Text(label,
@@ -266,15 +269,21 @@ class _OperationsBookingScreenState extends State<OperationsBookingScreen>
 
   (String, OperationsTone) _statusBadge(_BookingView view, Booking booking) =>
       switch (view) {
-        _BookingView.unclaimed => ('Menunggu Persetujuan', OperationsTone.orange),
-        _BookingView.mine ||
-        _BookingView.other =>
-          ('Menunggu Persetujuan', OperationsTone.blue),
+        _BookingView.unclaimed => (
+            'Menunggu Persetujuan',
+            OperationsTone.orange
+          ),
+        _BookingView.mine || _BookingView.other => (
+            'Menunggu Persetujuan',
+            OperationsTone.blue
+          ),
         _BookingView.rejected => ('Ditolak', OperationsTone.red),
         _BookingView.reassigned => ('Dialihkan', OperationsTone.grey),
         _BookingView.closed => (
             bookingStatusLabel(booking.status),
-            booking.status == 'confirmed' ? OperationsTone.green : OperationsTone.grey
+            booking.status == 'confirmed'
+                ? OperationsTone.green
+                : OperationsTone.grey
           ),
       };
 
@@ -308,12 +317,12 @@ class _OperationsBookingScreenState extends State<OperationsBookingScreen>
                     color: AppColors.navy))),
         OperationsStatusBadge(badge, tone, small: true),
       ]),
-      const SizedBox(height: 10),
+      const SizedBox(height: AppSpacing.sm),
       Text(body,
           style: const TextStyle(
               fontSize: 12, height: 1.6, color: AppColors.textSecondary)),
       if (view == _BookingView.mine && remaining != null) ...[
-        const SizedBox(height: 8),
+        const SizedBox(height: AppSpacing.sm),
         Text(
             remaining.isNegative
                 ? 'Claim kedaluwarsa. Status sedang disinkronkan.'
@@ -385,8 +394,8 @@ class _OperationsBookingScreenState extends State<OperationsBookingScreen>
                   : const LinearProgressIndicator(),
             if (_detail.message != null)
               Container(
-                  padding: const EdgeInsets.all(16),
-                  margin: const EdgeInsets.only(bottom: 12),
+                  padding: const EdgeInsets.all(AppSpacing.lg),
+                  margin: const EdgeInsets.only(bottom: AppSpacing.md),
                   decoration: BoxDecoration(
                       color: const Color(0xFFFFF0D6),
                       borderRadius: BorderRadius.circular(16)),
@@ -395,7 +404,7 @@ class _OperationsBookingScreenState extends State<OperationsBookingScreen>
                       children: [
                         const Icon(PhosphorIconsRegular.info,
                             color: Color(0xFF795018)),
-                        const SizedBox(height: 8),
+                        const SizedBox(height: AppSpacing.sm),
                         Text(_detail.message!,
                             key: const ValueKey('claim-message'),
                             style: const TextStyle(
@@ -406,8 +415,8 @@ class _OperationsBookingScreenState extends State<OperationsBookingScreen>
             if (booking != null) ...[
               if (!_detail.fresh && !_detail.busy)
                 Container(
-                  padding: const EdgeInsets.all(14),
-                  margin: const EdgeInsets.only(bottom: 12),
+                  padding: const EdgeInsets.all(AppSpacing.lg),
+                  margin: const EdgeInsets.only(bottom: AppSpacing.md),
                   decoration: BoxDecoration(
                       color: const Color(0xFFFFF0D6),
                       borderRadius: BorderRadius.circular(14)),
@@ -433,16 +442,17 @@ class _OperationsBookingScreenState extends State<OperationsBookingScreen>
                         return OperationsStatusBadge(label, tone);
                       }),
                     ]),
-                    const SizedBox(height: 16),
+                    const SizedBox(height: AppSpacing.lg),
                     Text(booking.destinationName,
                         style: const TextStyle(
                             fontSize: 20,
                             height: 1.3,
                             fontWeight: FontWeight.w800,
                             color: AppColors.navy)),
-                    const SizedBox(height: 14),
+                    const SizedBox(height: AppSpacing.lg),
                     Container(
-                        padding: const EdgeInsets.fromLTRB(14, 8, 8, 8),
+                        padding: const EdgeInsets.fromLTRB(AppSpacing.lg,
+                            AppSpacing.sm, AppSpacing.sm, AppSpacing.sm),
                         decoration: BoxDecoration(
                             color: const Color(0xFFF1F5FB),
                             border: Border.all(color: AppColors.border),
@@ -471,7 +481,7 @@ class _OperationsBookingScreenState extends State<OperationsBookingScreen>
                                   size: 20)),
                         ])),
                   ])),
-              const SizedBox(height: 12),
+              const SizedBox(height: AppSpacing.md),
               _BookingPanel(
                   child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -481,30 +491,30 @@ class _OperationsBookingScreenState extends State<OperationsBookingScreen>
                             fontSize: 16,
                             fontWeight: FontWeight.w800,
                             color: AppColors.navy)),
-                    const SizedBox(height: 14),
+                    const SizedBox(height: AppSpacing.lg),
                     Row(children: [
                       Expanded(
                           child: _InfoTile(
                               icon: PhosphorIconsRegular.calendarBlank,
                               label: 'Tanggal kunjungan',
                               value: visitDayLabel(booking.visitDate))),
-                      const SizedBox(width: 12),
+                      const SizedBox(width: AppSpacing.md),
                       Expanded(
                           child: _InfoTile(
                               icon: PhosphorIconsRegular.users,
                               label: 'Jumlah tiket',
                               value: '${booking.quantity} orang')),
                     ]),
-                    const SizedBox(height: 12),
+                    const SizedBox(height: AppSpacing.md),
                     _InfoTile(
                         icon: PhosphorIconsRegular.creditCard,
                         label: 'Total booking',
                         large: true,
                         value:
                             formatMoney(booking.totalAmount, booking.currency)),
-                    const SizedBox(height: 14),
+                    const SizedBox(height: AppSpacing.lg),
                     const Divider(height: 1, color: AppColors.border),
-                    const SizedBox(height: 14),
+                    const SizedBox(height: AppSpacing.lg),
                     Row(children: [
                       const Expanded(
                           child: Text('Batas persetujuan',
@@ -518,7 +528,7 @@ class _OperationsBookingScreenState extends State<OperationsBookingScreen>
                               color: AppColors.navy)),
                     ]),
                   ])),
-              const SizedBox(height: 12),
+              const SizedBox(height: AppSpacing.md),
               _BookingPanel(
                   child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -534,7 +544,7 @@ class _OperationsBookingScreenState extends State<OperationsBookingScreen>
                           style: TextStyle(
                               fontSize: 11, color: AppColors.textSecondary)),
                     ]),
-                    const SizedBox(height: 14),
+                    const SizedBox(height: AppSpacing.lg),
                     Row(children: [
                       Container(
                           width: 52,
@@ -554,7 +564,7 @@ class _OperationsBookingScreenState extends State<OperationsBookingScreen>
                                   fontSize: 18,
                                   fontWeight: FontWeight.w800,
                                   color: AppColors.blue))),
-                      const SizedBox(width: 14),
+                      const SizedBox(width: AppSpacing.lg),
                       Expanded(
                           child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
@@ -566,27 +576,27 @@ class _OperationsBookingScreenState extends State<OperationsBookingScreen>
                                     fontSize: 14,
                                     fontWeight: FontWeight.w800,
                                     color: AppColors.navy)),
-                            const SizedBox(height: 4),
+                            const SizedBox(height: AppSpacing.xs),
                             const Text('Nama sesuai data booking',
                                 style: TextStyle(
                                     fontSize: 12,
                                     color: AppColors.textSecondary)),
                           ])),
                     ]),
-                    const SizedBox(height: 14),
+                    const SizedBox(height: AppSpacing.lg),
                     _ContactRow(
                         icon: PhosphorIconsRegular.envelope,
                         text: booking.visitorEmail.isEmpty
                             ? '—'
                             : booking.visitorEmail),
-                    const SizedBox(height: 10),
+                    const SizedBox(height: AppSpacing.sm),
                     _ContactRow(
                         icon: PhosphorIconsRegular.deviceMobile,
                         text: booking.visitorPhone.isEmpty
                             ? '—'
                             : booking.visitorPhone),
                     if (booking.notes?.isNotEmpty == true) ...[
-                      const SizedBox(height: 12),
+                      const SizedBox(height: AppSpacing.md),
                       Text('Catatan: ${booking.notes}',
                           style: const TextStyle(
                               fontSize: 12,
@@ -597,14 +607,14 @@ class _OperationsBookingScreenState extends State<OperationsBookingScreen>
               if (view == _BookingView.mine ||
                   view == _BookingView.other ||
                   view == _BookingView.reassigned) ...[
-                const SizedBox(height: 12),
+                const SizedBox(height: AppSpacing.md),
                 _claimPanel(view),
               ],
               if (_stateNotice(view) case final notice?) ...[
-                const SizedBox(height: 12),
+                const SizedBox(height: AppSpacing.md),
                 notice,
               ],
-              const SizedBox(height: 14),
+              const SizedBox(height: AppSpacing.lg),
               const Text(
                   'Status yang ditampilkan mengikuti data server. Validasi persetujuan, kepemilikan claim, dan deadline tetap menjadi tanggung jawab backend.',
                   style: TextStyle(
@@ -614,10 +624,20 @@ class _OperationsBookingScreenState extends State<OperationsBookingScreen>
             ],
             if (_detail.uncertain)
               OutlinedButton(
+                  style: OutlinedButton.styleFrom(
+                      textStyle: const TextStyle(
+                          fontSize: 13, fontWeight: FontWeight.w800),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14))),
                   onPressed: _detail.busy ? null : _detail.recoverMutation,
                   child: const Text('Periksa ulang tindakan yang sama')),
             if (_detail.accessRevoked)
               TextButton(
+                  style: TextButton.styleFrom(
+                      textStyle: const TextStyle(
+                          fontSize: 13, fontWeight: FontWeight.w800),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14))),
                   onPressed: () => Navigator.maybePop(context),
                   child: const Text('Kembali ke destinasi')),
             const SizedBox(height: 40),
@@ -640,25 +660,30 @@ class _NoticeCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final c = operationsToneColors(tone);
     return Container(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(AppSpacing.lg),
         decoration: BoxDecoration(
             color: c.bg,
             border: Border.all(color: c.border),
             borderRadius: BorderRadius.circular(18)),
         child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Icon(icon, color: c.fg, size: 20),
-          const SizedBox(width: 12),
+          const SizedBox(width: AppSpacing.md),
           Expanded(
-              child:
-                  Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text(title,
-                style: TextStyle(
-                    fontSize: 13, fontWeight: FontWeight.w800, color: c.fg)),
-            const SizedBox(height: 6),
-            Text(body,
-                style: TextStyle(
-                    fontSize: 12, height: 1.6, color: c.fg.withValues(alpha: .9))),
-          ])),
+              child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                Text(title,
+                    style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w800,
+                        color: c.fg)),
+                const SizedBox(height: AppSpacing.sm),
+                Text(body,
+                    style: TextStyle(
+                        fontSize: 12,
+                        height: 1.6,
+                        color: c.fg.withValues(alpha: .9))),
+              ])),
         ]));
   }
 }
@@ -668,7 +693,7 @@ class _BookingPanel extends StatelessWidget {
   final Widget child;
   @override
   Widget build(BuildContext context) => Container(
-      padding: const EdgeInsets.all(18),
+      padding: const EdgeInsets.all(AppSpacing.lg),
       decoration: BoxDecoration(
           color: Colors.white,
           border: Border.all(color: AdminColors.border),
@@ -688,7 +713,7 @@ class _InfoTile extends StatelessWidget {
   final bool large;
   @override
   Widget build(BuildContext context) => Container(
-      padding: const EdgeInsets.all(14),
+      padding: const EdgeInsets.all(AppSpacing.lg),
       decoration: BoxDecoration(
           color: const Color(0xFFF6F9FD),
           border: Border.all(color: AppColors.border),
@@ -696,16 +721,16 @@ class _InfoTile extends StatelessWidget {
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Row(children: [
           Icon(icon, size: 15, color: AppColors.blue),
-          const SizedBox(width: 6),
+          const SizedBox(width: AppSpacing.sm),
           Expanded(
               child: Text(label,
                   style: const TextStyle(
                       fontSize: 11, color: AppColors.textSecondary))),
         ]),
-        SizedBox(height: large ? 10 : 8),
+        SizedBox(height: large ? AppSpacing.md : AppSpacing.sm),
         Text(value,
             style: TextStyle(
-                fontSize: large ? 22 : 15,
+                fontSize: large ? 22 : 16,
                 fontWeight: FontWeight.w800,
                 color: large ? AppColors.blue : AppColors.navy)),
       ]));
@@ -718,7 +743,7 @@ class _ContactRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Row(children: [
         Icon(icon, size: 17, color: AppColors.blue),
-        const SizedBox(width: 10),
+        const SizedBox(width: AppSpacing.sm),
         Expanded(
             child: Text(text,
                 style: const TextStyle(fontSize: 12, color: AppColors.navy))),
@@ -803,7 +828,7 @@ class _BookingActionSheetState extends State<_BookingActionSheet> {
   Widget _toneBox(String text, OperationsTone tone) {
     final c = operationsToneColors(tone);
     return Container(
-        padding: const EdgeInsets.all(14),
+        padding: const EdgeInsets.all(AppSpacing.lg),
         decoration: BoxDecoration(
             color: c.bg,
             border: Border.all(color: c.border),
@@ -830,22 +855,21 @@ class _BookingActionSheetState extends State<_BookingActionSheet> {
             child: InkWell(
                 onTap: onTap,
                 child: Padding(
-                    padding: const EdgeInsets.all(14),
+                    padding: const EdgeInsets.all(AppSpacing.lg),
                     child: Row(children: [
                       Container(
                           width: 44,
                           height: 44,
                           decoration: BoxDecoration(
                               color: danger
-                                  ? const Color(0xFFFDECEC)
+                                  ? AppColors.dangerTint
                                   : const Color(0xFFE8F1FD),
                               borderRadius: BorderRadius.circular(12)),
                           child: Icon(icon,
                               size: 22,
-                              color: danger
-                                  ? const Color(0xFFB23B3B)
-                                  : AppColors.blue)),
-                      const SizedBox(width: 14),
+                              color:
+                                  danger ? AppColors.danger : AppColors.blue)),
+                      const SizedBox(width: AppSpacing.lg),
                       Expanded(
                           child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
@@ -855,7 +879,7 @@ class _BookingActionSheetState extends State<_BookingActionSheet> {
                                     fontSize: 14,
                                     fontWeight: FontWeight.w800,
                                     color: AppColors.navy)),
-                            const SizedBox(height: 3),
+                            const SizedBox(height: AppSpacing.xs),
                             Text(subtitle,
                                 style: const TextStyle(
                                     fontSize: 12,
@@ -878,29 +902,32 @@ class _BookingActionSheetState extends State<_BookingActionSheet> {
           child: OutlinedButton(
               onPressed: onBack,
               style: OutlinedButton.styleFrom(
+                  textStyle: const TextStyle(
+                      fontSize: 13, fontWeight: FontWeight.w800),
                   foregroundColor: AppColors.blue,
                   backgroundColor: Colors.white,
-                  minimumSize: const Size(48, 48),
+                  minimumSize: const Size(48, 52),
                   side: const BorderSide(color: AppColors.border),
                   shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(radius))),
               child: Text(backLabel,
                   style: const TextStyle(
                       fontSize: 13, fontWeight: FontWeight.w800)))),
-      const SizedBox(width: 12),
+      const SizedBox(width: AppSpacing.md),
       Expanded(
           child: FilledButton(
               onPressed: onOk,
               style: FilledButton.styleFrom(
+                  textStyle: const TextStyle(
+                      fontSize: 13, fontWeight: FontWeight.w800),
                   backgroundColor:
-                      danger ? const Color(0xFFFDECEC) : AppColors.blue,
-                  foregroundColor:
-                      danger ? const Color(0xFFB23B3B) : Colors.white,
+                      danger ? AppColors.dangerTint : AppColors.blue,
+                  foregroundColor: danger ? AppColors.danger : Colors.white,
                   disabledBackgroundColor:
-                      danger ? const Color(0xFFFDECEC) : AppColors.blue,
+                      danger ? AppColors.dangerTint : AppColors.blue,
                   disabledForegroundColor:
-                      danger ? const Color(0xFFB23B3B) : Colors.white,
-                  minimumSize: const Size(48, 48),
+                      danger ? AppColors.danger : Colors.white,
+                  minimumSize: const Size(48, 52),
                   side: danger
                       ? const BorderSide(color: Color(0xFFF3C9C9))
                       : null,
@@ -915,8 +942,8 @@ class _BookingActionSheetState extends State<_BookingActionSheet> {
   }
 
   List<Widget> _menu() {
-    final claimedByOther = !_d.mine &&
-        _d.claim?.activeAt(DateTime.now().toUtc()) == true;
+    final claimedByOther =
+        !_d.mine && _d.claim?.activeAt(DateTime.now().toUtc()) == true;
     final options = <Widget>[
       _option(
           icon: PhosphorIconsRegular.hand,
@@ -953,14 +980,17 @@ class _BookingActionSheetState extends State<_BookingActionSheet> {
     }
     return [
       _lead('Pilih tindakan operasional untuk permintaan kunjungan ini.'),
-      const SizedBox(height: 14),
+      const SizedBox(height: AppSpacing.lg),
       _toneBox(
           _d.mine
               ? 'Claim hanya berlaku maksimal 15 menit, dan tidak memperpanjang deadline persetujuan.'
               : 'Claim harus berhasil diverifikasi sebelum tindakan persetujuan tersedia.',
           OperationsTone.blue),
-      const SizedBox(height: 14),
-      for (final option in options) ...[option, const SizedBox(height: 10)],
+      const SizedBox(height: AppSpacing.lg),
+      for (final option in options) ...[
+        option,
+        const SizedBox(height: AppSpacing.sm)
+      ],
     ];
   }
 
@@ -975,9 +1005,9 @@ class _BookingActionSheetState extends State<_BookingActionSheet> {
         return [
           _lead(
               'Ambil kepemilikan sementara untuk menangani booking ini. Claim tidak memperpanjang batas persetujuan.'),
-          const SizedBox(height: 14),
+          const SizedBox(height: AppSpacing.lg),
           _toneBox(_serverCheck, OperationsTone.orange),
-          const SizedBox(height: 18),
+          const SizedBox(height: AppSpacing.lg),
           _buttons(
               backLabel: 'Batal',
               onBack: () => Navigator.pop(context),
@@ -991,9 +1021,9 @@ class _BookingActionSheetState extends State<_BookingActionSheet> {
         return [
           _lead(
               'Persetujuan akan meneruskan booking ke tahapan berikutnya sesuai aturan sistem.'),
-          const SizedBox(height: 14),
+          const SizedBox(height: AppSpacing.lg),
           _toneBox(_serverCheck, OperationsTone.orange),
-          const SizedBox(height: 18),
+          const SizedBox(height: AppSpacing.lg),
           _buttons(
               backLabel: 'Batal',
               onBack: () => Navigator.pop(context),
@@ -1007,13 +1037,13 @@ class _BookingActionSheetState extends State<_BookingActionSheet> {
         return [
           _lead(
               'Isi alasan penolakan untuk membantu pengunjung memahami keputusan.'),
-          const SizedBox(height: 14),
+          const SizedBox(height: AppSpacing.lg),
           const Text('Alasan penolakan *',
               style: TextStyle(
                   fontSize: 12,
                   fontWeight: FontWeight.w800,
                   color: AppColors.navy)),
-          const SizedBox(height: 8),
+          const SizedBox(height: AppSpacing.sm),
           TextField(
               controller: _rejectReason,
               maxLength: 1000,
@@ -1022,7 +1052,7 @@ class _BookingActionSheetState extends State<_BookingActionSheet> {
               onChanged: (_) => setState(() {}),
               decoration: adminInputDecoration(null,
                   hint: 'Tuliskan alasan penolakan...')),
-          const SizedBox(height: 10),
+          const SizedBox(height: AppSpacing.sm),
           _buttons(
               backLabel: 'Kembali',
               onBack: () => _go(_SheetStep.menu),
@@ -1039,9 +1069,9 @@ class _BookingActionSheetState extends State<_BookingActionSheet> {
         return [
           _lead(
               'Claim Anda akan dilepaskan dan booking kembali dapat ditangani admin yang berwenang.'),
-          const SizedBox(height: 14),
+          const SizedBox(height: AppSpacing.lg),
           _toneBox(_serverCheck, OperationsTone.orange),
-          const SizedBox(height: 18),
+          const SizedBox(height: AppSpacing.lg),
           _buttons(
               backLabel: 'Batal',
               onBack: () => Navigator.pop(context),
@@ -1056,19 +1086,25 @@ class _BookingActionSheetState extends State<_BookingActionSheet> {
         final selected = admins.where((a) => a.guid == _target).firstOrNull;
         return [
           _lead('Pilih admin tujuan untuk menangani permintaan ini.'),
-          const SizedBox(height: 14),
+          const SizedBox(height: AppSpacing.lg),
           const Text('Admin tujuan',
               style: TextStyle(
                   fontSize: 12,
                   fontWeight: FontWeight.w800,
                   color: AppColors.navy)),
-          const SizedBox(height: 8),
+          const SizedBox(height: AppSpacing.sm),
           if (_loadingAdmins) const LinearProgressIndicator(),
           if (_adminError != null) ...[
             Text(_adminError!,
                 style: const TextStyle(fontSize: 12, color: Color(0xFFB23B3B))),
             TextButton(
-                onPressed: _fetchAdmins, child: const Text('Muat ulang admin')),
+                style: TextButton.styleFrom(
+                    textStyle: const TextStyle(
+                        fontSize: 13, fontWeight: FontWeight.w800),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14))),
+                onPressed: _fetchAdmins,
+                child: const Text('Muat ulang admin')),
           ],
           if (!_loadingAdmins && _adminError == null && admins.isEmpty)
             const Text(
@@ -1079,22 +1115,23 @@ class _BookingActionSheetState extends State<_BookingActionSheet> {
                 icon: const Icon(PhosphorIconsRegular.caretDown),
                 isExpanded: true,
                 initialValue: _target,
-                decoration: adminInputDecoration(null, hint: 'Pilih admin tujuan'),
+                decoration:
+                    adminInputDecoration(null, hint: 'Pilih admin tujuan'),
                 items: [
                   for (final account in admins)
                     DropdownMenuItem(
                         value: account.guid,
-                        child: Text(account.name,
-                            overflow: TextOverflow.ellipsis))
+                        child:
+                            Text(account.name, overflow: TextOverflow.ellipsis))
                 ],
                 onChanged: (value) => setState(() => _target = value)),
-          const SizedBox(height: 14),
+          const SizedBox(height: AppSpacing.lg),
           const Text('Alasan pengalihan *',
               style: TextStyle(
                   fontSize: 12,
                   fontWeight: FontWeight.w800,
                   color: AppColors.navy)),
-          const SizedBox(height: 8),
+          const SizedBox(height: AppSpacing.sm),
           TextField(
               controller: _reassignReason,
               maxLength: 255,
@@ -1103,11 +1140,11 @@ class _BookingActionSheetState extends State<_BookingActionSheet> {
               onChanged: (_) => setState(() {}),
               decoration: adminInputDecoration(null,
                   hint: 'Tuliskan alasan pengalihan')),
-          const SizedBox(height: 6),
+          const SizedBox(height: AppSpacing.sm),
           _toneBox(
               'Admin tujuan harus aktif dan ditugaskan ke destinasi ini. Batas persetujuan asli tidak berubah.',
               OperationsTone.blue),
-          const SizedBox(height: 18),
+          const SizedBox(height: AppSpacing.lg),
           _buttons(
               backLabel: 'Kembali',
               onBack: () => _go(_SheetStep.menu),
@@ -1135,7 +1172,11 @@ class _BookingActionSheetState extends State<_BookingActionSheet> {
               top: false,
               child: SingleChildScrollView(
                   padding: EdgeInsets.fromLTRB(
-                      20, 0, 20, MediaQuery.viewInsetsOf(context).bottom + 20),
+                      AppSpacing.sheetPadding,
+                      0,
+                      AppSpacing.sheetPadding,
+                      MediaQuery.viewInsetsOf(context).bottom +
+                          AppSpacing.sheetPadding),
                   child: Column(
                       mainAxisSize: MainAxisSize.min,
                       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -1151,16 +1192,17 @@ class _BookingActionSheetState extends State<_BookingActionSheet> {
                               tooltip: 'Tutup',
                               onPressed: () => Navigator.pop(context),
                               style: IconButton.styleFrom(
-                                  backgroundColor: const Color(0xFFEEF3FA),
+                                  backgroundColor:
+                                      AppColors.sheetCloseBackground,
                                   foregroundColor: AppColors.textSecondary,
                                   shape: RoundedRectangleBorder(
                                       borderRadius: BorderRadius.circular(12))),
-                              icon: const Icon(PhosphorIconsRegular.x,
-                                  size: 18)),
+                              icon:
+                                  const Icon(PhosphorIconsRegular.x, size: 18)),
                         ]),
-                        const SizedBox(height: 12),
+                        const SizedBox(height: AppSpacing.md),
                         const Divider(height: 1, color: AppColors.border),
-                        const SizedBox(height: 16),
+                        const SizedBox(height: AppSpacing.lg),
                         ..._content(),
                       ]))));
 }

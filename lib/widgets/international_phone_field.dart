@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:phone_numbers_parser/phone_numbers_parser.dart';
 import 'package:phone_numbers_parser/metadata.dart';
+import '../theme/app_colors.dart';
 
 PhoneNumber? parseBookingPhone(String input, IsoCode country) {
   if (input.trim().isEmpty) return null;
@@ -68,11 +69,11 @@ class _NationalPhoneFormatter extends TextInputFormatter {
   }
 }
 
-const _navy = Color(0xFF102D59);
-const _muted = Color(0xFF728099);
-const _border = Color(0xFFDCE4F0);
+const _navy = AppColors.navy;
+const _muted = AppColors.textSecondary;
+const _border = AppColors.border;
 const _codeStyle =
-    TextStyle(color: _navy, fontSize: 14, fontWeight: FontWeight.w600);
+    TextStyle(color: _navy, fontSize: 13, fontWeight: FontWeight.w600);
 
 /// Real Plus Jakarta Sans weights (a plain TextStyle gets faux bold).
 TextStyle _jakarta(double size, FontWeight weight, Color color) =>
@@ -131,87 +132,104 @@ class InternationalPhoneField extends StatelessWidget {
         nsn: examples.mobile.isEmpty ? examples.fixedLine : examples.mobile);
     final border = OutlineInputBorder(
         borderRadius: BorderRadius.circular(14),
-        borderSide: const BorderSide(color: Color(0xFFDCE4F0)));
+        borderSide: const BorderSide(color: AppColors.border));
+    final helperText = helper ??
+        (phone == null
+            ? null
+            : '+${phone.countryCode} ${phone.formatNsn(format: NsnFormat.international)}');
     final countrySelector = TextButton(
       key: const ValueKey('phoneCountryPicker'),
       onPressed: enabled ? () => _pickCountry(context) : null,
       style:
-          split ? TextButton.styleFrom(minimumSize: const Size(0, 56)) : null,
+          split ? TextButton.styleFrom(minimumSize: const Size(48, 56)) : null,
       child: Semantics(
         label: '${_countryNames[country.name]}, +${_dialCode(country)}',
         child: Row(mainAxisSize: MainAxisSize.min, children: [
           _flag(country, 24),
-          const SizedBox(width: 8),
+          const SizedBox(width: AppSpacing.sm),
           if (split)
             Flexible(child: Text('+${_dialCode(country)}', style: _codeStyle))
           else
             Text('+${_dialCode(country)}', style: _codeStyle),
-          const SizedBox(width: 4),
+          const SizedBox(width: AppSpacing.xs),
           const Icon(PhosphorIconsRegular.caretDown, size: 14, color: _muted),
         ]),
       ),
     );
-    final field = TextFormField(
-      key: const ValueKey('bookingPhone'),
-      controller: controller,
-      enabled: enabled,
-      keyboardType: TextInputType.phone,
-      autofillHints: const [AutofillHints.telephoneNumber],
-      inputFormatters: [_NationalPhoneFormatter(country)],
-      style: const TextStyle(color: Color(0xFF102D59), fontSize: 14),
-      decoration: InputDecoration(
-        labelText: label,
-        hintText: example.formatNsn(format: NsnFormat.international),
-        filled: true,
-        fillColor: Colors.white,
-        border: border,
-        enabledBorder: border,
-        focusedBorder: border.copyWith(
-            borderSide: const BorderSide(color: Color(0xFF1976D2), width: 2)),
-        errorText: error,
-        errorMaxLines: 3,
-        helperText: helper ??
-            (phone == null
+    final field = Semantics(
+        label: label == null ? 'Nomor telepon' : null,
+        child: TextFormField(
+          key: const ValueKey('bookingPhone'),
+          controller: controller,
+          enabled: enabled,
+          keyboardType: TextInputType.phone,
+          autofillHints: const [AutofillHints.telephoneNumber],
+          inputFormatters: [_NationalPhoneFormatter(country)],
+          style: const TextStyle(color: AppColors.navy, fontSize: 13),
+          decoration: InputDecoration(
+            labelText: label,
+            hintText: example.formatNsn(format: NsnFormat.international),
+            filled: true,
+            fillColor: AppColors.surface,
+            constraints: split ? const BoxConstraints(minHeight: 56) : null,
+            border: border,
+            enabledBorder: border,
+            focusedBorder: border.copyWith(
+                borderSide: const BorderSide(color: AppColors.blue, width: 2)),
+            errorText: error,
+            errorMaxLines: 3,
+            errorStyle: const TextStyle(
+                fontSize: 12, color: AppColors.danger, height: 1.5),
+            helperText: split ? null : helperText,
+            helperStyle: const TextStyle(color: _muted, fontSize: 11),
+            contentPadding: label == null
+                ? const EdgeInsets.symmetric(
+                    horizontal: AppSpacing.md, vertical: AppSpacing.lg)
+                : null,
+            helperMaxLines: 2,
+            prefixIconConstraints: const BoxConstraints(minHeight: 48),
+            prefixIcon: split
                 ? null
-                : '+${phone.countryCode} ${phone.formatNsn(format: NsnFormat.international)}'),
-        helperStyle: const TextStyle(color: _muted, fontSize: 11),
-        contentPadding: label == null
-            ? const EdgeInsets.symmetric(horizontal: 12, vertical: 18)
-            : null,
-        helperMaxLines: 2,
-        prefixIconConstraints: const BoxConstraints(minHeight: 48),
-        prefixIcon: split
-            ? null
-            : Padding(
-                padding: const EdgeInsets.only(left: 4, right: 12),
-                child: DecoratedBox(
-                  decoration: const BoxDecoration(
-                      border:
-                          Border(right: BorderSide(color: Color(0xFFDCE4F0)))),
-                  child: countrySelector,
-                ),
-              ),
-      ),
-      onChanged: (_) => onChanged(),
-      validator: (value) => parseBookingPhone(value ?? '', country) == null
-          ? 'Nomor telepon tidak valid untuk negara ini'
-          : null,
-    );
-    if (!split) return field;
-    return Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 122),
-        child: DecoratedBox(
-          decoration: BoxDecoration(
-            color: Colors.white,
-            border: Border.all(color: const Color(0xFFDCE4F0)),
-            borderRadius: BorderRadius.circular(14),
+                : Padding(
+                    padding: const EdgeInsets.only(
+                        left: AppSpacing.xs, right: AppSpacing.md),
+                    child: DecoratedBox(
+                      decoration: const BoxDecoration(
+                          border: Border(
+                              right: BorderSide(color: AppColors.border))),
+                      child: countrySelector,
+                    ),
+                  ),
           ),
-          child: countrySelector,
+          onChanged: (_) => onChanged(),
+          validator: (value) => parseBookingPhone(value ?? '', country) == null
+              ? 'Nomor telepon tidak valid untuk negara ini'
+              : null,
+        ));
+    if (!split) return field;
+    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+      Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 122),
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              color: AppColors.surface,
+              border: Border.all(color: AppColors.border),
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: countrySelector,
+          ),
         ),
-      ),
-      const SizedBox(width: 10),
-      Expanded(child: field),
+        const SizedBox(width: AppSpacing.sm),
+        Expanded(child: field),
+      ]),
+      if (helperText != null)
+        Padding(
+          padding: const EdgeInsets.only(top: AppSpacing.xs),
+          child: Text(helperText,
+              style: const TextStyle(
+                  color: AppColors.textSecondary, fontSize: 11, height: 1.5)),
+        ),
     ]);
   }
 }

@@ -296,11 +296,11 @@ class _OperationsFinancialState extends State<OperationsFinancialScreen>
                                   ? 'Data belum tersinkron'
                                   : 'Snapshot · ${formatDateTime(_receivedAt!)}',
                           style: const TextStyle(
-                              fontSize: 10, color: AppColors.textSecondary))),
+                              fontSize: 11, color: AppColors.textSecondary))),
                 ]),
                 const Text('Tarik untuk sinkron',
                     style: TextStyle(
-                        fontSize: 10, color: AppColors.textSecondary)),
+                        fontSize: 11, color: AppColors.textSecondary)),
               ]),
           const SizedBox(height: AppSpacing.md),
           Container(
@@ -347,7 +347,7 @@ class _OperationsFinancialState extends State<OperationsFinancialScreen>
                   const SizedBox(height: AppSpacing.sm),
                   Text(_metric('gross_revenue', money: true),
                       style: TextStyle(
-                          fontSize: _available ? 32 : 20,
+                          fontSize: _available ? 36 : 20,
                           height: 1.2,
                           fontWeight: FontWeight.w800,
                           color: AppColors.navy,
@@ -397,6 +397,11 @@ class _OperationsFinancialState extends State<OperationsFinancialScreen>
                     Align(
                         alignment: Alignment.centerRight,
                         child: TextButton(
+                            style: TextButton.styleFrom(
+                                textStyle: const TextStyle(
+                                    fontSize: 13, fontWeight: FontWeight.w800),
+                                shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(14))),
                             onPressed: _load,
                             child: const Text('Muat ulang aktivitas'))),
                   ] else if (_bookingTrend?.isEmpty ?? true)
@@ -422,15 +427,13 @@ class _OperationsFinancialState extends State<OperationsFinancialScreen>
         ]);
   }
 
-  Widget _preview() => _role == 1
-      ? _adminPreview()
-      : _financeMenuCard();
+  Widget _preview() => _role == 1 ? _adminPreview() : _financeMenuCard();
 
   /// Superadmin home entry point to the full finance page (no figures here).
   Widget _financeMenuCard() => Container(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.all(AppSpacing.sheetPadding),
       decoration: BoxDecoration(
-          color: AppColors.navy, borderRadius: BorderRadius.circular(24)),
+          color: AppColors.navy, borderRadius: BorderRadius.circular(20)),
       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
         Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
           const Expanded(
@@ -443,18 +446,18 @@ class _OperationsFinancialState extends State<OperationsFinancialScreen>
                         letterSpacing: .8,
                         fontWeight: FontWeight.w700,
                         color: Color(0xFFB9CCEA))),
-                SizedBox(height: 10),
+                SizedBox(height: AppSpacing.sm),
                 Text('Ringkasan Keuangan',
                     style: TextStyle(
                         fontSize: 20,
                         fontWeight: FontWeight.w800,
                         color: Colors.white)),
-                SizedBox(height: 8),
+                SizedBox(height: AppSpacing.sm),
                 Text('Kelola dan pantau laporan keuangan dalam satu tempat.',
                     style: TextStyle(
-                        fontSize: 14, height: 1.5, color: Color(0xFFDCE6F7))),
+                        fontSize: 13, height: 1.5, color: Color(0xFFDCE6F7))),
               ])),
-          const SizedBox(width: 12),
+          const SizedBox(width: AppSpacing.md),
           Container(
               width: 48,
               height: 48,
@@ -464,7 +467,7 @@ class _OperationsFinancialState extends State<OperationsFinancialScreen>
               child: const Icon(PhosphorIconsRegular.chartBar,
                   color: Colors.white, size: 24)),
         ]),
-        const SizedBox(height: 20),
+        const SizedBox(height: AppSpacing.xl),
         Material(
             color: Colors.white,
             borderRadius: BorderRadius.circular(14),
@@ -473,7 +476,8 @@ class _OperationsFinancialState extends State<OperationsFinancialScreen>
                 borderRadius: BorderRadius.circular(14),
                 onTap: _open,
                 child: const Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                    padding: EdgeInsets.symmetric(
+                        horizontal: AppSpacing.lg, vertical: AppSpacing.lg),
                     child: Row(children: [
                       Expanded(
                           child: Text('Buka Financial Dashboard',
@@ -494,7 +498,7 @@ class _OperationsFinancialState extends State<OperationsFinancialScreen>
               child: Text('Ringkasan Keuangan',
                   style: TextStyle(
                       fontSize: 16,
-                      fontWeight: FontWeight.w700,
+                      fontWeight: FontWeight.w800,
                       color: AppColors.navy))),
           Tooltip(
               message: 'Ringkasan DEMO bulan ini (UTC), seluruh penugasan. '
@@ -513,7 +517,13 @@ class _OperationsFinancialState extends State<OperationsFinancialScreen>
           Text(adminErrorMessage(_error!),
               style: const TextStyle(fontSize: 13, height: 1.5)),
           TextButton(
-              onPressed: _load, child: const Text('Muat ulang keuangan')),
+              style: TextButton.styleFrom(
+                  textStyle: const TextStyle(
+                      fontSize: 13, fontWeight: FontWeight.w800),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14))),
+              onPressed: _load,
+              child: const Text('Muat ulang keuangan')),
         ] else if (!_available)
           Text(_financialReason(_financial?['reason']),
               style: const TextStyle(
@@ -537,13 +547,15 @@ class _OperationsFinancialState extends State<OperationsFinancialScreen>
                 key: const ValueKey('home-financial-dashboard'),
                 onPressed: _open,
                 style: TextButton.styleFrom(
+                    textStyle: const TextStyle(
+                        fontSize: 13, fontWeight: FontWeight.w800),
                     padding: EdgeInsets.zero,
                     foregroundColor: AppColors.blueDeep),
                 iconAlignment: IconAlignment.end,
                 icon: const Icon(PhosphorIconsRegular.arrowRight, size: 20),
                 label: const Text('Buka dashboard keuangan',
                     style:
-                        TextStyle(fontSize: 12, fontWeight: FontWeight.w700)))),
+                        TextStyle(fontSize: 13, fontWeight: FontWeight.w800)))),
       ]));
 
   // ── Superadmin finance page ─────────────────────────────────────────────
@@ -566,30 +578,18 @@ class _OperationsFinancialState extends State<OperationsFinancialScreen>
             embedded: false,
             onRefresh: _load,
             children: [
-              Row(children: [
-                Expanded(
-                    child: _FinanceFilterCard(
-                        key: const ValueKey('financial-destination-filter'),
-                        icon: PhosphorIconsRegular.mapPin,
-                        caption: 'DESTINASI',
-                        value: filters['destination_guid'] == null
-                            ? 'Semua destinasi'
-                            : _destinationLabel ?? 'Destinasi terpilih',
-                        onTap: _filter)),
-                const SizedBox(width: 12),
-                Expanded(
-                    child: _FinanceFilterCard(
-                        key: const ValueKey('financial-date-filter'),
-                        icon: PhosphorIconsRegular.calendarBlank,
-                        caption: 'PERIODE',
-                        value: operationsPeriodLabel(filters),
-                        onTap: _filter)),
-              ]),
-              const SizedBox(height: 16),
+              OperationsFilterBar(
+                  filters: filters,
+                  keyPrefix: 'financial',
+                  destinationLabel: _destinationLabel,
+                  dateTooltip: 'Periode pembayaran dan aktivitas booking (UTC)',
+                  onDestinationPressed: _filter,
+                  onDatePressed: _filter),
+              const SizedBox(height: AppSpacing.lg),
               _FinanceTabs(
                   analytics: _analytics,
                   onChanged: (value) => setState(() => _analytics = value)),
-              const SizedBox(height: 20),
+              const SizedBox(height: AppSpacing.xl),
               if (_loading) const OperationsSkeleton(),
               if (_error != null)
                 _errorBlock(_error!, _scopeError(_error) ? _filter : _load,
@@ -604,17 +604,17 @@ class _OperationsFinancialState extends State<OperationsFinancialScreen>
                             'Belum ada sumber pembayaran tersedia'),
                         Text(_financialReason(financial['reason']),
                             style: const TextStyle(
-                                fontSize: 14,
+                                fontSize: 13,
                                 height: 1.6,
                                 color: Color(0xFF526787))),
                       ])),
-                  const SizedBox(height: 16),
+                  const SizedBox(height: AppSpacing.lg),
                 ],
                 if (_analytics)
                   ..._analyticsContent(financial)
                 else
                   ..._summaryContent(financial),
-                const SizedBox(height: 16),
+                const SizedBox(height: AppSpacing.lg),
                 _sourceCard(financial),
               ],
             ]));
@@ -622,12 +622,18 @@ class _OperationsFinancialState extends State<OperationsFinancialScreen>
 
   List<Widget> _summaryContent(Json financial) {
     final figures = [
-      ('Transaksi sukses', _metric('successful_transactions'),
-          'Pembayaran berhasil'),
+      (
+        'Transaksi sukses',
+        _metric('successful_transactions'),
+        'Pembayaran berhasil'
+      ),
       ('Tiket terjual', _metric('tickets_sold'), 'Total tiket'),
       ('Payment attempts', _metric('payment_attempts'), 'Percobaan pembayaran'),
-      ('Gross collected', _metric('gross_collected', money: true),
-          'Nominal terkumpul'),
+      (
+        'Gross collected',
+        _metric('gross_collected', money: true),
+        'Nominal terkumpul'
+      ),
     ];
     final unapplied = _number(financial['unapplied_collected']);
     final components = [
@@ -642,11 +648,11 @@ class _OperationsFinancialState extends State<OperationsFinancialScreen>
     return [
       _financeHeading('Performa Keuangan',
           'Ringkasan pembayaran berhasil pada periode terpilih.'),
-      const SizedBox(height: 14),
+      const SizedBox(height: AppSpacing.lg),
       Container(
           clipBehavior: Clip.antiAlias,
           decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(22),
+              borderRadius: BorderRadius.circular(20),
               gradient: const LinearGradient(
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
@@ -662,7 +668,7 @@ class _OperationsFinancialState extends State<OperationsFinancialScreen>
                         shape: BoxShape.circle,
                         color: Colors.white.withValues(alpha: .06)))),
             Padding(
-                padding: const EdgeInsets.all(20),
+                padding: const EdgeInsets.all(AppSpacing.sheetPadding),
                 child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
@@ -678,7 +684,7 @@ class _OperationsFinancialState extends State<OperationsFinancialScreen>
                             'berhasil (UTC).',
                             onDark: true),
                       ]),
-                      const SizedBox(height: 18),
+                      const SizedBox(height: AppSpacing.lg),
                       Text(_metric('gross_revenue', money: true),
                           style: TextStyle(
                               fontSize: _available ? 36 : 20,
@@ -688,7 +694,7 @@ class _OperationsFinancialState extends State<OperationsFinancialScreen>
                               fontFeatures: const [
                                 FontFeature.tabularFigures()
                               ])),
-                      const SizedBox(height: 14),
+                      const SizedBox(height: AppSpacing.lg),
                       Text(
                           'Nominal pembayaran berhasil yang diakui berdasarkan '
                           '${_financialDateBasisLabel(financial['date_basis'] ?? 'paid_utc')}.',
@@ -696,7 +702,7 @@ class _OperationsFinancialState extends State<OperationsFinancialScreen>
                               fontSize: 13, height: 1.5, color: Colors.white)),
                     ])),
           ])),
-      const SizedBox(height: 12),
+      const SizedBox(height: AppSpacing.md),
       LayoutBuilder(builder: (context, constraints) {
         final columns = constraints.maxWidth < 280 ||
                 MediaQuery.textScalerOf(context).scale(14) > 18
@@ -704,13 +710,13 @@ class _OperationsFinancialState extends State<OperationsFinancialScreen>
             : 2;
         return Column(children: [
           for (var i = 0; i < figures.length; i += columns) ...[
-            if (i > 0) const SizedBox(height: 12),
+            if (i > 0) const SizedBox(height: AppSpacing.md),
             IntrinsicHeight(
                 child: Row(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
                   for (var j = i; j < i + columns; j++) ...[
-                    if (j > i) const SizedBox(width: 12),
+                    if (j > i) const SizedBox(width: AppSpacing.md),
                     Expanded(
                         child: _financeFigureCard(
                             figures[j].$1, figures[j].$2, figures[j].$3)),
@@ -719,91 +725,89 @@ class _OperationsFinancialState extends State<OperationsFinancialScreen>
           ],
         ]);
       }),
-      const SizedBox(height: 12),
+      const SizedBox(height: AppSpacing.md),
       _DashboardCard(
-          child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-            _financeCardHeader('Rekonsiliasi collected',
-                trailing: _financeInfo(
-                    'Membandingkan nominal yang terkumpul dengan nominal yang '
-                    'sudah diterapkan ke booking.')),
-            const SizedBox(height: 14),
-            Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                    color: const Color(0xFFF1F6FE),
-                    borderRadius: BorderRadius.circular(14)),
-                child: IntrinsicHeight(
-                    child: Row(children: [
-                  Expanded(
-                      child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                        const Text('Gross collected',
-                            style: TextStyle(
-                                fontSize: 12, color: Color(0xFF526787))),
-                        const SizedBox(height: 6),
-                        Text(_metric('gross_collected', money: true),
-                            style: _financeValueStyle(18)),
-                      ])),
-                  const VerticalDivider(width: 24, color: AppColors.border),
-                  Expanded(
-                      child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.end,
-                          children: [
-                        const Text('Belum diterapkan',
-                            style: TextStyle(
-                                fontSize: 12, color: Color(0xFF526787))),
-                        const SizedBox(height: 6),
-                        Text(_metric('unapplied_collected', money: true),
-                            style: _financeValueStyle(18)),
-                      ])),
-                ]))),
-            const SizedBox(height: 12),
-            Text(
-                _available && unapplied == 0
-                    ? 'Angka Rp0 di sini memang tersedia pada snapshot. '
-                        'Metrik yang tidak tersedia tetap ditandai terpisah.'
-                    : 'Metrik yang tidak tersedia ditandai terpisah dan tidak '
-                        'dihitung sebagai Rp0.',
-                style: const TextStyle(
-                    fontSize: 12, height: 1.6, color: Color(0xFF526787))),
-          ])),
-      const SizedBox(height: 12),
+          child:
+              Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        _financeCardHeader('Rekonsiliasi collected',
+            trailing: _financeInfo(
+                'Membandingkan nominal yang terkumpul dengan nominal yang '
+                'sudah diterapkan ke booking.')),
+        const SizedBox(height: AppSpacing.lg),
+        Container(
+            padding: const EdgeInsets.all(AppSpacing.lg),
+            decoration: BoxDecoration(
+                color: const Color(0xFFF1F6FE),
+                borderRadius: BorderRadius.circular(14)),
+            child: IntrinsicHeight(
+                child: Row(children: [
+              Expanded(
+                  child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                    const Text('Gross collected',
+                        style:
+                            TextStyle(fontSize: 12, color: Color(0xFF526787))),
+                    const SizedBox(height: AppSpacing.sm),
+                    Text(_metric('gross_collected', money: true),
+                        style: _financeValueStyle(18)),
+                  ])),
+              const VerticalDivider(width: 24, color: AppColors.border),
+              Expanded(
+                  child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                    const Text('Belum diterapkan',
+                        style:
+                            TextStyle(fontSize: 12, color: Color(0xFF526787))),
+                    const SizedBox(height: AppSpacing.sm),
+                    Text(_metric('unapplied_collected', money: true),
+                        style: _financeValueStyle(18)),
+                  ])),
+            ]))),
+        const SizedBox(height: AppSpacing.md),
+        Text(
+            _available && unapplied == 0
+                ? 'Angka Rp0 di sini memang tersedia pada snapshot. '
+                    'Metrik yang tidak tersedia tetap ditandai terpisah.'
+                : 'Metrik yang tidak tersedia ditandai terpisah dan tidak '
+                    'dihitung sebagai Rp0.',
+            style: const TextStyle(
+                fontSize: 12, height: 1.6, color: Color(0xFF526787))),
+      ])),
+      const SizedBox(height: AppSpacing.md),
       _DashboardCard(
-          child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-            _financeCardHeader('Komponen Keuangan',
-                trailing: _financeInfo(
-                    'Komponen yang belum tersedia tidak dihitung sebagai Rp0.')),
-            const SizedBox(height: 6),
-            for (final component in components) ...[
-              _financeComponentRow(
-                  component.$1,
-                  _available && _number(financial[component.$2]) != null
-                      ? Text(_financialMoney(financial[component.$2]),
-                          style: _financeValueStyle(13))
-                      : _financeChip('Belum tersedia')),
-              const Divider(height: 1, color: AppColors.border),
-            ],
-            _financeComponentRow(
-                'Kelengkapan refund',
-                !_available
-                    ? _financeChip('Belum tersedia')
-                    : financial['refunds_complete'] == true
-                        ? _financeChip('Lengkap', good: true)
-                        : _financeChip('Belum lengkap')),
-            const SizedBox(height: 6),
-            Text(
-                missing
-                    ? 'Tidak dihitung sebagai Rp0. Informasi biaya gateway, '
-                        'settlement, dan refund belum lengkap.'
-                    : 'Seluruh komponen keuangan tersedia pada snapshot ini.',
-                style: const TextStyle(
-                    fontSize: 12, height: 1.6, color: Color(0xFF526787))),
-          ])),
+          child:
+              Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        _financeCardHeader('Komponen Keuangan',
+            trailing: _financeInfo(
+                'Komponen yang belum tersedia tidak dihitung sebagai Rp0.')),
+        const SizedBox(height: AppSpacing.sm),
+        for (final component in components) ...[
+          _financeComponentRow(
+              component.$1,
+              _available && _number(financial[component.$2]) != null
+                  ? Text(_financialMoney(financial[component.$2]),
+                      style: _financeValueStyle(13))
+                  : _financeChip('Belum tersedia')),
+          const Divider(height: 1, color: AppColors.border),
+        ],
+        _financeComponentRow(
+            'Kelengkapan refund',
+            !_available
+                ? _financeChip('Belum tersedia')
+                : financial['refunds_complete'] == true
+                    ? _financeChip('Lengkap', good: true)
+                    : _financeChip('Belum lengkap')),
+        const SizedBox(height: AppSpacing.sm),
+        Text(
+            missing
+                ? 'Tidak dihitung sebagai Rp0. Informasi biaya gateway, '
+                    'settlement, dan refund belum lengkap.'
+                : 'Seluruh komponen keuangan tersedia pada snapshot ini.',
+            style: const TextStyle(
+                fontSize: 12, height: 1.6, color: Color(0xFF526787))),
+      ])),
     ];
   }
 
@@ -825,7 +829,8 @@ class _OperationsFinancialState extends State<OperationsFinancialScreen>
       ),
     ];
     return _DashboardCard(
-        child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        child:
+            Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
       InkWell(
           key: const ValueKey('financial-source-toggle'),
           borderRadius: BorderRadius.circular(12),
@@ -837,15 +842,14 @@ class _OperationsFinancialState extends State<OperationsFinancialScreen>
                     children: [
                   Text('Sumber & Kelengkapan Data',
                       style: TextStyle(
-                          fontSize: 15,
+                          fontSize: 16,
                           fontWeight: FontWeight.w800,
                           color: AppColors.navy)),
-                  SizedBox(height: 4),
+                  SizedBox(height: AppSpacing.xs),
                   Text('Rincian asal data dan batasan pelaporan',
-                      style:
-                          TextStyle(fontSize: 12, color: Color(0xFF526787))),
+                      style: TextStyle(fontSize: 12, color: Color(0xFF526787))),
                 ])),
-            const SizedBox(width: 12),
+            const SizedBox(width: AppSpacing.md),
             Icon(
                 _sourceOpen
                     ? PhosphorIconsRegular.caretUp
@@ -854,7 +858,7 @@ class _OperationsFinancialState extends State<OperationsFinancialScreen>
                 color: AppColors.textSecondary),
           ])),
       if (_sourceOpen) ...[
-        const SizedBox(height: 12),
+        const SizedBox(height: AppSpacing.md),
         for (final row in rows) ...[
           const Divider(height: 1, color: AppColors.border),
           _financeComponentRow(
@@ -863,7 +867,7 @@ class _OperationsFinancialState extends State<OperationsFinancialScreen>
                   textAlign: TextAlign.right, style: _financeValueStyle(13))),
         ],
         const Divider(height: 1, color: AppColors.border),
-        const SizedBox(height: 12),
+        const SizedBox(height: AppSpacing.md),
         if (reason != null)
           Text(_financialReason(reason),
               style: const TextStyle(
@@ -883,7 +887,7 @@ class _OperationsFinancialState extends State<OperationsFinancialScreen>
     return [
       _financeHeading('Analitik Pembayaran',
           'Evaluasi performa proses pembayaran dan konversi.'),
-      const SizedBox(height: 14),
+      const SizedBox(height: AppSpacing.lg),
       _conversionCard(
           'Konversi per attempt',
           attempt,
@@ -892,7 +896,7 @@ class _OperationsFinancialState extends State<OperationsFinancialScreen>
           'Attempts sukses / selesai',
           'Persentase percobaan pembayaran yang berhasil dari seluruh '
               'percobaan yang sudah selesai.'),
-      const SizedBox(height: 12),
+      const SizedBox(height: AppSpacing.md),
       _conversionCard(
           'Konversi per booking',
           booking,
@@ -901,9 +905,9 @@ class _OperationsFinancialState extends State<OperationsFinancialScreen>
           'Booking paid / eligible',
           'Persentase booking yang sudah dibayar dari booking yang memenuhi '
               'syarat pembayaran.'),
-      const SizedBox(height: 12),
+      const SizedBox(height: AppSpacing.md),
       _attemptsCard(financial),
-      const SizedBox(height: 12),
+      const SizedBox(height: AppSpacing.md),
       _methodCard(financial),
     ];
   }
@@ -917,7 +921,7 @@ class _OperationsFinancialState extends State<OperationsFinancialScreen>
         child:
             Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
       _financeCardHeader(title, trailing: _financeInfo(info)),
-      const SizedBox(height: 10),
+      const SizedBox(height: AppSpacing.sm),
       Text(percent == null ? 'Belum Tersedia' : '${_financialNumber(percent)}%',
           style: TextStyle(
               fontSize: percent == null ? 14 : 36,
@@ -926,7 +930,7 @@ class _OperationsFinancialState extends State<OperationsFinancialScreen>
               color: AppColors.blueDeep,
               fontFeatures: const [FontFeature.tabularFigures()])),
       if (percent != null) ...[
-        const SizedBox(height: 12),
+        const SizedBox(height: AppSpacing.md),
         LinearProgressIndicator(
             value: (percent / 100).clamp(0.0, 1.0).toDouble(),
             minHeight: 8,
@@ -934,7 +938,7 @@ class _OperationsFinancialState extends State<OperationsFinancialScreen>
             backgroundColor: AppColors.border,
             color: AppColors.blue),
       ],
-      const SizedBox(height: 12),
+      const SizedBox(height: AppSpacing.md),
       Row(children: [
         Expanded(
             child: Text(countLabel,
@@ -944,7 +948,7 @@ class _OperationsFinancialState extends State<OperationsFinancialScreen>
             '${_financialNumber(conversion[numerator])} / ${_financialNumber(conversion[denominator])}',
             style: _financeValueStyle(12)),
       ]),
-      const SizedBox(height: 8),
+      const SizedBox(height: AppSpacing.sm),
       Text(
           [
             conversion['date_basis'] == null
@@ -977,16 +981,16 @@ class _OperationsFinancialState extends State<OperationsFinancialScreen>
                   style:
                       const TextStyle(fontSize: 12, color: Color(0xFF526787)))
               : null),
-      const SizedBox(height: 14),
+      const SizedBox(height: AppSpacing.lg),
       if (!_available)
-        const Text('Belum Tersedia', style: TextStyle(fontSize: 14))
+        const Text('Belum Tersedia', style: TextStyle(fontSize: 13))
       else ...[
         for (final row in rows)
           _financeAttemptBar(
               row.$1, _number(financial[row.$2]) ?? 0, total ?? 0, row.$3),
-        const SizedBox(height: 4),
+        const SizedBox(height: AppSpacing.xs),
         Container(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.all(AppSpacing.lg),
             decoration: BoxDecoration(
                 color: const Color(0xFFF1F6FE),
                 borderRadius: BorderRadius.circular(14)),
@@ -998,7 +1002,7 @@ class _OperationsFinancialState extends State<OperationsFinancialScreen>
                     const Text('Rata-rata durasi pembayaran',
                         style:
                             TextStyle(fontSize: 12, color: Color(0xFF526787))),
-                    const SizedBox(height: 6),
+                    const SizedBox(height: AppSpacing.sm),
                     Text(
                         average == null
                             ? 'Belum Tersedia'
@@ -1009,7 +1013,7 @@ class _OperationsFinancialState extends State<OperationsFinancialScreen>
                   'pembayaran berhasil.'),
             ])),
       ],
-      const SizedBox(height: 12),
+      const SizedBox(height: AppSpacing.md),
       Text(
           'Berhasil dihitung menurut ${_financialDateBasisLabel('paid_utc')}; '
           'status lainnya menurut ${_financialDateBasisLabel('attempt_started_utc')}.',
@@ -1021,28 +1025,29 @@ class _OperationsFinancialState extends State<OperationsFinancialScreen>
   Widget _financeAttemptBar(String label, num count, num total, Color color) {
     final share = total > 0 ? (count / total).clamp(0.0, 1.0).toDouble() : 0.0;
     return Padding(
-        padding: const EdgeInsets.only(bottom: 14),
+        padding: const EdgeInsets.only(bottom: AppSpacing.lg),
         child: Row(crossAxisAlignment: CrossAxisAlignment.center, children: [
           Expanded(
-              child:
-                  Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-            Row(children: [
-              Expanded(
-                  child: Text(label,
+              child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                Row(children: [
+                  Expanded(
+                      child: Text(label,
+                          style: const TextStyle(
+                              fontSize: 12, color: Color(0xFF526787)))),
+                  Text('${(share * 100).round()}%',
                       style: const TextStyle(
-                          fontSize: 12, color: Color(0xFF526787)))),
-              Text('${(share * 100).round()}%',
-                  style: const TextStyle(
-                      fontSize: 12, color: Color(0xFF526787))),
-            ]),
-            const SizedBox(height: 6),
-            LinearProgressIndicator(
-                value: share,
-                minHeight: 8,
-                borderRadius: BorderRadius.circular(8),
-                backgroundColor: const Color(0xFFEEF2F8),
-                color: color),
-          ])),
+                          fontSize: 12, color: Color(0xFF526787))),
+                ]),
+                const SizedBox(height: AppSpacing.sm),
+                LinearProgressIndicator(
+                    value: share,
+                    minHeight: 8,
+                    borderRadius: BorderRadius.circular(8),
+                    backgroundColor: const Color(0xFFEEF2F8),
+                    color: color),
+              ])),
           SizedBox(
               width: 36,
               child: Text(_financialNumber(count),
@@ -1067,21 +1072,25 @@ class _OperationsFinancialState extends State<OperationsFinancialScreen>
       _financeCardHeader('Metode & Channel',
           trailing: const Text('Distribusi nominal',
               style: TextStyle(fontSize: 12, color: Color(0xFF526787)))),
-      const SizedBox(height: 14),
+      const SizedBox(height: AppSpacing.lg),
       if (!_available || mix is! List)
-        const Text('Belum Tersedia', style: TextStyle(fontSize: 14))
+        const Text('Belum Tersedia', style: TextStyle(fontSize: 13))
       else if (items.isEmpty)
         const Text('Belum ada capture pada periode ini.',
-            style: TextStyle(fontSize: 14))
+            style: TextStyle(fontSize: 13))
       else
         for (var i = 0; i < items.length; i++) ...[
-          if (i > 0) const SizedBox(height: 18),
-          _financeMethodItem(items[i], palette[i % palette.length],
-              total > 0 ? (_number(items[i]['gross_collected']) ?? 0) / total : 0,
+          if (i > 0) const SizedBox(height: AppSpacing.lg),
+          _financeMethodItem(
+              items[i],
+              palette[i % palette.length],
+              total > 0
+                  ? (_number(items[i]['gross_collected']) ?? 0) / total
+                  : 0,
               single: items.length == 1),
         ],
       if (financial['method_mix_truncated'] == true) ...[
-        const SizedBox(height: 12),
+        const SizedBox(height: AppSpacing.md),
         Text(
             'Rincian dibatasi ${financial['method_mix_limit']} grup; total tetap mencakup seluruh grup.',
             style: const TextStyle(
@@ -1103,7 +1112,7 @@ class _OperationsFinancialState extends State<OperationsFinancialScreen>
             height: 10,
             decoration: BoxDecoration(
                 color: color, borderRadius: BorderRadius.circular(3))),
-        const SizedBox(width: 8),
+        const SizedBox(width: AppSpacing.sm),
         Expanded(
             child: Text(name,
                 style: const TextStyle(
@@ -1111,14 +1120,14 @@ class _OperationsFinancialState extends State<OperationsFinancialScreen>
                     fontWeight: FontWeight.w700,
                     color: AppColors.navy))),
       ]),
-      const SizedBox(height: 10),
+      const SizedBox(height: AppSpacing.sm),
       LinearProgressIndicator(
           value: share.clamp(0.0, 1.0).toDouble(),
           minHeight: 10,
           borderRadius: BorderRadius.circular(8),
           backgroundColor: const Color(0xFFEEF2F8),
           color: color),
-      const SizedBox(height: 10),
+      const SizedBox(height: AppSpacing.sm),
       Row(children: [
         Expanded(
             child: Text(
@@ -1128,7 +1137,7 @@ class _OperationsFinancialState extends State<OperationsFinancialScreen>
         Text(_financialMoney(item['gross_collected']),
             style: _financeValueStyle(13)),
       ]),
-      const SizedBox(height: 8),
+      const SizedBox(height: AppSpacing.sm),
       Text(
           'Channel: $method - $channel.'
           '${single ? ' Seluruh nominal yang teridentifikasi pada snapshot berasal dari channel ini.' : ''}',
@@ -1140,56 +1149,6 @@ class _OperationsFinancialState extends State<OperationsFinancialScreen>
 
 // ── Superadmin finance page building blocks ───────────────────────────────
 
-class _FinanceFilterCard extends StatelessWidget {
-  const _FinanceFilterCard(
-      {super.key,
-      required this.icon,
-      required this.caption,
-      required this.value,
-      required this.onTap});
-  final IconData icon;
-  final String caption;
-  final String value;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) => Material(
-      color: Colors.white,
-      clipBehavior: Clip.antiAlias,
-      shape: RoundedRectangleBorder(
-          side: const BorderSide(color: AppColors.border),
-          borderRadius: BorderRadius.circular(16)),
-      child: InkWell(
-          onTap: onTap,
-          child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-              child: Row(children: [
-                Icon(icon, size: 20, color: AppColors.blue),
-                const SizedBox(width: 10),
-                Expanded(
-                    child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                      Text(caption,
-                          style: const TextStyle(
-                              fontSize: 9.5,
-                              letterSpacing: .5,
-                              color: AppColors.textSecondary)),
-                      const SizedBox(height: 2),
-                      Text(value,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.w700,
-                              color: AppColors.navy)),
-                    ])),
-                const SizedBox(width: 6),
-                const Icon(PhosphorIconsRegular.caretDown,
-                    size: 16, color: AppColors.blue),
-              ]))));
-}
-
 class _FinanceTabs extends StatelessWidget {
   const _FinanceTabs({required this.analytics, required this.onChanged});
   final bool analytics;
@@ -1197,7 +1156,7 @@ class _FinanceTabs extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Container(
-      padding: const EdgeInsets.all(4),
+      padding: const EdgeInsets.all(AppSpacing.xs),
       decoration: BoxDecoration(
           color: const Color(0xFFE6EDF8),
           borderRadius: BorderRadius.circular(16)),
@@ -1221,7 +1180,7 @@ class _FinanceTabs extends StatelessWidget {
                           borderRadius: BorderRadius.circular(12),
                           onTap: () => onChanged(tab.$2),
                           child: SizedBox(
-                              height: 44,
+                              height: kMinInteractiveDimension,
                               child: Center(
                                   child: Text(tab.$1,
                                       textAlign: TextAlign.center,
@@ -1238,8 +1197,10 @@ Widget _financeHeading(String title, String subtitle) =>
     Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       Text(title,
           style: const TextStyle(
-              fontSize: 18, fontWeight: FontWeight.w800, color: AppColors.navy)),
-      const SizedBox(height: 4),
+              fontSize: 14,
+              fontWeight: FontWeight.w700,
+              color: AppColors.navy)),
+      const SizedBox(height: AppSpacing.xs),
       Text(subtitle,
           style: const TextStyle(
               fontSize: 13, height: 1.5, color: Color(0xFF526787))),
@@ -1252,7 +1213,7 @@ Widget _financeCardHeader(String title, {Widget? trailing}) => Row(children: [
                   fontSize: 16,
                   fontWeight: FontWeight.w800,
                   color: AppColors.navy))),
-      if (trailing != null) ...[const SizedBox(width: 8), trailing],
+      if (trailing != null) ...[const SizedBox(width: AppSpacing.sm), trailing],
     ]);
 
 /// Small "i" badge; tap to read what the figure means.
@@ -1260,7 +1221,7 @@ Widget _financeInfo(String message, {bool onDark = false}) => Tooltip(
     message: message,
     triggerMode: TooltipTriggerMode.tap,
     showDuration: const Duration(seconds: 5),
-    margin: const EdgeInsets.symmetric(horizontal: 24),
+    margin: const EdgeInsets.symmetric(horizontal: AppSpacing.xl),
     child: SizedBox(
         width: 32,
         height: 32,
@@ -1287,33 +1248,34 @@ Widget _financeFigureCard(String label, String value, String caption) {
   final money = value.startsWith('Rp');
   return _DashboardCard(
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-    Text(label,
-        style: const TextStyle(fontSize: 12, color: Color(0xFF526787))),
-    const SizedBox(height: 10),
+    Text(label, style: const TextStyle(fontSize: 12, color: Color(0xFF526787))),
+    const SizedBox(height: AppSpacing.sm),
     Text(value, style: _financeValueStyle(money ? 20 : 28)),
-    const SizedBox(height: 6),
+    const SizedBox(height: AppSpacing.sm),
     Text(caption,
         style: const TextStyle(fontSize: 12, color: Color(0xFF526787))),
   ]));
 }
 
 Widget _financeComponentRow(String label, Widget value) => Padding(
-    padding: const EdgeInsets.symmetric(vertical: 12),
+    padding: const EdgeInsets.symmetric(vertical: AppSpacing.md),
     child: Row(crossAxisAlignment: CrossAxisAlignment.center, children: [
       Expanded(
           flex: 4,
           child: Text(label,
               style: const TextStyle(fontSize: 13, color: Color(0xFF526787)))),
-      const SizedBox(width: 12),
+      const SizedBox(width: AppSpacing.md),
       // Value sits flush right (space-between), wrapping right-aligned.
       Expanded(
-          flex: 5, child: Align(alignment: Alignment.centerRight, child: value)),
+          flex: 5,
+          child: Align(alignment: Alignment.centerRight, child: value)),
     ]));
 
 Widget _financeChip(String text, {bool good = false}) => Container(
-    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+    padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.sm, vertical: AppSpacing.sm),
     decoration: BoxDecoration(
-        color: good ? AppColors.successTint : const Color(0xFFF0F3F8),
+        color: good ? AppColors.successTint : AppColors.sheetCloseBackground,
         borderRadius: BorderRadius.circular(8)),
     child: Row(mainAxisSize: MainAxisSize.min, children: [
       Container(
@@ -1322,7 +1284,7 @@ Widget _financeChip(String text, {bool good = false}) => Container(
           decoration: BoxDecoration(
               shape: BoxShape.circle,
               color: good ? AppColors.success : AppColors.textMuted)),
-      const SizedBox(width: 6),
+      const SizedBox(width: AppSpacing.sm),
       Flexible(
           child: Text(text,
               style: TextStyle(
@@ -1403,7 +1365,7 @@ class _FinancialBookingChart extends StatelessWidget {
                                       }),
                                 textAlign: TextAlign.center,
                                 style: const TextStyle(
-                                    fontSize: 10,
+                                    fontSize: 11,
                                     color: AppColors.textSecondary))),
                     ]),
                   ])));

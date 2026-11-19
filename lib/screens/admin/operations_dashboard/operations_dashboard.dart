@@ -68,12 +68,12 @@ class OperationsPage extends StatelessWidget {
                   role: role)),
           Padding(
               padding: EdgeInsets.fromLTRB(
-                  16,
-                  16,
-                  16,
+                  AppSpacing.lg,
+                  AppSpacing.lg,
+                  AppSpacing.lg,
                   // Pushed pages have no floating nav to clear.
                   !embedded
-                      ? 24 + MediaQuery.paddingOf(context).bottom
+                      ? AppSpacing.xl + MediaQuery.paddingOf(context).bottom
                       : 128),
               child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -494,7 +494,7 @@ class _OperationsDashboardState extends State<OperationsDashboard>
                                       _errorBlock(_error!,
                                           _scopeError(_error) ? _filter : _load,
                                           role: _role),
-                                      const SizedBox(height: 16),
+                                      const SizedBox(height: AppSpacing.lg),
                                       OperationsFinancialScreen(
                                           key: ValueKey('finance-$_request'),
                                           repository: _repository,
@@ -503,7 +503,7 @@ class _OperationsDashboardState extends State<OperationsDashboard>
                                           active: widget.active),
                                     ] else if (noAssignment) ...[
                                       const _NoAssignmentState(),
-                                      const SizedBox(height: 16),
+                                      const SizedBox(height: AppSpacing.lg),
                                       OperationsFinancialScreen(
                                           key: ValueKey('finance-$_request'),
                                           repository: _repository,
@@ -516,7 +516,7 @@ class _OperationsDashboardState extends State<OperationsDashboard>
                                             personal: _personal,
                                             onChanged: (value) => setState(
                                                 () => _personal = value)),
-                                        const SizedBox(height: 16),
+                                        const SizedBox(height: AppSpacing.lg),
                                       ],
                                       if (_role == 1 && _personal)
                                         ..._personalHome(data)
@@ -524,7 +524,7 @@ class _OperationsDashboardState extends State<OperationsDashboard>
                                         ..._destinationHome(data)
                                       else ...[
                                         _homeFilterBar(data),
-                                        const SizedBox(height: 12),
+                                        const SizedBox(height: AppSpacing.md),
                                         if (_role == 1) ...[
                                           _DashboardCard(
                                               child: Column(
@@ -540,7 +540,8 @@ class _OperationsDashboardState extends State<OperationsDashboard>
                                                         fontSize: 16,
                                                         fontWeight:
                                                             FontWeight.w700)),
-                                                const SizedBox(height: 12),
+                                                const SizedBox(
+                                                    height: AppSpacing.md),
                                                 Text(
                                                     _personal
                                                         ? _value(data.personal[
@@ -548,7 +549,7 @@ class _OperationsDashboardState extends State<OperationsDashboard>
                                                         : _value(data.metrics[
                                                             'pending_approvals']),
                                                     style: const TextStyle(
-                                                        fontSize: 32,
+                                                        fontSize: 36,
                                                         fontWeight:
                                                             FontWeight.w800)),
                                                 Text(
@@ -557,8 +558,21 @@ class _OperationsDashboardState extends State<OperationsDashboard>
                                                         : 'Booking menunggu keputusan',
                                                     style: const TextStyle(
                                                         fontSize: 13)),
-                                                const SizedBox(height: 12),
+                                                const SizedBox(
+                                                    height: AppSpacing.md),
                                                 FilledButton(
+                                                    style: FilledButton.styleFrom(
+                                                        textStyle:
+                                                            const TextStyle(
+                                                                fontSize: 13,
+                                                                fontWeight:
+                                                                    FontWeight
+                                                                        .w800),
+                                                        shape: RoundedRectangleBorder(
+                                                            borderRadius:
+                                                                BorderRadius
+                                                                    .circular(
+                                                                        14))),
                                                     onPressed: () => _open(_personal
                                                         ? OperationsReportScreen(
                                                             section:
@@ -578,7 +592,7 @@ class _OperationsDashboardState extends State<OperationsDashboard>
                                                         ? 'Lihat kinerja saya'
                                                         : 'Tinjau antrean')),
                                               ])),
-                                          const SizedBox(height: 12),
+                                          const SizedBox(height: AppSpacing.md),
                                         ],
                                         OperationsMetrics(
                                           values: _personal
@@ -678,7 +692,7 @@ class _OperationsDashboardState extends State<OperationsDashboard>
                                                     ],
                                         ),
                                         if (_personal) ...[
-                                          const SizedBox(height: 12),
+                                          const SizedBox(height: AppSpacing.md),
                                           _Notice(
                                               'Claim aktif saya saat ini: ${_value(data.assignedWorkload['personal_claims'])}. Riwayat keputusan pribadi mencakup penugasan sebelumnya.'),
                                           if (_role != 1)
@@ -693,10 +707,10 @@ class _OperationsDashboardState extends State<OperationsDashboard>
                                                         repository: _repository,
                                                         session: _session))),
                                         ],
-                                        const SizedBox(height: 16),
+                                        const SizedBox(height: AppSpacing.lg),
                                         if (_role != 1 || !_personal)
                                           _actionCenter(data),
-                                        const SizedBox(height: 16),
+                                        const SizedBox(height: AppSpacing.lg),
                                         if (_role != 1 || !_personal)
                                           OperationsFinancialScreen(
                                               key:
@@ -705,7 +719,7 @@ class _OperationsDashboardState extends State<OperationsDashboard>
                                               session: _session,
                                               preview: true,
                                               active: widget.active),
-                                        const SizedBox(height: 12),
+                                        const SizedBox(height: AppSpacing.md),
                                         if (_approvals != null) ...[
                                           _DecisionTrendCard(
                                               rows: _approvals!.series,
@@ -716,7 +730,7 @@ class _OperationsDashboardState extends State<OperationsDashboard>
                                                       initialFilters: _filters,
                                                       repository: _repository,
                                                       session: _session))),
-                                          const SizedBox(height: 16),
+                                          const SizedBox(height: AppSpacing.lg),
                                         ],
                                         if (_role != 1 || !_personal)
                                           _DashboardCard(
@@ -732,7 +746,8 @@ class _OperationsDashboardState extends State<OperationsDashboard>
                                                       fontSize: 13,
                                                       color:
                                                           Color(0xFF526787))),
-                                              const SizedBox(height: 8),
+                                              const SizedBox(
+                                                  height: AppSpacing.sm),
                                               Text(
                                                   'Periode: ${_period(data.period)} · basis dibuat (UTC)',
                                                   style: const TextStyle(
@@ -748,7 +763,7 @@ class _OperationsDashboardState extends State<OperationsDashboard>
                                           )),
                                         if (_actions.isNotEmpty &&
                                             (_role != 1 || !_personal)) ...[
-                                          const SizedBox(height: 16),
+                                          const SizedBox(height: AppSpacing.lg),
                                           _DashboardCard(
                                               child: Column(
                                             crossAxisAlignment:
@@ -782,7 +797,7 @@ class _OperationsDashboardState extends State<OperationsDashboard>
                                             ],
                                           )),
                                         ],
-                                        const SizedBox(height: 16),
+                                        const SizedBox(height: AppSpacing.lg),
                                         _HomeLinkCard(
                                             icon: PhosphorIconsRegular
                                                 .calendarDots,
@@ -793,10 +808,10 @@ class _OperationsDashboardState extends State<OperationsDashboard>
                                                 DaftarPendaftarScreen(
                                                     repository: _repository,
                                                     session: _session))),
-                                        const SizedBox(height: 12),
+                                        const SizedBox(height: AppSpacing.md),
                                         _HomeLinkCard(
-                                            icon:
-                                                PhosphorIconsRegular.chartLineUp,
+                                            icon: PhosphorIconsRegular
+                                                .chartLineUp,
                                             title: 'Kinerja destinasi',
                                             subtitle:
                                                 'Pantau performa destinasi wisata',
@@ -806,7 +821,7 @@ class _OperationsDashboardState extends State<OperationsDashboard>
                                                     repository: _repository,
                                                     session: _session,
                                                     initialFilters: _filters))),
-                                        const SizedBox(height: 12),
+                                        const SizedBox(height: AppSpacing.md),
                                         _HomeLinkCard(
                                             icon: PhosphorIconsRegular.scan,
                                             title: 'Kunjungan dan check-in',
@@ -850,7 +865,7 @@ class OperationsAnalyticsHub extends StatelessWidget {
               ('visitors', 'Kunjungan', 'Check-in yang teramati')
             ])
               Card(
-                  margin: const EdgeInsets.only(bottom: 8),
+                  margin: const EdgeInsets.only(bottom: AppSpacing.sm),
                   color: Colors.white,
                   elevation: 0,
                   shape: RoundedRectangleBorder(
@@ -859,7 +874,7 @@ class OperationsAnalyticsHub extends StatelessWidget {
                   clipBehavior: Clip.antiAlias,
                   child: ListTile(
                       contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 14, vertical: 8),
+                          horizontal: AppSpacing.lg, vertical: AppSpacing.sm),
                       title: Text(entry.$2,
                           style: const TextStyle(
                               fontSize: 14,
@@ -878,7 +893,7 @@ class OperationsAnalyticsHub extends StatelessWidget {
                                   section: entry.$1,
                                   repository: repository,
                                   session: session))))),
-            const SizedBox(height: 20),
+            const SizedBox(height: AppSpacing.xl),
             OperationsFinancialScreen(
                 repository: repository,
                 session: session,

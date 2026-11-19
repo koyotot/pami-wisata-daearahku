@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:phosphor_icons/phosphor_icons.dart';
 import 'package:latlong2/latlong.dart';
 import '../../data/admin_state.dart' show canAccessAdmin;
@@ -8,6 +9,7 @@ import '../../data/favorite_state.dart';
 import '../../services/api_client.dart';
 import '../../services/auth_session.dart';
 import '../../services/destination_directions.dart';
+import '../../theme/app_colors.dart';
 import '../../widgets/destination_hero_gallery.dart';
 import '../../widgets/reviews_sheet.dart';
 import '../../widgets/visit_format.dart';
@@ -21,13 +23,13 @@ export '../../services/destination_directions.dart'
     show destinationDirectionsUri;
 
 class _C {
-  static const blue = Color(0xFF1976D2);
-  static const navy = Color(0xFF102D59);
-  static const bg = Color(0xFFF5F8FD);
-  static const card = Colors.white;
+  static const blue = AppColors.blue;
+  static const navy = AppColors.navy;
+  static const bg = AppColors.bg;
+  static const card = AppColors.surface;
   static const text = navy;
-  static const textMuted = Color(0xFF64748B);
-  static const border = Color(0xFFDCE4F0);
+  static const textMuted = AppColors.textSecondary;
+  static const border = AppColors.border;
 }
 
 class DetailWisataScreen extends StatefulWidget {
@@ -191,7 +193,8 @@ class _DetailWisataScreenState extends State<DetailWisataScreen> {
         backgroundColor: _C.card,
         behavior: SnackBarBehavior.floating,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        margin: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+        margin: const EdgeInsets.fromLTRB(
+            AppSpacing.lg, 0, AppSpacing.lg, AppSpacing.md),
         duration: const Duration(seconds: 2),
       ),
     );
@@ -244,7 +247,7 @@ class _DetailWisataScreenState extends State<DetailWisataScreen> {
                                   : widget.wisata.nama,
                               onBack: () => Navigator.maybePop(context)),
                           Padding(
-                              padding: const EdgeInsets.all(24),
+                              padding: const EdgeInsets.all(AppSpacing.xl),
                               child: _detail.loading
                                   ? const LinearProgressIndicator()
                                   : Text(
@@ -260,20 +263,20 @@ class _DetailWisataScreenState extends State<DetailWisataScreen> {
                     height: MediaQuery.sizeOf(context).height * .42,
                     color: _C.border),
                 const Padding(
-                    padding: EdgeInsets.all(24),
+                    padding: EdgeInsets.all(AppSpacing.xl),
                     child: LinearProgressIndicator()),
                 const Center(child: Text('Memuat destinasi...')),
               ])
             : Center(
                 child: Padding(
-                    padding: const EdgeInsets.all(24),
+                    padding: const EdgeInsets.all(AppSpacing.xl),
                     child: Column(mainAxisSize: MainAxisSize.min, children: [
                       Text(
                           error is ApiException && error.status == 404
                               ? 'Destinasi tidak ditemukan atau tidak tersedia.'
                               : '${error ?? 'Destinasi belum tersedia.'}',
                           textAlign: TextAlign.center),
-                      const SizedBox(height: 12),
+                      const SizedBox(height: AppSpacing.md),
                       OutlinedButton(
                           onPressed: _loadDetail,
                           child: const Text('Coba lagi')),
@@ -323,7 +326,7 @@ class _DetailWisataScreenState extends State<DetailWisataScreen> {
                 if (widget.adminPreview)
                   const SliverToBoxAdapter(
                       child: Padding(
-                    padding: EdgeInsets.all(16),
+                    padding: EdgeInsets.all(AppSpacing.lg),
                     child: Text(
                         'Mode Pratinjau · Tidak dapat melakukan pemesanan',
                         key: ValueKey('v3-preview-mode'),
@@ -397,89 +400,74 @@ class _DetailWisataScreenState extends State<DetailWisataScreen> {
                               color: _C.bg,
                               borderRadius: BorderRadius.vertical(
                                   top: Radius.circular(28))),
-                          padding: const EdgeInsets.fromLTRB(24, 26, 24, 32),
+                          padding: const EdgeInsets.all(AppSpacing.lg),
                           child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                LayoutBuilder(builder: (context, constraints) {
-                                  final title = Text(destination.name,
-                                      style: const TextStyle(
-                                          color: _C.navy,
-                                          fontSize: 28,
-                                          height: 1.2,
-                                          fontWeight: FontWeight.w800,
-                                          letterSpacing: -.8));
-                                  final score = TextButton.icon(
-                                      onPressed: _openReviews,
-                                      icon: const Icon(PhosphorIconsFill.star,
-                                          color: Color(0xFFE08600), size: 20),
-                                      label: Text(rating,
-                                          // Screen readers say "dash" for '-'.
-                                          semanticsLabel: rating == '-'
-                                              ? 'Belum dinilai'
-                                              : null,
-                                          style: const TextStyle(
-                                              color: _C.navy,
-                                              fontWeight: FontWeight.w700)));
-                                  if (constraints.maxWidth < 320 ||
-                                      MediaQuery.textScalerOf(context)
-                                              .scale(14) >
-                                          19)
-                                    return Column(
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.start,
-                                        children: [title, score]);
-                                  // Title takes the remaining width; the
-                                  // rating hugs the right edge (capped so a
-                                  // long label can't squeeze the title).
-                                  return Row(
-                                      mainAxisAlignment:
-                                          MainAxisAlignment.spaceBetween,
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        Expanded(child: title),
-                                        const SizedBox(width: 8),
-                                        ConstrainedBox(
-                                            constraints: BoxConstraints(
-                                                maxWidth:
-                                                    constraints.maxWidth * .45),
-                                            child: score)
-                                      ]);
-                                }),
-                                const SizedBox(height: 10),
+                                Text(destination.name,
+                                    style: GoogleFonts.plusJakartaSans(
+                                        color: _C.navy,
+                                        fontSize: 22,
+                                        height: 1.2,
+                                        fontWeight: FontWeight.w800,
+                                        letterSpacing: -.5)),
+                                const SizedBox(height: AppSpacing.sm),
                                 _location(destination.location),
-                                const SizedBox(height: 18),
-                                Wrap(spacing: 10, runSpacing: 10, children: [
-                                  if (destination.category != null)
-                                    _meta(PhosphorIconsRegular.squaresFour,
-                                        destination.category!.name),
-                                  if (destination.openingHours.isNotEmpty)
-                                    _meta(PhosphorIconsRegular.clock,
-                                        destination.openingHours),
-                                ]),
+                                const SizedBox(height: AppSpacing.lg),
+                                Wrap(
+                                    spacing: AppSpacing.sm,
+                                    runSpacing: AppSpacing.sm,
+                                    children: [
+                                      if (destination.category != null)
+                                        _meta(PhosphorIconsRegular.squaresFour,
+                                            destination.category!.name),
+                                      if (destination.openingHours.isNotEmpty)
+                                        _meta(PhosphorIconsRegular.clock,
+                                            destination.openingHours),
+                                      OutlinedButton.icon(
+                                        onPressed: _openReviews,
+                                        style: OutlinedButton.styleFrom(
+                                          foregroundColor: _C.navy,
+                                          backgroundColor: _C.card,
+                                          minimumSize: const Size(48, 48),
+                                          tapTargetSize:
+                                              MaterialTapTargetSize.padded,
+                                          visualDensity: VisualDensity.standard,
+                                          padding: const EdgeInsets.symmetric(
+                                              horizontal: AppSpacing.md,
+                                              vertical: AppSpacing.sm),
+                                          side: const BorderSide(
+                                              color: _C.border),
+                                          shape: RoundedRectangleBorder(
+                                              borderRadius:
+                                                  BorderRadius.circular(12)),
+                                        ),
+                                        icon: const Icon(PhosphorIconsFill.star,
+                                            size: 16, color: _C.blue),
+                                        label: Text(
+                                            rating == '-'
+                                                ? (destination.ratingCount == 0
+                                                    ? 'Belum ada rating'
+                                                    : 'Rating belum tersedia')
+                                                : '$rating · ${destination.ratingCount} ulasan',
+                                            style: GoogleFonts.plusJakartaSans(
+                                                fontSize: 11,
+                                                fontWeight: FontWeight.w600)),
+                                      ),
+                                    ]),
                                 if (!(destination.isActive &&
                                     destination.category?.isActive !=
                                         false)) ...[
-                                  const SizedBox(height: 18),
+                                  const SizedBox(height: AppSpacing.lg),
                                   const Text(
                                       'Destinasi ini sedang tidak menerima kunjungan.',
                                       style: TextStyle(color: _C.textMuted)),
                                 ],
-                                const SizedBox(height: 30),
-                                _heading('Tentang Destinasi'),
-                                const SizedBox(height: 14),
-                                // Same white card as "Lokasi Destinasi".
-                                Container(
-                                    width: double.infinity,
-                                    padding: const EdgeInsets.all(18),
-                                    decoration: BoxDecoration(
-                                        color: Colors.white,
-                                        border: Border.all(color: _C.border),
-                                        borderRadius:
-                                            BorderRadius.circular(18)),
-                                    child: LayoutBuilder(
-                                        builder: (context, constraints) {
+                                const SizedBox(height: AppSpacing.xl),
+                                _heading('Tentang destinasi'),
+                                const SizedBox(height: AppSpacing.md),
+                                _contentCard(LayoutBuilder(
+                                    builder: (context, constraints) {
                                   final description =
                                       destination.description.isEmpty
                                           ? 'Deskripsi belum tersedia.'
@@ -488,8 +476,8 @@ class _DetailWisataScreenState extends State<DetailWisataScreen> {
                                       .style
                                       .merge(const TextStyle(
                                           color: _C.textMuted,
-                                          fontSize: 14,
-                                          height: 1.8))
+                                          fontSize: 12,
+                                          height: 1.6))
                                       .merge(MediaQuery.boldTextOf(context)
                                           ? const TextStyle(
                                               fontWeight: FontWeight.bold)
@@ -501,7 +489,7 @@ class _DetailWisataScreenState extends State<DetailWisataScreen> {
                                   final painter = TextPainter(
                                     text: TextSpan(
                                         text: description, style: style),
-                                    maxLines: 4,
+                                    maxLines: 3,
                                     ellipsis: '\u2026',
                                     textScaler: textScaler,
                                     textDirection: textDirection,
@@ -516,7 +504,7 @@ class _DetailWisataScreenState extends State<DetailWisataScreen> {
                                           CrossAxisAlignment.start,
                                       children: [
                                         Text(description,
-                                            maxLines: collapsed ? 4 : null,
+                                            maxLines: collapsed ? 3 : null,
                                             overflow: collapsed
                                                 ? TextOverflow.ellipsis
                                                 : TextOverflow.visible,
@@ -525,34 +513,50 @@ class _DetailWisataScreenState extends State<DetailWisataScreen> {
                                             style: style),
                                         if (overflows)
                                           TextButton(
+                                              style: TextButton.styleFrom(
+                                                foregroundColor: _C.blue,
+                                                minimumSize: const Size(48, 48),
+                                                padding: EdgeInsets.zero,
+                                                alignment: Alignment.centerLeft,
+                                                textStyle:
+                                                    GoogleFonts.plusJakartaSans(
+                                                        fontSize: 13,
+                                                        fontWeight:
+                                                            FontWeight.w800),
+                                              ),
                                               onPressed: () => setState(
                                                   () => _expanded = !_expanded),
                                               child: Text(_expanded
-                                                  ? 'Tampilkan Lebih Sedikit'
-                                                  : 'Baca selengkapnya')),
+                                                  ? 'Ringkas ↑'
+                                                  : 'Selengkapnya ↓')),
                                       ]);
                                 })),
-                                const SizedBox(height: 30),
-                                _heading('Fasilitas Tersedia'),
-                                const SizedBox(height: 14),
+                                const SizedBox(height: AppSpacing.xl),
+                                _heading('Fasilitas'),
+                                const SizedBox(height: AppSpacing.md),
                                 if (destination.facilities.isEmpty)
-                                  const Text('Fasilitas belum dicantumkan.',
-                                      style: TextStyle(color: _C.textMuted))
+                                  _contentCard(const Text(
+                                      'Informasi fasilitas belum dicantumkan oleh pengelola.',
+                                      style: TextStyle(
+                                          color: _C.textMuted,
+                                          fontSize: 12,
+                                          height: 1.6)))
                                 else
                                   Wrap(
-                                      spacing: 10,
-                                      runSpacing: 10,
+                                      spacing: AppSpacing.sm,
+                                      runSpacing: AppSpacing.sm,
                                       children: destination.facilities
                                           .map((facility) => _meta(
                                               _facilityIcon(facility.iconKey),
                                               facility.name))
                                           .toList()),
-                                const SizedBox(height: 30),
+                                const SizedBox(height: AppSpacing.xl),
                                 _heading('Lokasi Destinasi'),
-                                const SizedBox(height: 14),
+                                const SizedBox(height: AppSpacing.md),
                                 Container(
                                     width: double.infinity,
-                                    padding: const EdgeInsets.all(18),
+                                    padding:
+                                        const EdgeInsets.all(AppSpacing.lg),
                                     decoration: BoxDecoration(
                                         color: Colors.white,
                                         border: Border.all(color: _C.border),
@@ -563,7 +567,7 @@ class _DetailWisataScreenState extends State<DetailWisataScreen> {
                                             CrossAxisAlignment.stretch,
                                         children: [
                                           _location(destination.location),
-                                          const SizedBox(height: 14),
+                                          const SizedBox(height: AppSpacing.md),
                                           if (destination.hasCoordinates) ...[
                                             Material(
                                                 clipBehavior: Clip.antiAlias,
@@ -599,20 +603,21 @@ class _DetailWisataScreenState extends State<DetailWisataScreen> {
                                                                           borderRadius:
                                                                               BorderRadius.all(Radius.circular(8))),
                                                                       child: Padding(
-                                                                          padding: EdgeInsets.all(8),
+                                                                          padding: EdgeInsets.all(AppSpacing.sm),
                                                                           child: Row(
                                                                             mainAxisSize:
                                                                                 MainAxisSize.min,
                                                                             children: [
                                                                               Icon(PhosphorIconsRegular.arrowsOut, color: _C.blue),
-                                                                              SizedBox(width: 4),
+                                                                              SizedBox(width: AppSpacing.xs),
                                                                               Text('Lihat peta', style: TextStyle(color: _C.navy))
                                                                             ],
                                                                           )),
                                                                     )),
                                                                   ),
                                                                 ]))))),
-                                            const SizedBox(height: 10),
+                                            const SizedBox(
+                                                height: AppSpacing.sm),
                                             OutlinedButton.icon(
                                                 onPressed: widget
                                                             .adminPreview ||
@@ -632,7 +637,7 @@ class _DetailWisataScreenState extends State<DetailWisataScreen> {
                                                     color: _C.textMuted,
                                                     fontSize: 12)),
                                         ])),
-                                const SizedBox(height: 24),
+                                const SizedBox(height: AppSpacing.xl),
                                 // Full width so the link sits at the right
                                 // edge; it still wraps below at large text.
                                 SizedBox(
@@ -641,25 +646,34 @@ class _DetailWisataScreenState extends State<DetailWisataScreen> {
                                       alignment: WrapAlignment.spaceBetween,
                                       crossAxisAlignment:
                                           WrapCrossAlignment.center,
-                                      spacing: 12,
+                                      spacing: AppSpacing.md,
                                       children: [
-                                        _heading('Ulasan Pengunjung'),
-                                        TextButton(
-                                            onPressed: _openReviews,
-                                            child: const Text('Lihat Semua'))
+                                        _heading('Ulasan pengunjung'),
+                                        if (destination.ratingCount > 0)
+                                          TextButton(
+                                              onPressed: _openReviews,
+                                              child: const Text('Lihat Semua',
+                                                  style: TextStyle(
+                                                      fontSize: 13,
+                                                      fontWeight:
+                                                          FontWeight.w800)))
                                       ]),
                                 ),
-                                const SizedBox(height: 10),
+                                const SizedBox(height: AppSpacing.sm),
                                 if (destination.ratingCount == 0)
-                                  const Text(
+                                  _contentCard(const Text(
                                       'Belum ada ulasan untuk destinasi ini.',
                                       style: TextStyle(
-                                          color: _C.textMuted, height: 1.6))
+                                          color: _C.textMuted,
+                                          fontSize: 12,
+                                          height: 1.6)))
                                 else
                                   Text(
                                       '$rating dari 5, ${destination.ratingCount} ulasan pengunjung',
                                       style: const TextStyle(
-                                          color: _C.textMuted, height: 1.6)),
+                                          color: _C.textMuted,
+                                          fontSize: 12,
+                                          height: 1.6)),
                               ]),
                         ))),
               ]),
@@ -715,10 +729,10 @@ class _DetailWisataScreenState extends State<DetailWisataScreen> {
         children: [
           const Text('Harga tiket / orang',
               style: TextStyle(color: _C.textMuted, fontSize: 12)),
-          const SizedBox(height: 4),
+          const SizedBox(height: AppSpacing.xs),
           Text(visitMoney(destination.ticketPrice, destination.currency),
-              style: const TextStyle(
-                  color: _C.navy, fontSize: 21, fontWeight: FontWeight.w800)),
+              style: GoogleFonts.plusJakartaSans(
+                  color: _C.navy, fontSize: 13, fontWeight: FontWeight.w800)),
         ]);
     final action = FilledButton(
         onPressed: !widget.adminPreview &&
@@ -728,10 +742,13 @@ class _DetailWisataScreenState extends State<DetailWisataScreen> {
             : null,
         style: FilledButton.styleFrom(
             backgroundColor: _C.blue,
-            minimumSize: const Size(0, 54),
-            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+            minimumSize: const Size(140, 50),
+            textStyle: GoogleFonts.plusJakartaSans(
+                fontSize: 13, fontWeight: FontWeight.w800),
+            padding: const EdgeInsets.symmetric(
+                horizontal: AppSpacing.lg, vertical: AppSpacing.md),
             shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16))),
+                borderRadius: BorderRadius.circular(14))),
         child: Text(
             widget.adminPreview
                 ? 'Daftar Kunjungan'
@@ -740,26 +757,37 @@ class _DetailWisataScreenState extends State<DetailWisataScreen> {
                     ? 'Daftar Kunjungan'
                     : 'Tidak tersedia',
             textAlign: TextAlign.center));
-    return Container(
-        decoration: const BoxDecoration(
-            color: Colors.white,
-            border: Border(top: BorderSide(color: _C.border))),
+    return Material(
+        color: AppColors.surface,
+        elevation: 8,
+        shadowColor: AppColors.dockShadow,
+        surfaceTintColor: Colors.transparent,
         child: SafeArea(
             top: false,
             child: Padding(
-                padding: const EdgeInsets.fromLTRB(20, 14, 20, 12),
+                padding: const EdgeInsets.symmetric(
+                    horizontal: AppSpacing.lg, vertical: AppSpacing.md),
                 child: LayoutBuilder(builder: (context, constraints) {
-                  if (constraints.maxWidth < 340 ||
+                  if (constraints.maxWidth < 280 ||
                       MediaQuery.textScalerOf(context).scale(14) > 19)
                     return Column(
                         mainAxisSize: MainAxisSize.min,
                         crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [price, const SizedBox(height: 12), action]);
-                  return Row(children: [
-                    Expanded(child: price),
-                    const SizedBox(width: 14),
-                    Expanded(child: action)
-                  ]);
+                        children: [
+                          price,
+                          const SizedBox(height: AppSpacing.md),
+                          action
+                        ]);
+                  return Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Expanded(child: price),
+                        const SizedBox(width: AppSpacing.md),
+                        ConstrainedBox(
+                            constraints: BoxConstraints(
+                                maxWidth: constraints.maxWidth / 2),
+                            child: action)
+                      ]);
                 }))));
   }
 
@@ -779,31 +807,40 @@ class _DetailWisataScreenState extends State<DetailWisataScreen> {
                           color: Colors.white, strokeWidth: 2))
                   : Icon(icon, color: Colors.white),
               constraints: const BoxConstraints(minWidth: 48, minHeight: 48)));
+  Widget _contentCard(Widget child) => Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(AppSpacing.lg),
+      decoration: BoxDecoration(
+          color: _C.card,
+          border: Border.all(color: _C.border),
+          borderRadius: BorderRadius.circular(AppSpacing.lg)),
+      child: child);
   Widget _heading(String text) => Text(text,
-      style: const TextStyle(
-          color: _C.navy, fontSize: 17, fontWeight: FontWeight.w800));
+      style: GoogleFonts.plusJakartaSans(
+          color: _C.navy, fontSize: 14, fontWeight: FontWeight.w700));
   Widget _location(String text) =>
       Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
         const Icon(PhosphorIconsRegular.mapPin, color: _C.blue, size: 18),
-        const SizedBox(width: 6),
+        const SizedBox(width: AppSpacing.sm),
         Expanded(
             child: Text(text.isEmpty ? 'Lokasi belum dicantumkan.' : text,
                 style: const TextStyle(
-                    color: _C.textMuted, fontSize: 13, height: 1.5)))
+                    color: _C.textMuted, fontSize: 12, height: 1.6)))
       ]);
   Widget _meta(IconData icon, String text) => Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      padding: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.md, vertical: AppSpacing.sm),
       decoration: BoxDecoration(
           color: Colors.white,
           border: Border.all(color: _C.border),
           borderRadius: BorderRadius.circular(12)),
       child: Row(mainAxisSize: MainAxisSize.min, children: [
-        Icon(icon, color: _C.textMuted, size: 17),
-        const SizedBox(width: 8),
+        Icon(icon, color: _C.blue, size: 16),
+        const SizedBox(width: AppSpacing.sm),
         Flexible(
             child: Text(text,
-                style: const TextStyle(
-                    color: _C.navy, fontSize: 12, fontWeight: FontWeight.w600)))
+                style: GoogleFonts.plusJakartaSans(
+                    color: _C.navy, fontSize: 11, fontWeight: FontWeight.w600)))
       ]));
   IconData _facilityIcon(String? key) => switch (key) {
         'parking' || 'local_parking' => PhosphorIconsRegular.car,

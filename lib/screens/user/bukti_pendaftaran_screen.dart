@@ -3,37 +3,41 @@
 // REDESIGN: biru terang + Plus Jakarta Sans — selaras home_screen
 // - Header: tombol kembali (kiri) + tombol drawer (kanan)
 // - Kartu statistik (Menunggu / Disetujui / Ditolak) = filter
-// - Kartu tiket modern dengan strip status berwarna
+// - Kartu ringkasan dengan tautan ke halaman detail pendaftaran
 // Butuh package: google_fonts
 // ============================================================
 import 'package:flutter/material.dart';
 import 'package:phosphor_icons/phosphor_icons.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
+import '../../data/admin_state.dart' show formatInstantInZone, visitDayLabel;
 import '../../data/app_data.dart';
 import '../../data/booking_errors.dart';
 import '../../data/booking_state.dart';
 import '../../data/business_repository.dart';
 import '../../data/payment_models.dart';
 import '../../services/auth_session.dart';
+import '../../theme/app_colors.dart';
 import '../auth/auth_presentation.dart';
 import '../../widgets/booking_ticket_qr_section.dart';
 import '../../widgets/booking_payment_section.dart';
 import '../../widgets/booking_refund_section.dart';
 import '../../widgets/payment_deadline.dart';
+import '../../widgets/operations_status.dart';
+import '../../widgets/visit_format.dart' show visitMonths;
 
 // ── Palet (sama dengan home_screen) ──────────────────────────
-const _blue = Color(0xFF1976D2);
-const _blueDeep = Color(0xFF1558B0);
-const _navy = Color(0xFF102D59);
-const _orange = Color(0xFFFF9800);
-const _background = Color(0xFFF5F8FD);
-const _textMuted = Color(0xFF728099);
-const _border = Color(0xFFDCE4F0);
-const _green = Color(0xFF10B981);
-const _greenDeep = Color(0xFF059669);
-const _red = Color(0xFFE5484D);
-const _amber = Color(0xFFF59E0B);
+const _blue = AppColors.blue;
+const _blueDeep = AppColors.blueDeep;
+const _navy = AppColors.navy;
+const _orange = AppColors.orange;
+const _background = AppColors.bg;
+const _textMuted = AppColors.textSecondary;
+const _border = AppColors.border;
+const _green = AppColors.success;
+const _greenDeep = AppColors.success;
+const _red = AppColors.danger;
+const _amber = AppColors.warningText;
 
 TextStyle _font(
   double size,
@@ -68,7 +72,7 @@ _StatusStyle _styleFor(String status) {
     case 'rejected':
     case 'ditolak':
       return const _StatusStyle(
-          _red, Color(0xFFC53030), 'Ditolak', PhosphorIconsFill.xCircle);
+          _red, AppColors.danger, 'Ditolak', PhosphorIconsFill.xCircle);
     case 'pending_approval':
       return _StatusStyle(_blue, _blueDeep, bookingStatusLabel(status),
           PhosphorIconsRegular.hourglassHigh);
@@ -80,38 +84,25 @@ _StatusStyle _styleFor(String status) {
           PhosphorIconsRegular.hourglassHigh);
     case 'payment_verification':
     case 'payment_review':
-      return _StatusStyle(_amber, const Color(0xFFD97706),
+      return _StatusStyle(_amber, AppColors.warningText,
           bookingStatusLabel(status), PhosphorIconsRegular.hourglassHigh);
     case 'cancelled':
-      return const _StatusStyle(_textMuted, Color(0xFF5B6B85), 'Dibatalkan',
-          PhosphorIconsRegular.prohibit);
+      return const _StatusStyle(_textMuted, AppColors.textSecondary,
+          'Dibatalkan', PhosphorIconsRegular.prohibit);
     case 'expired':
-      return const _StatusStyle(_textMuted, Color(0xFF5B6B85), 'Kedaluwarsa',
-          PhosphorIconsRegular.timer);
+      return const _StatusStyle(_textMuted, AppColors.textSecondary,
+          'Kedaluwarsa', PhosphorIconsRegular.timer);
     default:
-      return _StatusStyle(_textMuted, const Color(0xFF5B6B85),
+      return _StatusStyle(_textMuted, AppColors.textSecondary,
           bookingStatusLabel(status), PhosphorIconsRegular.info);
   }
 }
 
-String _formatBookingDate(String value) {
+String _formatBookingDate(String value, {bool shortMonth = false}) {
   final date = DateTime.tryParse(value);
   if (date == null) return value;
-  const months = [
-    'Januari',
-    'Februari',
-    'Maret',
-    'April',
-    'Mei',
-    'Juni',
-    'Juli',
-    'Agustus',
-    'September',
-    'Oktober',
-    'November',
-    'Desember',
-  ];
-  return '${date.day} ${months[date.month - 1]} ${date.year}';
+  final month = visitMonths[date.month - 1];
+  return '${date.day} ${shortMonth ? month.substring(0, 3) : month} ${date.year}';
 }
 
 String _formatBookingTotal(Booking booking) {
@@ -215,7 +206,9 @@ class BuktiPendaftaranScreen extends StatefulWidget {
 }
 
 class _BuktiPendaftaranScreenState extends State<BuktiPendaftaranScreen> {
-  String? _filter; // null = semua, atau 'menunggu' / 'disetujui' / 'ditolak'
+  String? _filter;
+  final _search = TextEditingController();
+  String _query = '';
 
   /// Riwayat dari Laravel (semua halaman, tanpa duplikat). Respons lama atau dari sesi
   /// sebelumnya tidak pernah menimpa data yang lebih baru.
@@ -251,7 +244,11 @@ class _BuktiPendaftaranScreenState extends State<BuktiPendaftaranScreen> {
 
   void _refresh() {
     if (!mounted) return;
-    setState(() => _filter = null);
+    setState(() {
+      _filter = null;
+      _query = '';
+      _search.clear();
+    });
     _loadBookings();
   }
 
@@ -261,6 +258,7 @@ class _BuktiPendaftaranScreenState extends State<BuktiPendaftaranScreen> {
     BookingEvents.changed.removeListener(_loadBookings);
     _bookings.removeListener(_changed);
     _bookings.dispose();
+    _search.dispose();
     super.dispose();
   }
 
@@ -268,6 +266,13 @@ class _BuktiPendaftaranScreenState extends State<BuktiPendaftaranScreen> {
         'menunggu' => actual == 'pending_approval',
         'disetujui' => actual == 'confirmed',
         'ditolak' => actual == 'rejected',
+        'pembayaran' => const {
+            'awaiting_payment',
+            'payment_verification',
+            'payment_review'
+          }.contains(actual),
+        'expired' => actual == 'expired',
+        'cancelled' => actual == 'cancelled',
         _ => false,
       };
 
@@ -295,9 +300,13 @@ class _BuktiPendaftaranScreenState extends State<BuktiPendaftaranScreen> {
             final hasError = _bookings.error != null && _bookings.items.isEmpty;
             final byGuid = {for (final b in _bookings.items) b.guid: b};
             final semua = _bookings.items.map(_fromBooking).toList();
-            final tampil = _filter == null
-                ? semua
-                : semua.where((p) => _matches(p.status, _filter!)).toList();
+            final tampil = semua
+                .where((p) =>
+                    (_filter == null || _matches(p.status, _filter!)) &&
+                    (_query.isEmpty ||
+                        p.wisata.toLowerCase().contains(_query) ||
+                        p.nomorBukti.toLowerCase().contains(_query)))
+                .toList();
 
             int hitung(String s) =>
                 semua.where((p) => _matches(p.status, s)).length;
@@ -347,14 +356,14 @@ class _BuktiPendaftaranScreenState extends State<BuktiPendaftaranScreen> {
                             hasScrollBody: false, child: _buildFilterKosong())
                       else
                         SliverPadding(
-                          padding: const EdgeInsets.fromLTRB(20, 0, 20, 32),
+                          padding: const EdgeInsets.fromLTRB(AppSpacing.lg, 0,
+                              AppSpacing.lg, AppSpacing.xl + AppSpacing.sm),
                           sliver: SliverList(
                             delegate: SliverChildBuilderDelegate(
                               (_, i) {
                                 final p = tampil[i];
                                 return _FadeSlide(
-                                  // key menjaga state kartu (expand/ulasan)
-                                  // saat filter berganti.
+                                  // State kartu mengikuti booking saat filter berganti.
                                   key: ValueKey(p.id ?? p.nomorBukti),
                                   index: i,
                                   child: _TicketCard(
@@ -400,7 +409,7 @@ class _BuktiPendaftaranScreenState extends State<BuktiPendaftaranScreen> {
       centerTitle: true,
       title: Container(
         height: 34,
-        padding: const EdgeInsets.symmetric(horizontal: 12),
+        padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
         decoration: BoxDecoration(
           color: Colors.white.withValues(alpha: 0.22),
           borderRadius: BorderRadius.circular(17),
@@ -411,10 +420,10 @@ class _BuktiPendaftaranScreenState extends State<BuktiPendaftaranScreen> {
           children: [
             const Icon(PhosphorIconsRegular.bookmark,
                 size: 14, color: Colors.white),
-            const SizedBox(width: 5),
+            const SizedBox(width: AppSpacing.xs),
             Text(
               '$total pendaftaran',
-              style: _font(11.5, FontWeight.w700, Colors.white),
+              style: _font(11, FontWeight.w700, Colors.white),
             ),
           ],
         ),
@@ -425,7 +434,8 @@ class _BuktiPendaftaranScreenState extends State<BuktiPendaftaranScreen> {
           _headerButton(
             icon: PhosphorIconsRegular.list,
             iconSize: 22,
-            margin: const EdgeInsets.fromLTRB(0, 8, 20, 8),
+            margin: const EdgeInsets.fromLTRB(
+                0, AppSpacing.sm, AppSpacing.lg, AppSpacing.sm),
             onTap: widget.onBukaMenu!,
           ),
       ],
@@ -449,8 +459,8 @@ class _BuktiPendaftaranScreenState extends State<BuktiPendaftaranScreen> {
                 ),
               ),
               Positioned(
-                left: 22,
-                right: 22,
+                left: AppSpacing.lg,
+                right: AppSpacing.lg,
                 bottom: 128,
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -459,14 +469,14 @@ class _BuktiPendaftaranScreenState extends State<BuktiPendaftaranScreen> {
                     Text(
                       'Riwayat Pendaftaran',
                       style: _font(
-                        26,
+                        22,
                         FontWeight.w800,
                         Colors.white,
                         height: 1.1,
                         letterSpacing: -0.8,
                       ),
                     ),
-                    const SizedBox(height: 3),
+                    const SizedBox(height: AppSpacing.xs),
                     Text(
                       'Pantau status & tiket kunjunganmu',
                       style: _font(
@@ -486,7 +496,8 @@ class _BuktiPendaftaranScreenState extends State<BuktiPendaftaranScreen> {
       bottom: PreferredSize(
         preferredSize: const Size.fromHeight(110),
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(20, 0, 20, 48),
+          padding: const EdgeInsets.fromLTRB(
+              AppSpacing.lg, 0, AppSpacing.lg, AppSpacing.xl * 2),
           child: Row(
             children: [
               Expanded(
@@ -498,7 +509,7 @@ class _BuktiPendaftaranScreenState extends State<BuktiPendaftaranScreen> {
                   onTap: () => _setFilter('menunggu'),
                 ),
               ),
-              const SizedBox(width: 10),
+              const SizedBox(width: AppSpacing.md),
               Expanded(
                 child: _StatTile(
                   label: 'Disetujui',
@@ -508,7 +519,7 @@ class _BuktiPendaftaranScreenState extends State<BuktiPendaftaranScreen> {
                   onTap: () => _setFilter('disetujui'),
                 ),
               ),
-              const SizedBox(width: 10),
+              const SizedBox(width: AppSpacing.md),
               Expanded(
                 child: _StatTile(
                   label: 'Ditolak',
@@ -538,8 +549,8 @@ class _BuktiPendaftaranScreenState extends State<BuktiPendaftaranScreen> {
     return Padding(
       padding: margin,
       child: SizedBox(
-        width: 40,
-        height: 40,
+        width: kMinInteractiveDimension,
+        height: kMinInteractiveDimension,
         child: Material(
           color: Colors.white.withValues(alpha: 0.22),
           shape: RoundedRectangleBorder(
@@ -562,31 +573,88 @@ class _BuktiPendaftaranScreenState extends State<BuktiPendaftaranScreen> {
 
   // ── Judul bagian ───────────────────────────────────────────
   Widget _buildSectionTitle(int jumlah) {
-    final aktif = _filter != null;
-    final label = aktif ? _styleFor(_filter!).label : null;
     return Padding(
-      padding: const EdgeInsets.fromLTRB(22, 20, 22, 14),
-      child: Row(children: [
-        Container(
-          width: 4,
-          height: 18,
-          decoration: BoxDecoration(
-            color: _orange,
-            borderRadius: BorderRadius.circular(4),
+      padding: const EdgeInsets.fromLTRB(
+          AppSpacing.lg, AppSpacing.xl, AppSpacing.lg, AppSpacing.lg),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        Row(children: [
+          Expanded(
+              child: Text('Daftar kunjungan',
+                  style: _font(16, FontWeight.w800, _navy))),
+          const SizedBox(width: AppSpacing.sm),
+          Text('$jumlah pendaftaran',
+              style: _font(12, FontWeight.w500, _textMuted)),
+        ]),
+        const SizedBox(height: AppSpacing.md),
+        SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: Row(children: [
+            for (final (value, label) in const <(String?, String)>[
+              (null, 'Semua'),
+              ('menunggu', 'Persetujuan'),
+              ('disetujui', 'Disetujui'),
+              ('pembayaran', 'Pembayaran'),
+              ('expired', 'Kedaluwarsa'),
+              ('cancelled', 'Dibatalkan'),
+              ('ditolak', 'Ditolak'),
+            ])
+              Padding(
+                padding: const EdgeInsets.only(right: AppSpacing.sm),
+                child: Semantics(
+                  selected: _filter == value,
+                  child: OutlinedButton(
+                    key: ValueKey('history-filter-${value ?? 'all'}'),
+                    onPressed: () => setState(() => _filter = value),
+                    style: OutlinedButton.styleFrom(
+                      minimumSize: const Size(48, 48),
+                      padding:
+                          const EdgeInsets.symmetric(horizontal: AppSpacing.md),
+                      foregroundColor:
+                          _filter == value ? _blueDeep : _textMuted,
+                      backgroundColor: _filter == value
+                          ? AppColors.blueTint
+                          : AppColors.surface,
+                      side: BorderSide(
+                          color: _filter == value
+                              ? _blue.withValues(alpha: .3)
+                              : _border),
+                      textStyle: _font(13, FontWeight.w800, _navy),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(AppSpacing.md)),
+                    ),
+                    child: Text(label),
+                  ),
+                ),
+              ),
+          ]),
+        ),
+        const SizedBox(height: AppSpacing.lg),
+        TextField(
+          key: const ValueKey('history-search'),
+          controller: _search,
+          onChanged: (value) =>
+              setState(() => _query = value.trim().toLowerCase()),
+          style: _font(13, FontWeight.w500, _navy),
+          textInputAction: TextInputAction.search,
+          decoration: InputDecoration(
+            hintText: 'Cari destinasi atau nomor booking',
+            hintStyle: _font(12, FontWeight.w500, _textMuted),
+            constraints:
+                const BoxConstraints(minHeight: kMinInteractiveDimension),
+            contentPadding: const EdgeInsets.all(AppSpacing.lg),
+            prefixIcon: const Icon(PhosphorIconsRegular.magnifyingGlass,
+                size: 20, color: _textMuted),
+            suffixIcon: _search.text.isEmpty
+                ? null
+                : IconButton(
+                    tooltip: 'Hapus pencarian',
+                    onPressed: () => setState(() {
+                          _search.clear();
+                          _query = '';
+                        }),
+                    icon: const Icon(PhosphorIconsRegular.x, size: 20)),
           ),
         ),
-        const SizedBox(width: 8),
-        Expanded(
-          child: Text(
-            aktif ? '$jumlah tiket · $label' : 'Tiket Kunjunganmu',
-            style: _font(15, FontWeight.w800, _navy, letterSpacing: -0.2),
-          ),
-        ),
-        if (aktif)
-          GestureDetector(
-            onTap: () => setState(() => _filter = null),
-            child: Text('Reset', style: _font(12.5, FontWeight.w700, _blue)),
-          ),
       ]),
     );
   }
@@ -594,7 +662,8 @@ class _BuktiPendaftaranScreenState extends State<BuktiPendaftaranScreen> {
   // ── Empty state (belum ada riwayat sama sekali) ────────────
   Widget _buildEmpty() {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 32, horizontal: 22),
+      padding: const EdgeInsets.symmetric(
+          vertical: AppSpacing.xl + AppSpacing.sm, horizontal: AppSpacing.lg),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
@@ -615,43 +684,26 @@ class _BuktiPendaftaranScreenState extends State<BuktiPendaftaranScreen> {
             child:
                 const Icon(PhosphorIconsRegular.ticket, size: 48, color: _blue),
           ),
-          const SizedBox(height: 22),
+          const SizedBox(height: AppSpacing.xl),
           Text('Belum ada riwayat pendaftaran',
               style: _font(17, FontWeight.w800, _navy, letterSpacing: -0.3)),
-          const SizedBox(height: 8),
+          const SizedBox(height: AppSpacing.sm),
           Text(
             'Daftarkan kunjungan wisata terlebih dahulu,\ntiketmu akan muncul di sini.',
             textAlign: TextAlign.center,
             style: _font(13, FontWeight.w500, _textMuted, height: 1.6),
           ),
-          const SizedBox(height: 26),
-          GestureDetector(
-            onTap: _jelajahi,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 26, vertical: 14),
-              decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                    colors: [Color(0xFF2386E8), _blueDeep]),
-                borderRadius: BorderRadius.circular(16),
-                boxShadow: [
-                  BoxShadow(
-                    color: _blue.withValues(alpha: 0.35),
-                    blurRadius: 18,
-                    offset: const Offset(0, 8),
-                  ),
-                ],
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Icon(PhosphorIconsRegular.compass,
-                      color: Colors.white, size: 20),
-                  const SizedBox(width: 8),
-                  Text('Jelajahi Wisata',
-                      style: _font(14, FontWeight.w700, Colors.white)),
-                ],
-              ),
-            ),
+          const SizedBox(height: AppSpacing.xl),
+          ElevatedButton.icon(
+            onPressed: _jelajahi,
+            style: ElevatedButton.styleFrom(
+                minimumSize: const Size(48, 48),
+                elevation: 0,
+                textStyle: _font(13, FontWeight.w800, AppColors.surface),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14))),
+            icon: const Icon(PhosphorIconsRegular.compass, size: 20),
+            label: const Text('Jelajahi Wisata'),
           ),
         ],
       ),
@@ -660,9 +712,9 @@ class _BuktiPendaftaranScreenState extends State<BuktiPendaftaranScreen> {
 
   // ── Filter aktif tapi tidak ada hasil ──────────────────────
   Widget _buildFilterKosong() {
-    final label = _styleFor(_filter ?? '').label.toLowerCase();
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 32, horizontal: 22),
+      padding: const EdgeInsets.symmetric(
+          vertical: AppSpacing.xl + AppSpacing.sm, horizontal: AppSpacing.lg),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
@@ -677,25 +729,26 @@ class _BuktiPendaftaranScreenState extends State<BuktiPendaftaranScreen> {
             child: const Icon(PhosphorIconsRegular.tray,
                 size: 42, color: _textMuted),
           ),
-          const SizedBox(height: 20),
-          Text('Tidak ada tiket $label',
+          const SizedBox(height: AppSpacing.xl),
+          Text('Pendaftaran tidak ditemukan',
               style: _font(17, FontWeight.w800, _navy, letterSpacing: -0.3)),
-          const SizedBox(height: 8),
-          Text('Coba lihat status yang lain',
+          const SizedBox(height: AppSpacing.sm),
+          Text('Coba kata kunci atau status yang lain.',
               style: _font(13, FontWeight.w500, _textMuted)),
-          const SizedBox(height: 18),
-          GestureDetector(
-            onTap: () => setState(() => _filter = null),
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 11),
-              decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                    colors: [Color(0xFF2386E8), _blueDeep]),
-                borderRadius: BorderRadius.circular(14),
-              ),
-              child: Text('Tampilkan semua',
-                  style: _font(13, FontWeight.w700, Colors.white)),
-            ),
+          const SizedBox(height: AppSpacing.lg),
+          ElevatedButton(
+            onPressed: () => setState(() {
+              _filter = null;
+              _search.clear();
+              _query = '';
+            }),
+            style: ElevatedButton.styleFrom(
+                minimumSize: const Size(48, 48),
+                elevation: 0,
+                textStyle: _font(13, FontWeight.w800, AppColors.surface),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14))),
+            child: const Text('Tampilkan semua'),
           ),
         ],
       ),
@@ -734,17 +787,9 @@ class _StatTile extends StatelessWidget {
             color:
                 selected ? Colors.white : Colors.white.withValues(alpha: 0.35),
           ),
-          boxShadow: selected
-              ? [
-                  BoxShadow(
-                    color: _navy.withValues(alpha: 0.18),
-                    blurRadius: 14,
-                    offset: const Offset(0, 6),
-                  ),
-                ]
-              : null,
         ),
-        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+        padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.sm, vertical: AppSpacing.xs),
         // The tile height is fixed by the header; at large text scales the
         // label stays on one line and the content shrinks only as far as needed.
         child: FittedBox(
@@ -755,10 +800,10 @@ class _StatTile extends StatelessWidget {
               Text(
                 '$count',
                 style: _font(
-                    20, FontWeight.w800, selected ? accent : Colors.white,
+                    26, FontWeight.w800, selected ? accent : Colors.white,
                     height: 1.1),
               ),
-              const SizedBox(height: 2),
+              const SizedBox(height: AppSpacing.xs),
               Text(
                 label,
                 maxLines: 1,
@@ -810,6 +855,7 @@ class _TicketCard extends StatefulWidget {
   final Booking? booking;
   final bool isLaravel;
   final bool initiallyExpanded;
+  final bool detailPage;
   final BusinessRepository? repository;
 
   /// Dipanggil dengan salinan booking terbaru dari server (detail / hasil pembatalan).
@@ -821,6 +867,7 @@ class _TicketCard extends StatefulWidget {
       this.booking,
       this.isLaravel = false,
       this.initiallyExpanded = false,
+      this.detailPage = false,
       this.repository,
       this.onChanged,
       this.onTicketIssued});
@@ -830,7 +877,7 @@ class _TicketCard extends StatefulWidget {
 }
 
 class _TicketCardState extends State<_TicketCard> {
-  bool _expanded = false;
+  bool _contactExpanded = false;
   bool get _sudahUlasan => _controller?.booking.review != null;
   String? _statusSebelumnya;
   BookingDetailController? _controller;
@@ -848,7 +895,7 @@ class _TicketCardState extends State<_TicketCard> {
       _emitted = booking;
       if (widget.initiallyExpanded) {
         WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (mounted) _toggleExpand();
+          if (mounted) _loadDetail();
         });
       }
     }
@@ -891,7 +938,7 @@ class _TicketCardState extends State<_TicketCard> {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
           content: Row(children: [
             const Icon(PhosphorIconsFill.checkCircle, color: _green, size: 18),
-            const SizedBox(width: 8),
+            const SizedBox(width: AppSpacing.sm),
             Expanded(
               child: Text(
                 'Pendaftaran ${widget.pendaftar.wisata} disetujui!',
@@ -910,7 +957,7 @@ class _TicketCardState extends State<_TicketCard> {
           content: Row(children: [
             const Icon(PhosphorIconsFill.xCircle,
                 color: Colors.white, size: 18),
-            const SizedBox(width: 8),
+            const SizedBox(width: AppSpacing.sm),
             Expanded(
               child: Text(
                 'Pendaftaran ${widget.pendaftar.wisata} ditolak.',
@@ -933,15 +980,21 @@ class _TicketCardState extends State<_TicketCard> {
     if (controller == null || !controller.booking.canReview) return;
     showModalBottomSheet(
       context: context,
-      backgroundColor: Colors.transparent,
+      backgroundColor: AppColors.surface,
       isScrollControlled: true,
-      builder: (_) => _FormUlasanSheet(
-        pendaftar: widget.pendaftar,
-        controller: controller,
-        onSelesai: () {
-          if (mounted) setState(() {});
-        },
-      ),
+      useSafeArea: true,
+      shape: const RoundedRectangleBorder(
+          borderRadius:
+              BorderRadius.vertical(top: Radius.circular(AppSpacing.xl))),
+      builder: (_) => SafeArea(
+          top: false,
+          child: _FormUlasanSheet(
+            pendaftar: widget.pendaftar,
+            controller: controller,
+            onSelesai: () {
+              if (mounted) setState(() {});
+            },
+          )),
     );
   }
 
@@ -952,7 +1005,7 @@ class _TicketCardState extends State<_TicketCard> {
         content: Row(
           children: [
             const Icon(PhosphorIconsFill.checkCircle, color: _green, size: 18),
-            const SizedBox(width: 8),
+            const SizedBox(width: AppSpacing.sm),
             Text('Nomor bukti disalin!',
                 style: _font(13, FontWeight.w600, Colors.white)),
           ],
@@ -973,186 +1026,814 @@ class _TicketCardState extends State<_TicketCard> {
         : widget.pendaftar;
     final st = _styleFor(p.status);
 
+    if (widget.detailPage && controller != null) {
+      return _buildDetailPage(controller);
+    }
+
     return Container(
-      margin: const EdgeInsets.only(bottom: 18),
+      margin: const EdgeInsets.only(bottom: AppSpacing.lg),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(26),
-        border: Border.all(
-          color: _border,
-          width: 1.2,
-        ),
-        boxShadow: const [
-          BoxShadow(
-            color: Color(0x140F2D59),
-            blurRadius: 14,
-            offset: Offset(0, 5),
-          ),
-        ],
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: _border),
       ),
+      clipBehavior: Clip.antiAlias,
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           _buildTicketHeader(p, st),
           _buildDashedDivider(),
           _buildTicketBody(p),
-          if (controller != null &&
-              controller.booking.status == 'awaiting_payment')
-            Padding(
-              padding: const EdgeInsets.fromLTRB(18, 0, 18, 14),
-              child: PaymentDeadline(
-                  expiresAt: controller.booking.paymentExpiresAt,
-                  serverTime: _paymentSnapshot?.serverTime,
-                  onElapsed: () {
-                    controller.refresh();
-                    BookingEvents.notify();
-                  }),
+          Container(
+            padding: const EdgeInsets.symmetric(
+                horizontal: AppSpacing.lg, vertical: AppSpacing.xs),
+            decoration: const BoxDecoration(
+              color: AppColors.surface,
+              border: Border(top: BorderSide(color: AppColors.border)),
             ),
-          if (controller?.booking.paymentTestOnly == true)
-            Padding(
-                padding: const EdgeInsets.fromLTRB(18, 0, 18, 12),
-                child: Text(
-                    '${controller!.booking.paymentLabel ?? 'DEMO'} / TEST_ONLY · tanpa uang nyata',
-                    style: _font(12, FontWeight.w700, _blueDeep))),
-          if (controller != null)
-            Padding(
-              padding: const EdgeInsets.fromLTRB(18, 0, 18, 14),
-              child: Text(
-                '${controller.booking.checkedInCount}/${controller.booking.quantity} tiket sudah check-in',
-                style: _font(12, FontWeight.w600, _navy),
+            child: _detailPair(
+              Text(_historySummary(controller?.booking),
+                  style: _font(12, FontWeight.w500, _textMuted, height: 1.5)),
+              TextButton(
+                key: const ValueKey('history-booking-detail'),
+                onPressed: controller == null
+                    ? null
+                    : () => _openBookingDetail(controller),
+                style: TextButton.styleFrom(
+                  minimumSize: const Size(48, 48),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: AppSpacing.sm),
+                  foregroundColor: _blueDeep,
+                  textStyle: _font(13, FontWeight.w800, _blueDeep),
+                ),
+                child: const Row(mainAxisSize: MainAxisSize.min, children: [
+                  Text('Lihat detail'),
+                  SizedBox(width: AppSpacing.sm),
+                  Icon(PhosphorIconsRegular.arrowRight, size: 18),
+                ]),
               ),
+              intrinsicSecond: true,
             ),
-          if (widget.isLaravel || p.catatan.isNotEmpty || p.email.isNotEmpty)
-            _buildExpandBtn(p),
-          if (_controller?.booking.canReview == true || _sudahUlasan)
-            _buildUlasanButton(),
+          ),
         ],
       ),
     );
   }
 
-  Widget _buildTicketHeader(Pendaftar p, _StatusStyle st) {
-    return Padding(
-        padding: const EdgeInsets.fromLTRB(18, 18, 18, 4),
-        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          _StatusBadge(status: p.status, onPhoto: false),
-          const SizedBox(height: 12),
-          Text(p.wisata,
-              style: _font(20, FontWeight.w800, _navy, height: 1.25)),
-          const SizedBox(height: 4),
-          SizedBox(
-            width: double.infinity,
-            child: TextButton(
-              onPressed: _copyNomor,
-              style: TextButton.styleFrom(
-                  padding: EdgeInsets.zero,
-                  alignment: Alignment.centerLeft,
-                  minimumSize: const Size(48, 44)),
-              child: Row(children: [
-                const Icon(PhosphorIconsRegular.copy, size: 16),
-                const SizedBox(width: 8),
-                Expanded(
-                    child: Text(p.nomorBukti,
-                        softWrap: true,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        // Sized so a full BK- code fits one line at 393 dp.
-                        style: _font(12, FontWeight.w700, _blue))),
-              ]),
+  String _historySummary(Booking? booking) {
+    if (booking == null) return 'Total belum tersedia';
+    if (booking.status == 'confirmed') {
+      if (booking.json['quantity'] is! num ||
+          (booking.json['checked_in_count'] is! num &&
+              booking.checkedInAt == null)) {
+        return 'Check-in belum tersedia';
+      }
+      return '${booking.checkedInCount} dari ${booking.quantity} check-in';
+    }
+    return '${_detailTotal(booking)} · Total booking';
+  }
+
+  Future<void> _openBookingDetail(BookingDetailController controller) async {
+    await Navigator.of(context).push(MaterialPageRoute<void>(
+        builder: (_) => BookingTicketScreen(
+            bookingGuid: controller.booking.guid,
+            repository: controller.repository)));
+    if (mounted) await controller.refresh();
+  }
+
+  Widget _buildDetailPage(BookingDetailController c) {
+    final b = c.booking;
+    Widget page({Widget? paymentContent, Widget? checkout}) => Scaffold(
+          backgroundColor: AppColors.bg,
+          appBar: AppBar(title: const Text('Detail Pendaftaran')),
+          bottomNavigationBar: checkout == null
+              ? null
+              : Material(
+                  color: AppColors.surface,
+                  elevation: 8,
+                  shadowColor: AppColors.dockShadow,
+                  child: SafeArea(
+                    top: false,
+                    minimum: const EdgeInsets.all(AppSpacing.lg),
+                    child: _detailPair(
+                      Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('Total pembayaran',
+                              style: _font(12, FontWeight.w500,
+                                  AppColors.textSecondary)),
+                          const SizedBox(height: AppSpacing.xs),
+                          Text(_detailTotal(b),
+                              style: _font(
+                                  13, FontWeight.w800, AppColors.blueDeep)),
+                        ],
+                      ),
+                      checkout,
+                      intrinsicSecond: true,
+                    ),
+                  ),
+                ),
+          body: SafeArea(
+            top: false,
+            bottom: checkout == null,
+            child: RefreshIndicator(
+              onRefresh: () async {
+                await c.refresh();
+                await c.loadDocuments();
+              },
+              child: SingleChildScrollView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                padding: const EdgeInsets.all(AppSpacing.lg),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    if (c.refreshing) const LinearProgressIndicator(),
+                    _detailSummary(b),
+                    _detailProgress(c),
+                    if (b.status == 'awaiting_payment') ...[
+                      const SizedBox(height: AppSpacing.md),
+                      if (b.paymentExpiresAt != null)
+                        PaymentDeadline(
+                          expiresAt: b.paymentExpiresAt,
+                          serverTime: _paymentSnapshot?.serverTime,
+                          banner: true,
+                          caption: 'Status akhir diverifikasi oleh sistem.',
+                          onElapsed: () {
+                            c.refresh();
+                            BookingEvents.notify();
+                          },
+                        )
+                      else if (b.paymentSelectionExpiresAt != null)
+                        _detailSelectionDeadline(b),
+                    ],
+                    if (b.status == 'confirmed' &&
+                        (b.paymentStatus == 'paid' ||
+                            b.paymentTestOnly ||
+                            b.isFree ||
+                            c.documents?.entryTickets?.isFree == true))
+                      BookingTicketQrSection(
+                          repository: c.repository,
+                          bookingGuid: b.guid,
+                          booking: b,
+                          onRefreshed: c.refresh),
+                    _detailHeading('Informasi Kunjungan'),
+                    _detailVisit(b, c.documents?.entryTickets),
+                    _detailHeading('Data Pendaftar'),
+                    _detailContact(b),
+                    const SizedBox(height: AppSpacing.md),
+                    _detailPanel(
+                      _detailNotice(
+                        PhosphorIconsRegular.info,
+                        'Apa langkah selanjutnya?',
+                        b.status == 'awaiting_payment' &&
+                                _paymentSnapshot?.canCreate == true &&
+                                _paymentSnapshot?.attemptStatus == null
+                            ? 'Pendaftaran sudah disetujui, tetapi pembayaran belum dikonfirmasi. Pilih metode pembayaran untuk melanjutkan. Nomor VA atau QRIS ditampilkan setelah diterbitkan provider.'
+                            : _nextStepFor(b,
+                                ticketIssued: c.documents?.entryTicketsIssued,
+                                entry: c.documents?.entryTickets),
+                      ),
+                      color: AppColors.blueTint,
+                    ),
+                    if (b.paymentTestOnly)
+                      Padding(
+                        padding: const EdgeInsets.only(top: AppSpacing.sm),
+                        child: Text(
+                          '${b.paymentLabel ?? 'DEMO'} / TEST_ONLY · tanpa uang nyata',
+                          style: _font(12, FontWeight.w700, AppColors.blueDeep),
+                        ),
+                      ),
+                    if (paymentContent != null) paymentContent,
+                    if (c.message != null)
+                      Padding(
+                        padding: const EdgeInsets.only(top: AppSpacing.sm),
+                        child: Text(c.message!,
+                            key: const ValueKey('detailMessage'),
+                            style: _font(12, FontWeight.w600, _red)),
+                      ),
+                    _detailHeading('Dokumen Pendaftaran'),
+                    _detailPanel(
+                        Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: _documentWidgets(c)),
+                        padding: AppSpacing.lg),
+                    if (b.status == 'confirmed' && b.paymentStatus == 'paid')
+                      BookingRefundSection(
+                          repository: c.repository,
+                          bookingGuid: b.guid,
+                          onChanged: c.refresh),
+                    if (b.cancellable) ...[
+                      const SizedBox(height: AppSpacing.lg),
+                      OutlinedButton.icon(
+                        key: const ValueKey('cancelBooking'),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: _red,
+                          backgroundColor: AppColors.surface,
+                          textStyle: _font(13, FontWeight.w800, _red),
+                          minimumSize: const Size(48, 48),
+                          side: BorderSide(color: _red.withValues(alpha: .4)),
+                          shape: RoundedRectangleBorder(
+                              borderRadius:
+                                  BorderRadius.circular(AppSpacing.md)),
+                        ),
+                        onPressed:
+                            c.cancelling ? null : () => _confirmCancel(c),
+                        icon:
+                            const Icon(PhosphorIconsRegular.xCircle, size: 20),
+                        label: Text(c.cancelling
+                            ? 'Membatalkan…'
+                            : 'Batalkan Pendaftaran'),
+                      ),
+                    ],
+                    if (b.canReview || _sudahUlasan) ...[
+                      const SizedBox(height: AppSpacing.lg),
+                      _buildUlasanButton(),
+                    ],
+                    const SizedBox(height: AppSpacing.lg),
+                  ],
+                ),
+              ),
             ),
           ),
+        );
+
+    if (!b.isFree &&
+        (const ['awaiting_payment', 'payment_verification', 'payment_review']
+                .contains(b.status) ||
+            (b.paymentTestOnly && b.paymentStatus != 'paid'))) {
+      return BookingPaymentSection(
+        booking: b,
+        repository: c.repository,
+        onSnapshot: (snapshot) {
+          if (mounted) setState(() => _paymentSnapshot = snapshot);
+        },
+        onReturned: () async {
+          await c.refresh();
+          await c.loadDocuments();
+        },
+        layoutBuilder: (context, content, checkout) => page(
+            paymentContent: checkout == null ? content : null,
+            checkout: checkout),
+      );
+    }
+    return page();
+  }
+
+  String _detailTotal(Booking b) =>
+      b.json['total_amount'] is num ? _formatBookingTotal(b) : 'Belum tersedia';
+
+  Widget _detailPanel(Widget child,
+          {Color color = AppColors.surface,
+          Color border = AppColors.border,
+          double padding = AppSpacing.lg}) =>
+      Container(
+        padding: EdgeInsets.all(padding),
+        decoration: BoxDecoration(
+          color: color,
+          border: Border.all(color: border),
+          borderRadius: BorderRadius.circular(AppSpacing.lg),
+        ),
+        child: child,
+      );
+
+  Widget _detailHeading(String title) => Padding(
+        padding:
+            const EdgeInsets.only(top: AppSpacing.xl, bottom: AppSpacing.md),
+        child: Text(title, style: _font(16, FontWeight.w800, AppColors.navy)),
+      );
+
+  Widget _detailPair(Widget first, Widget second,
+          {bool intrinsicSecond = false}) =>
+      LayoutBuilder(
+        builder: (context, constraints) {
+          if (constraints.maxWidth < 280 ||
+              MediaQuery.textScalerOf(context).scale(1) > 1.3) {
+            return Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [first, const SizedBox(height: AppSpacing.md), second],
+            );
+          }
+          return Row(children: [
+            Expanded(child: first),
+            const SizedBox(width: AppSpacing.md),
+            if (intrinsicSecond) second else Expanded(child: second),
+          ]);
+        },
+      );
+
+  Widget _detailSummary(Booking b) => _detailPanel(Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: double.infinity,
+            child: Wrap(
+              alignment: WrapAlignment.spaceBetween,
+              spacing: AppSpacing.sm,
+              runSpacing: AppSpacing.sm,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              children: [
+                Text('PENDAFTARAN WISATA',
+                    style: _font(11, FontWeight.w700, AppColors.textSecondary,
+                        letterSpacing: .8)),
+                _StatusBadge(status: b.status, compact: true),
+              ],
+            ),
+          ),
+          const SizedBox(height: AppSpacing.lg),
+          Text(b.destinationName,
+              style: _font(16, FontWeight.w800, AppColors.navy)),
+          const SizedBox(height: AppSpacing.sm),
+          Text(
+              'Kunjungan wisata · ${b.visitDate.isEmpty ? 'Tanggal belum tersedia' : _formatBookingDate(b.visitDate)}',
+              style: _font(12, FontWeight.w500, AppColors.textSecondary)),
+          const Divider(height: AppSpacing.xl, color: AppColors.border),
+          _detailPair(
+            Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text('Total tagihan',
+                  style: _font(12, FontWeight.w500, AppColors.textSecondary)),
+              const SizedBox(height: AppSpacing.xs),
+              Text(_detailTotal(b),
+                  style: _font(26, FontWeight.w800, AppColors.blueDeep)),
+            ]),
+            OutlinedButton.icon(
+              key: const ValueKey('booking-code'),
+              onPressed:
+                  b.bookingNumber.isEmpty ? null : () => _showBookingCode(b),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: AppColors.blue,
+                backgroundColor: AppColors.blueTint,
+                minimumSize: const Size(48, 48),
+                tapTargetSize: MaterialTapTargetSize.padded,
+                visualDensity: VisualDensity.standard,
+                padding: const EdgeInsets.symmetric(
+                    horizontal: AppSpacing.md, vertical: AppSpacing.sm),
+                side: BorderSide(color: AppColors.blue.withValues(alpha: .2)),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(AppSpacing.md)),
+              ),
+              icon: const Icon(PhosphorIconsRegular.copy, size: 18),
+              label: Text('Kode Booking',
+                  style: _font(13, FontWeight.w800, AppColors.blue)),
+            ),
+            intrinsicSecond: true,
+          ),
+        ],
+      ));
+
+  Widget _detailProgress(BookingDetailController c) {
+    final b = c.booking;
+    final approved = const {
+      'awaiting_payment',
+      'payment_verification',
+      'payment_review',
+      'confirmed'
+    }.contains(b.status);
+    final confirmed = b.status == 'confirmed';
+    final issued = confirmed && c.documents?.entryTicketsIssued == true;
+    final stopped =
+        const {'rejected', 'cancelled', 'expired'}.contains(b.status);
+    final current = confirmed ? 3 : (approved ? 2 : 1);
+    final steps = [
+      (
+        'Disetujui',
+        approved ? 'Berhasil' : bookingStatusLabel(b.status),
+        approved
+      ),
+      (
+        'Pembayaran',
+        confirmed
+            ? (b.isFree ? 'Gratis' : 'Terkonfirmasi')
+            : (approved && !stopped
+                ? (b.status == 'awaiting_payment'
+                    ? 'Menunggu'
+                    : bookingStatusLabel(b.status))
+                : 'Belum tersedia'),
+        confirmed
+      ),
+      (
+        'Tiket Masuk',
+        issued
+            ? 'Diterbitkan'
+            : (c.loadingDocuments
+                ? 'Memeriksa…'
+                : (c.documents == null ? 'Belum diketahui' : 'Belum tersedia')),
+        issued
+      ),
+    ];
+    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+      Padding(
+        padding:
+            const EdgeInsets.only(top: AppSpacing.xl, bottom: AppSpacing.md),
+        child: Wrap(
+          alignment: WrapAlignment.spaceBetween,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          spacing: AppSpacing.sm,
+          runSpacing: AppSpacing.xs,
+          children: [
+            Text('Progres Pendaftaran',
+                style: _font(16, FontWeight.w800, AppColors.navy)),
+            Text(
+                stopped
+                    ? bookingStatusLabel(b.status)
+                    : 'Langkah $current dari 3',
+                style: _font(12, FontWeight.w500, AppColors.textSecondary)),
+          ],
+        ),
+      ),
+      _detailPanel(Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        for (var i = 0; i < steps.length; i++) ...[
+          if (i > 0)
+            Padding(
+              padding: const EdgeInsets.only(top: AppSpacing.md),
+              child: SizedBox(
+                  width: AppSpacing.xl,
+                  child: Divider(
+                      height: 1,
+                      color: steps[i - 1].$3
+                          ? AppColors.success.withValues(alpha: .4)
+                          : AppColors.border)),
+            ),
+          Expanded(
+              child: Column(children: [
+            Container(
+              width: AppSpacing.xl,
+              height: AppSpacing.xl,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                border: Border.all(
+                    color: steps[i].$3
+                        ? AppColors.success.withValues(alpha: .2)
+                        : (!stopped && current == i + 1
+                            ? AppColors.blue.withValues(alpha: .25)
+                            : AppColors.border)),
+                color: steps[i].$3
+                    ? AppColors.successTint
+                    : (!stopped && current == i + 1
+                        ? AppColors.blueTint
+                        : AppColors.bg),
+              ),
+              child: steps[i].$3
+                  ? const Icon(PhosphorIconsRegular.check,
+                      size: 14, color: AppColors.success)
+                  : Text('${i + 1}',
+                      style: _font(
+                          11,
+                          FontWeight.w800,
+                          !stopped && current == i + 1
+                              ? AppColors.blue
+                              : AppColors.textSecondary)),
+            ),
+            const SizedBox(height: AppSpacing.sm),
+            Text(steps[i].$1,
+                textAlign: TextAlign.center,
+                style: _font(12, FontWeight.w700, AppColors.navy)),
+            const SizedBox(height: AppSpacing.xs),
+            Text(steps[i].$2,
+                textAlign: TextAlign.center,
+                style: _font(12, FontWeight.w500, AppColors.textSecondary)),
+          ])),
+        ],
+      ])),
+    ]);
+  }
+
+  Widget _detailSelectionDeadline(Booking b) => _detailPanel(
+        Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Container(
+            padding: const EdgeInsets.all(AppSpacing.sm),
+            decoration: BoxDecoration(
+              color: AppColors.warningBorder.withValues(alpha: .4),
+              borderRadius: BorderRadius.circular(AppSpacing.md),
+            ),
+            child: const Icon(PhosphorIconsRegular.clock,
+                size: 16, color: AppColors.warningText),
+          ),
+          const SizedBox(width: AppSpacing.md),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Batas memilih pembayaran',
+                    style: _font(14, FontWeight.w700, AppColors.warningText)),
+                const SizedBox(height: AppSpacing.xs),
+                Text(
+                    formatInstantInZone(
+                            b.paymentSelectionExpiresAt!, b.destinationTimezone)
+                        .replaceFirst(', ', ' · '),
+                    style: _font(12, FontWeight.w800, AppColors.warningText)),
+                const SizedBox(height: AppSpacing.sm),
+                Text(
+                    'Pilih metode pembayaran sebelum batas waktu yang ditentukan.\nStatus akhir tetap diverifikasi oleh sistem.',
+                    style: _font(12, FontWeight.w500, AppColors.warningText,
+                        height: 1.5)),
+              ],
+            ),
+          ),
+        ]),
+        color: AppColors.warningTint,
+        border: AppColors.warningBorder,
+      );
+
+  Widget _detailVisit(Booking b, EntryTicketsInfo? entry) {
+    final checked = (b.json['checked_in_count'] as num?)?.toInt() ??
+        (b.checkedInAt == null ? null : b.quantity);
+    final quantity = (b.json['quantity'] as num?)?.toInt();
+    return _detailPanel(Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _detailPair(
+          _detailPanel(
+              _InfoItem(
+                  icon: PhosphorIconsRegular.calendarBlank,
+                  label: 'Tanggal kunjungan',
+                  maxLines: null,
+                  compact: true,
+                  value: b.visitDate.isEmpty
+                      ? 'Belum tersedia'
+                      : visitDayLabel(b.visitDate)),
+              color: AppColors.bg,
+              padding: AppSpacing.md),
+          _detailPanel(
+              _InfoItem(
+                  icon: PhosphorIconsRegular.users,
+                  label: 'Jumlah pengunjung',
+                  maxLines: null,
+                  compact: true,
+                  value:
+                      quantity == null ? 'Belum tersedia' : '$quantity orang'),
+              color: AppColors.bg,
+              padding: AppSpacing.md),
+        ),
+        const Divider(height: AppSpacing.xl, color: AppColors.border),
+        Wrap(
+            alignment: WrapAlignment.spaceBetween,
+            spacing: AppSpacing.sm,
+            runSpacing: AppSpacing.xs,
+            children: [
+              Text('Progres check-in',
+                  style: _font(12, FontWeight.w500, AppColors.textSecondary)),
+              Text(
+                  checked == null || quantity == null
+                      ? 'Belum tersedia'
+                      : '$checked / $quantity pengunjung',
+                  style: _font(12, FontWeight.w700, AppColors.blueDeep)),
+            ]),
+        const SizedBox(height: AppSpacing.sm),
+        if (checked != null && quantity != null && quantity > 0)
+          LinearProgressIndicator(
+            value: (checked / quantity).clamp(0.0, 1.0),
+            minHeight: AppSpacing.sm,
+            borderRadius: BorderRadius.circular(AppSpacing.xs),
+            backgroundColor: AppColors.bg,
+            color: AppColors.blue,
+            semanticsLabel: 'Progres check-in',
+            semanticsValue: '$checked dari $quantity pengunjung',
+          ),
+        const SizedBox(height: AppSpacing.sm),
+        Text(
+            checked == 0 && b.status == 'awaiting_payment'
+                ? 'Check-in belum dilakukan. Tiket masuk belum tersedia selama pembayaran belum terkonfirmasi.'
+                : entry != null
+                    ? _entryNextStep(entry)
+                    : (b.status != 'confirmed'
+                        ? 'Tiket masuk belum tersedia. ${bookingStatusNote(b.status) ?? bookingStatusLabel(b.status)}'
+                        : 'Ketersediaan tiket masuk dapat diperiksa pada bagian Tiket masuk.'),
+            style: _font(12, FontWeight.w500, AppColors.textSecondary,
+                height: 1.5)),
+      ],
+    ));
+  }
+
+  Widget _detailContact(Booking b) => _detailPanel(Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          _detailPair(
+            Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text('Nama pendaftar',
+                  style: _font(12, FontWeight.w500, AppColors.textSecondary)),
+              const SizedBox(height: AppSpacing.xs),
+              Text(b.visitorName,
+                  style: _font(13, FontWeight.w700, AppColors.navy)),
+            ]),
+            TextButton(
+              key: const ValueKey('toggle-booking-contact'),
+              style: TextButton.styleFrom(
+                foregroundColor: AppColors.blue,
+                backgroundColor: AppColors.blueTint,
+                minimumSize: const Size(48, 48),
+                tapTargetSize: MaterialTapTargetSize.padded,
+                visualDensity: VisualDensity.standard,
+                padding: const EdgeInsets.symmetric(
+                    horizontal: AppSpacing.sm, vertical: AppSpacing.sm),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(AppSpacing.md)),
+              ),
+              onPressed: () =>
+                  setState(() => _contactExpanded = !_contactExpanded),
+              child: Row(mainAxisSize: MainAxisSize.min, children: [
+                Text(_contactExpanded ? 'Tutup Kontak' : 'Lihat Kontak',
+                    style: _font(13, FontWeight.w800, AppColors.blue)),
+                const SizedBox(width: AppSpacing.xs),
+                Icon(
+                    _contactExpanded
+                        ? PhosphorIconsRegular.caretUp
+                        : PhosphorIconsRegular.caretDown,
+                    size: 16),
+              ]),
+            ),
+            intrinsicSecond: true,
+          ),
+          if (_contactExpanded) ...[
+            const Divider(height: AppSpacing.xl, color: AppColors.border),
+            Text('Email',
+                style: _font(11, FontWeight.w500, AppColors.textSecondary)),
+            SelectableText(
+                b.visitorEmail.isEmpty ? 'Belum tersedia' : b.visitorEmail,
+                style: _font(13, FontWeight.w600, AppColors.navy)),
+            const SizedBox(height: AppSpacing.md),
+            Text('Nomor telepon',
+                style: _font(11, FontWeight.w500, AppColors.textSecondary)),
+            SelectableText(
+                b.visitorPhone.isEmpty ? 'Belum tersedia' : b.visitorPhone,
+                style: _font(13, FontWeight.w600, AppColors.navy)),
+          ],
+          if (b.notes?.isNotEmpty == true) ...[
+            const Divider(height: AppSpacing.xl, color: AppColors.border),
+            Text('Catatan',
+                style: _font(11, FontWeight.w500, AppColors.textSecondary)),
+            Text(b.notes!, style: _font(12, FontWeight.w500, AppColors.navy)),
+          ],
+        ],
+      ));
+
+  Widget _detailNotice(IconData icon, String title, String text,
+          {Color color = AppColors.blueDeep}) =>
+      Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, color: color, size: 16),
+          const SizedBox(width: AppSpacing.sm),
+          Expanded(
+              child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                Text(title, style: _font(14, FontWeight.w700, color)),
+                const SizedBox(height: AppSpacing.sm),
+                Text(text,
+                    style: _font(12, FontWeight.w500, AppColors.textSecondary,
+                        height: 1.6)),
+              ])),
+        ],
+      );
+
+  Future<T?> _detailSheet<T>(Widget Function(BuildContext) content,
+          {double padding = AppSpacing.sheetPadding}) =>
+      showModalBottomSheet<T>(
+        context: context,
+        isScrollControlled: true,
+        useSafeArea: true,
+        showDragHandle: true,
+        backgroundColor: AppColors.surface,
+        shape: const RoundedRectangleBorder(
+            borderRadius:
+                BorderRadius.vertical(top: Radius.circular(AppSpacing.xl))),
+        builder: (sheetContext) => SafeArea(
+          top: false,
+          child: Padding(
+            padding: EdgeInsets.only(
+                bottom: MediaQuery.viewInsetsOf(sheetContext).bottom),
+            child: SingleChildScrollView(
+              padding: EdgeInsets.all(padding),
+              child: content(sheetContext),
+            ),
+          ),
+        ),
+      );
+
+  void _showBookingCode(Booking b) {
+    _detailSheet<void>((sheetContext) => Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text('Kode Booking',
+                style: _font(20, FontWeight.w800, AppColors.navy)),
+            const SizedBox(height: AppSpacing.lg),
+            SelectableText(b.bookingNumber,
+                style: _font(16, FontWeight.w700, AppColors.blueDeep)),
+            const SizedBox(height: AppSpacing.xl),
+            ElevatedButton.icon(
+              key: const ValueKey('copy-booking-code'),
+              style: ElevatedButton.styleFrom(
+                  minimumSize: const Size(48, 48),
+                  elevation: 0,
+                  textStyle: _font(13, FontWeight.w800, AppColors.surface),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14))),
+              onPressed: () {
+                Navigator.pop(sheetContext);
+                _copyNomor();
+              },
+              icon: const Icon(PhosphorIconsRegular.copy, size: 16),
+              label: const Text('Salin'),
+            ),
+          ],
+        ));
+  }
+
+  Widget _buildTicketHeader(Pendaftar p, _StatusStyle st) {
+    final tone = switch (p.status) {
+      'pending_approval' ||
+      'awaiting_payment' ||
+      'payment_verification' ||
+      'payment_review' =>
+        OperationsTone.orange,
+      'confirmed' => OperationsTone.green,
+      'rejected' => OperationsTone.red,
+      _ => OperationsTone.grey,
+    };
+    final colors = operationsToneColors(tone);
+    final icon = switch (p.status) {
+      'confirmed' => PhosphorIconsRegular.checkCircle,
+      'rejected' => PhosphorIconsRegular.xCircle,
+      'awaiting_payment' || 'expired' => PhosphorIconsRegular.clock,
+      _ => st.icon,
+    };
+    return Padding(
+        padding: const EdgeInsets.all(AppSpacing.lg),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Container(
+            padding: const EdgeInsets.symmetric(
+                horizontal: AppSpacing.md, vertical: AppSpacing.xs),
+            decoration: BoxDecoration(
+              color: colors.bg,
+              border: Border.all(color: colors.border),
+              borderRadius: BorderRadius.circular(AppSpacing.md),
+            ),
+            child: Row(mainAxisSize: MainAxisSize.min, children: [
+              Icon(icon, size: 16, color: colors.fg),
+              const SizedBox(width: AppSpacing.sm),
+              Flexible(
+                  child: Text(st.label,
+                      style: _font(11, FontWeight.w700, colors.fg))),
+            ]),
+          ),
+          const SizedBox(height: AppSpacing.md),
+          Text(p.wisata,
+              style: _font(16, FontWeight.w800, _navy, height: 1.25)),
+          const SizedBox(height: AppSpacing.sm),
+          Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            const Icon(PhosphorIconsRegular.ticket, size: 16, color: _blue),
+            const SizedBox(width: AppSpacing.sm),
+            Expanded(
+                child: SelectableText(
+                    p.nomorBukti.isEmpty
+                        ? 'Kode booking belum tersedia'
+                        : p.nomorBukti,
+                    style: _font(11, FontWeight.w700, _blue, height: 1.5))),
+          ]),
         ]));
   }
 
   Widget _buildDashedDivider() {
-    return SizedBox(
-      height: 18,
-      child: Row(
-        children: [
-          Container(
-            width: 14,
-            height: 18,
-            decoration: const BoxDecoration(
-              color: _background,
-              borderRadius: BorderRadius.horizontal(right: Radius.circular(9)),
-            ),
-          ),
-          const Expanded(
-            child: CustomPaint(
-              painter: _DashedLinePainter(color: _border),
-            ),
-          ),
-          Container(
-            width: 14,
-            height: 18,
-            decoration: const BoxDecoration(
-              color: _background,
-              borderRadius: BorderRadius.horizontal(left: Radius.circular(9)),
-            ),
-          ),
-        ],
-      ),
+    return const Padding(
+      padding: EdgeInsets.symmetric(horizontal: AppSpacing.lg),
+      child: SizedBox(
+          height: 1,
+          width: double.infinity,
+          child: CustomPaint(painter: _DashedLinePainter(color: _border))),
     );
   }
 
   Widget _buildTicketBody(Pendaftar p) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(18, 8, 18, 18),
-      child: LayoutBuilder(
-        builder: (context, constraints) {
-          final fields = [
-            _InfoItem(
-                icon: PhosphorIconsRegular.userCircle,
-                label: 'Nama',
-                value: p.namaPengunjung),
-            _InfoItem(
-                icon: PhosphorIconsRegular.calendarBlank,
-                label: 'Tanggal',
-                value: _formatBookingDate(p.tanggal)),
-            _InfoItem(
-                icon: PhosphorIconsRegular.users,
-                label: 'Jumlah',
-                value: '${p.jumlahOrang} orang'),
-            _InfoItem(
-                icon: PhosphorIconsRegular.phone,
-                label: 'Telepon',
-                value: p.noTelepon),
-          ];
-          if (constraints.maxWidth < 280 ||
-              MediaQuery.textScalerOf(context).scale(1) > 1.3) {
-            return Column(
-              children: [
-                for (var i = 0; i < fields.length; i++) ...[
-                  fields[i],
-                  if (i < fields.length - 1) const SizedBox(height: 14),
-                ],
-              ],
-            );
-          }
-          // Short values share a row; name and phone get the full width so
-          // an email-style name or a long number is not broken mid-word.
-          return Column(children: [
-            Row(children: [
-              Expanded(child: fields[1]),
-              Expanded(child: fields[2])
-            ]),
-            const SizedBox(height: 14),
-            fields[0],
-            const SizedBox(height: 14),
-            fields[3],
-          ]);
-        },
+      padding: const EdgeInsets.all(AppSpacing.lg),
+      child: _detailPair(
+        _InfoItem(
+            icon: PhosphorIconsRegular.calendarBlank,
+            label: 'Tanggal kunjungan',
+            compact: true,
+            maxLines: null,
+            value: p.tanggal.isEmpty
+                ? 'Belum tersedia'
+                : _formatBookingDate(p.tanggal, shortMonth: true)),
+        _InfoItem(
+            icon: PhosphorIconsRegular.users,
+            label: 'Jumlah pengunjung',
+            compact: true,
+            maxLines: null,
+            value: _controller?.booking.json['quantity'] is num
+                ? '${p.jumlahOrang} orang'
+                : 'Belum tersedia'),
       ),
     );
   }
 
-  Future<void> _toggleExpand() async {
+  void _loadDetail() {
     final controller = _controller;
-    if (controller == null || _expanded) {
-      setState(() => _expanded = !_expanded);
-      return;
-    }
-    setState(() => _expanded = true);
-    // Saat dibuka: ambil detail terkini dan dokumen dari server (tanpa menunggu).
+    if (controller == null) return;
     controller.refresh();
     controller.loadDocuments();
   }
@@ -1165,24 +1846,93 @@ class _TicketCardState extends State<_TicketCard> {
 
   Future<void> _confirmCancel(BookingDetailController c) async {
     if (c.cancelling) return;
-    final yes = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Batalkan pendaftaran?'),
-        content: Text(
-            'Pendaftaran ${c.booking.bookingNumber} untuk ${c.booking.destinationName} akan dibatalkan dan kuota dilepas. Tindakan ini tidak dapat dibatalkan.'),
-        actions: [
-          TextButton(
-              onPressed: () => Navigator.pop(context, false),
-              child: const Text('Kembali')),
-          TextButton(
-              onPressed: () => Navigator.pop(context, true),
-              child: const Text('Batalkan pendaftaran')),
-        ],
-      ),
-    );
+    final yes = await _detailSheet<bool>(
+        (sheetContext) => Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Row(children: [
+                  Expanded(
+                      child: Text('Batalkan Pendaftaran',
+                          style: _font(20, FontWeight.w800, AppColors.navy))),
+                  IconButton(
+                    tooltip: 'Tutup',
+                    onPressed: () => Navigator.pop(sheetContext, false),
+                    icon: Container(
+                      padding: const EdgeInsets.all(AppSpacing.sm),
+                      decoration: BoxDecoration(
+                          color: AppColors.sheetCloseBackground,
+                          borderRadius: BorderRadius.circular(AppSpacing.md)),
+                      child: const Icon(PhosphorIconsRegular.x,
+                          size: 20, color: AppColors.textSecondary),
+                    ),
+                  ),
+                ]),
+                const Divider(height: AppSpacing.xl, color: AppColors.border),
+                Text(
+                  'Yakin ingin mengajukan pembatalan pendaftaran ${c.booking.destinationName}${c.booking.visitDate.isEmpty ? '' : ' untuk ${_formatBookingDate(c.booking.visitDate)}'}?',
+                  style: _font(12, FontWeight.w500, AppColors.textSecondary,
+                      height: 1.6),
+                ),
+                const SizedBox(height: AppSpacing.xl),
+                _detailPair(
+                  Text('Jumlah pengunjung',
+                      style:
+                          _font(12, FontWeight.w500, AppColors.textSecondary)),
+                  Text(
+                      c.booking.json['quantity'] is num
+                          ? '${c.booking.quantity} orang'
+                          : 'Belum tersedia',
+                      style: _font(13, FontWeight.w700, AppColors.navy)),
+                  intrinsicSecond: true,
+                ),
+                const Divider(height: AppSpacing.xl, color: AppColors.border),
+                _detailPair(
+                  Text('Total tagihan',
+                      style:
+                          _font(12, FontWeight.w500, AppColors.textSecondary)),
+                  Text(_detailTotal(c.booking),
+                      style: _font(13, FontWeight.w700, AppColors.navy)),
+                  intrinsicSecond: true,
+                ),
+                const SizedBox(height: AppSpacing.xl),
+                _detailPair(
+                  OutlinedButton(
+                      onPressed: () => Navigator.pop(sheetContext, false),
+                      style: OutlinedButton.styleFrom(
+                          foregroundColor: AppColors.blueDeep,
+                          side: const BorderSide(color: AppColors.border),
+                          textStyle:
+                              _font(13, FontWeight.w800, AppColors.blueDeep),
+                          shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(14)),
+                          minimumSize: const Size(kMinInteractiveDimension,
+                              kMinInteractiveDimension + AppSpacing.xs)),
+                      child: const Text('Kembali')),
+                  ElevatedButton(
+                      key: const ValueKey('confirm-cancel-booking'),
+                      style: ElevatedButton.styleFrom(
+                          backgroundColor: _red,
+                          foregroundColor: AppColors.surface,
+                          elevation: 0,
+                          textStyle:
+                              _font(13, FontWeight.w800, AppColors.surface),
+                          minimumSize: const Size(kMinInteractiveDimension,
+                              kMinInteractiveDimension + AppSpacing.xs),
+                          shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(14))),
+                      onPressed: () => Navigator.pop(sheetContext, true),
+                      child: const Text('Batalkan')),
+                ),
+              ],
+            ),
+        padding: AppSpacing.sheetPadding);
     if (yes != true || !mounted) return;
     final ok = await c.cancel();
+    if (widget.detailPage && ok && mounted) {
+      await c.refresh();
+      await c.loadDocuments();
+    }
     if (!mounted) return;
     _snack(ok
         ? 'Pendaftaran dibatalkan. Status dari server: ${bookingStatusLabel(c.booking.status)}.'
@@ -1198,217 +1948,16 @@ class _TicketCardState extends State<_TicketCard> {
         : (c.message ?? 'Dokumen belum dapat diunduh.'));
   }
 
-  Widget _buildExpandBtn(Pendaftar p) {
-    final c = _controller;
-    final label = (c?.refreshing ?? false)
-        ? 'Memuat...'
-        : (_expanded ? 'Sembunyikan detail' : 'Tampilkan detail');
-    final indicator = AnimatedRotation(
-      turns: _expanded ? 0.5 : 0,
-      duration: MediaQuery.disableAnimationsOf(context)
-          ? Duration.zero
-          : const Duration(milliseconds: 200),
-      child: const Icon(PhosphorIconsRegular.caretDown, color: _blue, size: 18),
-    );
-    final expandedContent = _expanded
-        ? Container(
-            width: double.infinity,
-            padding: const EdgeInsets.fromLTRB(18, 0, 18, 18),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                if (p.email.isNotEmpty) ...[
-                  _InfoItem(
-                      icon: PhosphorIconsRegular.envelope,
-                      label: 'Email',
-                      value: p.email),
-                  const SizedBox(height: 10),
-                ],
-                if (p.catatan.isNotEmpty)
-                  _InfoItem(
-                      icon: PhosphorIconsRegular.note,
-                      label: 'Catatan',
-                      value: p.catatan),
-                if (c != null) ..._buildServerDetail(c),
-              ],
-            ),
-          )
-        : const SizedBox(width: double.infinity);
-    final details = MediaQuery.disableAnimationsOf(context)
-        ? expandedContent
-        : AnimatedSize(
-            duration: const Duration(milliseconds: 250),
-            curve: Curves.easeInOut,
-            child: expandedContent,
-          );
-    return Container(
-      decoration: const BoxDecoration(
-        border: Border(top: BorderSide(color: _border, width: 1)),
-      ),
-      child: Column(
-        children: [
-          GestureDetector(
-            onTap: _toggleExpand,
-            behavior: HitTestBehavior.opaque,
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
-              child: MediaQuery.textScalerOf(context).scale(1) > 1.3
-                  ? Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(label,
-                            textAlign: TextAlign.center,
-                            style: _font(12, FontWeight.w700, _blue)),
-                        indicator,
-                      ],
-                    )
-                  : Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Flexible(
-                          child: Text(label,
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
-                              textAlign: TextAlign.center,
-                              style: _font(12, FontWeight.w700, _blue)),
-                        ),
-                        const SizedBox(width: 4),
-                        indicator,
-                      ],
-                    ),
-            ),
-          ),
-          details,
-        ],
-      ),
-    );
-  }
-
-  /// Status server, pembatalan dan dokumen untuk booking Laravel.
-  List<Widget> _buildServerDetail(BookingDetailController c) {
-    final b = c.booking;
-    final note = bookingStatusNote(b.status);
+  List<Widget> _documentWidgets(BookingDetailController c) {
     final docs = c.documents;
-    final status = _styleFor(b.status);
     return [
-      const SizedBox(height: 10),
-      _InfoItem(
-        icon: PhosphorIconsRegular.money,
-        label: 'Total',
-        value: _formatBookingTotal(b),
-      ),
-      const SizedBox(height: 10),
-      Container(
-        key: const ValueKey('detailStatus'),
-        width: double.infinity,
-        padding: const EdgeInsets.all(14),
-        decoration: BoxDecoration(
-          color: status.color.withValues(alpha: .08),
-          border: Border.all(color: status.color.withValues(alpha: .28)),
-          borderRadius: BorderRadius.circular(18),
-        ),
-        child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Icon(status.icon, color: status.deep, size: 20),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(bookingStatusLabel(b.status),
-                    style: _font(14, FontWeight.w800, status.deep)),
-                if (note != null) ...[
-                  const SizedBox(height: 3),
-                  Text(note,
-                      style:
-                          _font(12, FontWeight.w500, _textMuted, height: 1.4)),
-                ],
-              ],
-            ),
-          ),
-        ]),
-      ),
-      const SizedBox(height: 12),
-      Container(
-        width: double.infinity,
-        padding: const EdgeInsets.all(14),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          border: Border.all(color: _border),
-          borderRadius: BorderRadius.circular(18),
-        ),
-        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text('Apa Selanjutnya?', style: _font(13, FontWeight.w800, _navy)),
-          const SizedBox(height: 5),
-          Text(
-              _nextStepFor(b,
-                  ticketIssued: docs?.entryTicketsIssued,
-                  entry: docs?.entryTickets),
-              style: _font(12, FontWeight.w500, _textMuted, height: 1.45)),
-        ]),
-      ),
-      if (c.message != null)
-        Padding(
-          padding: const EdgeInsets.only(top: 8),
-          child: Text(c.message!,
-              key: const ValueKey('detailMessage'),
-              style: _font(12, FontWeight.w600, _red)),
-        ),
-      if (!b.isFree &&
-          (const ['awaiting_payment', 'payment_verification', 'payment_review']
-                  .contains(b.status) ||
-              (b.paymentTestOnly && b.paymentStatus != 'paid')))
-        BookingPaymentSection(
-            booking: b,
-            repository: c.repository,
-            onSnapshot: (snapshot) {
-              if (mounted) setState(() => _paymentSnapshot = snapshot);
-            },
-            onReturned: () async {
-              await c.refresh();
-              await c.loadDocuments();
-            }),
-      if (b.status == 'confirmed' &&
-          (b.paymentStatus == 'paid' ||
-              b.paymentTestOnly ||
-              b.isFree ||
-              docs?.entryTickets?.isFree == true))
-        BookingTicketQrSection(
-            repository: c.repository,
-            bookingGuid: b.guid,
-            onRefreshed: c.refresh),
-      if (b.status == 'confirmed' && b.paymentStatus == 'paid')
-        BookingRefundSection(
-            repository: c.repository,
-            bookingGuid: b.guid,
-            onChanged: c.refresh),
-      if (b.cancellable) ...[
-        const SizedBox(height: 12),
-        SizedBox(
-          width: double.infinity,
-          child: OutlinedButton(
-            key: const ValueKey('cancelBooking'),
-            style: OutlinedButton.styleFrom(
-                foregroundColor: _red, side: const BorderSide(color: _red)),
-            onPressed: c.cancelling ? null : () => _confirmCancel(c),
-            child: c.cancelling
-                ? const SizedBox(
-                    width: 18,
-                    height: 18,
-                    child: CircularProgressIndicator(strokeWidth: 2))
-                : const Text('Batalkan Pendaftaran'),
-          ),
-        ),
-      ],
-      const SizedBox(height: 14),
-      Text('Dokumen', style: _font(13, FontWeight.w800, _navy)),
-      const SizedBox(height: 6),
       if (c.loadingDocuments)
         Row(children: [
           const SizedBox(
               width: 18,
               height: 18,
               child: CircularProgressIndicator(strokeWidth: 2)),
-          const SizedBox(width: 8),
+          const SizedBox(width: AppSpacing.sm),
           Text('Memeriksa dokumen...',
               style: _font(12, FontWeight.w500, _textMuted)),
         ])
@@ -1433,19 +1982,19 @@ class _TicketCardState extends State<_TicketCard> {
         if (docs.ticketDownloadAvailable) ...[
           _documentRow(c, 'ticket', 'Dokumen tiket grup (PDF)'),
           Padding(
-            padding: const EdgeInsets.only(bottom: 4),
+            padding: const EdgeInsets.only(bottom: AppSpacing.xs),
             child: Text(
                 'Dokumen ini hanya konfirmasi pendaftaran, bukan tiket masuk. QR tiket masuk ada pada bagian Tiket masuk.',
                 key: const ValueKey('ticketDocumentNote'),
-                style: _font(11.5, FontWeight.w500, _textMuted)),
+                style: _font(11, FontWeight.w500, _textMuted)),
           ),
         ],
-        if (docs.invoice != null)
+        if (docs.invoice != null && !widget.detailPage)
           Padding(
-            padding: const EdgeInsets.only(top: 4),
+            padding: const EdgeInsets.only(top: AppSpacing.xs),
             child: Text(
                 'Invoice adalah konfirmasi pendaftaran, bukan bukti pembayaran.',
-                style: _font(11.5, FontWeight.w500, _textMuted)),
+                style: _font(11, FontWeight.w500, _textMuted)),
           ),
       ],
     ];
@@ -1453,10 +2002,81 @@ class _TicketCardState extends State<_TicketCard> {
 
   Widget _documentRow(BookingDetailController c, String type, String label) {
     final busy = c.downloading == type;
+    if (widget.detailPage) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(vertical: AppSpacing.xs),
+        child: Row(children: [
+          Container(
+            padding: const EdgeInsets.all(AppSpacing.sm),
+            decoration: BoxDecoration(
+              color: AppColors.blueTint,
+              borderRadius: BorderRadius.circular(AppSpacing.md),
+            ),
+            child: const Icon(PhosphorIconsRegular.fileText,
+                size: 20, color: AppColors.blue),
+          ),
+          const SizedBox(width: AppSpacing.md),
+          Expanded(
+            child: TextButton(
+              style: TextButton.styleFrom(
+                  alignment: Alignment.centerLeft,
+                  padding: EdgeInsets.zero,
+                  minimumSize: const Size(48, 48)),
+              onPressed:
+                  c.downloading != null ? null : () => _download(c, type),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(type == 'invoice' ? 'Konfirmasi Pendaftaran' : label,
+                      style: _font(13, FontWeight.w700, AppColors.navy)),
+                  const SizedBox(height: AppSpacing.xs),
+                  Text(
+                      switch (type) {
+                        'invoice' => 'Invoice · Bukan bukti pembayaran',
+                        'receipt' => 'Bukti pembayaran dari sistem',
+                        _ => 'PDF grup · Bukan tiket masuk QR',
+                      },
+                      style:
+                          _font(12, FontWeight.w500, AppColors.textSecondary)),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(width: AppSpacing.sm),
+          OutlinedButton(
+            key: ValueKey('download_$type'),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: AppColors.blue,
+              backgroundColor: AppColors.blueTint,
+              textStyle: _font(13, FontWeight.w800, AppColors.blue),
+              minimumSize: const Size(48, 48),
+              tapTargetSize: MaterialTapTargetSize.padded,
+              visualDensity: VisualDensity.standard,
+              padding: const EdgeInsets.symmetric(
+                  horizontal: AppSpacing.md, vertical: AppSpacing.sm),
+              side: BorderSide(color: AppColors.blue.withValues(alpha: .2)),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(AppSpacing.md)),
+            ),
+            onPressed: c.downloading != null ? null : () => _download(c, type),
+            child: busy
+                ? const SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(strokeWidth: 2))
+                : const Text('Unduh'),
+          ),
+        ]),
+      );
+    }
     return Row(children: [
-      Expanded(child: Text(label, style: _font(12.5, FontWeight.w600, _navy))),
+      Expanded(child: Text(label, style: _font(12, FontWeight.w600, _navy))),
       TextButton(
         key: ValueKey('download_$type'),
+        style: TextButton.styleFrom(
+            minimumSize: const Size(48, 48),
+            textStyle: _font(13, FontWeight.w800, _blue)),
         onPressed: c.downloading != null ? null : () => _download(c, type),
         child: busy
             ? const SizedBox(
@@ -1473,19 +2093,20 @@ class _TicketCardState extends State<_TicketCard> {
       decoration: const BoxDecoration(
         border: Border(top: BorderSide(color: _border, width: 1)),
       ),
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+      padding: const EdgeInsets.fromLTRB(
+          AppSpacing.lg, AppSpacing.md, AppSpacing.lg, AppSpacing.lg),
       child: Material(
         color: _sudahUlasan ? _background : _orange.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(14),
         clipBehavior: Clip.antiAlias,
         child: InkWell(
           onTap: _sudahUlasan ? null : _bukaFormUlasan,
           splashColor: _orange.withValues(alpha: 0.15),
           child: Container(
             width: double.infinity,
-            padding: const EdgeInsets.symmetric(vertical: 13),
+            padding: const EdgeInsets.symmetric(vertical: AppSpacing.lg),
             decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(16),
+              borderRadius: BorderRadius.circular(14),
               border: Border.all(
                 color: _sudahUlasan ? _border : _orange.withValues(alpha: 0.45),
               ),
@@ -1500,7 +2121,7 @@ class _TicketCardState extends State<_TicketCard> {
                   color: _sudahUlasan ? _greenDeep : const Color(0xFFE08600),
                   size: 17,
                 ),
-                const SizedBox(width: 8),
+                const SizedBox(width: AppSpacing.sm),
                 Text(
                   _sudahUlasan ? 'Ulasan Sudah Ditulis' : 'Tulis Ulasan',
                   style: _font(
@@ -1612,13 +2233,13 @@ class _FormUlasanSheetState extends State<_FormUlasanSheet> {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding:
-          EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+      padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(context).bottom),
       child: Container(
-        padding: const EdgeInsets.fromLTRB(22, 14, 22, 28),
+        padding: const EdgeInsets.all(AppSpacing.sheetPadding),
         decoration: const BoxDecoration(
           color: Colors.white,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(30)),
+          borderRadius:
+              BorderRadius.vertical(top: Radius.circular(AppSpacing.xl)),
         ),
         child: SingleChildScrollView(
           child: Column(
@@ -1635,7 +2256,7 @@ class _FormUlasanSheetState extends State<_FormUlasanSheet> {
                   ),
                 ),
               ),
-              const SizedBox(height: 18),
+              const SizedBox(height: AppSpacing.lg),
               Row(
                 children: [
                   Container(
@@ -1648,64 +2269,63 @@ class _FormUlasanSheetState extends State<_FormUlasanSheet> {
                     child: const Icon(PhosphorIconsRegular.chatText,
                         color: Color(0xFFE08600), size: 22),
                   ),
-                  const SizedBox(width: 12),
+                  const SizedBox(width: AppSpacing.md),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text('Tulis Ulasan',
-                            style: _font(18, FontWeight.w800, _navy,
+                            style: _font(20, FontWeight.w800, _navy,
                                 letterSpacing: -0.4)),
                         Text(widget.pendaftar.wisata,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
-                            style: _font(12.5, FontWeight.w500, _textMuted)),
+                            style: _font(12, FontWeight.w500, _textMuted)),
                       ],
                     ),
                   ),
                 ],
               ),
-              const SizedBox(height: 22),
+              const SizedBox(height: AppSpacing.xl),
               Text('Rating', style: _font(13, FontWeight.w700, _navy)),
-              const SizedBox(height: 10),
-              Row(
+              const SizedBox(height: AppSpacing.md),
+              Wrap(
+                spacing: AppSpacing.xs,
+                runSpacing: AppSpacing.sm,
                 children: [
                   ...List.generate(5, (i) {
                     final filled = i < _rating;
-                    return GestureDetector(
-                      onTap: () => setState(() => _rating = i + 1),
-                      child: Padding(
-                        padding: const EdgeInsets.only(right: 6),
-                        child: AnimatedSwitcher(
-                          duration: const Duration(milliseconds: 180),
-                          child: Icon(
-                            filled
-                                ? PhosphorIconsFill.star
-                                : PhosphorIconsRegular.star,
-                            key: ValueKey(filled),
-                            color: filled ? _orange : _border,
-                            size: 38,
-                          ),
+                    return IconButton(
+                      tooltip: '${i + 1} bintang',
+                      onPressed: () => setState(() => _rating = i + 1),
+                      style: IconButton.styleFrom(
+                          minimumSize: const Size(48, 48),
+                          padding: const EdgeInsets.all(AppSpacing.xs)),
+                      icon: AnimatedSwitcher(
+                        duration: const Duration(milliseconds: 180),
+                        child: Icon(
+                          filled
+                              ? PhosphorIconsFill.star
+                              : PhosphorIconsRegular.star,
+                          key: ValueKey(filled),
+                          color: filled ? _orange : _border,
+                          size: 38,
                         ),
                       ),
                     );
                   }),
-                  const SizedBox(width: 6),
-                  Expanded(
-                    child: Text(
-                      _labelRating[_rating],
-                      style: _font(12.5, FontWeight.w700, _orange),
-                    ),
-                  ),
                 ],
               ),
-              const SizedBox(height: 18),
+              const SizedBox(height: AppSpacing.sm),
+              Text(_labelRating[_rating],
+                  style: _font(12, FontWeight.w700, _orange)),
+              const SizedBox(height: AppSpacing.lg),
               Text('Ulasanmu', style: _font(13, FontWeight.w700, _navy)),
-              const SizedBox(height: 8),
+              const SizedBox(height: AppSpacing.sm),
               TextField(
                 controller: _isiCtrl,
                 maxLines: 4,
-                style: _font(14, FontWeight.w500, _navy),
+                style: _font(13, FontWeight.w500, _navy),
                 cursorColor: _blue,
                 decoration: InputDecoration(
                   hintText:
@@ -1714,73 +2334,50 @@ class _FormUlasanSheetState extends State<_FormUlasanSheet> {
                   filled: true,
                   fillColor: _background,
                   enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(16),
-                    borderSide: const BorderSide(color: _border, width: 1.3),
+                    borderRadius: BorderRadius.circular(14),
+                    borderSide: const BorderSide(color: _border),
                   ),
                   focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(16),
+                    borderRadius: BorderRadius.circular(14),
                     borderSide: const BorderSide(color: _blue, width: 1.6),
                   ),
-                  contentPadding: const EdgeInsets.all(14),
+                  contentPadding: const EdgeInsets.all(AppSpacing.lg),
                 ),
               ),
               if (_error != null) ...[
-                const SizedBox(height: 10),
+                const SizedBox(height: AppSpacing.md),
                 Row(
                   children: [
                     const Icon(PhosphorIconsRegular.warningCircle,
                         color: _red, size: 16),
-                    const SizedBox(width: 6),
+                    const SizedBox(width: AppSpacing.sm),
                     Expanded(
                       child: Text(_error!,
-                          style: _font(12.5, FontWeight.w600, _red)),
+                          style: _font(12, FontWeight.w600, _red)),
                     ),
                   ],
                 ),
               ],
-              const SizedBox(height: 22),
-              GestureDetector(
-                onTap: _isLoading ? null : _submit,
-                child: Container(
-                  width: double.infinity,
-                  height: 54,
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: _isLoading
-                          ? [_blueDeep, _blueDeep]
-                          : [const Color(0xFF2386E8), _blueDeep],
-                    ),
-                    borderRadius: BorderRadius.circular(18),
-                    boxShadow: _isLoading
-                        ? []
-                        : [
-                            BoxShadow(
-                              color: _blue.withValues(alpha: 0.35),
-                              blurRadius: 18,
-                              offset: const Offset(0, 8),
-                            ),
-                          ],
-                  ),
-                  child: Center(
-                    child: _isLoading
-                        ? const SizedBox(
-                            width: 22,
-                            height: 22,
-                            child: CircularProgressIndicator(
-                                color: Colors.white, strokeWidth: 2.5),
-                          )
-                        : Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              const Icon(PhosphorIconsRegular.paperPlaneTilt,
-                                  color: Colors.white, size: 17),
-                              const SizedBox(width: 8),
-                              Text('Kirim Ulasan',
-                                  style:
-                                      _font(15, FontWeight.w800, Colors.white)),
-                            ],
-                          ),
-                  ),
+              const SizedBox(height: AppSpacing.xl),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  key: const ValueKey('submit-booking-review'),
+                  onPressed: _isLoading ? null : _submit,
+                  style: ElevatedButton.styleFrom(
+                      minimumSize: const Size(48, 52),
+                      elevation: 0,
+                      textStyle: _font(13, FontWeight.w800, AppColors.surface),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14))),
+                  icon: _isLoading
+                      ? const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(strokeWidth: 2))
+                      : const Icon(PhosphorIconsRegular.paperPlaneTilt,
+                          size: 20),
+                  label: const Text('Kirim Ulasan'),
                 ),
               ),
             ],
@@ -1798,42 +2395,50 @@ class _InfoItem extends StatelessWidget {
   final IconData icon;
   final String label;
   final String value;
+  final int? maxLines;
+  final bool compact;
 
   const _InfoItem({
     required this.icon,
     required this.label,
     required this.value,
+    this.maxLines = 2,
+    this.compact = false,
   });
 
   @override
   Widget build(BuildContext context) {
     return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
+      crossAxisAlignment:
+          compact ? CrossAxisAlignment.center : CrossAxisAlignment.start,
       children: [
         Container(
-          width: 32,
-          height: 32,
+          width: compact ? AppSpacing.xl + AppSpacing.xs : 32,
+          height: compact ? AppSpacing.xl + AppSpacing.xs : 32,
           decoration: BoxDecoration(
-            color: _blue.withValues(alpha: 0.10),
-            borderRadius: BorderRadius.circular(10),
+            color: AppColors.blueTint,
+            borderRadius: BorderRadius.circular(AppSpacing.md),
           ),
           child: Icon(icon, size: 15, color: _blue),
         ),
-        const SizedBox(width: 10),
+        const SizedBox(width: AppSpacing.md),
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
                 label,
-                style: _font(10.5, FontWeight.w600, _textMuted),
+                style: _font(compact ? 11 : 12, FontWeight.w500, _textMuted,
+                    height: 1.5),
               ),
-              const SizedBox(height: 2),
+              const SizedBox(height: AppSpacing.xs),
               Text(
                 value,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: _font(13, FontWeight.w700, _navy),
+                maxLines: maxLines,
+                overflow: maxLines == null
+                    ? TextOverflow.clip
+                    : TextOverflow.ellipsis,
+                style: _font(13, FontWeight.w700, _navy, height: 1.5),
               ),
             ],
           ),
@@ -1854,12 +2459,12 @@ class _DashedLinePainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     final paint = Paint()
       ..color = color
-      ..strokeWidth = 1.5
+      ..strokeWidth = 1
       ..style = PaintingStyle.stroke;
 
     double x = 0;
-    const dashW = 6.0;
-    const gapW = 4.0;
+    const dashW = AppSpacing.xs;
+    const gapW = AppSpacing.xs;
     final y = size.height / 2;
 
     while (x < size.width) {
@@ -1878,33 +2483,50 @@ class _DashedLinePainter extends CustomPainter {
 class _StatusBadge extends StatelessWidget {
   final String status;
   final bool onPhoto; // true bila ditaruh di atas foto
-  const _StatusBadge({required this.status, this.onPhoto = false});
+  final bool compact;
+  const _StatusBadge(
+      {required this.status, this.onPhoto = false, this.compact = false});
 
   @override
   Widget build(BuildContext context) {
     final st = _styleFor(status);
+    final awaitingPayment = compact && status == 'awaiting_payment';
+    final foreground = awaitingPayment ? AppColors.warningText : st.deep;
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      padding: compact
+          ? const EdgeInsets.all(AppSpacing.sm)
+          : const EdgeInsets.symmetric(
+              horizontal: AppSpacing.md, vertical: AppSpacing.sm),
       decoration: BoxDecoration(
         color: onPhoto
             ? Colors.white.withValues(alpha: 0.95)
-            : st.color.withValues(alpha: 0.14),
-        borderRadius: BorderRadius.circular(20),
+            : awaitingPayment
+                ? AppColors.warningTint
+                : st.color.withValues(alpha: 0.14),
+        borderRadius: BorderRadius.circular(AppSpacing.md),
         border: onPhoto
             ? null
-            : Border.all(color: st.color.withValues(alpha: 0.35)),
+            : Border.all(
+                color: awaitingPayment
+                    ? AppColors.warningBorder
+                    : st.color.withValues(alpha: 0.35)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(st.icon, size: 12, color: st.deep),
-          const SizedBox(width: 5),
+          if (compact)
+            ExcludeSemantics(
+                child:
+                    Icon(PhosphorIconsFill.circle, size: 6, color: foreground))
+          else
+            Icon(st.icon, size: 12, color: st.deep),
+          const SizedBox(width: AppSpacing.sm),
           Flexible(
             child: Text(st.label,
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
-                style: _font(10.5, FontWeight.w800, st.deep)),
+                style: _font(11, FontWeight.w700, foreground)),
           ),
         ],
       ),
@@ -1913,7 +2535,7 @@ class _StatusBadge extends StatelessWidget {
 }
 
 // ══════════════════════════════════════════════════════════
-//  TIKET BOTTOM SHEET — muncul saat kartu disetujui diklik
+//  DETAIL PENDAFTARAN — halaman penuh dari riwayat dan notifikasi
 // ══════════════════════════════════════════════════════════
 
 class BookingTicketScreen extends StatefulWidget {
@@ -1935,7 +2557,6 @@ class BookingTicketScreen extends StatefulWidget {
 class _BookingTicketScreenState extends State<BookingTicketScreen> {
   late final BusinessRepository _repository;
   late final int _generation;
-  bool _ticketIssued = false;
   Future<Booking>? _booking;
   @override
   void initState() {
@@ -1971,49 +2592,40 @@ class _BookingTicketScreenState extends State<BookingTicketScreen> {
         session.authenticated.value &&
         session.deviceSessionReady &&
         session.role == 0;
-    return Scaffold(
+    Widget shell(Widget body) => Scaffold(
         backgroundColor: _background,
-        appBar: AppBar(
-            title: Text(_ticketIssued ? 'Detail Tiket' : 'Detail Pendaftaran'),
-            backgroundColor: _background,
-            foregroundColor: _navy),
-        body: !valid
-            ? const Center(
-                child: Text('Sesi berubah. Silakan buka kembali tiket.'))
-            : FutureBuilder<Booking>(
-                future: _booking,
-                builder: (context, snapshot) {
-                  if (snapshot.connectionState != ConnectionState.done) {
-                    return const Center(child: CircularProgressIndicator());
-                  }
-                  final booking = snapshot.data;
-                  if (snapshot.hasError ||
-                      booking == null ||
-                      booking.guid != widget.bookingGuid) {
-                    return Center(
-                        child:
-                            Column(mainAxisSize: MainAxisSize.min, children: [
-                      const Text('Pendaftaran belum dapat dimuat.'),
-                      TextButton(
-                          onPressed: () => setState(() {
-                                _booking =
-                                    _repository.booking(widget.bookingGuid);
-                              }),
-                          child: const Text('Coba lagi')),
-                    ]));
-                  }
-                  return SingleChildScrollView(
-                      padding: const EdgeInsets.all(20),
-                      child: _TicketCard(
-                          pendaftar: _fromBooking(booking),
-                          booking: booking,
-                          isLaravel: true,
-                          initiallyExpanded: true,
-                          repository: _repository,
-                          onTicketIssued: (issued) {
-                            if (_ticketIssued == issued) return;
-                            setState(() => _ticketIssued = issued);
-                          }));
-                }));
+        appBar: AppBar(title: const Text('Detail Pendaftaran')),
+        body: body);
+    return !valid
+        ? shell(const Center(
+            child: Text('Sesi berubah. Silakan buka kembali tiket.')))
+        : FutureBuilder<Booking>(
+            future: _booking,
+            builder: (context, snapshot) {
+              if (snapshot.connectionState != ConnectionState.done) {
+                return shell(const Center(child: CircularProgressIndicator()));
+              }
+              final booking = snapshot.data;
+              if (snapshot.hasError ||
+                  booking == null ||
+                  booking.guid != widget.bookingGuid) {
+                return shell(Center(
+                    child: Column(mainAxisSize: MainAxisSize.min, children: [
+                  const Text('Pendaftaran belum dapat dimuat.'),
+                  TextButton(
+                      onPressed: () => setState(() {
+                            _booking = _repository.booking(widget.bookingGuid);
+                          }),
+                      child: const Text('Coba lagi')),
+                ])));
+              }
+              return _TicketCard(
+                  pendaftar: _fromBooking(booking),
+                  booking: booking,
+                  isLaravel: true,
+                  initiallyExpanded: true,
+                  detailPage: true,
+                  repository: _repository);
+            });
   }
 }

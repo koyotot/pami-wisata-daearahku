@@ -17,6 +17,7 @@ import '../../data/app_data.dart';
 import '../../data/booking_state.dart';
 import '../../data/business_repository.dart';
 import '../../data/favorite_state.dart';
+import '../../theme/app_colors.dart';
 import '../../widgets/reviews_sheet.dart';
 import '../../widgets/select_sheet.dart' show showConfirmSheet;
 import '../../widgets/profile_avatar.dart';
@@ -180,37 +181,20 @@ class _ProfilUserScreenState extends State<ProfilUserScreen>
   }
 
   Future<void> _konfirmasiLogout(BuildContext context) async {
-    final konfirmasi = await showDialog<bool>(
-      context: context,
-      builder: (_) => AlertDialog(
-        backgroundColor: _C.card,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: Text(
-          'Keluar dari Akun?',
-          style: TextStyle(color: _C.text, fontWeight: FontWeight.w800),
-        ),
-        content: Text(
-          'Kamu perlu login kembali untuk mengakses akun ini.',
-          style: TextStyle(color: _C.textMuted, height: 1.5),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: Text('Batal', style: TextStyle(color: _C.textMuted)),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: Text('Keluar',
-                style:
-                    TextStyle(color: _C.danger, fontWeight: FontWeight.w800)),
-          ),
-        ],
-      ),
-    );
-
-    if (konfirmasi != true) return;
-
     final generation = AuthSession.instance.sessionGeneration;
+    final konfirmasi = await showConfirmSheet(context,
+        title: 'Keluar dari Akun?',
+        message: 'Kamu perlu login kembali untuk mengakses akun ini.',
+        confirmLabel: 'Keluar',
+        cancelLabel: 'Batal',
+        icon: PhosphorIconsRegular.signOut,
+        confirmColor: AppColors.danger,
+        emphasizeConfirm: true);
+
+    if (!konfirmasi ||
+        !context.mounted ||
+        !AuthSession.instance.isCurrentGeneration(generation)) return;
+
     try {
       await AuthSession.instance.logout();
     } catch (_) {
@@ -1219,8 +1203,24 @@ class _EditProfilScreenState extends State<_EditProfilScreen> {
   Widget build(BuildContext context) {
     final border = OutlineInputBorder(
       borderRadius: BorderRadius.circular(14),
-      borderSide: const BorderSide(color: _C.border),
+      borderSide: const BorderSide(color: AppColors.border),
     );
+    final decoration = InputDecoration(
+      filled: true,
+      fillColor: AppColors.surface,
+      border: border,
+      enabledBorder: border,
+      focusedBorder: border.copyWith(
+          borderSide: const BorderSide(color: AppColors.blue, width: 2)),
+      contentPadding: const EdgeInsets.all(AppSpacing.lg),
+      constraints: const BoxConstraints(minHeight: kMinInteractiveDimension),
+      errorMaxLines: 3,
+      hintStyle: _font(13, FontWeight.w500, AppColors.textSecondary),
+      errorStyle: _font(12, FontWeight.w500, AppColors.danger, height: 1.5),
+    );
+    final labelStyle = _font(12, FontWeight.w500, AppColors.navy);
+    final avatarBusy = AuthSession.instance.avatarBusy.value;
+    final canSave = !_isLoading && _hasChanges && !avatarBusy;
     if (!_validSession) {
       return Scaffold(
           appBar: AppBar(title: const Text('Edit Profil')),
@@ -1241,153 +1241,265 @@ class _EditProfilScreenState extends State<_EditProfilScreen> {
               statusBarColor: Colors.transparent,
               statusBarIconBrightness: Brightness.light),
           child: Scaffold(
-            backgroundColor: _C.bg,
+            backgroundColor: AppColors.bg,
+            bottomNavigationBar: Padding(
+              padding: EdgeInsets.only(
+                  bottom: MediaQuery.viewInsetsOf(context).bottom),
+              child: Material(
+                color: AppColors.surface,
+                elevation: 8,
+                shadowColor: AppColors.dockShadow,
+                child: SafeArea(
+                  top: false,
+                  child: Padding(
+                    padding: const EdgeInsets.all(AppSpacing.lg),
+                    child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          FilledButton(
+                            key: const ValueKey('edit-profile-save'),
+                            onPressed: canSave ? _submit : null,
+                            style: FilledButton.styleFrom(
+                              minimumSize: const Size(48, 52),
+                              backgroundColor: AppColors.blue,
+                              foregroundColor: AppColors.surface,
+                              disabledBackgroundColor: AppColors.border,
+                              disabledForegroundColor: AppColors.textSecondary,
+                              textStyle:
+                                  _font(13, FontWeight.w800, AppColors.surface),
+                              shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(14)),
+                            ),
+                            child: Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  if (_isLoading) ...[
+                                    const SizedBox.square(
+                                        dimension: 16,
+                                        child: CircularProgressIndicator(
+                                            strokeWidth: 2)),
+                                    const SizedBox(width: AppSpacing.sm),
+                                  ],
+                                  Flexible(
+                                      child: Text(
+                                          _isLoading
+                                              ? 'Menyimpan perubahan...'
+                                              : 'Simpan Perubahan',
+                                          textAlign: TextAlign.center)),
+                                ]),
+                          ),
+                          const SizedBox(height: AppSpacing.sm),
+                          Text(
+                              avatarBusy
+                                  ? 'Tunggu perubahan foto selesai.'
+                                  : 'Tombol aktif setelah ada perubahan data.',
+                              textAlign: TextAlign.center,
+                              style: _font(
+                                  11, FontWeight.w500, AppColors.textSecondary,
+                                  height: 1.5)),
+                        ]),
+                  ),
+                ),
+              ),
+            ),
             body: SafeArea(
               top: false,
+              bottom: false,
               child: SingleChildScrollView(
                 keyboardDismissBehavior:
                     ScrollViewKeyboardDismissBehavior.onDrag,
                 child: Form(
-                    key: _formKey,
-                    child: Column(children: [
-                      TimeBasedScenicBackground(
-                          child: SafeArea(
-                              bottom: false,
-                              child: Padding(
-                                  padding:
-                                      const EdgeInsets.fromLTRB(20, 8, 20, 0),
-                                  child: Column(children: [
-                                    Row(children: [
-                                      IconButton(
-                                          tooltip: 'Kembali',
-                                          onPressed: _isLoading ? null : _close,
-                                          icon: const Icon(
-                                              PhosphorIconsRegular.arrowLeft,
-                                              color: Colors.white)),
-                                      Expanded(
-                                          child: Text('Edit Profil',
-                                              style: _font(20, FontWeight.w800,
-                                                  Colors.white))),
-                                    ]),
-                                    const SizedBox(height: 24),
-                                    IgnorePointer(
-                                        ignoring: _isLoading,
-                                        child: const ProfileAvatar(size: 112)),
-                                    const SizedBox(height: 12),
-                                    TextButton(
-                                        onPressed: _isLoading ||
-                                                AuthSession
-                                                    .instance.avatarBusy.value
-                                            ? null
-                                            : () => changeProfilePhoto(context),
-                                        style: TextButton.styleFrom(
-                                            foregroundColor: Colors.white),
-                                        child: const Text('Ganti Foto Profil')),
-                                    Text(
-                                        switch (currentUser?.avatarSource) {
-                                          'google' => 'Foto Google',
-                                          'custom' => 'Foto pilihanmu',
-                                          _ => 'Avatar inisial',
-                                        },
-                                        style: _font(
-                                            12, FontWeight.w500, Colors.white)),
-                                    const SizedBox(height: 28),
-                                  ])))),
-                      Container(
-                          margin: const EdgeInsets.fromLTRB(20, 20, 20, 28),
-                          padding: const EdgeInsets.all(20),
-                          decoration: BoxDecoration(
-                              color: _C.card,
-                              borderRadius: BorderRadius.circular(24)),
-                          child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.stretch,
-                              children: [
-                                AbsorbPointer(
-                                  absorbing: _isLoading,
-                                  child: Column(children: [
-                                    TextFormField(
-                                      controller: _namaCtrl,
-                                      enabled: !_isLoading,
-                                      textCapitalization:
-                                          TextCapitalization.words,
-                                      textInputAction: TextInputAction.next,
-                                      autofillHints: const [AutofillHints.name],
-                                      style:
-                                          _font(14, FontWeight.w500, _C.text),
-                                      decoration: InputDecoration(
-                                        labelText: 'Nama Lengkap',
-                                        errorText: _nameError,
-                                        errorMaxLines: 3,
-                                        filled: true,
-                                        fillColor: _C.card,
-                                        border: border,
-                                        enabledBorder: border,
-                                        focusedBorder: border.copyWith(
-                                            borderSide: const BorderSide(
-                                                color: _C.blue, width: 2)),
-                                        contentPadding:
-                                            const EdgeInsets.symmetric(
-                                                horizontal: 16, vertical: 16),
+                  key: _formKey,
+                  child: Column(children: [
+                    TimeBasedScenicBackground(
+                      child: SafeArea(
+                        bottom: false,
+                        child: Padding(
+                          padding: const EdgeInsets.fromLTRB(
+                              AppSpacing.lg, AppSpacing.sm, AppSpacing.lg, 0),
+                          child: Column(children: [
+                            Row(children: [
+                              IconButton(
+                                tooltip: 'Kembali',
+                                onPressed: _isLoading ? null : _close,
+                                style: IconButton.styleFrom(
+                                    minimumSize: const Size(48, 48)),
+                                icon: const Icon(PhosphorIconsRegular.arrowLeft,
+                                    color: AppColors.surface),
+                              ),
+                              Expanded(
+                                  child: Text('Edit Profil',
+                                      style: _font(20, FontWeight.w800,
+                                          AppColors.surface))),
+                            ]),
+                            const SizedBox(height: AppSpacing.xl),
+                            IgnorePointer(
+                                ignoring: _isLoading,
+                                child: const ProfileAvatar(size: 112)),
+                            const SizedBox(height: AppSpacing.md),
+                            TextButton(
+                              onPressed: _isLoading || avatarBusy
+                                  ? null
+                                  : () => changeProfilePhoto(context),
+                              style: TextButton.styleFrom(
+                                  minimumSize: const Size(48, 48),
+                                  foregroundColor: AppColors.surface,
+                                  textStyle: _font(
+                                      13, FontWeight.w800, AppColors.surface)),
+                              child: const Text('Ganti Foto Profil'),
+                            ),
+                            Text(
+                                switch (currentUser?.avatarSource) {
+                                  'google' => 'Foto Google',
+                                  'custom' => 'Foto pilihanmu',
+                                  _ => 'Avatar inisial'
+                                },
+                                style: _font(
+                                    12, FontWeight.w500, AppColors.surface)),
+                            const SizedBox(height: AppSpacing.xl),
+                          ]),
+                        ),
+                      ),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(AppSpacing.lg,
+                          AppSpacing.xl, AppSpacing.lg, AppSpacing.xl),
+                      child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            Text('Informasi Pribadi',
+                                style:
+                                    _font(16, FontWeight.w800, AppColors.navy)),
+                            const SizedBox(height: AppSpacing.xs),
+                            Text(
+                                'Perbarui informasi akun yang ingin kamu ubah.',
+                                style: _font(12, FontWeight.w500,
+                                    AppColors.textSecondary,
+                                    height: 1.6)),
+                            const SizedBox(height: AppSpacing.lg),
+                            Container(
+                              padding: const EdgeInsets.all(AppSpacing.lg),
+                              decoration: BoxDecoration(
+                                  color: AppColors.surface,
+                                  border: Border.all(color: AppColors.border),
+                                  borderRadius:
+                                      BorderRadius.circular(AppSpacing.lg)),
+                              child: AbsorbPointer(
+                                absorbing: _isLoading,
+                                child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.stretch,
+                                    children: [
+                                      Text('Nama Lengkap', style: labelStyle),
+                                      const SizedBox(height: AppSpacing.sm),
+                                      Semantics(
+                                          label: 'Nama Lengkap',
+                                          child: TextFormField(
+                                            key: const ValueKey(
+                                                'edit-profile-name'),
+                                            controller: _namaCtrl,
+                                            enabled: !_isLoading,
+                                            textCapitalization:
+                                                TextCapitalization.words,
+                                            textInputAction:
+                                                TextInputAction.next,
+                                            autofillHints: const [
+                                              AutofillHints.name
+                                            ],
+                                            style: _font(13, FontWeight.w500,
+                                                AppColors.navy),
+                                            decoration: decoration.copyWith(
+                                              hintText: 'Masukkan nama lengkap',
+                                              errorText: _nameError,
+                                              prefixIcon: const Icon(
+                                                  PhosphorIconsRegular.user,
+                                                  size: 20,
+                                                  color: AppColors.blue),
+                                            ),
+                                            onChanged: (_) => setState(
+                                                () => _nameError = null),
+                                            validator: (value) =>
+                                                value == null ||
+                                                        value.trim().isEmpty
+                                                    ? 'Nama tidak boleh kosong.'
+                                                    : null,
+                                          )),
+                                      const SizedBox(height: AppSpacing.xl),
+                                      Row(children: [
+                                        Expanded(
+                                            child: Text('Email',
+                                                style: labelStyle)),
+                                        const SizedBox(width: AppSpacing.sm),
+                                        const Icon(PhosphorIconsRegular.lock,
+                                            size: 16,
+                                            color: AppColors.textSecondary),
+                                        const SizedBox(width: AppSpacing.xs),
+                                        Text('Tidak dapat diubah',
+                                            style: _font(11, FontWeight.w500,
+                                                AppColors.textSecondary)),
+                                      ]),
+                                      const SizedBox(height: AppSpacing.sm),
+                                      Semantics(
+                                          label: 'Email, tidak dapat diubah',
+                                          child: TextFormField(
+                                            key: const ValueKey(
+                                                'edit-profile-email'),
+                                            initialValue:
+                                                currentUser?.email ?? '',
+                                            readOnly: true,
+                                            showCursor: false,
+                                            decoration: decoration.copyWith(
+                                                hintText: 'Email',
+                                                fillColor: AppColors.bg,
+                                                focusedBorder: border,
+                                                prefixIcon: const Icon(
+                                                    PhosphorIconsRegular
+                                                        .envelope,
+                                                    size: 20,
+                                                    color: AppColors
+                                                        .textSecondary)),
+                                            style: _font(13, FontWeight.w500,
+                                                AppColors.textSecondary),
+                                          )),
+                                      const SizedBox(height: AppSpacing.xl),
+                                      Text('Nomor Telepon', style: labelStyle),
+                                      const SizedBox(height: AppSpacing.sm),
+                                      InternationalPhoneField(
+                                        split: true,
+                                        label: null,
+                                        enabled: !_isLoading,
+                                        controller: _teleponCtrl,
+                                        country: _phoneCountry,
+                                        error: _phoneError,
+                                        onCountryChanged: _countryChanged,
+                                        onChanged: _phoneChanged,
                                       ),
-                                      onChanged: (_) =>
-                                          setState(() => _nameError = null),
-                                      validator: (value) =>
-                                          value == null || value.trim().isEmpty
-                                              ? 'Nama tidak boleh kosong.'
-                                              : null,
-                                    ),
-                                    const SizedBox(height: 16),
-                                    TextFormField(
-                                      initialValue: currentUser?.email ?? '',
-                                      readOnly: true,
-                                      decoration: InputDecoration(
-                                          labelText: 'Email',
-                                          border: border,
-                                          suffixIcon: const Icon(
-                                              PhosphorIconsRegular.lock)),
-                                      style: _font(
-                                          14, FontWeight.w500, _C.textMuted),
-                                    ),
-                                    const SizedBox(height: 16),
-                                    InternationalPhoneField(
-                                      split: true,
-                                      enabled: !_isLoading,
-                                      controller: _teleponCtrl,
-                                      country: _phoneCountry,
-                                      error: _phoneError,
-                                      onCountryChanged: _countryChanged,
-                                      onChanged: _phoneChanged,
-                                    ),
-                                  ]),
-                                ),
-                                if (_error != null) ...[
-                                  const SizedBox(height: 12),
-                                  _ErrorBanner(message: _error!),
-                                ],
-                                const SizedBox(height: 24),
-                                FilledButton(
-                                  onPressed: _isLoading ||
-                                          !_hasChanges ||
-                                          AuthSession.instance.avatarBusy.value
-                                      ? null
-                                      : _submit,
-                                  style: FilledButton.styleFrom(
-                                      minimumSize: const Size(0, 52),
-                                      backgroundColor: _C.blue,
-                                      foregroundColor: Colors.white,
-                                      shape: RoundedRectangleBorder(
-                                          borderRadius:
-                                              BorderRadius.circular(14))),
-                                  child: _isLoading
-                                      ? const SizedBox.square(
-                                          dimension: 22,
-                                          child: CircularProgressIndicator(
-                                              color: Colors.white,
-                                              strokeWidth: 2))
-                                      : const Text('Simpan Perubahan'),
-                                ),
-                              ])),
-                    ])),
+                                    ]),
+                              ),
+                            ),
+                            if (_error != null) ...[
+                              const SizedBox(height: AppSpacing.md),
+                              _ErrorBanner(message: _error!),
+                            ],
+                            const SizedBox(height: AppSpacing.lg),
+                            Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Icon(PhosphorIconsRegular.info,
+                                      size: 16, color: AppColors.textSecondary),
+                                  const SizedBox(width: AppSpacing.sm),
+                                  Expanded(
+                                      child: Text(
+                                          'Pastikan informasi yang kamu masukkan sudah benar sebelum menyimpan perubahan.',
+                                          style: _font(12, FontWeight.w500,
+                                              AppColors.textSecondary,
+                                              height: 1.6))),
+                                ]),
+                          ]),
+                    ),
+                  ]),
+                ),
               ),
             ),
           ),
@@ -1548,21 +1660,23 @@ class _ErrorBanner extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.lg, vertical: AppSpacing.md),
         decoration: BoxDecoration(
-          color: _C.danger.withValues(alpha: 0.1),
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: _C.danger.withValues(alpha: 0.4), width: 1),
+          color: AppColors.dangerTint,
+          borderRadius: BorderRadius.circular(AppSpacing.lg),
+          border: Border.all(color: AppColors.dangerBorder),
         ),
         child: Row(
           children: [
             Icon(PhosphorIconsRegular.warningCircle,
-                color: _C.danger, size: 18),
-            const SizedBox(width: 10),
+                color: AppColors.danger, size: 18),
+            const SizedBox(width: AppSpacing.md),
             Expanded(
               child: Text(
                 message,
-                style: TextStyle(color: _C.danger, fontSize: 13, height: 1.4),
+                style: const TextStyle(
+                    color: AppColors.danger, fontSize: 13, height: 1.5),
               ),
             ),
           ],

@@ -61,14 +61,14 @@ class _PaymentInstructionPreviewScreenState
   Widget _caption(String text) => Text(text,
       style: const TextStyle(
           fontSize: 11,
-          fontWeight: FontWeight.w800,
+          fontWeight: FontWeight.w700,
           letterSpacing: .8,
           color: AppColors.textMuted));
 
   Widget _note(String text, {required bool warning}) {
-    final bg = warning ? const Color(0xFFFFF7E6) : const Color(0xFFEEF5FD);
-    final border = warning ? const Color(0xFFF3DDAA) : const Color(0xFFC9DDF7);
-    final fg = warning ? const Color(0xFF80531B) : AppColors.blueDeep;
+    final bg = warning ? AppColors.warningTint : AppColors.blueTint;
+    final border = warning ? AppColors.warningBorder : AppColors.border;
+    final fg = warning ? AppColors.warningText : AppColors.blueDeep;
     return Container(
         margin: const EdgeInsets.only(top: AppSpacing.md),
         padding: const EdgeInsets.all(AppSpacing.md),
@@ -97,23 +97,24 @@ class _PaymentInstructionPreviewScreenState
             bottomNavigationBar: Material(
                 color: AppColors.surface,
                 elevation: 8,
-                shadowColor: Colors.black26,
+                shadowColor: AppColors.dockShadow,
                 child: SafeArea(
                     top: false,
                     child: Padding(
-                        padding: const EdgeInsets.fromLTRB(20, 12, 20, 12),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: AppSpacing.lg, vertical: AppSpacing.md),
                         child: Column(
                             mainAxisSize: MainAxisSize.min,
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               const Text('Total tagihan',
                                   style: TextStyle(
-                                      fontSize: 11,
+                                      fontSize: 12,
                                       color: AppColors.textSecondary)),
-                              const SizedBox(height: 2),
+                              const SizedBox(height: AppSpacing.xs),
                               Text(widget.totalLabel,
                                   style: const TextStyle(
-                                      fontSize: 20,
+                                      fontSize: 13,
                                       fontWeight: FontWeight.w800,
                                       color: AppColors.navy)),
                             ])))),
@@ -125,43 +126,42 @@ class _PaymentInstructionPreviewScreenState
                       active: true,
                       child: Padding(
                           padding: EdgeInsets.fromLTRB(
-                              AppSpacing.md,
+                              AppSpacing.lg,
                               MediaQuery.paddingOf(context).top + AppSpacing.sm,
-                              20,
+                              AppSpacing.lg,
                               AppSpacing.xl),
                           child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 const Row(children: [
-                                  BackButton(color: Colors.white),
+                                  BackButton(color: AppColors.surface),
                                   Expanded(
                                       child: Text('WISATA DAERAHKU',
                                           style: TextStyle(
                                               fontSize: 12,
                                               fontWeight: FontWeight.w800,
-                                              color: Colors.white)))
+                                              color: AppColors.surface)))
                                 ]),
                                 const Padding(
-                                    padding: EdgeInsets.only(
-                                        left: AppSpacing.sm,
-                                        top: AppSpacing.lg),
+                                    padding:
+                                        EdgeInsets.only(top: AppSpacing.lg),
                                     child: Text('Instruksi Pembayaran',
                                         style: TextStyle(
-                                            fontSize: 24,
+                                            fontSize: 22,
                                             fontWeight: FontWeight.w800,
-                                            color: Colors.white))),
+                                            color: AppColors.surface))),
                                 const Padding(
-                                    padding: EdgeInsets.only(
-                                        left: AppSpacing.sm, top: 6),
+                                    padding:
+                                        EdgeInsets.only(top: AppSpacing.sm),
                                     child: Text(
                                         'Pratinjau instruksi metode yang dipilih',
                                         style: TextStyle(
                                             fontSize: 12,
-                                            color: Colors.white))),
+                                            color: AppColors.surface))),
                               ]))),
                   Padding(
-                      padding: const EdgeInsets.fromLTRB(
-                          20, AppSpacing.lg + 2, 20, AppSpacing.xl + 4),
+                      padding: const EdgeInsets.fromLTRB(AppSpacing.lg,
+                          AppSpacing.lg, AppSpacing.lg, AppSpacing.xl),
                       child: Column(
                           crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
@@ -200,16 +200,16 @@ class _PaymentInstructionPreviewScreenState
                                               fontSize: 16,
                                               fontWeight: FontWeight.w800,
                                               color: AppColors.navy)),
-                                      const SizedBox(height: 2),
-                                      const Text('Pratinjau langkah selanjutnya',
+                                      const SizedBox(height: AppSpacing.xs),
+                                      const Text(
+                                          'Pratinjau langkah selanjutnya',
                                           style: TextStyle(
                                               fontSize: 12,
-                                              color:
-                                                  AppColors.textSecondary)),
+                                              color: AppColors.textSecondary)),
                                     ])),
                               ]),
                               const Divider(
-                                  height: AppSpacing.xl + 4,
+                                  height: AppSpacing.xl,
                                   color: AppColors.border),
                               const Text('Total tagihan',
                                   style: TextStyle(
@@ -218,7 +218,7 @@ class _PaymentInstructionPreviewScreenState
                               const SizedBox(height: AppSpacing.xs),
                               Text(widget.totalLabel,
                                   style: const TextStyle(
-                                      fontSize: 30,
+                                      fontSize: 26,
                                       height: 1.1,
                                       fontWeight: FontWeight.w800,
                                       color: AppColors.blueDeep)),
@@ -228,13 +228,13 @@ class _PaymentInstructionPreviewScreenState
                               const SizedBox(height: AppSpacing.md),
                               CustomPaint(
                                   painter: const DashedBorderPainter(
-                                      Color(0xFFB9D3F2)),
+                                      AppColors.border),
                                   child: Container(
                                       width: double.infinity,
                                       padding:
                                           const EdgeInsets.all(AppSpacing.xl),
                                       decoration: BoxDecoration(
-                                          color: const Color(0xFFF5F9FE),
+                                          color: AppColors.bg,
                                           borderRadius:
                                               BorderRadius.circular(18)),
                                       child: Column(children: [
@@ -256,7 +256,7 @@ class _PaymentInstructionPreviewScreenState
                                             textAlign: TextAlign.center,
                                             style: const TextStyle(
                                                 fontSize: 14,
-                                                fontWeight: FontWeight.w800,
+                                                fontWeight: FontWeight.w700,
                                                 color: AppColors.navy)),
                                         const SizedBox(height: AppSpacing.sm),
                                         Text(
@@ -274,7 +274,7 @@ class _PaymentInstructionPreviewScreenState
                               const Text('Cara pembayaran',
                                   style: TextStyle(
                                       fontSize: 14,
-                                      fontWeight: FontWeight.w800,
+                                      fontWeight: FontWeight.w700,
                                       color: AppColors.navy)),
                               const SizedBox(height: AppSpacing.md),
                               for (var i = 0; i < _steps.length; i++)
@@ -312,7 +312,8 @@ class _PaymentInstructionPreviewScreenState
                             Center(
                                 child: TextButton.icon(
                                     key: const Key('preview-switch'),
-                                    onPressed: () => Navigator.maybePop(context),
+                                    onPressed: () =>
+                                        Navigator.maybePop(context),
                                     style: TextButton.styleFrom(
                                         minimumSize: const Size(48, 48),
                                         foregroundColor: AppColors.blue),
@@ -321,7 +322,7 @@ class _PaymentInstructionPreviewScreenState
                                         size: 16),
                                     label: const Text('Pilih Metode Lain',
                                         style: TextStyle(
-                                            fontSize: 12,
+                                            fontSize: 13,
                                             fontWeight: FontWeight.w800)))),
                           ])),
                 ]))));

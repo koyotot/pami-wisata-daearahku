@@ -158,8 +158,8 @@ class _OperationsQueueScreenState extends State<OperationsQueueScreen>
   Future<void> _loadOwnerNames(int request) async {
     try {
       for (var page = 1; page <= 5; page++) {
-        final result = await _repository.adminAccounts(
-            query: {'page': '$page', 'per_page': '100'});
+        final result = await _repository
+            .adminAccounts(query: {'page': '$page', 'per_page': '100'});
         if (!_valid || request != _request) return;
         setState(() {
           for (final account in result.items) {
@@ -266,7 +266,7 @@ class _OperationsQueueScreenState extends State<OperationsQueueScreen>
   // ── Shared blocks ────────────────────────────────────────
 
   Widget _ownershipTabs() => Container(
-      padding: const EdgeInsets.all(4),
+      padding: const EdgeInsets.all(AppSpacing.xs),
       decoration: BoxDecoration(
           color: AdminColors.tint, borderRadius: BorderRadius.circular(16)),
       child: Row(children: [
@@ -281,6 +281,8 @@ class _OperationsQueueScreenState extends State<OperationsQueueScreen>
                   child: TextButton(
                       key: ValueKey('queue-ownership-${item.$1}'),
                       style: TextButton.styleFrom(
+                          textStyle: const TextStyle(
+                              fontSize: 13, fontWeight: FontWeight.w800),
                           foregroundColor: _ownership == item.$1
                               ? AdminColors.blue
                               : AdminColors.textMuted,
@@ -289,30 +291,33 @@ class _OperationsQueueScreenState extends State<OperationsQueueScreen>
                               : Colors.transparent,
                           minimumSize: const Size(48, 48),
                           padding: const EdgeInsets.symmetric(
-                              horizontal: 8, vertical: 12),
+                              horizontal: AppSpacing.sm,
+                              vertical: AppSpacing.md),
                           shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(12))),
                       onPressed: () => setState(() => _ownership = item.$1),
                       child: Text(item.$2,
                           textAlign: TextAlign.center,
                           style: const TextStyle(
-                              fontSize: 12, fontWeight: FontWeight.w700))))),
+                              fontSize: 13, fontWeight: FontWeight.w800))))),
       ]));
 
   Widget _errorBox() => Container(
-      padding: const EdgeInsets.all(18),
-      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(AppSpacing.lg),
+      margin: const EdgeInsets.only(bottom: AppSpacing.md),
       decoration: BoxDecoration(
           color: _revoked ? const Color(0xFFFFECEA) : const Color(0xFFFFF0D6),
           borderRadius: BorderRadius.circular(16)),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Icon(
-            _revoked ? PhosphorIconsRegular.lock : PhosphorIconsRegular.wifiSlash,
+            _revoked
+                ? PhosphorIconsRegular.lock
+                : PhosphorIconsRegular.wifiSlash,
             color: const Color(0xFF795018)),
-        const SizedBox(height: 10),
+        const SizedBox(height: AppSpacing.sm),
         Text(_revoked ? 'Akses telah berubah' : 'Antrean belum dapat dimuat',
-            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
-        const SizedBox(height: 6),
+            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
+        const SizedBox(height: AppSpacing.sm),
         Text(_error!, style: const TextStyle(fontSize: 13, height: 1.5)),
       ]));
 
@@ -320,7 +325,8 @@ class _OperationsQueueScreenState extends State<OperationsQueueScreen>
     final filtering =
         _filters.isNotEmpty || _ownership != 'all' || _query.trim().isNotEmpty;
     return Container(
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 32),
+        padding:
+            const EdgeInsets.symmetric(horizontal: AppSpacing.lg, vertical: 32),
         decoration: BoxDecoration(
             color: Colors.white,
             border: Border.all(color: AdminColors.border),
@@ -332,11 +338,12 @@ class _OperationsQueueScreenState extends State<OperationsQueueScreen>
                   : PhosphorIconsRegular.checkCircle,
               size: 40,
               color: filtering ? AdminColors.blue : const Color(0xFF16784C)),
-          const SizedBox(height: 16),
+          const SizedBox(height: AppSpacing.lg),
           Text(filtering ? 'Tidak ada hasil' : 'Antrean sudah kosong',
               textAlign: TextAlign.center,
-              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800)),
-          const SizedBox(height: 8),
+              style:
+                  const TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
+          const SizedBox(height: AppSpacing.sm),
           Text(
               filtering
                   ? 'Tidak ada booking untuk filter ini. Reset filter atau muat halaman berikutnya.'
@@ -346,6 +353,11 @@ class _OperationsQueueScreenState extends State<OperationsQueueScreen>
                   fontSize: 13, height: 1.6, color: Color(0xFF526787))),
           if (_role != 1 && (_ownership != 'all' || _query.isNotEmpty))
             TextButton(
+                style: TextButton.styleFrom(
+                    textStyle: const TextStyle(
+                        fontSize: 13, fontWeight: FontWeight.w800),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14))),
                 onPressed: () => setState(() {
                       _ownership = 'all';
                       _query = '';
@@ -402,26 +414,28 @@ class _OperationsQueueScreenState extends State<OperationsQueueScreen>
 
   Widget _statCard(String value, String label, {Color? dot}) => Expanded(
       child: Container(
-          padding: const EdgeInsets.all(14),
+          padding: const EdgeInsets.all(AppSpacing.lg),
           decoration: BoxDecoration(
               color: Colors.white,
               border: Border.all(color: AppColors.border),
               borderRadius: BorderRadius.circular(16)),
-          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          child:
+              Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Text(value,
                 style: const TextStyle(
                     fontSize: 26,
                     height: 1.1,
                     fontWeight: FontWeight.w800,
                     color: AppColors.navy)),
-            const SizedBox(height: 6),
+            const SizedBox(height: AppSpacing.sm),
             Row(children: [
               if (dot != null) ...[
                 Container(
                     width: 6,
                     height: 6,
-                    decoration: BoxDecoration(color: dot, shape: BoxShape.circle)),
-                const SizedBox(width: 6),
+                    decoration:
+                        BoxDecoration(color: dot, shape: BoxShape.circle)),
+                const SizedBox(width: AppSpacing.sm),
               ],
               Expanded(
                   child: Text(label,
@@ -449,20 +463,20 @@ class _OperationsQueueScreenState extends State<OperationsQueueScreen>
                   onTap: onTap,
                   child: Padding(
                       padding: const EdgeInsets.symmetric(
-                          horizontal: 12, vertical: 10),
+                          horizontal: AppSpacing.md, vertical: AppSpacing.sm),
                       child: Row(children: [
                         Icon(icon, size: 18, color: AppColors.blue),
-                        const SizedBox(width: 10),
+                        const SizedBox(width: AppSpacing.sm),
                         Expanded(
                             child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                               Text(caption,
                                   style: const TextStyle(
-                                      fontSize: 9,
-                                      letterSpacing: .6,
+                                      fontSize: 11,
+                                      letterSpacing: .8,
                                       color: AppColors.textSecondary)),
-                              const SizedBox(height: 2),
+                              const SizedBox(height: AppSpacing.xs),
                               Text(label,
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
@@ -493,7 +507,8 @@ class _OperationsQueueScreenState extends State<OperationsQueueScreen>
               enabledBorder: InputBorder.none,
               focusedBorder: InputBorder.none,
               filled: false,
-              contentPadding: const EdgeInsets.symmetric(vertical: 14),
+              contentPadding:
+                  const EdgeInsets.symmetric(vertical: AppSpacing.lg),
               prefixIcon: const Icon(PhosphorIconsRegular.magnifyingGlass,
                   size: 20, color: AppColors.blue),
               suffixIcon: _query.isEmpty
@@ -543,13 +558,14 @@ class _OperationsQueueScreenState extends State<OperationsQueueScreen>
             : 'Tinjau Booking';
     return Container(
         key: ValueKey(row.bookingGuid),
-        margin: const EdgeInsets.only(bottom: 12),
-        padding: const EdgeInsets.all(16),
+        margin: const EdgeInsets.only(bottom: AppSpacing.md),
+        padding: const EdgeInsets.all(AppSpacing.lg),
         decoration: BoxDecoration(
             color: Colors.white,
             border: Border.all(color: AppColors.border),
             borderRadius: BorderRadius.circular(20)),
-        child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        child:
+            Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
           Row(children: [
             Expanded(
                 child: Text(_shortId(row.bookingGuid ?? 'Booking'),
@@ -559,10 +575,10 @@ class _OperationsQueueScreenState extends State<OperationsQueueScreen>
                         fontSize: 12,
                         fontWeight: FontWeight.w700,
                         color: AppColors.textSecondary))),
-            const SizedBox(width: 8),
+            const SizedBox(width: AppSpacing.sm),
             OperationsStatusBadge(badge, badgeTone),
           ]),
-          const SizedBox(height: 14),
+          const SizedBox(height: AppSpacing.lg),
           Text(row.name ?? 'Destinasi',
               style: const TextStyle(
                   fontSize: 16,
@@ -570,24 +586,25 @@ class _OperationsQueueScreenState extends State<OperationsQueueScreen>
                   fontWeight: FontWeight.w800,
                   color: AppColors.navy)),
           if (visit.isNotEmpty) ...[
-            const SizedBox(height: 8),
+            const SizedBox(height: AppSpacing.sm),
             Row(children: [
               const Icon(PhosphorIconsRegular.calendarBlank,
                   size: 15, color: AppColors.blue),
-              const SizedBox(width: 6),
+              const SizedBox(width: AppSpacing.sm),
               Text(visitDayLabel(visit),
                   style: const TextStyle(
                       fontSize: 12, color: AppColors.textSecondary)),
             ]),
           ],
-          const SizedBox(height: 14),
+          const SizedBox(height: AppSpacing.lg),
           Container(
-              padding: const EdgeInsets.all(14),
+              padding: const EdgeInsets.all(AppSpacing.lg),
               decoration: BoxDecoration(
                   color: colors.bg, borderRadius: BorderRadius.circular(14)),
-              child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              child:
+                  Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
                 Icon(PhosphorIconsRegular.clock, size: 20, color: colors.fg),
-                const SizedBox(width: 12),
+                const SizedBox(width: AppSpacing.md),
                 Expanded(
                     child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -597,7 +614,7 @@ class _OperationsQueueScreenState extends State<OperationsQueueScreen>
                               fontSize: 12,
                               fontWeight: FontWeight.w800,
                               color: AppColors.navy)),
-                      const SizedBox(height: 4),
+                      const SizedBox(height: AppSpacing.xs),
                       Text(boxBody,
                           style: TextStyle(
                               fontSize: 12,
@@ -607,7 +624,7 @@ class _OperationsQueueScreenState extends State<OperationsQueueScreen>
                                   : colors.fg)),
                     ])),
               ])),
-          const SizedBox(height: 14),
+          const SizedBox(height: AppSpacing.lg),
           Row(children: [
             Expanded(
                 child: Text(operationalActionLabel(row.action),
@@ -615,22 +632,25 @@ class _OperationsQueueScreenState extends State<OperationsQueueScreen>
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
                         fontSize: 11, color: AppColors.textSecondary))),
-            const SizedBox(width: 12),
+            const SizedBox(width: AppSpacing.md),
             FilledButton.icon(
                 key: ValueKey('queue-open-${row.bookingGuid}'),
                 onPressed: () => _open(row),
                 iconAlignment: IconAlignment.end,
                 icon: const Icon(PhosphorIconsRegular.arrowRight, size: 16),
                 style: FilledButton.styleFrom(
+                    textStyle: const TextStyle(
+                        fontSize: 13, fontWeight: FontWeight.w800),
                     backgroundColor: AppColors.blue,
                     foregroundColor: Colors.white,
                     minimumSize: const Size(140, 48),
-                    padding: const EdgeInsets.symmetric(horizontal: 18),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
                     shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12))),
                 label: Text(buttonLabel,
                     style: const TextStyle(
-                        fontSize: 12, fontWeight: FontWeight.w800))),
+                        fontSize: 13, fontWeight: FontWeight.w800))),
           ]),
         ]));
   }
@@ -642,12 +662,12 @@ class _OperationsQueueScreenState extends State<OperationsQueueScreen>
     return [
       Row(children: [
         _statCard('${_items.length}', 'Total antrean'),
-        const SizedBox(width: 10),
+        const SizedBox(width: AppSpacing.sm),
         _statCard('$available', 'Tersedia', dot: const Color(0xFF1E7A45)),
-        const SizedBox(width: 10),
+        const SizedBox(width: AppSpacing.sm),
         _statCard('$claimed', 'Claim aktif', dot: AppColors.textSecondary),
       ]),
-      const SizedBox(height: 14),
+      const SizedBox(height: AppSpacing.lg),
       Row(children: [
         _filterTile(
             key: const ValueKey('queue-destination-filter'),
@@ -657,7 +677,7 @@ class _OperationsQueueScreenState extends State<OperationsQueueScreen>
                 : _destinationLabel ?? 'Destinasi terpilih',
             icon: PhosphorIconsRegular.mapPin,
             onTap: _revoked ? null : _destinationFilter),
-        const SizedBox(width: 10),
+        const SizedBox(width: AppSpacing.sm),
         _filterTile(
             key: const ValueKey('queue-date-filter'),
             caption: 'TGL BOOKING',
@@ -669,6 +689,11 @@ class _OperationsQueueScreenState extends State<OperationsQueueScreen>
         Align(
             alignment: Alignment.centerRight,
             child: TextButton(
+                style: TextButton.styleFrom(
+                    textStyle: const TextStyle(
+                        fontSize: 13, fontWeight: FontWeight.w800),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14))),
                 onPressed: () {
                   setState(() {
                     _filters = {};
@@ -677,11 +702,11 @@ class _OperationsQueueScreenState extends State<OperationsQueueScreen>
                   _load();
                 },
                 child: const Text('Reset filter'))),
-      const SizedBox(height: 10),
+      const SizedBox(height: AppSpacing.sm),
       _searchField(),
-      const SizedBox(height: 12),
+      const SizedBox(height: AppSpacing.md),
       _ownershipTabs(),
-      const SizedBox(height: 18),
+      const SizedBox(height: AppSpacing.lg),
       Row(crossAxisAlignment: CrossAxisAlignment.center, children: [
         Expanded(
             child:
@@ -691,7 +716,7 @@ class _OperationsQueueScreenState extends State<OperationsQueueScreen>
                   fontSize: 16,
                   fontWeight: FontWeight.w800,
                   color: AppColors.navy)),
-          const SizedBox(height: 4),
+          const SizedBox(height: AppSpacing.xs),
           Text('${rows.length} permintaan ditemukan',
               style: const TextStyle(
                   fontSize: 12, color: AppColors.textSecondary)),
@@ -702,29 +727,43 @@ class _OperationsQueueScreenState extends State<OperationsQueueScreen>
             iconAlignment: IconAlignment.end,
             icon: const Icon(PhosphorIconsRegular.caretDown, size: 16),
             style: OutlinedButton.styleFrom(
+                textStyle:
+                    const TextStyle(fontSize: 13, fontWeight: FontWeight.w800),
                 foregroundColor: AppColors.navy,
                 backgroundColor: Colors.white,
                 minimumSize: const Size(48, 48),
-                padding: const EdgeInsets.symmetric(horizontal: 14),
+                padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
                 side: const BorderSide(color: AppColors.border),
                 shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12))),
             label: Text(_sortLabels[_sort]!,
-                style:
-                    const TextStyle(fontSize: 12, fontWeight: FontWeight.w700))),
+                style: const TextStyle(
+                    fontSize: 13, fontWeight: FontWeight.w800))),
       ]),
-      const SizedBox(height: 14),
+      const SizedBox(height: AppSpacing.lg),
       if (_loading)
-        _items.isEmpty ? const OperationsSkeleton() : const LinearProgressIndicator(),
+        _items.isEmpty
+            ? const OperationsSkeleton()
+            : const LinearProgressIndicator(),
       if (_error != null) _errorBox(),
       if (!_loading && _error == null && rows.isEmpty) _emptyBox(),
       for (final row in rows) _queueCard(row),
       if (_next)
         OutlinedButton(
+            style: OutlinedButton.styleFrom(
+                textStyle:
+                    const TextStyle(fontSize: 13, fontWeight: FontWeight.w800),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14))),
             onPressed: _loading ? null : () => _load(more: true),
             child: const Text('Muat berikutnya')),
       if (_revoked)
         TextButton(
+            style: TextButton.styleFrom(
+                textStyle:
+                    const TextStyle(fontSize: 13, fontWeight: FontWeight.w800),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14))),
             onPressed: () => Navigator.maybePop(context),
             child: const Text('Kembali')),
     ];
@@ -742,18 +781,20 @@ class _OperationsQueueScreenState extends State<OperationsQueueScreen>
           dateTooltip: 'Filter tanggal pembuatan booking · UTC',
           onDestinationPressed: _revoked ? null : _filter,
           onDatePressed: _revoked ? null : _filter),
-      const SizedBox(height: 12),
+      const SizedBox(height: AppSpacing.md),
       _ownershipTabs(),
-      const SizedBox(height: 12),
+      const SizedBox(height: AppSpacing.md),
       if (_loading)
-        _items.isEmpty ? const OperationsSkeleton() : const LinearProgressIndicator(),
+        _items.isEmpty
+            ? const OperationsSkeleton()
+            : const LinearProgressIndicator(),
       if (_error != null) _errorBox(),
       if (!_loading && _error == null && rows.isEmpty) _emptyBox(),
       for (final row in rows)
         Container(
             key: ValueKey(row.bookingGuid),
-            margin: const EdgeInsets.only(bottom: 10),
-            padding: const EdgeInsets.all(14),
+            margin: const EdgeInsets.only(bottom: AppSpacing.sm),
+            padding: const EdgeInsets.all(AppSpacing.lg),
             decoration: BoxDecoration(
                 color: Colors.white,
                 border: Border.all(color: AdminColors.border),
@@ -768,13 +809,13 @@ class _OperationsQueueScreenState extends State<OperationsQueueScreen>
                           fontSize: 12,
                           fontWeight: FontWeight.w600,
                           color: Color(0xFF526787))),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: AppSpacing.sm),
                   Text(row.name ?? 'Destinasi',
                       style: const TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.w800,
                           color: AdminColors.navy)),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: AppSpacing.sm),
                   Align(
                       alignment: Alignment.centerLeft,
                       child: AdminBadge(
@@ -782,10 +823,10 @@ class _OperationsQueueScreenState extends State<OperationsQueueScreen>
                               ? 'Claim aktif'
                               : 'Tersedia untuk diambil',
                           row.claimState == 'active'
-                              ? const Color(0xFF98621E)
+                              ? AppColors.warningText
                               : const Color(0xFF16784C))),
                   if (row.claimState == 'active') ...[
-                    const SizedBox(height: 6),
+                    const SizedBox(height: AppSpacing.sm),
                     Text('Pemilik: ${row.raw['owner_user_guid'] ?? '—'}',
                         style: const TextStyle(
                             fontSize: 12, color: Color(0xFF526787))),
@@ -793,9 +834,9 @@ class _OperationsQueueScreenState extends State<OperationsQueueScreen>
                         style: const TextStyle(
                             fontSize: 12, color: Color(0xFF526787))),
                   ],
-                  const SizedBox(height: 12),
+                  const SizedBox(height: AppSpacing.md),
                   Container(
-                      padding: const EdgeInsets.all(10),
+                      padding: const EdgeInsets.all(AppSpacing.sm),
                       decoration: BoxDecoration(
                           color: const Color(0xFFFFF0D6),
                           borderRadius: BorderRadius.circular(12)),
@@ -804,7 +845,7 @@ class _OperationsQueueScreenState extends State<OperationsQueueScreen>
                           children: [
                             const Icon(PhosphorIconsRegular.clock,
                                 size: 18, color: Color(0xFF795018)),
-                            const SizedBox(width: 8),
+                            const SizedBox(width: AppSpacing.sm),
                             Expanded(
                                 child: Text(
                                     '${operationalActionLabel(row.action)}\nBatas: ${row.raw['approval_expires_at'] ?? '—'}',
@@ -813,10 +854,12 @@ class _OperationsQueueScreenState extends State<OperationsQueueScreen>
                                         height: 1.5,
                                         color: Color(0xFF795018)))),
                           ])),
-                  const SizedBox(height: 12),
+                  const SizedBox(height: AppSpacing.md),
                   FilledButton(
                       onPressed: () => _open(row),
                       style: FilledButton.styleFrom(
+                          textStyle: const TextStyle(
+                              fontSize: 13, fontWeight: FontWeight.w800),
                           backgroundColor: AdminColors.blue,
                           foregroundColor: Colors.white,
                           minimumSize: const Size(48, 48),
@@ -826,10 +869,20 @@ class _OperationsQueueScreenState extends State<OperationsQueueScreen>
                 ])),
       if (_next)
         OutlinedButton(
+            style: OutlinedButton.styleFrom(
+                textStyle:
+                    const TextStyle(fontSize: 13, fontWeight: FontWeight.w800),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14))),
             onPressed: _loading ? null : () => _load(more: true),
             child: const Text('Muat berikutnya')),
       if (_revoked)
         TextButton(
+            style: TextButton.styleFrom(
+                textStyle:
+                    const TextStyle(fontSize: 13, fontWeight: FontWeight.w800),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14))),
             onPressed: () => Navigator.maybePop(context),
             child: const Text('Kembali')),
     ];

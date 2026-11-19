@@ -13,10 +13,15 @@ class BookingPaymentSection extends StatefulWidget {
       required this.booking,
       required this.repository,
       this.onSnapshot,
+      this.layoutBuilder,
       required this.onReturned});
   final Booking booking;
   final BusinessRepository repository;
   final ValueChanged<PaymentSnapshot>? onSnapshot;
+
+  /// Lets the detail page place the existing checkout action in its bottom bar.
+  final Widget Function(BuildContext context, Widget content, Widget? checkout)?
+      layoutBuilder;
   final Future<void> Function() onReturned;
   @override
   State<BookingPaymentSection> createState() => _BookingPaymentSectionState();
@@ -180,36 +185,52 @@ class _BookingPaymentSectionState extends State<BookingPaymentSection>
                 : (_methods == null
                     ? null
                     : 'Pembayaran online belum tersedia saat ini.'));
-    return Padding(
-        padding: const EdgeInsets.only(top: 14),
+    final checkout = real && _checkoutLabel != null
+        ? ElevatedButton(
+            key: const Key('payment-open-checkout'),
+            onPressed: _loading || _opening || !_valid ? null : _openCheckout,
+            style: ElevatedButton.styleFrom(
+                elevation: 0,
+                minimumSize: Size(widget.layoutBuilder == null ? 48 : 140,
+                    widget.layoutBuilder == null ? 48 : 50),
+                padding: const EdgeInsets.symmetric(
+                    horizontal: AppSpacing.lg, vertical: AppSpacing.md),
+                textStyle: Theme.of(context)
+                    .textTheme
+                    .labelLarge
+                    ?.copyWith(fontSize: 13, fontWeight: FontWeight.w800),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14))),
+            child: Text(widget.layoutBuilder != null &&
+                    _checkoutLabel == 'Pilih Metode Pembayaran'
+                ? 'Pilih Pembayaran →'
+                : _checkoutLabel!))
+        : null;
+    final content = Padding(
+        padding: const EdgeInsets.only(top: AppSpacing.lg),
         child:
             Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
           Text(demo ? 'Pembayaran DEMO / TEST_ONLY' : 'Pembayaran',
               style: const TextStyle(
-                  fontSize: 13,
+                  fontSize: 16,
                   fontWeight: FontWeight.w800,
                   color: AppColors.blueDeep)),
-          const SizedBox(height: 8),
+          const SizedBox(height: AppSpacing.sm),
           if (_loading) const LinearProgressIndicator(),
           Text(statusText ?? 'Memeriksa metode pembayaran dari server…',
               style: const TextStyle(
-                  fontSize: 12, height: 1.5, color: Color(0xFF526787))),
-          const SizedBox(height: 8),
+                  fontSize: 12, height: 1.5, color: AppColors.textSecondary)),
+          const SizedBox(height: AppSpacing.sm),
           if (_intent?.attemptStatus != null && (real || demo))
             Text('Attempt terakhir: ${_intent!.attemptStatus}',
                 style: const TextStyle(
-                    fontSize: 12, height: 1.5, color: Color(0xFF526787))),
+                    fontSize: 12, height: 1.5, color: AppColors.textSecondary)),
           // Real payments open the native checkout. The DEMO controls stay for demo mode.
           if (real) ...[
-            if (_checkoutLabel != null)
+            if (checkout != null && widget.layoutBuilder == null)
               Padding(
-                  padding: const EdgeInsets.only(bottom: 8),
-                  child: ElevatedButton(
-                      key: const Key('payment-open-checkout'),
-                      onPressed: _loading || _opening || !_valid
-                          ? null
-                          : _openCheckout,
-                      child: Text(_checkoutLabel!))),
+                  padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+                  child: checkout),
           ] else if (demo) ...[
             ElevatedButton(
                 onPressed: _loading ||
@@ -230,5 +251,6 @@ class _BookingPaymentSectionState extends State<BookingPaymentSection>
                 onPressed: _loading ? null : _load,
                 child: const Text('Periksa metode lagi')),
         ]));
+    return widget.layoutBuilder?.call(context, content, checkout) ?? content;
   }
 }

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:phosphor_icons/phosphor_icons.dart';
+import '../../theme/app_colors.dart';
 import '../../data/admin_state.dart';
 import '../../data/business_repository.dart';
 import '../../widgets/select_sheet.dart' show showConfirmSheet;
@@ -243,7 +244,8 @@ class _DestinationAdminAssignmentsScreenState
   // ── Build blocks ─────────────────────────────────────────
   Widget _statCard(String value, String label) => Expanded(
         child: Container(
-          padding: const EdgeInsets.fromLTRB(14, 14, 10, 12),
+          padding: const EdgeInsets.fromLTRB(
+              AppSpacing.lg, AppSpacing.lg, AppSpacing.sm, AppSpacing.md),
           decoration: BoxDecoration(
               color: AdminColors.card,
               border: Border.all(color: AdminColors.border),
@@ -256,7 +258,7 @@ class _DestinationAdminAssignmentsScreenState
                     fontSize: 26,
                     height: 1.2,
                     fontWeight: FontWeight.w800)),
-            const SizedBox(height: 4),
+            const SizedBox(height: AppSpacing.xs),
             Text(label,
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
@@ -269,7 +271,7 @@ class _DestinationAdminAssignmentsScreenState
       );
 
   Widget _tabs() => Container(
-        padding: const EdgeInsets.all(4),
+        padding: const EdgeInsets.all(AppSpacing.xs),
         decoration: BoxDecoration(
             color: const Color(0xFFE9EFF8),
             borderRadius: BorderRadius.circular(16)),
@@ -297,23 +299,16 @@ class _DestinationAdminAssignmentsScreenState
                   },
                   child: AnimatedContainer(
                     duration: const Duration(milliseconds: 180),
-                    constraints: const BoxConstraints(minHeight: 46),
+                    constraints: const BoxConstraints(
+                        minHeight: kMinInteractiveDimension),
                     alignment: Alignment.center,
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: AppSpacing.sm, vertical: AppSpacing.sm),
                     decoration: BoxDecoration(
                         color: _perAdmin == tab.$1
                             ? Colors.white
                             : Colors.transparent,
-                        borderRadius: BorderRadius.circular(12),
-                        boxShadow: _perAdmin == tab.$1
-                            ? const [
-                                BoxShadow(
-                                    color: Color(0x14102D59),
-                                    blurRadius: 6,
-                                    offset: Offset(0, 2))
-                              ]
-                            : null),
+                        borderRadius: BorderRadius.circular(12)),
                     child: Text(tab.$2,
                         textAlign: TextAlign.center,
                         style: TextStyle(
@@ -332,7 +327,7 @@ class _DestinationAdminAssignmentsScreenState
   Widget _chip(String value, String label) {
     final selected = _filter == value;
     return Padding(
-      padding: const EdgeInsets.only(right: 8),
+      padding: const EdgeInsets.only(right: AppSpacing.sm),
       child: Semantics(
         selected: selected,
         button: true,
@@ -342,11 +337,12 @@ class _DestinationAdminAssignmentsScreenState
           onTap: () => setState(() => _filter = value),
           child: AnimatedContainer(
             duration: const Duration(milliseconds: 180),
-            constraints: const BoxConstraints(minHeight: 36),
+            constraints:
+                const BoxConstraints(minHeight: kMinInteractiveDimension),
             alignment: Alignment.center,
-            padding: const EdgeInsets.symmetric(horizontal: 14),
+            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
             decoration: BoxDecoration(
-                color: selected ? const Color(0xFFE8F3FF) : Colors.white,
+                color: selected ? AppColors.blueTint : Colors.white,
                 borderRadius: BorderRadius.circular(20),
                 border: Border.all(
                     color: selected ? AdminColors.blue : AdminColors.border)),
@@ -386,9 +382,10 @@ class _DestinationAdminAssignmentsScreenState
     Key? key,
   }) =>
       Padding(
-        padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
+        padding: const EdgeInsets.fromLTRB(
+            AppSpacing.md, 0, AppSpacing.md, AppSpacing.sm),
         child: Material(
-          color: highlighted ? const Color(0xFFE8F3FF) : Colors.transparent,
+          color: highlighted ? AppColors.blueTint : Colors.transparent,
           shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(14),
               side: BorderSide(
@@ -399,7 +396,8 @@ class _DestinationAdminAssignmentsScreenState
             key: key,
             onTap: onTap,
             child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+              padding: const EdgeInsets.symmetric(
+                  horizontal: AppSpacing.md, vertical: AppSpacing.lg),
               child: child,
             ),
           ),
@@ -414,7 +412,7 @@ class _DestinationAdminAssignmentsScreenState
       onTap: () => _openAdmin(admin),
       child: Row(children: [
         _avatar(admin.name),
-        const SizedBox(width: 12),
+        const SizedBox(width: AppSpacing.md),
         Expanded(
           child:
               Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -425,18 +423,18 @@ class _DestinationAdminAssignmentsScreenState
                     color: AdminColors.navy,
                     fontSize: 14,
                     fontWeight: FontWeight.w800)),
-            const SizedBox(height: 2),
+            const SizedBox(height: AppSpacing.xs),
             Text(admin.email,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: const TextStyle(
                     color: AdminColors.textMuted, fontSize: 12)),
-            const SizedBox(height: 4),
+            const SizedBox(height: AppSpacing.xs),
             Wrap(crossAxisAlignment: WrapCrossAlignment.center, children: [
               Container(
                   width: 6,
                   height: 6,
-                  margin: const EdgeInsets.only(right: 5),
+                  margin: const EdgeInsets.only(right: AppSpacing.xs),
                   decoration: BoxDecoration(
                       color: admin.isActive
                           ? AdminColors.success
@@ -448,8 +446,7 @@ class _DestinationAdminAssignmentsScreenState
                       fontSize: 11,
                       fontWeight: FontWeight.w600)),
               const Text('  ·  ',
-                  style:
-                      TextStyle(color: AdminColors.textMuted, fontSize: 11)),
+                  style: TextStyle(color: AdminColors.textMuted, fontSize: 11)),
               Text(count == 0 ? 'Belum ditugaskan' : '$count destinasi',
                   style: const TextStyle(
                       color: AdminColors.textMuted,
@@ -481,7 +478,7 @@ class _DestinationAdminAssignmentsScreenState
                     color: AdminColors.navy,
                     fontSize: 14,
                     fontWeight: FontWeight.w800)),
-            const SizedBox(height: 2),
+            const SizedBox(height: AppSpacing.xs),
             Text(
                 destination.location.isEmpty
                     ? 'Lokasi belum dicantumkan'
@@ -490,7 +487,7 @@ class _DestinationAdminAssignmentsScreenState
                 overflow: TextOverflow.ellipsis,
                 style: const TextStyle(
                     color: AdminColors.textMuted, fontSize: 12)),
-            const SizedBox(height: 6),
+            const SizedBox(height: AppSpacing.sm),
             Text(count == 0 ? 'Belum ada admin' : '$count admin ditugaskan',
                 style: TextStyle(
                     color:
@@ -540,7 +537,8 @@ class _DestinationAdminAssignmentsScreenState
           border: Border.all(color: AdminColors.border)),
       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
         Padding(
-          padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
+          padding: const EdgeInsets.fromLTRB(
+              AppSpacing.lg, AppSpacing.lg, AppSpacing.lg, AppSpacing.md),
           child: Row(children: [
             Expanded(
                 child: Text(_perAdmin ? 'Daftar Admin' : 'Daftar Destinasi',
@@ -549,7 +547,8 @@ class _DestinationAdminAssignmentsScreenState
                         fontSize: 16,
                         fontWeight: FontWeight.w800))),
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              padding: const EdgeInsets.symmetric(
+                  horizontal: AppSpacing.sm, vertical: AppSpacing.xs),
               decoration: BoxDecoration(
                   color: const Color(0xFFEAF0F8),
                   borderRadius: BorderRadius.circular(20)),
@@ -562,28 +561,29 @@ class _DestinationAdminAssignmentsScreenState
           ]),
         ),
         Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16),
+          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
           child: DecoratedBox(
             decoration: BoxDecoration(
-                color: const Color(0xFFF5F8FD),
+                color: AppColors.bg,
                 borderRadius: BorderRadius.circular(14),
                 border: Border.all(color: AdminColors.border)),
             child: TextField(
               key: const ValueKey('assignment-search'),
               controller: _searchController,
               onChanged: (value) => setState(() => _query = value),
-              style: const TextStyle(fontSize: 14, color: AdminColors.navy),
+              style: const TextStyle(fontSize: 13, color: AdminColors.navy),
               decoration: InputDecoration(
                   hintText: _perAdmin
                       ? 'Cari nama atau email admin...'
                       : 'Cari nama destinasi...',
                   hintStyle: const TextStyle(
-                      color: AdminColors.textMuted, fontSize: 14),
+                      color: AdminColors.textMuted, fontSize: 13),
                   border: InputBorder.none,
                   enabledBorder: InputBorder.none,
                   focusedBorder: InputBorder.none,
                   filled: false,
-                  contentPadding: const EdgeInsets.symmetric(vertical: 14),
+                  contentPadding:
+                      const EdgeInsets.symmetric(vertical: AppSpacing.lg),
                   prefixIcon: const Icon(PhosphorIconsRegular.magnifyingGlass,
                       color: AdminColors.blue, size: 20),
                   suffixIcon: _query.isEmpty
@@ -599,7 +599,8 @@ class _DestinationAdminAssignmentsScreenState
           ),
         ),
         Padding(
-          padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+          padding: const EdgeInsets.fromLTRB(
+              AppSpacing.lg, AppSpacing.md, AppSpacing.lg, AppSpacing.md),
           child: SingleChildScrollView(
             scrollDirection: Axis.horizontal,
             child: Row(children: [
@@ -610,14 +611,16 @@ class _DestinationAdminAssignmentsScreenState
           ),
         ),
         const Divider(height: 1, color: AdminColors.border),
-        const SizedBox(height: 12),
+        const SizedBox(height: AppSpacing.md),
         if (_loading)
           const Padding(
-              padding: EdgeInsets.fromLTRB(16, 4, 16, 20),
+              padding: EdgeInsets.fromLTRB(AppSpacing.lg, AppSpacing.xs,
+                  AppSpacing.lg, AppSpacing.sheetPadding),
               child: LinearProgressIndicator(color: AdminColors.blue))
         else if (shown == 0)
           Padding(
-              padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+              padding: const EdgeInsets.fromLTRB(
+                  AppSpacing.lg, AppSpacing.sm, AppSpacing.lg, AppSpacing.xl),
               child: Text(
                   total == 0
                       ? (_perAdmin
@@ -631,7 +634,7 @@ class _DestinationAdminAssignmentsScreenState
           for (final admin in admins) _adminRow(admin)
         else
           for (final destination in destinations) _destinationRow(destination),
-        const SizedBox(height: 4),
+        const SizedBox(height: AppSpacing.xs),
       ]),
     );
   }
@@ -657,8 +660,8 @@ class _DestinationAdminAssignmentsScreenState
       onRefresh: _load,
       slivers: [
         SliverPadding(
-          padding: EdgeInsets.fromLTRB(
-              16, 8, 16, 32 + MediaQuery.paddingOf(context).bottom),
+          padding: EdgeInsets.fromLTRB(AppSpacing.lg, AppSpacing.sm,
+              AppSpacing.lg, 32 + MediaQuery.paddingOf(context).bottom),
           sliver: SliverList(
             delegate: SliverChildListDelegate([
               IntrinsicHeight(
@@ -666,24 +669,30 @@ class _DestinationAdminAssignmentsScreenState
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
                       _statCard('${_admins.length}', 'Total admin'),
-                      const SizedBox(width: 10),
+                      const SizedBox(width: AppSpacing.sm),
                       _statCard('$assignedAdmins', 'Sudah ditugaskan'),
-                      const SizedBox(width: 10),
+                      const SizedBox(width: AppSpacing.sm),
                       _statCard('${_admins.length - assignedAdmins}',
                           'Belum ditugaskan'),
                     ]),
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: AppSpacing.lg),
               _tabs(),
-              const SizedBox(height: 16),
+              const SizedBox(height: AppSpacing.lg),
               if (_error != null) ...[
                 AdminNotice(_error!),
                 Align(
                   alignment: Alignment.centerLeft,
                   child: TextButton(
-                      onPressed: _load, child: const Text('Coba lagi')),
+                      style: TextButton.styleFrom(
+                          textStyle: const TextStyle(
+                              fontSize: 13, fontWeight: FontWeight.w800),
+                          shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(14))),
+                      onPressed: _load,
+                      child: const Text('Coba lagi')),
                 ),
-                const SizedBox(height: 8),
+                const SizedBox(height: AppSpacing.sm),
               ],
               _listCard(),
             ]),
@@ -773,22 +782,23 @@ class _AssignmentSheetState extends State<_AssignmentSheet> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Padding(
-                padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
+                padding: const EdgeInsets.fromLTRB(AppSpacing.sheetPadding, 0,
+                    AppSpacing.sheetPadding, AppSpacing.md),
                 child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       const Text('Penugasan Admin',
                           style: TextStyle(
                               color: AdminColors.navy,
-                              fontSize: 18,
+                              fontSize: 20,
                               fontWeight: FontWeight.w800)),
-                      const SizedBox(height: 2),
+                      const SizedBox(height: AppSpacing.xs),
                       Text(
                           '${admin.name} · pilih destinasi yang boleh dikelola',
                           style: const TextStyle(
                               color: AdminColors.textMuted, fontSize: 12)),
                       if (!admin.isActive) ...[
-                        const SizedBox(height: 8),
+                        const SizedBox(height: AppSpacing.sm),
                         const AdminNotice(
                             'Akun nonaktif: penugasan hanya dapat dilepas, tidak dapat ditambah.',
                             color: AdminColors.warning),
@@ -798,24 +808,27 @@ class _AssignmentSheetState extends State<_AssignmentSheet> {
               Flexible(
                 child: widget.destinations.isEmpty
                     ? const Padding(
-                        padding: EdgeInsets.all(24),
+                        padding: EdgeInsets.all(AppSpacing.xl),
                         child: Text('Belum ada destinasi.',
                             textAlign: TextAlign.center,
                             style: TextStyle(color: AdminColors.textMuted)))
                     : ListView.separated(
                         shrinkWrap: true,
-                        padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+                        padding: const EdgeInsets.fromLTRB(
+                            AppSpacing.sheetPadding,
+                            0,
+                            AppSpacing.sheetPadding,
+                            AppSpacing.md),
                         itemCount: widget.destinations.length,
-                        separatorBuilder: (_, __) => const SizedBox(height: 8),
+                        separatorBuilder: (_, __) =>
+                            const SizedBox(height: AppSpacing.sm),
                         itemBuilder: (_, index) {
                           final destination = widget.destinations[index];
                           final checked = _selected.contains(destination.guid);
                           final locked =
                               _saving || (!admin.isActive && !checked);
                           return Material(
-                            color: checked
-                                ? const Color(0xFFE8F3FF)
-                                : Colors.white,
+                            color: checked ? AppColors.blueTint : Colors.white,
                             shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(14),
                                 side: BorderSide(
@@ -838,7 +851,7 @@ class _AssignmentSheetState extends State<_AssignmentSheet> {
                               child: Opacity(
                                 opacity: locked && !_saving ? .5 : 1,
                                 child: Padding(
-                                  padding: const EdgeInsets.all(12),
+                                  padding: const EdgeInsets.all(AppSpacing.md),
                                   child: Row(children: [
                                     Checkbox(
                                         value: checked,
@@ -866,7 +879,7 @@ class _AssignmentSheetState extends State<_AssignmentSheet> {
                                           color: AdminColors.blue,
                                           size: 20),
                                     ),
-                                    const SizedBox(width: 12),
+                                    const SizedBox(width: AppSpacing.md),
                                     Expanded(
                                       child: Column(
                                           crossAxisAlignment:
@@ -880,7 +893,8 @@ class _AssignmentSheetState extends State<_AssignmentSheet> {
                                                     fontSize: 13,
                                                     fontWeight:
                                                         FontWeight.w800)),
-                                            const SizedBox(height: 2),
+                                            const SizedBox(
+                                                height: AppSpacing.xs),
                                             Text(
                                                 destination.location.isEmpty
                                                     ? 'Lokasi belum dicantumkan'
@@ -903,13 +917,16 @@ class _AssignmentSheetState extends State<_AssignmentSheet> {
               const Divider(height: 1, color: AdminColors.border),
               Padding(
                 padding: EdgeInsets.fromLTRB(
-                    20, 12, 20, 16 + MediaQuery.paddingOf(context).bottom),
+                    AppSpacing.sheetPadding,
+                    AppSpacing.md,
+                    AppSpacing.sheetPadding,
+                    AppSpacing.lg + MediaQuery.paddingOf(context).bottom),
                 child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
                       if (_error != null) ...[
                         AdminNotice(_error!),
-                        const SizedBox(height: 10),
+                        const SizedBox(height: AppSpacing.sm),
                       ],
                       Text(
                           _changes == 0
@@ -921,7 +938,7 @@ class _AssignmentSheetState extends State<_AssignmentSheet> {
                                   : AdminColors.blue,
                               fontSize: 12,
                               fontWeight: FontWeight.w600)),
-                      const SizedBox(height: 12),
+                      const SizedBox(height: AppSpacing.md),
                       Row(children: [
                         Expanded(
                           flex: 2,
@@ -930,17 +947,17 @@ class _AssignmentSheetState extends State<_AssignmentSheet> {
                             onPressed: _saving ? null : _cancel,
                             style: OutlinedButton.styleFrom(
                                 foregroundColor: AdminColors.blue,
-                                minimumSize: const Size.fromHeight(50),
+                                minimumSize: const Size.fromHeight(52),
                                 side:
                                     const BorderSide(color: AdminColors.border),
                                 shape: RoundedRectangleBorder(
                                     borderRadius: BorderRadius.circular(14)),
                                 textStyle: const TextStyle(
-                                    fontSize: 14, fontWeight: FontWeight.w800)),
+                                    fontSize: 13, fontWeight: FontWeight.w800)),
                             child: const Text('Batalkan'),
                           ),
                         ),
-                        const SizedBox(width: 12),
+                        const SizedBox(width: AppSpacing.md),
                         Expanded(
                           flex: 3,
                           child: FilledButton(
@@ -949,11 +966,11 @@ class _AssignmentSheetState extends State<_AssignmentSheet> {
                             style: FilledButton.styleFrom(
                                 backgroundColor: AdminColors.blue,
                                 foregroundColor: Colors.white,
-                                minimumSize: const Size.fromHeight(50),
+                                minimumSize: const Size.fromHeight(52),
                                 shape: RoundedRectangleBorder(
                                     borderRadius: BorderRadius.circular(14)),
                                 textStyle: const TextStyle(
-                                    fontSize: 14, fontWeight: FontWeight.w800)),
+                                    fontSize: 13, fontWeight: FontWeight.w800)),
                             child: Text(
                                 _saving ? 'Menyimpan...' : 'Simpan Penugasan'),
                           ),
@@ -992,24 +1009,25 @@ class _DestinationAccessSheet extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           const Padding(
-            padding: EdgeInsets.fromLTRB(20, 0, 20, 12),
+            padding: EdgeInsets.fromLTRB(AppSpacing.sheetPadding, 0,
+                AppSpacing.sheetPadding, AppSpacing.md),
             child:
                 Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               Text('Akses Destinasi',
                   style: TextStyle(
                       color: AdminColors.navy,
-                      fontSize: 18,
+                      fontSize: 20,
                       fontWeight: FontWeight.w800)),
-              SizedBox(height: 2),
+              SizedBox(height: AppSpacing.xs),
               Text('Informasi penugasan — hanya lihat',
-                  style:
-                      TextStyle(color: AdminColors.textMuted, fontSize: 12)),
+                  style: TextStyle(color: AdminColors.textMuted, fontSize: 12)),
             ]),
           ),
           Flexible(
             child: ListView(
               shrinkWrap: true,
-              padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
+              padding: const EdgeInsets.fromLTRB(AppSpacing.sheetPadding, 0,
+                  AppSpacing.sheetPadding, AppSpacing.md),
               children: [
                 Row(children: [
                   Container(
@@ -1021,7 +1039,7 @@ class _DestinationAccessSheet extends StatelessWidget {
                     child: const Icon(PhosphorIconsRegular.mapPin,
                         color: AdminColors.blue, size: 22),
                   ),
-                  const SizedBox(width: 12),
+                  const SizedBox(width: AppSpacing.md),
                   Expanded(
                     child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1029,9 +1047,9 @@ class _DestinationAccessSheet extends StatelessWidget {
                           Text(destination.name,
                               style: const TextStyle(
                                   color: AdminColors.navy,
-                                  fontSize: 15,
+                                  fontSize: 16,
                                   fontWeight: FontWeight.w800)),
-                          const SizedBox(height: 2),
+                          const SizedBox(height: AppSpacing.xs),
                           Text(
                               destination.location.isEmpty
                                   ? 'Lokasi belum dicantumkan'
@@ -1041,9 +1059,9 @@ class _DestinationAccessSheet extends StatelessWidget {
                         ]),
                   ),
                 ]),
-                const SizedBox(height: 14),
+                const SizedBox(height: AppSpacing.lg),
                 Container(
-                  padding: const EdgeInsets.all(12),
+                  padding: const EdgeInsets.all(AppSpacing.md),
                   decoration: BoxDecoration(
                       color: const Color(0xFFEAF3FF),
                       borderRadius: BorderRadius.circular(12),
@@ -1062,7 +1080,7 @@ class _DestinationAccessSheet extends StatelessWidget {
                         color: AdminColors.navy, fontSize: 12, height: 1.45),
                   ),
                 ),
-                const SizedBox(height: 16),
+                const SizedBox(height: AppSpacing.lg),
                 Row(children: [
                   const Expanded(
                       child: Text('Admin yang Ditugaskan',
@@ -1074,17 +1092,18 @@ class _DestinationAccessSheet extends StatelessWidget {
                       style: const TextStyle(
                           color: AdminColors.textMuted, fontSize: 12)),
                 ]),
-                const SizedBox(height: 8),
+                const SizedBox(height: AppSpacing.sm),
                 if (admins.isEmpty)
                   const Padding(
-                      padding: EdgeInsets.symmetric(vertical: 16),
+                      padding: EdgeInsets.symmetric(vertical: AppSpacing.lg),
                       child: Text('Belum ada admin yang ditugaskan.',
                           style: TextStyle(
                               color: AdminColors.textMuted, fontSize: 13)))
                 else
                   for (final admin in admins)
                     Container(
-                      padding: const EdgeInsets.symmetric(vertical: 10),
+                      padding:
+                          const EdgeInsets.symmetric(vertical: AppSpacing.sm),
                       decoration: const BoxDecoration(
                           border: Border(
                               bottom: BorderSide(color: AdminColors.border))),
@@ -1102,7 +1121,7 @@ class _DestinationAccessSheet extends StatelessWidget {
                                   fontSize: 12,
                                   fontWeight: FontWeight.w800)),
                         ),
-                        const SizedBox(width: 12),
+                        const SizedBox(width: AppSpacing.md),
                         Expanded(
                           child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
@@ -1123,9 +1142,9 @@ class _DestinationAccessSheet extends StatelessWidget {
                                         fontSize: 12)),
                               ]),
                         ),
-                        const SizedBox(width: 8),
+                        const SizedBox(width: AppSpacing.sm),
                         Material(
-                          color: const Color(0xFFE8F3FF),
+                          color: AppColors.blueTint,
                           borderRadius: BorderRadius.circular(12),
                           child: InkWell(
                             key: ValueKey('access-manage-${admin.guid}'),
@@ -1133,10 +1152,11 @@ class _DestinationAccessSheet extends StatelessWidget {
                             onTap: () => Navigator.pop(context, admin),
                             child: Container(
                               constraints: const BoxConstraints(
-                                  minHeight: 40, minWidth: 64),
+                                  minHeight: kMinInteractiveDimension,
+                                  minWidth: 64),
                               alignment: Alignment.center,
-                              padding:
-                                  const EdgeInsets.symmetric(horizontal: 14),
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: AppSpacing.lg),
                               child: const Text('Kelola',
                                   style: TextStyle(
                                       color: AdminColors.blue,
@@ -1153,18 +1173,21 @@ class _DestinationAccessSheet extends StatelessWidget {
           const Divider(height: 1, color: AdminColors.border),
           Padding(
             padding: EdgeInsets.fromLTRB(
-                20, 12, 20, 16 + MediaQuery.paddingOf(context).bottom),
+                AppSpacing.sheetPadding,
+                AppSpacing.md,
+                AppSpacing.sheetPadding,
+                AppSpacing.lg + MediaQuery.paddingOf(context).bottom),
             child: OutlinedButton(
               key: const ValueKey('access-open-admin-tab'),
               onPressed: () => Navigator.pop(context, 'tab'),
               style: OutlinedButton.styleFrom(
                   foregroundColor: AdminColors.navy,
-                  minimumSize: const Size.fromHeight(50),
+                  minimumSize: const Size.fromHeight(52),
                   side: const BorderSide(color: AdminColors.border),
                   shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(14)),
                   textStyle: const TextStyle(
-                      fontSize: 14, fontWeight: FontWeight.w800)),
+                      fontSize: 13, fontWeight: FontWeight.w800)),
               child: const Text('Kelola Penugasan per Admin'),
             ),
           ),

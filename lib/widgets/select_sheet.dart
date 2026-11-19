@@ -3,6 +3,7 @@
 // with a check), matching the country and destination pickers.
 import 'package:flutter/material.dart';
 import 'package:phosphor_icons/phosphor_icons.dart';
+import '../theme/app_colors.dart';
 
 const _navy = Color(0xFF102D59);
 const _blue = Color(0xFF1976D2);
@@ -303,7 +304,7 @@ class SelectFormField<T> extends StatelessWidget {
 }
 
 /// Project-standard confirmation bottom sheet (drag handle, icon, title,
-/// message, stacked buttons). Resolves to true when the destructive action is
+/// message, and confirmation actions). Resolves to true when the destructive action is
 /// confirmed; false when the user keeps going or dismisses the sheet.
 Future<bool> showConfirmSheet(
   BuildContext context, {
@@ -312,66 +313,103 @@ Future<bool> showConfirmSheet(
   required String confirmLabel,
   required String cancelLabel,
   IconData icon = PhosphorIconsRegular.warning,
-  Color confirmColor = const Color(0xFFE5484D),
+  Color confirmColor = AppColors.danger,
   bool emphasizeConfirm = false,
 }) async {
   final result = await showModalBottomSheet<bool>(
     context: context,
+    isScrollControlled: true,
     useSafeArea: true,
     showDragHandle: true,
-    backgroundColor: Colors.white,
+    backgroundColor: AppColors.surface,
     shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
-    builder: (sheetContext) => Padding(
-      padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Container(
-              width: 44,
-              height: 44,
-              decoration: BoxDecoration(
-                  color: confirmColor.withValues(alpha: .1),
-                  borderRadius: BorderRadius.circular(14)),
-              child: Icon(icon, color: confirmColor, size: 22),
-            ),
-            const SizedBox(width: 14),
-            Expanded(
-              child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(title,
+    builder: (sheetContext) => SafeArea(
+        top: false,
+        child: SingleChildScrollView(
+          padding: EdgeInsets.fromLTRB(
+              AppSpacing.sheetPadding,
+              0,
+              AppSpacing.sheetPadding,
+              AppSpacing.sheetPadding +
+                  MediaQuery.viewInsetsOf(sheetContext).bottom),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Row(children: [
+                Expanded(
+                    child: Text(title,
                         style: const TextStyle(
-                            color: _navy,
-                            fontSize: 18,
-                            fontWeight: FontWeight.w800)),
-                    const SizedBox(height: 4),
-                    Text(message,
-                        style: const TextStyle(
-                            color: _muted, fontSize: 13, height: 1.45)),
-                  ]),
-            ),
-          ]),
-          const SizedBox(height: 20),
-          if (emphasizeConfirm) ...[
-            _sheetFilled(confirmLabel, confirmColor,
-                () => Navigator.pop(sheetContext, true)),
-            const SizedBox(height: 10),
-            _sheetOutlined(cancelLabel, _muted, _border,
-                () => Navigator.pop(sheetContext, false)),
-          ] else ...[
-            _sheetFilled(
-                cancelLabel, _blue, () => Navigator.pop(sheetContext, false)),
-            const SizedBox(height: 10),
-            _sheetOutlined(confirmLabel, confirmColor,
-                confirmColor.withValues(alpha: .35),
-                () => Navigator.pop(sheetContext, true)),
-          ],
-        ],
-      ),
-    ),
+                            color: AppColors.navy,
+                            fontSize: 20,
+                            fontWeight: FontWeight.w800))),
+                IconButton(
+                  tooltip: 'Tutup',
+                  onPressed: () => Navigator.pop(sheetContext, false),
+                  style: IconButton.styleFrom(
+                    minimumSize: const Size(48, 48),
+                    backgroundColor: AppColors.sheetCloseBackground,
+                    foregroundColor: AppColors.textSecondary,
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(AppSpacing.md)),
+                  ),
+                  icon: const Icon(PhosphorIconsRegular.x, size: 20),
+                ),
+              ]),
+              const Divider(height: AppSpacing.xl, color: AppColors.border),
+              Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Container(
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(
+                      color: confirmColor.withValues(alpha: .1),
+                      borderRadius: BorderRadius.circular(14)),
+                  child: Icon(icon, color: confirmColor, size: 22),
+                ),
+                const SizedBox(width: AppSpacing.md),
+                Expanded(
+                  child: Text(message,
+                      style: const TextStyle(
+                          color: AppColors.textSecondary,
+                          fontSize: 12,
+                          height: 1.6)),
+                ),
+              ]),
+              const SizedBox(height: AppSpacing.xl),
+              LayoutBuilder(builder: (context, constraints) {
+                final cancel = _sheetOutlined(cancelLabel, AppColors.blueDeep,
+                    AppColors.border, () => Navigator.pop(sheetContext, false));
+                final confirm = emphasizeConfirm
+                    ? _sheetFilled(confirmLabel, confirmColor,
+                        () => Navigator.pop(sheetContext, true))
+                    : _sheetOutlined(
+                        confirmLabel,
+                        confirmColor,
+                        confirmColor.withValues(alpha: .35),
+                        () => Navigator.pop(sheetContext, true));
+                if (constraints.maxWidth < 280 ||
+                    MediaQuery.textScalerOf(context).scale(1) > 1.3) {
+                  return Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        cancel,
+                        const SizedBox(height: AppSpacing.md),
+                        confirm
+                      ]);
+                }
+                return IntrinsicHeight(
+                    child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                      Expanded(child: cancel),
+                      const SizedBox(width: AppSpacing.md),
+                      Expanded(child: confirm)
+                    ]));
+              }),
+            ],
+          ),
+        )),
   );
   return result ?? false;
 }
@@ -381,12 +419,13 @@ Widget _sheetFilled(String label, Color color, VoidCallback onPressed) =>
       onPressed: onPressed,
       style: FilledButton.styleFrom(
           backgroundColor: color,
-          foregroundColor: Colors.white,
-          minimumSize: const Size.fromHeight(50),
+          foregroundColor: AppColors.surface,
+          minimumSize: const Size(48, 52),
           shape:
               RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-          textStyle: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800)),
-      child: Text(label),
+          textStyle:
+              const TextStyle(fontSize: 13, fontWeight: FontWeight.w800)),
+      child: Text(label, textAlign: TextAlign.center),
     );
 
 Widget _sheetOutlined(
@@ -395,10 +434,11 @@ Widget _sheetOutlined(
       onPressed: onPressed,
       style: OutlinedButton.styleFrom(
           foregroundColor: color,
-          minimumSize: const Size.fromHeight(50),
+          minimumSize: const Size(48, 52),
           side: BorderSide(color: border),
           shape:
               RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-          textStyle: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800)),
-      child: Text(label),
+          textStyle:
+              const TextStyle(fontSize: 13, fontWeight: FontWeight.w800)),
+      child: Text(label, textAlign: TextAlign.center),
     );

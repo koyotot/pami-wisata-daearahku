@@ -251,6 +251,37 @@ void main() {
       expect(controller.cancelling, isFalse);
     });
 
+    test('an awaiting_payment booking is cancelled from the server cancellable flag',
+        () async {
+      repository.onCancel = (guid) async =>
+          Booking(bookingJson(status: 'cancelled', cancellable: false));
+      final controller = BookingDetailController(
+          repository, Booking(bookingJson(status: 'awaiting_payment')));
+      addTearDown(controller.dispose);
+      expect(await controller.cancel(), isTrue);
+      expect(repository.cancelCalls, 1);
+      expect(controller.booking.status, 'cancelled');
+    });
+
+    test('409 booking_already_paid and payment_verification_pending are plain messages',
+        () async {
+      for (final (code, text) in [
+        ('booking_already_paid', 'Pembayaran sudah diterima'),
+        ('payment_verification_pending', 'sedang diverifikasi'),
+      ]) {
+        repository.onCancel =
+            (guid) async => throw ApiException('x', 409, code);
+        repository.onBooking = (guid) async =>
+            Booking(bookingJson(status: 'awaiting_payment'));
+        final controller = BookingDetailController(
+            repository, Booking(bookingJson(status: 'awaiting_payment')));
+        addTearDown(controller.dispose);
+        expect(await controller.cancel(), isFalse);
+        expect(controller.message, contains(text));
+        expect(controller.booking.status, 'awaiting_payment');
+      }
+    });
+
     test('409 booking_already_cancelled is reported as such', () async {
       repository.onCancel = (guid) async => throw const ApiException(
           'x', 409, 'booking_already_cancelled');

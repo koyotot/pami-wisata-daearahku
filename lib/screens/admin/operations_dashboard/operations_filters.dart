@@ -23,7 +23,7 @@ Future<Map<String, String>?> showOperationsFilters(BuildContext context,
         isScrollControlled: true,
         useSafeArea: true,
         showDragHandle: true,
-        backgroundColor: home ? AppColors.surface : AppColors.bg,
+        backgroundColor: AppColors.surface,
         shape: const RoundedRectangleBorder(
             borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
         builder: (_) => Theme(
@@ -201,7 +201,11 @@ class _OperationsFiltersState extends State<_OperationsFilters> {
           : _roleOneFilters(context)
       : Padding(
           padding: EdgeInsets.fromLTRB(
-              20, 0, 20, MediaQuery.viewInsetsOf(context).bottom + 24),
+              AppSpacing.sheetPadding,
+              0,
+              AppSpacing.sheetPadding,
+              MediaQuery.viewInsetsOf(context).bottom +
+                  AppSpacing.sheetPadding),
           child: SingleChildScrollView(
               child: Column(
                   mainAxisSize: MainAxisSize.min,
@@ -212,20 +216,20 @@ class _OperationsFiltersState extends State<_OperationsFilters> {
                         fontSize: 22,
                         fontWeight: FontWeight.w800,
                         color: AppColors.navy)),
-                const SizedBox(height: 6),
+                const SizedBox(height: AppSpacing.sm),
                 Text(
                     widget.financial
                         ? 'Periode UTC, maksimal 366 hari inklusif. Scope mengikuti akses Anda.'
                         : 'Sesuaikan destinasi dan periode operasional.',
                     style: const TextStyle(
                         fontSize: 13, height: 1.5, color: Color(0xFF526787))),
-                const SizedBox(height: 24),
+                const SizedBox(height: AppSpacing.xl),
                 const Text('Destinasi yang dapat diakses',
                     style: TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.w700,
                         color: AppColors.navy)),
-                const SizedBox(height: 8),
+                const SizedBox(height: AppSpacing.sm),
                 DropdownButtonFormField<String>(
                     icon: const Icon(PhosphorIconsRegular.caretDown),
                     key: widget.financial
@@ -237,7 +241,7 @@ class _OperationsFiltersState extends State<_OperationsFilters> {
                             color: AppColors.blue),
                         filled: true,
                         fillColor: Colors.white,
-                        contentPadding: const EdgeInsets.all(14),
+                        contentPadding: const EdgeInsets.all(AppSpacing.lg),
                         enabledBorder: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(14),
                             borderSide:
@@ -268,23 +272,28 @@ class _OperationsFiltersState extends State<_OperationsFilters> {
                         : null),
                 if (_loading)
                   const Padding(
-                      padding: EdgeInsets.all(16),
+                      padding: EdgeInsets.all(AppSpacing.lg),
                       child: LinearProgressIndicator()),
                 if (_error != null) _errorBlock(_error!, _load, role: _role),
                 if (_next && !_loading)
                   TextButton(
+                      style: TextButton.styleFrom(
+                          textStyle: const TextStyle(
+                              fontSize: 13, fontWeight: FontWeight.w800),
+                          shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(14))),
                       onPressed: _load,
                       child: const Text('Muat destinasi berikutnya')),
                 if (!_loading && _error == null && _destinations.isEmpty)
                   const _Notice(
                       'Belum ada destinasi ditugaskan. Hubungi Superadmin.'),
-                const SizedBox(height: 20),
+                const SizedBox(height: AppSpacing.xl),
                 const Text('Periode',
                     style: TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.w700,
                         color: AppColors.navy)),
-                const SizedBox(height: 8),
+                const SizedBox(height: AppSpacing.sm),
                 if (widget.financial) ...[
                   DropdownButtonFormField<String>(
                       icon: const Icon(PhosphorIconsRegular.caretDown),
@@ -316,7 +325,7 @@ class _OperationsFiltersState extends State<_OperationsFilters> {
                                       _to!.subtract(const Duration(days: 6));
                                 }
                               })),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: AppSpacing.sm),
                 ],
                 OutlinedButton.icon(
                     onPressed: _valid ? _dates : null,
@@ -337,8 +346,13 @@ class _OperationsFiltersState extends State<_OperationsFilters> {
                             : 'Pilih periode'
                         : '${isoDay(_from!)} — ${isoDay(_to!)}')),
                 if (_validation != null) _Notice(_validation!),
-                const SizedBox(height: 16),
+                const SizedBox(height: AppSpacing.lg),
                 FilledButton(
+                    style: FilledButton.styleFrom(
+                        textStyle: const TextStyle(
+                            fontSize: 13, fontWeight: FontWeight.w800),
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(14))),
                     onPressed: _valid &&
                             !_loading &&
                             _error == null &&
@@ -358,8 +372,13 @@ class _OperationsFiltersState extends State<_OperationsFilters> {
                             })
                         : null,
                     child: const Text('Terapkan filter')),
-                const SizedBox(height: 8),
+                const SizedBox(height: AppSpacing.sm),
                 OutlinedButton(
+                    style: OutlinedButton.styleFrom(
+                        textStyle: const TextStyle(
+                            fontSize: 13, fontWeight: FontWeight.w800),
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(14))),
                     onPressed: _valid
                         ? () {
                             setState(() {
@@ -379,8 +398,12 @@ class _OperationsFiltersState extends State<_OperationsFilters> {
     return SafeArea(
         top: false,
         child: Padding(
-            padding: EdgeInsets.fromLTRB(AppSpacing.md, 0, AppSpacing.md,
-                MediaQuery.viewInsetsOf(context).bottom + AppSpacing.lg),
+            padding: EdgeInsets.fromLTRB(
+                AppSpacing.sheetPadding,
+                0,
+                AppSpacing.sheetPadding,
+                MediaQuery.viewInsetsOf(context).bottom +
+                    AppSpacing.sheetPadding),
             child: SingleChildScrollView(
                 child: Column(
                     mainAxisSize: MainAxisSize.min,
@@ -471,7 +494,11 @@ class _OperationsFiltersState extends State<_OperationsFilters> {
       top: false,
       child: Padding(
           padding: EdgeInsets.fromLTRB(
-              20, 0, 20, MediaQuery.viewInsetsOf(context).bottom + 16),
+              AppSpacing.sheetPadding,
+              0,
+              AppSpacing.sheetPadding,
+              MediaQuery.viewInsetsOf(context).bottom +
+                  AppSpacing.sheetPadding),
           child: SingleChildScrollView(
               physics: const AlwaysScrollableScrollPhysics(),
               child: Column(
@@ -483,10 +510,10 @@ class _OperationsFiltersState extends State<_OperationsFilters> {
                         subtitle: widget.financial
                             ? 'Periode UTC · maksimal 366 hari inklusif'
                             : 'Scope mengikuti penugasan. Tanggal mengikuti basis laporan.'),
-                    const SizedBox(height: 24),
+                    const SizedBox(height: AppSpacing.xl),
                     const Text('Destinasi',
                         style: TextStyle(fontWeight: FontWeight.w700)),
-                    const SizedBox(height: 8),
+                    const SizedBox(height: AppSpacing.sm),
                     _OperationsFilterField(
                         label: _destination == null
                             ? 'Semua destinasi saya'
@@ -507,10 +534,10 @@ class _OperationsFiltersState extends State<_OperationsFilters> {
                                 setState(() => _destination =
                                     value.isEmpty ? null : value);
                               }),
-                    const SizedBox(height: 24),
+                    const SizedBox(height: AppSpacing.xl),
                     const Text('Periode',
                         style: TextStyle(fontWeight: FontWeight.w700)),
-                    const SizedBox(height: 8),
+                    const SizedBox(height: AppSpacing.sm),
                     _OperationsFilterField(
                         label: _from != null && _to != null
                             ? '${isoDay(_from!)} — ${isoDay(_to!)}'
@@ -523,8 +550,13 @@ class _OperationsFiltersState extends State<_OperationsFilters> {
                     if (!_valid)
                       const _Notice(
                           'Akses berubah. Tutup filter dan buka kembali dari akun aktif.'),
-                    const SizedBox(height: 24),
+                    const SizedBox(height: AppSpacing.xl),
                     FilledButton(
+                        style: FilledButton.styleFrom(
+                            textStyle: const TextStyle(
+                                fontSize: 13, fontWeight: FontWeight.w800),
+                            shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(14))),
                         key: const ValueKey('operations-apply-filters'),
                         onPressed: _valid && _validation == null
                             ? () => Navigator.pop(context, <String, String>{
@@ -538,6 +570,11 @@ class _OperationsFiltersState extends State<_OperationsFilters> {
                             : null,
                         child: const Text('Terapkan filter')),
                     TextButton(
+                        style: TextButton.styleFrom(
+                            textStyle: const TextStyle(
+                                fontSize: 13, fontWeight: FontWeight.w800),
+                            shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(14))),
                         key: const ValueKey('operations-reset-filters'),
                         onPressed: !_valid
                             ? null
@@ -564,7 +601,7 @@ Future<String?> showOperationsDestinationPicker(BuildContext context,
         useSafeArea: true,
         isScrollControlled: true,
         showDragHandle: true,
-        backgroundColor: home ? AppColors.surface : AppColors.bg,
+        backgroundColor: AppColors.surface,
         shape: const RoundedRectangleBorder(
             borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
         builder: (_) => Theme(
@@ -688,10 +725,11 @@ class _OperationsDestinationPickerState
         top: false,
         child: Padding(
             padding: EdgeInsets.fromLTRB(
-                widget.home ? AppSpacing.md : 20,
+                AppSpacing.sheetPadding,
                 0,
-                widget.home ? AppSpacing.md : 20,
-                MediaQuery.viewInsetsOf(context).bottom + AppSpacing.lg),
+                AppSpacing.sheetPadding,
+                MediaQuery.viewInsetsOf(context).bottom +
+                    AppSpacing.sheetPadding),
             child: ConstrainedBox(
                 constraints: BoxConstraints(
                     minHeight: widget.home
@@ -714,7 +752,7 @@ class _OperationsDestinationPickerState
                           subtitle: widget.home
                               ? 'Hanya lokasi yang termasuk penugasan Anda.'
                               : 'Hanya destinasi dalam penugasan Anda.'),
-                      const SizedBox(height: 16),
+                      const SizedBox(height: AppSpacing.lg),
                       TextField(
                           key: const ValueKey('operations-destination-search'),
                           decoration: InputDecoration(
@@ -725,7 +763,7 @@ class _OperationsDestinationPickerState
                                   Icon(PhosphorIconsRegular.magnifyingGlass)),
                           onChanged: (value) =>
                               setState(() => _search = value)),
-                      const SizedBox(height: 12),
+                      const SizedBox(height: AppSpacing.md),
                       if (_loading) const LinearProgressIndicator(),
                       Flexible(
                           child: RefreshIndicator(
@@ -778,8 +816,7 @@ class _OperationsDestinationPickerState
                           ? AppColors.blue.withValues(alpha: .08)
                           : AppColors.surface,
                       minimumSize: Size(48, widget.home ? 48 : 56),
-                      padding: EdgeInsets.all(
-                          widget.home ? AppSpacing.md : AppSpacing.lg),
+                      padding: EdgeInsets.all(AppSpacing.sheetPadding),
                       shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(14))),
                   onPressed: enabled
@@ -790,7 +827,7 @@ class _OperationsDestinationPickerState
                       : null,
                   child: Row(children: [
                     const Icon(PhosphorIconsRegular.mapPin, size: 20),
-                    const SizedBox(width: 12),
+                    const SizedBox(width: AppSpacing.md),
                     Expanded(
                         child: Text(label,
                             style: widget.home
@@ -800,7 +837,7 @@ class _OperationsDestinationPickerState
                                         ? FontWeight.w700
                                         : FontWeight.w400)
                                 : null)),
-                    const SizedBox(width: 8),
+                    const SizedBox(width: AppSpacing.sm),
                     if (!widget.home || selected)
                       Icon(
                           selected
@@ -827,7 +864,7 @@ Future<DateTimeRange?> showOperationsDateRangeCalendar(BuildContext context,
         useSafeArea: true,
         isScrollControlled: true,
         showDragHandle: true,
-        backgroundColor: home ? AppColors.surface : AppColors.bg,
+        backgroundColor: AppColors.surface,
         shape: const RoundedRectangleBorder(
             borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
         builder: (_) => Theme(
@@ -938,8 +975,8 @@ class _OperationsDateRangeCalendarState
   Widget build(BuildContext context) => SafeArea(
       top: false,
       child: Padding(
-          padding: EdgeInsets.fromLTRB(widget.home ? AppSpacing.md : 16, 0,
-              widget.home ? AppSpacing.md : 16, AppSpacing.lg),
+          padding: EdgeInsets.fromLTRB(AppSpacing.sheetPadding, 0,
+              AppSpacing.sheetPadding, AppSpacing.lg),
           child: ConstrainedBox(
               constraints: BoxConstraints(
                   maxHeight: MediaQuery.sizeOf(context).height * .86),
@@ -961,7 +998,7 @@ class _OperationsDateRangeCalendarState
                 Flexible(
                     child: SingleChildScrollView(
                         child: Column(children: [
-                  const SizedBox(height: 16),
+                  const SizedBox(height: AppSpacing.lg),
                   if (widget.home)
                     Row(children: [
                       for (final preset in <(String, int?)>[
@@ -992,19 +1029,29 @@ class _OperationsDateRangeCalendarState
                       ],
                     ])
                   else if (!widget.singleDay)
-                    Wrap(spacing: 8, runSpacing: 8, children: [
-                      for (final preset in <(String, int?)>[
-                        ('7 hari', 7),
-                        ('30 hari', 30),
-                        ('Bulan ini', null)
-                      ])
-                        OutlinedButton(
-                            key: ValueKey(
-                                'operations-preset-${preset.$2 ?? 'month'}'),
-                            onPressed: () => _preset(preset.$2),
-                            child: Text(preset.$1)),
-                    ]),
-                  const SizedBox(height: 16),
+                    Wrap(
+                        spacing: AppSpacing.sm,
+                        runSpacing: AppSpacing.sm,
+                        children: [
+                          for (final preset in <(String, int?)>[
+                            ('7 hari', 7),
+                            ('30 hari', 30),
+                            ('Bulan ini', null)
+                          ])
+                            OutlinedButton(
+                                style: OutlinedButton.styleFrom(
+                                    textStyle: const TextStyle(
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.w800),
+                                    shape: RoundedRectangleBorder(
+                                        borderRadius:
+                                            BorderRadius.circular(14))),
+                                key: ValueKey(
+                                    'operations-preset-${preset.$2 ?? 'month'}'),
+                                onPressed: () => _preset(preset.$2),
+                                child: Text(preset.$1)),
+                        ]),
+                  const SizedBox(height: AppSpacing.lg),
                   if (!widget.singleDay)
                     Row(children: [
                       Expanded(
@@ -1023,7 +1070,7 @@ class _OperationsDateRangeCalendarState
                                     _selectingStart = true;
                                     _validation = null;
                                   }))),
-                      const SizedBox(width: 8),
+                      const SizedBox(width: AppSpacing.sm),
                       Expanded(
                           child: _OperationsFilterField(
                               home: widget.home,
@@ -1042,7 +1089,7 @@ class _OperationsDateRangeCalendarState
                                     _validation = null;
                                   }))),
                     ]),
-                  const SizedBox(height: 16),
+                  const SizedBox(height: AppSpacing.lg),
                   Row(children: [
                     IconButton(
                         tooltip: 'Bulan sebelumnya',
@@ -1078,6 +1125,11 @@ class _OperationsDateRangeCalendarState
                   if (_validation != null) _Notice(_validation!),
                   if (!widget.home)
                     TextButton(
+                        style: TextButton.styleFrom(
+                            textStyle: const TextStyle(
+                                fontSize: 13, fontWeight: FontWeight.w800),
+                            shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(14))),
                         key: const ValueKey('operations-reset-period'),
                         onPressed: () => setState(() {
                               _from = null;
@@ -1086,7 +1138,7 @@ class _OperationsDateRangeCalendarState
                             }),
                         child: const Text('Pilih ulang tanggal')),
                 ]))),
-                const SizedBox(height: 8),
+                const SizedBox(height: AppSpacing.sm),
                 if (widget.home)
                   _OperationsSheetActions(
                       calendar: true,
@@ -1106,6 +1158,11 @@ class _OperationsDateRangeCalendarState
                   SizedBox(
                       width: double.infinity,
                       child: FilledButton(
+                          style: FilledButton.styleFrom(
+                              textStyle: const TextStyle(
+                                  fontSize: 13, fontWeight: FontWeight.w800),
+                              shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(14))),
                           key: const ValueKey('operations-apply-period'),
                           onPressed: _from != null &&
                                   _to != null &&
@@ -1129,7 +1186,7 @@ class _OperationsDateRangeCalendarState
                   textAlign: TextAlign.center,
                   style: const TextStyle(fontSize: 12, color: AppColors.navy)))
       ]),
-      const SizedBox(height: 8),
+      const SizedBox(height: AppSpacing.sm),
       GridView.builder(
           shrinkWrap: true,
           padding: EdgeInsets.zero,
@@ -1200,10 +1257,10 @@ class _OperationsSheetHeading extends StatelessWidget {
                 Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Text(title,
               style: TextStyle(
-                  fontSize: home ? 18 : 22,
+                  fontSize: 20,
                   fontWeight: FontWeight.w800,
                   color: AppColors.navy)),
-          const SizedBox(height: 6),
+          const SizedBox(height: AppSpacing.sm),
           Text(subtitle,
               style: TextStyle(
                   fontSize: home ? 12 : 13,
@@ -1212,15 +1269,14 @@ class _OperationsSheetHeading extends StatelessWidget {
         ])),
         IconButton(
             tooltip: 'Tutup',
-            style: home
-                ? IconButton.styleFrom(
-                    backgroundColor: AppColors.bg,
-                    foregroundColor: AppColors.textSecondary,
-                    shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12)))
-                : null,
+            style: IconButton.styleFrom(
+                backgroundColor: AppColors.sheetCloseBackground,
+                foregroundColor: AppColors.textSecondary,
+                minimumSize: const Size(48, 48),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12))),
             onPressed: () => Navigator.pop(context),
-            icon: Icon(PhosphorIconsRegular.x, size: home ? 18 : 24)),
+            icon: const Icon(PhosphorIconsRegular.x, size: 18)),
       ]);
 }
 
@@ -1263,7 +1319,7 @@ class _OperationsFilterField extends StatelessWidget {
               if (caption != null) ...[
                 Text(caption!,
                     style: const TextStyle(
-                        fontSize: 9, color: AppColors.textSecondary)),
+                        fontSize: 11, color: AppColors.textSecondary)),
                 const SizedBox(height: AppSpacing.xs),
               ],
               Text(label,
@@ -1306,25 +1362,27 @@ class _OperationsSheetActions extends StatelessWidget {
             calendar ? 'operations-reset-period' : 'operations-reset-filters'),
         onPressed: onReset,
         style: OutlinedButton.styleFrom(
+            minimumSize: const Size(48, 52),
             foregroundColor: AppColors.blue,
             side: const BorderSide(color: AppColors.border),
             shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12))),
+                borderRadius: BorderRadius.circular(14))),
         child: Text(calendar ? 'Reset' : 'Reset filter',
             textAlign: TextAlign.center,
-            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700)));
+            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w800)));
     final apply = FilledButton(
         key: ValueKey(
             calendar ? 'operations-apply-period' : 'operations-apply-filters'),
         onPressed: onApply,
         style: FilledButton.styleFrom(
+            minimumSize: const Size(48, 52),
             backgroundColor: AppColors.blue,
             foregroundColor: AppColors.surface,
             shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12))),
+                borderRadius: BorderRadius.circular(14))),
         child: Text(calendar ? 'Terapkan periode' : 'Terapkan filter',
             textAlign: TextAlign.center,
-            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700)));
+            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w800)));
     return LayoutBuilder(builder: (context, constraints) {
       if (constraints.maxWidth < 280 ||
           MediaQuery.textScalerOf(context).scale(14) > 20) {

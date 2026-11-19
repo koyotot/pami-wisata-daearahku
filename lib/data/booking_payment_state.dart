@@ -96,12 +96,32 @@ class BookingPaymentState extends ChangeNotifier with WidgetsBindingObserver {
         : bookingDeadline;
   }
 
-  bool get windowOpen =>
-      _foreground &&
-      _routeVisible &&
-      serverNow != null &&
-      paymentDeadline != null &&
-      serverNow!.isBefore(paymentDeadline!);
+  /// The 15-minute countdown is running (a method was chosen and the cycle was not reset).
+  bool get countdownStarted => paymentDeadline != null;
+
+  /// Choosing is closed: the server says so, or the selection deadline passed on the server clock.
+  bool get selectionClosed {
+    final s = snapshot;
+    if (s == null) return false;
+    if (s.selectionClosed) return true;
+    final until = s.selectionExpiresAt;
+    final now = serverNow;
+    return !countdownStarted &&
+        until != null &&
+        now != null &&
+        !now.isBefore(until);
+  }
+
+  /// A null deadline is "countdown not started", not "closed": while the server still lets the customer
+  /// create (choose phase) the window is open.
+  bool get windowOpen {
+    if (!_foreground || !_routeVisible || serverNow == null) return false;
+    final deadline = paymentDeadline;
+    if (deadline == null) {
+      return snapshot?.canCreate == true && !selectionClosed;
+    }
+    return serverNow!.isBefore(deadline);
+  }
   final Duration minInterval;
   final Duration maxInterval;
   final FlutterSecureStorage _storage;
@@ -121,6 +141,7 @@ class BookingPaymentState extends ChangeNotifier with WidgetsBindingObserver {
   bool loaded = false;
   bool loading = false;
   bool creating = false;
+  bool switching = false;
   bool checking = false;
   bool offline = false;
   bool retryOpen = false;
@@ -239,7 +260,12 @@ class BookingPaymentState extends ChangeNotifier with WidgetsBindingObserver {
     if (s.intentStatus == 'needs_review') return PaymentPhase.review;
     // Past its deadline but unresolved: never expired/failed, never retryable, keep watching.
     if (s.verificationPending) return PaymentPhase.verifying;
-    if (status == null) {
+    final chooseAgain = status == null ||
+        // Cycle reset: the old attempt is proven unpaid and the countdown is null again.
+        (const ['failed', 'expired', 'cancelled'].contains(status) &&
+            !countdownStarted &&
+            s.canCreate);
+    if (chooseAgain) {
       return b.status == 'awaiting_payment' && s.isRealPayment && windowOpen
           ? PaymentPhase.choose
           : PaymentPhase.blocked;
@@ -260,13 +286,14 @@ class BookingPaymentState extends ChangeNotifier with WidgetsBindingObserver {
         PaymentPhase.review
       ].contains(phase);
 
-  bool get busy => _inFlight || creating;
+  bool get busy => _inFlight || creating || switching;
 
   /// The retry offer: previous attempt is terminal and the server says a new one is allowed.
-  bool get canRetry =>
+  bool get canRetry => !busy && !retryOpen && canRetryNow;
+
+  /// [canRetry] without the busy / already-open gates.
+  bool get canRetryNow =>
       valid &&
-      !busy &&
-      !retryOpen &&
       const [PaymentPhase.failed, PaymentPhase.expired, PaymentPhase.cancelled]
           .contains(phase) &&
       snapshot?.canCreate == true &&
@@ -450,6 +477,7 @@ class BookingPaymentState extends ChangeNotifier with WidgetsBindingObserver {
       freshBooking.status,
       freshBooking.paymentStatus,
       fresh.canCreate,
+      fresh.bookingExpiresAt?.toIso8601String(),
     ].join('|');
     final changed = signature != _signature;
     _signature = signature;
@@ -616,9 +644,50 @@ class BookingPaymentState extends ChangeNotifier with WidgetsBindingObserver {
   void onCountdownElapsed() {
     _clearQr();
     _notify();
-    if (!valid || !_pollable) return;
+    if (!valid) return;
+    if (!_pollable) {
+      // Chooser with a running countdown (after "Ganti metode"): one read-only refresh decides.
+      unawaited(reload());
+      return;
+    }
     _nextPollAt = now();
     _schedule();
+  }
+
+  /// "Ganti metode pembayaran": asks the server to close the unpaid attempt, then shows the chooser again
+  /// with the countdown still running. Returns a plain Indonesian message when it did not succeed.
+  Future<String?> cancelAttempt() async {
+    final attempt = snapshot?.attemptGuid;
+    if (!valid || busy || attempt == null || phase != PaymentPhase.awaiting) {
+      return null;
+    }
+    _inFlight = true;
+    switching = true;
+    error = null;
+    _notify();
+    String? failure;
+    try {
+      await repository.cancelPaymentAttempt(bookingGuid, attempt);
+      _requireValid();
+      await _read();
+      if (!confirmed && canRetryNow) retryOpen = true;
+      BookingEvents.notify();
+    } catch (e) {
+      if (valid) {
+        failure = cancelAttemptError(e);
+        try {
+          await _read();
+        } catch (_) {
+          // Keep what was known; the message explains that nothing was changed.
+        }
+      }
+    } finally {
+      _inFlight = false;
+      switching = false;
+      _notify();
+      _afterOperation();
+    }
+    return failure;
   }
 
   Duration get _pollDelay {

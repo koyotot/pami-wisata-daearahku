@@ -46,9 +46,9 @@ class _Zone {
   DateTime wall(DateTime instant) => instant.toUtc().add(offset);
 
   /// The instant for the wall-clock fields of [local] in this zone.
-  DateTime instant(DateTime local) => DateTime.utc(
-          local.year, local.month, local.day, local.hour, local.minute)
-      .subtract(offset);
+  DateTime instant(DateTime local) =>
+      DateTime.utc(local.year, local.month, local.day, local.hour, local.minute)
+          .subtract(offset);
 }
 
 String _two(int v) => v.toString().padLeft(2, '0');
@@ -116,7 +116,8 @@ class _SuperadminQuotaViewState extends State<SuperadminQuotaView> {
     return list;
   }
 
-  bool _inMonth(QuotaEntry e, String key) => visitDay(e.visitDate).startsWith(key);
+  bool _inMonth(QuotaEntry e, String key) =>
+      visitDay(e.visitDate).startsWith(key);
 
   List<String> _monthKeys() {
     final now = _zone.wall(DateTime.now());
@@ -151,7 +152,7 @@ class _SuperadminQuotaViewState extends State<SuperadminQuotaView> {
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   const Padding(
-                      padding: EdgeInsets.only(bottom: 14),
+                      padding: EdgeInsets.only(bottom: AppSpacing.lg),
                       child: Text(
                           'Tampilkan jadwal kunjungan berdasarkan bulan.',
                           style: TextStyle(
@@ -162,7 +163,7 @@ class _SuperadminQuotaViewState extends State<SuperadminQuotaView> {
                       (key, _monthLabel(key), countOf(key)),
                   ])
                     Padding(
-                        padding: const EdgeInsets.only(bottom: 8),
+                        padding: const EdgeInsets.only(bottom: AppSpacing.sm),
                         child: Material(
                             color: _month == option.$1
                                 ? AppColors.blueTint
@@ -178,7 +179,8 @@ class _SuperadminQuotaViewState extends State<SuperadminQuotaView> {
                                 key: ValueKey('quota-month-${option.$1}'),
                                 onTap: () => Navigator.pop(sheet, option.$1),
                                 child: Padding(
-                                    padding: const EdgeInsets.all(16),
+                                    padding:
+                                        const EdgeInsets.all(AppSpacing.lg),
                                     child: Row(children: [
                                       Expanded(
                                           child: Column(
@@ -190,8 +192,10 @@ class _SuperadminQuotaViewState extends State<SuperadminQuotaView> {
                                                     fontSize: 14,
                                                     fontWeight: FontWeight.w800,
                                                     color: AppColors.navy)),
-                                            const SizedBox(height: 4),
-                                            Text('${option.$3} jadwal kunjungan',
+                                            const SizedBox(
+                                                height: AppSpacing.xs),
+                                            Text(
+                                                '${option.$3} jadwal kunjungan',
                                                 style: const TextStyle(
                                                     fontSize: 12,
                                                     color: AppColors
@@ -213,7 +217,8 @@ class _SuperadminQuotaViewState extends State<SuperadminQuotaView> {
     DateTime opens;
     DateTime closes;
     if (entry != null) {
-      visit = _parseDay(entry.visitDate) ?? DateTime(nowWall.year, nowWall.month, nowWall.day);
+      visit = _parseDay(entry.visitDate) ??
+          DateTime(nowWall.year, nowWall.month, nowWall.day);
       capacity = entry.capacity;
       opens = entry.opensAt == null ? nowWall : _zone.wall(entry.opensAt!);
       closes = entry.closesAt == null ? nowWall : _zone.wall(entry.closesAt!);
@@ -226,7 +231,8 @@ class _SuperadminQuotaViewState extends State<SuperadminQuotaView> {
       capacity = sorted.isEmpty ? null : sorted.last.capacity;
       opens = nowWall;
       final before = visit.subtract(const Duration(days: 1));
-      closes = DateTime(before.year, before.month, before.day, nowWall.hour, nowWall.minute);
+      closes = DateTime(
+          before.year, before.month, before.day, nowWall.hour, nowWall.minute);
     }
     final saved = await showModalBottomSheet<bool>(
         context: context,
@@ -321,22 +327,26 @@ class _SuperadminQuotaViewState extends State<SuperadminQuotaView> {
                   key: const ValueKey('quota-month-filter'),
                   onPressed: _pickMonth,
                   style: OutlinedButton.styleFrom(
+                      textStyle: const TextStyle(
+                          fontSize: 13, fontWeight: FontWeight.w800),
                       minimumSize: const Size(48, 48),
                       foregroundColor: AppColors.navy,
                       backgroundColor: AppColors.surface,
                       side: const BorderSide(color: AppColors.border),
-                      padding: const EdgeInsets.symmetric(horizontal: 14),
+                      padding:
+                          const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
                       shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(14))),
-                  icon: const Icon(PhosphorIconsRegular.calendarBlank, size: 18),
+                  icon:
+                      const Icon(PhosphorIconsRegular.calendarBlank, size: 18),
                   label: Row(mainAxisSize: MainAxisSize.min, children: [
                     Text(
                         _month == 'all'
                             ? 'Semua Bulan'
                             : '${_shortMonth(int.parse(_month.substring(5)))} ${_month.substring(0, 4)}',
                         style: const TextStyle(
-                            fontSize: 12, fontWeight: FontWeight.w700)),
-                    const SizedBox(width: 6),
+                            fontSize: 13, fontWeight: FontWeight.w800)),
+                    const SizedBox(width: AppSpacing.sm),
                     const Icon(PhosphorIconsRegular.caretDown, size: 14),
                   ])),
             ]),
@@ -348,7 +358,8 @@ class _SuperadminQuotaViewState extends State<SuperadminQuotaView> {
             if (visible.isEmpty)
               _card(
                   child: Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      padding:
+                          const EdgeInsets.symmetric(vertical: AppSpacing.md),
                       child: Text(
                           all.isEmpty
                               ? 'Belum ada jadwal kuota. Tambahkan tanggal kunjungan beserta kapasitasnya.'
@@ -375,7 +386,7 @@ class _SuperadminQuotaViewState extends State<SuperadminQuotaView> {
   }
 
   Widget _destinationCard() => _card(
-      child: Row(children: [
+          child: Row(children: [
         Container(
             width: 48,
             height: 48,
@@ -386,7 +397,8 @@ class _SuperadminQuotaViewState extends State<SuperadminQuotaView> {
                 size: 22, color: AppColors.blue)),
         const SizedBox(width: AppSpacing.md),
         Expanded(
-            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            child:
+                Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           const Text('DESTINASI YANG DIKELOLA',
               style: TextStyle(
                   fontSize: 11,
@@ -406,37 +418,45 @@ class _SuperadminQuotaViewState extends State<SuperadminQuotaView> {
 
   Widget _errorCard() => _card(
       child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 12),
-          child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          padding: const EdgeInsets.symmetric(vertical: AppSpacing.md),
+          child:
+              Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
             const Icon(PhosphorIconsRegular.wifiSlash,
                 size: 36, color: AppColors.warningText),
-            const SizedBox(height: 16),
+            const SizedBox(height: AppSpacing.lg),
             const Text('Data belum dapat dimuat',
                 textAlign: TextAlign.center,
                 style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.w800,
                     color: AppColors.navy)),
-            const SizedBox(height: 10),
+            const SizedBox(height: AppSpacing.sm),
             Text(widget.error ?? '',
                 textAlign: TextAlign.center,
                 style: const TextStyle(
                     fontSize: 13, height: 1.6, color: AppColors.textSecondary)),
-            const SizedBox(height: 20),
+            const SizedBox(height: AppSpacing.xl),
             FilledButton.icon(
+                style: FilledButton.styleFrom(
+                    textStyle: const TextStyle(
+                        fontSize: 13, fontWeight: FontWeight.w800),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14))),
                 onPressed: widget.onRefresh,
-                icon: const Icon(PhosphorIconsRegular.arrowsClockwise, size: 20),
+                icon:
+                    const Icon(PhosphorIconsRegular.arrowsClockwise, size: 20),
                 label: const Text('Coba lagi')),
           ])));
 
   Widget _dock() => Material(
       color: AppColors.surface,
       elevation: 8,
-      shadowColor: Colors.black26,
+      shadowColor: AppColors.dockShadow,
       child: SafeArea(
           top: false,
           child: Padding(
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+              padding: const EdgeInsets.fromLTRB(
+                  AppSpacing.lg, AppSpacing.md, AppSpacing.lg, AppSpacing.md),
               child: Row(children: [
                 Expanded(
                     child: Column(
@@ -445,14 +465,14 @@ class _SuperadminQuotaViewState extends State<SuperadminQuotaView> {
                         children: [
                       const Text('Pengaturan kunjungan',
                           style: TextStyle(
-                              fontSize: 11, color: AppColors.textSecondary)),
-                      const SizedBox(height: 2),
+                              fontSize: 12, color: AppColors.textSecondary)),
+                      const SizedBox(height: AppSpacing.xs),
                       Text(widget.destinationName,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: const TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w700,
+                              fontSize: 13,
+                              fontWeight: FontWeight.w800,
                               color: AppColors.navy)),
                     ])),
                 const SizedBox(width: AppSpacing.md),
@@ -460,16 +480,19 @@ class _SuperadminQuotaViewState extends State<SuperadminQuotaView> {
                     key: const ValueKey('add-quota'),
                     onPressed: () => _openForm(),
                     style: FilledButton.styleFrom(
-                        minimumSize: const Size(48, 52),
+                        textStyle: const TextStyle(
+                            fontSize: 13, fontWeight: FontWeight.w800),
+                        minimumSize: const Size(140, 52),
                         backgroundColor: AppColors.blue,
                         foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(horizontal: 20),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: AppSpacing.lg),
                         shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(14))),
                     icon: const Icon(PhosphorIconsRegular.plus, size: 20),
                     label: const Text('Tambah Tanggal',
                         style: TextStyle(
-                            fontSize: 14, fontWeight: FontWeight.w800))),
+                            fontSize: 13, fontWeight: FontWeight.w800))),
               ]))));
 }
 
@@ -482,8 +505,8 @@ Widget _card({required Widget child}) => Container(
     child: child);
 
 Widget _notice(String text, {bool danger = false}) {
-  final bg = danger ? const Color(0xFFFDECEC) : const Color(0xFFEEF5FD);
-  final border = danger ? const Color(0xFFF3C9C9) : const Color(0xFFC9DDF7);
+  final bg = danger ? AppColors.dangerTint : const Color(0xFFEEF5FD);
+  final border = danger ? AppColors.dangerBorder : const Color(0xFFC9DDF7);
   final fg = danger ? _danger : AppColors.blueDeep;
   return Container(
       padding: const EdgeInsets.all(AppSpacing.md),
@@ -528,8 +551,8 @@ class _Stat extends StatelessWidget {
         Text(label,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
-            style: const TextStyle(
-                fontSize: 11, color: AppColors.textSecondary)),
+            style:
+                const TextStyle(fontSize: 11, color: AppColors.textSecondary)),
       ]));
 }
 
@@ -545,7 +568,11 @@ class _SheetFrame extends StatelessWidget {
       top: false,
       child: Padding(
           padding: EdgeInsets.fromLTRB(
-              20, 0, 20, 20 + MediaQuery.viewInsetsOf(context).bottom),
+              AppSpacing.sheetPadding,
+              0,
+              AppSpacing.sheetPadding,
+              AppSpacing.sheetPadding +
+                  MediaQuery.viewInsetsOf(context).bottom),
           child: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -561,15 +588,15 @@ class _SheetFrame extends StatelessWidget {
                       tooltip: 'Tutup',
                       onPressed: onClose,
                       style: IconButton.styleFrom(
-                          backgroundColor: const Color(0xFFEEF3FA),
+                          backgroundColor: AppColors.sheetCloseBackground,
                           foregroundColor: AppColors.textSecondary,
                           shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(12))),
                       icon: const Icon(PhosphorIconsRegular.x, size: 18)),
                 ]),
-                const SizedBox(height: 12),
+                const SizedBox(height: AppSpacing.md),
                 const Divider(height: 1, color: AppColors.border),
-                const SizedBox(height: 14),
+                const SizedBox(height: AppSpacing.lg),
                 Flexible(child: SingleChildScrollView(child: child)),
               ])));
 }
@@ -601,11 +628,12 @@ class _ScheduleCard extends StatelessWidget {
         ? visitDayLabel(entry.visitDate)
         : '${_weekdays[day.weekday - 1]}, ${day.day} ${_shortMonth(day.month)} ${day.year}';
     return _card(
-        child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        child:
+            Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
       Row(children: [
         Container(
             width: 56,
-            padding: const EdgeInsets.symmetric(vertical: 8),
+            padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
             decoration: BoxDecoration(
                 color: AppColors.blueTint,
                 border: Border.all(color: const Color(0xFFC9DDF7)),
@@ -625,13 +653,14 @@ class _ScheduleCard extends StatelessWidget {
             ])),
         const SizedBox(width: AppSpacing.md),
         Expanded(
-            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            child:
+                Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Text(title,
               style: const TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.w800,
                   color: AppColors.navy)),
-          const SizedBox(height: 2),
+          const SizedBox(height: AppSpacing.xs),
           const Text('Tanggal kunjungan',
               style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
         ])),
@@ -659,7 +688,7 @@ class _ScheduleCard extends StatelessWidget {
                 height: 1.1,
                 fontWeight: FontWeight.w800,
                 color: AppColors.navy)),
-        const SizedBox(width: 6),
+        const SizedBox(width: AppSpacing.sm),
         Expanded(
             child: Text('/ ${_count(entry.capacity)} orang',
                 style: const TextStyle(
@@ -702,7 +731,8 @@ class _ScheduleCard extends StatelessWidget {
                     fontWeight: FontWeight.w800,
                     color: AppColors.navy))),
         Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+            padding: const EdgeInsets.symmetric(
+                horizontal: AppSpacing.sm, vertical: AppSpacing.xs),
             decoration: BoxDecoration(
                 color: const Color(0xFFEEF1F6),
                 borderRadius: BorderRadius.circular(10)),
@@ -714,8 +744,7 @@ class _ScheduleCard extends StatelessWidget {
       ]),
       const SizedBox(height: AppSpacing.md),
       _TimelineRow('Booking dibuka', _stamp(entry.opensAt, zone)),
-      _TimelineRow('Booking ditutup', _stamp(entry.closesAt, zone),
-          last: true),
+      _TimelineRow('Booking ditutup', _stamp(entry.closesAt, zone), last: true),
       const SizedBox(height: AppSpacing.md),
       const Divider(height: 1, color: AppColors.border),
       const SizedBox(height: AppSpacing.sm),
@@ -731,15 +760,17 @@ class _ScheduleCard extends StatelessWidget {
             key: ValueKey('detail-${entry.visitDate}'),
             onPressed: onDetail,
             style: TextButton.styleFrom(
+                textStyle:
+                    const TextStyle(fontSize: 13, fontWeight: FontWeight.w800),
                 minimumSize: const Size(48, 48),
                 foregroundColor: AppColors.blue,
                 backgroundColor: AppColors.blueTint,
-                padding: const EdgeInsets.symmetric(horizontal: 16),
+                padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
                 shape: RoundedRectangleBorder(
                     side: const BorderSide(color: Color(0xFFC9DDF7)),
                     borderRadius: BorderRadius.circular(12))),
             child: const Text('Lihat Rincian →',
-                style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800))),
+                style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800))),
       ]),
     ]));
   }
@@ -760,8 +791,8 @@ class _MiniTile extends StatelessWidget {
           borderRadius: BorderRadius.circular(14)),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Text(label,
-            style: const TextStyle(
-                fontSize: 11, color: AppColors.textSecondary)),
+            style:
+                const TextStyle(fontSize: 11, color: AppColors.textSecondary)),
         const SizedBox(height: AppSpacing.xs),
         Text(value,
             style: TextStyle(
@@ -777,21 +808,20 @@ class _TimelineRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => IntrinsicHeight(
-      child: Row(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          child: Row(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
         SizedBox(
             width: 20,
             child: Column(children: [
               Container(
                   width: 12,
                   height: 12,
-                  margin: const EdgeInsets.only(top: 3),
+                  margin: const EdgeInsets.only(top: AppSpacing.xs),
                   decoration: BoxDecoration(
                       color: Colors.white,
                       shape: BoxShape.circle,
                       border: Border.all(color: AppColors.blue, width: 2))),
               if (!last)
-                Expanded(
-                    child: Container(width: 1.5, color: AppColors.border)),
+                Expanded(child: Container(width: 1.5, color: AppColors.border)),
             ])),
         const SizedBox(width: AppSpacing.sm),
         Expanded(
@@ -800,16 +830,16 @@ class _TimelineRow extends StatelessWidget {
                 child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                  Text(label,
-                      style: const TextStyle(
-                          fontSize: 12, color: AppColors.textSecondary)),
-                  const SizedBox(height: 2),
-                  Text(value,
-                      style: const TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w800,
-                          color: AppColors.navy)),
-                ]))),
+                      Text(label,
+                          style: const TextStyle(
+                              fontSize: 12, color: AppColors.textSecondary)),
+                      const SizedBox(height: AppSpacing.xs),
+                      Text(value,
+                          style: const TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w800,
+                              color: AppColors.navy)),
+                    ]))),
       ]));
 }
 
@@ -835,17 +865,18 @@ class _DetailSheet extends StatelessWidget {
     return _SheetFrame(
         title: 'Rincian Jadwal',
         onClose: () => Navigator.pop(context),
-        child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        child:
+            Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
           if (day != null)
             Padding(
-                padding: const EdgeInsets.only(bottom: 8),
+                padding: const EdgeInsets.only(bottom: AppSpacing.sm),
                 child: Text('${_weekdays[day.weekday - 1]}, $long',
                     style: const TextStyle(
                         fontSize: 12, color: AppColors.textSecondary))),
           for (final row in rows) ...[
             const Divider(height: 1, color: AppColors.border),
             Padding(
-                padding: const EdgeInsets.symmetric(vertical: 14),
+                padding: const EdgeInsets.symmetric(vertical: AppSpacing.lg),
                 child: Row(children: [
                   Expanded(
                       child: Text(row.$1,
@@ -871,6 +902,8 @@ class _DetailSheet extends StatelessWidget {
                     key: const ValueKey('quota-detail-close'),
                     onPressed: () => Navigator.pop(context),
                     style: OutlinedButton.styleFrom(
+                        textStyle: const TextStyle(
+                            fontSize: 13, fontWeight: FontWeight.w800),
                         minimumSize: const Size.fromHeight(52),
                         foregroundColor: AppColors.blue,
                         side: const BorderSide(color: AppColors.border),
@@ -878,13 +911,15 @@ class _DetailSheet extends StatelessWidget {
                             borderRadius: BorderRadius.circular(14))),
                     child: const Text('Tutup',
                         style: TextStyle(
-                            fontSize: 14, fontWeight: FontWeight.w800)))),
+                            fontSize: 13, fontWeight: FontWeight.w800)))),
             const SizedBox(width: AppSpacing.md),
             Expanded(
                 child: FilledButton(
                     key: const ValueKey('quota-detail-edit'),
                     onPressed: () => Navigator.pop(context, true),
                     style: FilledButton.styleFrom(
+                        textStyle: const TextStyle(
+                            fontSize: 13, fontWeight: FontWeight.w800),
                         minimumSize: const Size.fromHeight(52),
                         backgroundColor: AppColors.blue,
                         foregroundColor: Colors.white,
@@ -892,7 +927,7 @@ class _DetailSheet extends StatelessWidget {
                             borderRadius: BorderRadius.circular(14))),
                     child: const Text('Ubah Kuota',
                         style: TextStyle(
-                            fontSize: 14, fontWeight: FontWeight.w800)))),
+                            fontSize: 13, fontWeight: FontWeight.w800)))),
           ]),
         ]));
   }
@@ -950,8 +985,7 @@ class _QuotaFormSheet extends StatefulWidget {
 class _QuotaFormSheetState extends State<_QuotaFormSheet> {
   late final _capacity = TextEditingController(
       text: widget.initialCapacity == null ? '' : '${widget.initialCapacity}');
-  late final _opensTime =
-      TextEditingController(text: _hm(widget.initialOpens));
+  late final _opensTime = TextEditingController(text: _hm(widget.initialOpens));
   late final _closesTime =
       TextEditingController(text: _hm(widget.initialCloses));
   late DateTime _visit = widget.initialVisit;
@@ -982,10 +1016,9 @@ class _QuotaFormSheetState extends State<_QuotaFormSheet> {
   }
 
   (int, int)? _time(String text) {
-    final match = RegExp(r'^([01]?\d|2[0-3]):([0-5]\d)$').firstMatch(text.trim());
-    return match == null
-        ? null
-        : (int.parse(match[1]!), int.parse(match[2]!));
+    final match =
+        RegExp(r'^([01]?\d|2[0-3]):([0-5]\d)$').firstMatch(text.trim());
+    return match == null ? null : (int.parse(match[1]!), int.parse(match[2]!));
   }
 
   Future<void> _submit() async {
@@ -1003,14 +1036,17 @@ class _QuotaFormSheetState extends State<_QuotaFormSheet> {
     final closes = widget.zone.instant(DateTime(_closesDate.year,
         _closesDate.month, _closesDate.day, close.$1, close.$2));
     var problem = validateQuotaInput(
-        visitDate: _visit, capacity: capacity, opensAt: opens, closesAt: closes);
+        visitDate: _visit,
+        capacity: capacity,
+        opensAt: opens,
+        closesAt: closes);
     if (problem == null && _editing && capacity! < widget.entry!.allocated) {
       problem =
           'Kapasitas tidak boleh lebih kecil dari jumlah yang sudah teralokasi (${widget.entry!.allocated} orang).';
     }
     if (problem == null &&
-        closes.isAfter(widget.zone.instant(
-            DateTime(_visit.year, _visit.month, _visit.day)))) {
+        closes.isAfter(widget.zone
+            .instant(DateTime(_visit.year, _visit.month, _visit.day)))) {
       problem = 'Booking harus ditutup sebelum hari kunjungan dimulai.';
     }
     if (problem != null) {
@@ -1037,27 +1073,29 @@ class _QuotaFormSheetState extends State<_QuotaFormSheet> {
     }
   }
 
-  InputDecoration _decoration({Widget? suffix, String? hint}) => InputDecoration(
-      hintText: hint,
-      filled: true,
-      fillColor: _fieldFill,
-      suffixIcon: suffix,
-      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-      border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
-          borderSide: const BorderSide(color: AppColors.border)),
-      enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
-          borderSide: const BorderSide(color: AppColors.border)),
-      disabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
-          borderSide: const BorderSide(color: AppColors.border)),
-      focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
-          borderSide: const BorderSide(color: AppColors.blue, width: 1.5)));
+  InputDecoration _decoration({Widget? suffix, String? hint}) =>
+      InputDecoration(
+          hintText: hint,
+          filled: true,
+          fillColor: _fieldFill,
+          suffixIcon: suffix,
+          contentPadding: const EdgeInsets.symmetric(
+              horizontal: AppSpacing.lg, vertical: AppSpacing.lg),
+          border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(14),
+              borderSide: const BorderSide(color: AppColors.border)),
+          enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(14),
+              borderSide: const BorderSide(color: AppColors.border)),
+          disabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(14),
+              borderSide: const BorderSide(color: AppColors.border)),
+          focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(14),
+              borderSide: const BorderSide(color: AppColors.blue, width: 1.5)));
 
   Widget _label(String text) => Padding(
-      padding: const EdgeInsets.only(bottom: 6),
+      padding: const EdgeInsets.only(bottom: AppSpacing.sm),
       child: Text('$text *',
           style: const TextStyle(
               fontSize: 12,
@@ -1088,7 +1126,7 @@ class _QuotaFormSheetState extends State<_QuotaFormSheet> {
                             : AppColors.textMuted)),
                 child: Text(_fieldDate(value),
                     style: TextStyle(
-                        fontSize: 14,
+                        fontSize: 13,
                         color: enabled
                             ? AppColors.navy
                             : AppColors.textSecondary)))),
@@ -1103,7 +1141,7 @@ class _QuotaFormSheetState extends State<_QuotaFormSheet> {
             enabled: !_saving,
             keyboardType: TextInputType.number,
             inputFormatters: [_TimeFormatter()],
-            style: const TextStyle(fontSize: 14, color: AppColors.navy),
+            style: const TextStyle(fontSize: 13, color: AppColors.navy),
             decoration: _decoration(
                 hint: 'HH:mm',
                 suffix: const Icon(PhosphorIconsRegular.clock,
@@ -1120,8 +1158,8 @@ class _QuotaFormSheetState extends State<_QuotaFormSheet> {
         const SizedBox(width: AppSpacing.md),
         Expanded(
             flex: 2,
-            child: _timeField('Jam (HH:mm)', time,
-                ValueKey('quota-$keyName-time'))),
+            child: _timeField(
+                'Jam (HH:mm)', time, ValueKey('quota-$keyName-time'))),
       ]);
 
   @override
@@ -1130,7 +1168,8 @@ class _QuotaFormSheetState extends State<_QuotaFormSheet> {
     return _SheetFrame(
         title: _editing ? 'Ubah Kuota' : 'Tambah Tanggal',
         onClose: () => Navigator.pop(context, false),
-        child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        child:
+            Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
           Text(
               _editing
                   ? 'Perbarui kapasitas dan jendela pemesanan untuk tanggal kunjungan ini.'
@@ -1138,8 +1177,8 @@ class _QuotaFormSheetState extends State<_QuotaFormSheet> {
               style: const TextStyle(
                   fontSize: 12, color: AppColors.textSecondary)),
           const SizedBox(height: AppSpacing.lg),
-          _dateField('Tanggal kunjungan', _visit,
-              (d) => setState(() => _visit = d),
+          _dateField(
+              'Tanggal kunjungan', _visit, (d) => setState(() => _visit = d),
               enabled: !_editing, key: const ValueKey('quota-visit-date')),
           const SizedBox(height: AppSpacing.lg),
           Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -1150,7 +1189,7 @@ class _QuotaFormSheetState extends State<_QuotaFormSheet> {
                 enabled: !_saving,
                 keyboardType: TextInputType.number,
                 inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                style: const TextStyle(fontSize: 14, color: AppColors.navy),
+                style: const TextStyle(fontSize: 13, color: AppColors.navy),
                 decoration: _decoration()),
           ]),
           if (_editing) ...[
@@ -1172,9 +1211,7 @@ class _QuotaFormSheetState extends State<_QuotaFormSheet> {
                               '. Kapasitas tidak boleh lebih kecil dari jumlah yang sudah teralokasi.'),
                     ]),
                     style: const TextStyle(
-                        fontSize: 12,
-                        height: 1.5,
-                        color: AppColors.blueDeep))),
+                        fontSize: 12, height: 1.5, color: AppColors.blueDeep))),
           ],
           const SizedBox(height: AppSpacing.xl),
           Text(
@@ -1182,7 +1219,7 @@ class _QuotaFormSheetState extends State<_QuotaFormSheet> {
               style: const TextStyle(
                   fontSize: 11,
                   fontWeight: FontWeight.w800,
-                  letterSpacing: .6,
+                  letterSpacing: .8,
                   color: AppColors.blue)),
           const SizedBox(height: AppSpacing.md),
           _windowRow('Booking dibuka', _opensDate,
@@ -1209,6 +1246,8 @@ class _QuotaFormSheetState extends State<_QuotaFormSheet> {
                     onPressed:
                         _saving ? null : () => Navigator.pop(context, false),
                     style: OutlinedButton.styleFrom(
+                        textStyle: const TextStyle(
+                            fontSize: 13, fontWeight: FontWeight.w800),
                         minimumSize: const Size.fromHeight(52),
                         foregroundColor: AppColors.blue,
                         side: const BorderSide(color: AppColors.border),
@@ -1216,13 +1255,15 @@ class _QuotaFormSheetState extends State<_QuotaFormSheet> {
                             borderRadius: BorderRadius.circular(14))),
                     child: const Text('Batal',
                         style: TextStyle(
-                            fontSize: 14, fontWeight: FontWeight.w800)))),
+                            fontSize: 13, fontWeight: FontWeight.w800)))),
             const SizedBox(width: AppSpacing.md),
             Expanded(
                 child: FilledButton(
                     key: const ValueKey('quota-save'),
                     onPressed: _saving ? null : _submit,
                     style: FilledButton.styleFrom(
+                        textStyle: const TextStyle(
+                            fontSize: 13, fontWeight: FontWeight.w800),
                         minimumSize: const Size.fromHeight(52),
                         backgroundColor: AppColors.blue,
                         foregroundColor: Colors.white,
@@ -1236,7 +1277,7 @@ class _QuotaFormSheetState extends State<_QuotaFormSheet> {
                                 strokeWidth: 2, color: Colors.white))
                         : Text(_editing ? 'Simpan Perubahan' : 'Tambah Jadwal',
                             style: const TextStyle(
-                                fontSize: 14, fontWeight: FontWeight.w800)))),
+                                fontSize: 13, fontWeight: FontWeight.w800)))),
           ]),
         ]));
   }

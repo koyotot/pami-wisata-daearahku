@@ -13,6 +13,7 @@ import '../../data/booking_state.dart';
 import '../../data/business_repository.dart';
 import '../../services/api_client.dart';
 import '../../services/auth_session.dart';
+import '../../theme/app_colors.dart';
 import '../../data/app_data.dart';
 import '../../widgets/api_image.dart';
 import '../../widgets/availability_calendar.dart';
@@ -23,15 +24,15 @@ import 'package:phone_numbers_parser/phone_numbers_parser.dart';
 
 // ── Palet (sama dengan home_screen.dart) ─────────────────────
 class _C {
-  static const blue = Color(0xFF1976D2);
-  static const navy = Color(0xFF102D59);
-  static const orange = Color(0xFFFF9800);
-  static const bg = Color(0xFFF5F8FD);
-  static const card = Colors.white;
+  static const blue = AppColors.blue;
+  static const navy = AppColors.navy;
+  static const orange = AppColors.orange;
+  static const bg = AppColors.bg;
+  static const card = AppColors.surface;
   static const text = navy;
-  static const textMuted = Color(0xFF728099);
+  static const textMuted = AppColors.textMuted;
   static const textDim = Color(0xFF9AA7BC);
-  static const border = Color(0xFFDCE4F0);
+  static const border = AppColors.border;
   static const danger = Color(0xFFE5484D);
 
   // Alias supaya kode lama tetap jalan dengan warna baru
@@ -64,8 +65,12 @@ class DaftarKunjunganScreen extends StatefulWidget {
 class _DaftarKunjunganScreenState extends State<DaftarKunjunganScreen>
     with SingleTickerProviderStateMixin {
   final _formKey = GlobalKey<FormState>();
+  final _contactFormKey = GlobalKey<FormState>();
   final _calendarKey = GlobalKey();
   final _guestKey = GlobalKey();
+  final _notesKey = GlobalKey();
+  final _scrollController = ScrollController();
+  int _step = 1;
   BuildContext? _summaryContext;
   bool _reviewing = false;
   bool _pendingLoading = true;
@@ -181,6 +186,7 @@ class _DaftarKunjunganScreenState extends State<DaftarKunjunganScreen>
     if (mounted) {
       setState(() {
         _tanggal = null;
+        _step = 1;
         _jumlahOrang = 1;
         _completed = false;
         _pendingFields = null;
@@ -232,14 +238,14 @@ class _DaftarKunjunganScreenState extends State<DaftarKunjunganScreen>
     }
   }
 
-  /// Reset before every load so a previous month/quantity cannot enable submit.
+  /// Fetch single-ticket availability once per month; quantity changes use its remaining quota.
   void _loadAvailability() {
     _availability.reset();
     if (!widget.wisata.isLaravel) return;
     final guid = widget.wisata.id;
     final month =
         '${_month.year.toString().padLeft(4, '0')}-${_month.month.toString().padLeft(2, '0')}';
-    final quantity = _jumlahOrang;
+    const quantity = 1;
     _availability.load(() async {
       final response =
           await _repository.monthlyAvailability(guid, month, quantity);
@@ -263,15 +269,16 @@ class _DaftarKunjunganScreenState extends State<DaftarKunjunganScreen>
       _session.deviceSessionReady &&
       !_availability.loading &&
       _availability.error == null &&
-      _availability.data?.requestedQuantity == _jumlahOrang &&
-      _selectedAvailability?.bookable == true;
+      _availability.data?.requestedQuantity == 1 &&
+      _selectedAvailability?.bookable == true &&
+      _selectedAvailability?.remaining != null &&
+      _jumlahOrang <= _selectedAvailability!.remaining!;
 
   void _changeQuantity(int quantity) {
     setState(() {
       _jumlahOrang = quantity;
       _fieldErrors.remove('quantity');
     });
-    _loadAvailability();
   }
 
   /// Open day with enough remaining capacity, no unresolved earlier attempt, nothing in flight.
@@ -294,6 +301,7 @@ class _DaftarKunjunganScreenState extends State<DaftarKunjunganScreen>
     _teleponCtrl.dispose();
     _emailCtrl.dispose();
     _catatanCtrl.dispose();
+    _scrollController.dispose();
     super.dispose();
   }
 
@@ -323,6 +331,10 @@ class _DaftarKunjunganScreenState extends State<DaftarKunjunganScreen>
   }
 
   Future<void> _submit() async {
+    if (!_contactFormKey.currentState!.validate()) {
+      _goToStep(1);
+      return;
+    }
     if (!_formKey.currentState!.validate()) return;
     if (_tanggal == null) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -332,7 +344,7 @@ class _DaftarKunjunganScreenState extends State<DaftarKunjunganScreen>
           behavior: SnackBarBehavior.floating,
           shape:
               RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          margin: const EdgeInsets.all(16),
+          margin: const EdgeInsets.all(AppSpacing.lg),
         ),
       );
       return;
@@ -391,14 +403,12 @@ class _DaftarKunjunganScreenState extends State<DaftarKunjunganScreen>
           _fieldErrors = error.fieldErrors;
           _phoneError = error.fieldErrors['visitor_phone'];
         });
-        final target = error.fieldErrors.keys.any((key) => [
-                  'visitor_name',
-                  'visitor_email',
-                  'visitor_phone'
-                ].contains(key))
-            ? _guestKey
-            : _calendarKey;
-        _scrollTo(target);
+        final contactError = error.fieldErrors.keys.any((key) =>
+            ['visitor_name', 'visitor_email', 'visitor_phone'].contains(key));
+        _goToStep(contactError ? 1 : 2);
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) _scrollTo(contactError ? _guestKey : _calendarKey);
+        });
       }
       _showMessage(bookingErrorMessage(error, mutation: true));
       // An unknown outcome leaves the intent behind: surface it. A definitive refusal
@@ -568,6 +578,20 @@ class _DaftarKunjunganScreenState extends State<DaftarKunjunganScreen>
   String get _unitPrice => visitMoney(widget.wisata.ticketPrice, _currency);
   bool get _busy => _isLoading || _intentBusy || _completed;
 
+  void _goToStep(int step) {
+    FocusManager.instance.primaryFocus?.unfocus();
+    setState(() => _step = step);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted && _scrollController.hasClients) _scrollController.jumpTo(0);
+    });
+  }
+
+  void _continueToPlan() {
+    if (_busy || _reviewing || !_contactFormKey.currentState!.validate())
+      return;
+    _goToStep(2);
+  }
+
   void _scrollTo(GlobalKey key) {
     final target = key.currentContext;
     if (target != null)
@@ -580,8 +604,12 @@ class _DaftarKunjunganScreenState extends State<DaftarKunjunganScreen>
 
   Future<void> _reviewRegistration() async {
     if (!_submitEnabled) return;
+    if (!_contactFormKey.currentState!.validate()) {
+      _goToStep(1);
+      return;
+    }
     if (!_formKey.currentState!.validate()) {
-      _scrollTo(_guestKey);
+      _scrollTo(_notesKey);
       return;
     }
     final user = currentUser;
@@ -602,6 +630,8 @@ class _DaftarKunjunganScreenState extends State<DaftarKunjunganScreen>
       useSafeArea: true,
       showDragHandle: true,
       backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
       builder: (context) {
         _summaryContext = context;
         return SafeArea(
@@ -610,42 +640,51 @@ class _DaftarKunjunganScreenState extends State<DaftarKunjunganScreen>
               constraints: BoxConstraints(
                   maxHeight: MediaQuery.sizeOf(context).height * .88),
               child: SingleChildScrollView(
-                  padding: const EdgeInsets.fromLTRB(24, 8, 24, 24),
+                  padding: EdgeInsets.fromLTRB(
+                      AppSpacing.sheetPadding,
+                      AppSpacing.sm,
+                      AppSpacing.sheetPadding,
+                      AppSpacing.sheetPadding +
+                          MediaQuery.viewInsetsOf(context).bottom),
                   child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        const Text('Ringkasan Pendaftaran',
-                            style: TextStyle(
+                        Text('Ringkasan Pendaftaran',
+                            style: _jakarta(const TextStyle(
                                 color: _C.navy,
-                                fontSize: 22,
-                                fontWeight: FontWeight.w800)),
-                        const SizedBox(height: 8),
+                                fontSize: 20,
+                                fontWeight: FontWeight.w800))),
+                        const SizedBox(height: AppSpacing.sm),
                         const Text(
                             'Periksa kembali kunjungan Anda sebelum mengirim permintaan.',
-                            style: TextStyle(color: _C.textMuted, height: 1.5)),
-                        const SizedBox(height: 20),
+                            style: TextStyle(
+                                color: _C.textMuted,
+                                fontSize: 12,
+                                height: 1.5)),
+                        const SizedBox(height: AppSpacing.lg),
                         _summaryRow('Destinasi', widget.wisata.nama),
                         _summaryRow('Tanggal kunjungan', visitDateLabel(date)),
                         _summaryRow('Jumlah pengunjung', '$quantity orang'),
-                        const Divider(height: 28, color: _C.border),
+                        const Divider(height: AppSpacing.xl, color: _C.border),
                         _summaryRow('Nama lengkap', name),
                         _summaryRow('Nomor telepon', phone.international),
-                        _summaryRow('Email', email),
+                        _summaryRow('Alamat email', email),
                         if (notes.isNotEmpty) _summaryRow('Catatan', notes),
-                        const Divider(height: 28, color: _C.border),
-                        _summaryRow('Harga / orang', _unitPrice),
+                        const Divider(height: AppSpacing.xl, color: _C.border),
+                        _summaryRow('Harga per orang', _unitPrice),
                         _summaryRow(
                             'Estimasi Total',
                             visitMoney(widget.wisata.ticketPrice * quantity,
-                                _currency)),
-                        const SizedBox(height: 8),
+                                _currency),
+                            total: true),
+                        const Divider(height: AppSpacing.xl, color: _C.border),
                         const Text(
                             'Harga dan ketersediaan akhir mengikuti konfirmasi layanan. Permintaan ini belum berarti persetujuan pengelola atau pembayaran berhasil.',
                             style: TextStyle(
                                 color: _C.textMuted,
                                 fontSize: 12,
                                 height: 1.6)),
-                        const SizedBox(height: 24),
+                        const SizedBox(height: AppSpacing.xl),
                         FilledButton(
                             key: const ValueKey('confirmBookingButton'),
                             onPressed: () {
@@ -657,12 +696,15 @@ class _DaftarKunjunganScreenState extends State<DaftarKunjunganScreen>
                             },
                             style: FilledButton.styleFrom(
                                 backgroundColor: _C.blue,
-                                padding: const EdgeInsets.all(16),
+                                minimumSize: const Size(48, 52),
+                                textStyle: _jakarta(const TextStyle(
+                                    fontSize: 13, fontWeight: FontWeight.w800)),
+                                padding: const EdgeInsets.all(AppSpacing.lg),
                                 shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(16))),
+                                    borderRadius: BorderRadius.circular(14))),
                             child: const Text('Kirim Permintaan Kunjungan',
                                 textAlign: TextAlign.center)),
-                        const SizedBox(height: 8),
+                        const SizedBox(height: AppSpacing.sm),
                         TextButton(
                             onPressed: () {
                               if (answered ||
@@ -682,15 +724,29 @@ class _DaftarKunjunganScreenState extends State<DaftarKunjunganScreen>
     if (confirmed == true && _submitEnabled) await _submit();
   }
 
-  Widget _summaryRow(String label, String value) => Padding(
-      padding: const EdgeInsets.symmetric(vertical: 7),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Text(label, style: const TextStyle(color: _C.textMuted, fontSize: 12)),
-        const SizedBox(height: 4),
-        Text(value,
-            style: const TextStyle(
-                color: _C.navy, fontWeight: FontWeight.w700, height: 1.5))
-      ]));
+  Widget _summaryRow(String label, String value, {bool total = false}) =>
+      Padding(
+          padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
+          child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                    child: Text(label,
+                        style: const TextStyle(
+                            color: _C.textMuted, fontSize: 12))),
+                const SizedBox(width: AppSpacing.md),
+                Flexible(
+                    flex: 2,
+                    child: Text(value,
+                        textAlign: TextAlign.end,
+                        style: _jakarta(TextStyle(
+                            fontSize: total ? 20 : 12,
+                            color: total ? _C.blue : _C.navy,
+                            fontWeight:
+                                total ? FontWeight.w800 : FontWeight.w700,
+                            height: 1.5))))
+              ]));
 
   @override
   Widget build(BuildContext context) {
@@ -700,384 +756,575 @@ class _DaftarKunjunganScreenState extends State<DaftarKunjunganScreen>
         widget.wisata.isActive &&
         _session.deviceSessionReady;
     final remaining = _selectedAvailability?.remaining;
-    return Scaffold(
-      backgroundColor: _C.bg,
-      appBar: AppBar(
-          backgroundColor: Colors.white,
-          foregroundColor: _C.navy,
-          elevation: 0,
-          surfaceTintColor: Colors.transparent,
-          systemOverlayStyle: const SystemUiOverlayStyle(
-              statusBarColor: Colors.transparent,
-              statusBarIconBrightness: Brightness.dark,
-              systemNavigationBarColor: Colors.transparent,
-              systemNavigationBarIconBrightness: Brightness.dark),
-          leading: IconButton(
-              tooltip: 'Kembali',
-              onPressed: () => Navigator.pop(context),
-              icon: const Icon(PhosphorIconsRegular.arrowLeft)),
-          title: const Text('Daftar Kunjungan',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800)),
-          centerTitle: true),
-      bottomNavigationBar: MediaQuery.viewInsetsOf(context).bottom > 0
-          ? null
-          : Container(
-              decoration: const BoxDecoration(
-                  color: Colors.white,
-                  border: Border(top: BorderSide(color: _C.border))),
-              child: SafeArea(
-                  top: false,
-                  child: Padding(
-                      padding: const EdgeInsets.fromLTRB(20, 14, 20, 12),
-                      child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            Wrap(
-                                alignment: WrapAlignment.spaceBetween,
-                                runSpacing: 8,
-                                spacing: 16,
-                                children: [
-                                  Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        const Text('Estimasi Total',
-                                            style: TextStyle(
-                                                color: _C.textMuted,
-                                                fontSize: 12)),
-                                        const SizedBox(height: 3),
-                                        Text(
-                                            visitMoney(
-                                                widget.wisata.ticketPrice *
-                                                    _jumlahOrang,
-                                                _currency),
-                                            style: const TextStyle(
-                                                color: _C.navy,
-                                                fontSize: 22,
-                                                fontWeight: FontWeight.w800))
-                                      ]),
-                                  Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        const Text('Tanggal kunjungan',
-                                            style: TextStyle(
-                                                color: _C.textMuted,
-                                                fontSize: 12)),
-                                        const SizedBox(height: 4),
-                                        Text(
-                                            _tanggal == null
-                                                ? 'Belum dipilih'
-                                                : visitDateLabel(_tanggal!),
-                                            style: const TextStyle(
-                                                color: _C.navy,
-                                                fontSize: 12,
-                                                fontWeight: FontWeight.w600))
-                                      ]),
-                                ]),
-                            const SizedBox(height: 12),
-                            FilledButton(
-                                key: const ValueKey('submitButton'),
-                                onPressed: _submitEnabled
-                                    ? _reviewRegistration
-                                    : canGuide && _tanggal == null
-                                        ? () => _scrollTo(_calendarKey)
-                                        : null,
-                                style: FilledButton.styleFrom(
-                                    backgroundColor: _C.blue,
-                                    disabledBackgroundColor:
-                                        const Color(0xFFB5C7DD),
-                                    padding: const EdgeInsets.symmetric(
-                                        horizontal: 16, vertical: 16),
-                                    shape: RoundedRectangleBorder(
-                                        borderRadius:
-                                            BorderRadius.circular(16))),
-                                child: _isLoading
-                                    ? const SizedBox(
-                                        width: 22,
-                                        height: 22,
-                                        child: CircularProgressIndicator(
-                                            color: Colors.white,
-                                            strokeWidth: 2))
-                                    : Text(
-                                        _pendingFields != null
-                                            ? 'Selesaikan Percobaan Sebelumnya'
-                                            : _tanggal == null
-                                                ? 'Pilih Tanggal Kunjungan'
-                                                : 'Tinjau Pendaftaran',
-                                        textAlign: TextAlign.center,
-                                        style: const TextStyle(
-                                            fontWeight: FontWeight.w800))),
-                          ]))),
-            ),
-      body: FadeTransition(
-          opacity: _fadeAnim,
-          child: SlideTransition(
-              position: _slideAnim,
-              child: Form(
-                  key: _formKey,
-                  child: ListView(
-                    keyboardDismissBehavior:
-                        ScrollViewKeyboardDismissBehavior.onDrag,
-                    padding: const EdgeInsets.fromLTRB(20, 20, 20, 32),
-                    children: [
-                      _DestinasiCard(
-                          wisata: widget.wisata, repository: _repository),
-                      if (!widget.wisata.isActive)
-                        const Padding(
-                            padding: EdgeInsets.only(top: 16),
-                            child: Text(
-                                'Destinasi ini sedang tidak menerima kunjungan.',
-                                style: TextStyle(color: _C.danger))),
-                      if (_pendingLoading)
-                        Padding(
-                            padding: const EdgeInsets.only(top: 16),
-                            child: _infoCard(
-                                child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                  Text(_intentMessage ??
-                                      'Memeriksa percobaan pendaftaran sebelumnya...'),
-                                  if (_intentMessage != null)
-                                    TextButton(
-                                        onPressed: _loadPendingIntent,
-                                        child: const Text('Coba lagi'))
-                                ]))),
-                      if (_pendingFields != null && !_completed) ...[
-                        const SizedBox(height: 16),
-                        _buildIntentPanel(_pendingFields!)
-                      ],
-                      const SizedBox(height: 28),
-                      KeyedSubtree(
-                          key: _guestKey,
+    return PopScope(
+        canPop: _step == 1,
+        onPopInvokedWithResult: (didPop, _) {
+          if (!didPop && !_busy && !_reviewing) _goToStep(1);
+        },
+        child: Scaffold(
+          backgroundColor: _C.bg,
+          appBar: AppBar(
+              backgroundColor: Colors.white,
+              foregroundColor: _C.navy,
+              elevation: 0,
+              surfaceTintColor: Colors.transparent,
+              systemOverlayStyle: const SystemUiOverlayStyle(
+                  statusBarColor: Colors.transparent,
+                  statusBarIconBrightness: Brightness.dark,
+                  systemNavigationBarColor: Colors.transparent,
+                  systemNavigationBarIconBrightness: Brightness.dark),
+              leading: IconButton(
+                  tooltip: 'Kembali',
+                  onPressed: _busy || _reviewing
+                      ? null
+                      : () {
+                          if (_step == 2) {
+                            _goToStep(1);
+                          } else {
+                            Navigator.pop(context);
+                          }
+                        },
+                  icon: const Icon(PhosphorIconsRegular.arrowLeft)),
+              title: const Text('Daftar Kunjungan',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800)),
+              centerTitle: true),
+          bottomNavigationBar: MediaQuery.viewInsetsOf(context).bottom > 0
+              ? null
+              : Container(
+                  decoration: const BoxDecoration(
+                      color: Colors.white,
+                      border: Border(top: BorderSide(color: _C.border))),
+                  child: SafeArea(
+                      top: false,
+                      child: Padding(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: AppSpacing.lg,
+                              vertical: AppSpacing.md),
                           child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
+                              mainAxisSize: MainAxisSize.min,
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
                               children: [
-                                Text('INFORMASI KONTAK',
-                                    style: _jakarta(const TextStyle(
-                                        color: _C.blue,
-                                        fontSize: 11,
-                                        fontWeight: FontWeight.w800,
-                                        letterSpacing: 1.6))),
-                                const SizedBox(height: 6),
-                                Text('Data Pengunjung',
-                                    style: _jakarta(const TextStyle(
-                                        color: _C.navy,
-                                        fontSize: 24,
-                                        height: 1.2,
-                                        fontWeight: FontWeight.w800))),
-                              ])),
-                      const SizedBox(height: 8),
-                      const Text(
-                          'Lengkapi kontak yang dapat dihubungi untuk kunjungan wisata ini. Perubahan tidak mengganti profil Anda.',
-                          style: TextStyle(
-                              color: _C.textMuted, fontSize: 12, height: 1.6)),
-                      const SizedBox(height: 20),
-                      _fieldLabel('Nama lengkap'),
-                      _DarkField(
-                          controller: _namaCtrl,
-                          label: 'Nama lengkap',
-                          labelAbove: true,
-                          hint: 'Masukkan nama lengkap',
-                          icon: PhosphorIconsRegular.userCircle,
-                          enabled: !_busy,
-                          error: _fieldErrors['visitor_name'],
-                          onChanged: () => setState(
-                              () => _fieldErrors.remove('visitor_name')),
-                          validator: (v) => v == null || v.trim().isEmpty
-                              ? 'Nama wajib diisi'
-                              : v.trim().length > 255
-                                  ? 'Nama maksimal 255 karakter'
-                                  : null),
-                      const SizedBox(height: 20),
-                      _fieldLabel('Nomor telepon'),
-                      Semantics(
-                          label: 'Nomor telepon',
-                          child: InternationalPhoneField(
-                              controller: _teleponCtrl,
-                              country: _phoneCountry,
-                              enabled: !_busy,
-                              error: _phoneError,
-                              label: null,
-                              helper:
-                                  'Gunakan nomor aktif yang dapat dihubungi.',
-                              onCountryChanged: (country) => setState(() {
-                                    _phoneCountry = country;
-                                    _phoneError = null;
-                                    if (_teleponCtrl.text
-                                        .trim()
-                                        .startsWith('+')) {
-                                      final phone = parseBookingPhone(
-                                          _teleponCtrl.text, country);
-                                      if (phone != null)
-                                        _teleponCtrl.text = phone.nsn;
-                                    }
-                                    final phone = parseBookingPhone(
-                                        _teleponCtrl.text, country);
-                                    if (phone != null)
-                                      _teleponCtrl.text = phone.formatNsn(
-                                          format: NsnFormat.international);
-                                  }),
-                              onChanged: () => setState(() {
-                                    _phoneError = null;
-                                    _detectPhoneCountry();
-                                  }))),
-                      const SizedBox(height: 20),
-                      _fieldLabel('Alamat email'),
-                      _DarkField(
-                          controller: _emailCtrl,
-                          label: 'Alamat email',
-                          labelAbove: true,
-                          hint: 'nama@email.com',
-                          icon: PhosphorIconsRegular.envelope,
-                          keyboardType: TextInputType.emailAddress,
-                          enabled: !_busy,
-                          error: _fieldErrors['visitor_email'],
-                          onChanged: () => setState(
-                              () => _fieldErrors.remove('visitor_email')),
-                          validator: (v) => v == null ||
-                                  !RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$')
-                                      .hasMatch(v.trim())
-                              ? 'Email tidak valid'
-                              : v.trim().length > 255
-                                  ? 'Email maksimal 255 karakter'
-                                  : null),
-                      const SizedBox(height: 30),
-                      KeyedSubtree(
-                          key: _calendarKey,
-                          child: _sectionLabel('Tanggal Kunjungan')),
-                      const SizedBox(height: 6),
-                      const Text(
-                          'Pilih tanggal dan lihat sisa tiket yang tersedia.',
-                          style: TextStyle(
-                              color: _C.textMuted, fontSize: 12, height: 1.6)),
-                      const SizedBox(height: 14),
-                      _infoCard(
-                          child: AvailabilityCalendar(
-                              month: _month,
-                              availability: _availability.data,
-                              selectedDate: _tanggal == null
-                                  ? null
-                                  : formatVisitDate(_tanggal!),
-                              enabled: canChooseDate &&
-                                  !_availability.loading &&
-                                  _availability.error == null,
-                              navigationEnabled: canChooseDate,
-                              earliestMonth: destinationCalendarNow(
-                                  _availability.data?.timezone ??
-                                      widget.wisata.timezone),
-                              onMonthChanged: (month) {
-                                setState(() {
-                                  _month = month;
-                                  _tanggal = null;
-                                  _fieldErrors.remove('visit_date');
-                                });
-                                _loadAvailability();
-                              },
-                              onSelected: (day) => setState(() {
-                                    _tanggal = DateTime.parse(day.date);
-                                    _fieldErrors.remove('visit_date');
-                                  }))),
-                      const SizedBox(height: 12),
-                      _buildAvailability(),
-                      if (_fieldErrors['visit_date'] != null)
-                        _inlineError(_fieldErrors['visit_date']!),
-                      const SizedBox(height: 26),
-                      _sectionLabel('Jumlah Pengunjung'),
-                      const SizedBox(height: 14),
-                      _infoCard(
-                          child: LayoutBuilder(builder: (context, constraints) {
-                        final label = Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
+                                if (_step == 2) ...[
+                                  Wrap(
+                                      alignment: WrapAlignment.spaceBetween,
+                                      runSpacing: AppSpacing.sm,
+                                      spacing: AppSpacing.lg,
+                                      children: [
+                                        Column(
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.start,
+                                            children: [
+                                              const Text('Estimasi Total',
+                                                  style: TextStyle(
+                                                      color: _C.textMuted,
+                                                      fontSize: 12)),
+                                              const SizedBox(
+                                                  height: AppSpacing.xs),
+                                              Text(
+                                                  visitMoney(
+                                                      widget.wisata
+                                                              .ticketPrice *
+                                                          _jumlahOrang,
+                                                      _currency),
+                                                  style: const TextStyle(
+                                                      color: _C.navy,
+                                                      fontSize: 22,
+                                                      fontWeight:
+                                                          FontWeight.w800))
+                                            ]),
+                                        Column(
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.start,
+                                            children: [
+                                              const Text('Tanggal kunjungan',
+                                                  style: TextStyle(
+                                                      color: _C.textMuted,
+                                                      fontSize: 12)),
+                                              const SizedBox(
+                                                  height: AppSpacing.xs),
+                                              Text(
+                                                  _tanggal == null
+                                                      ? 'Belum dipilih'
+                                                      : visitDateLabel(
+                                                          _tanggal!),
+                                                  style: const TextStyle(
+                                                      color: _C.navy,
+                                                      fontSize: 12,
+                                                      fontWeight:
+                                                          FontWeight.w600))
+                                            ]),
+                                      ]),
+                                  const SizedBox(height: AppSpacing.md),
+                                ],
+                                FilledButton(
+                                    key: const ValueKey('submitButton'),
+                                    onPressed: _step == 1
+                                        ? (canGuide ? _continueToPlan : null)
+                                        : _submitEnabled
+                                            ? _reviewRegistration
+                                            : canGuide && _tanggal == null
+                                                ? () => _scrollTo(_calendarKey)
+                                                : null,
+                                    style: FilledButton.styleFrom(
+                                        backgroundColor: _C.blue,
+                                        minimumSize: const Size(48, 48),
+                                        textStyle: _jakarta(const TextStyle(
+                                            fontSize: 13,
+                                            fontWeight: FontWeight.w800)),
+                                        disabledBackgroundColor:
+                                            _C.blue.withValues(alpha: .5),
+                                        padding: const EdgeInsets.symmetric(
+                                            horizontal: AppSpacing.lg,
+                                            vertical: AppSpacing.lg),
+                                        shape: RoundedRectangleBorder(
+                                            borderRadius:
+                                                BorderRadius.circular(14))),
+                                    child: _isLoading
+                                        ? const SizedBox(
+                                            width: 22,
+                                            height: 22,
+                                            child: CircularProgressIndicator(
+                                                color: Colors.white,
+                                                strokeWidth: 2))
+                                        : Text(
+                                            _step == 1
+                                                ? 'Lanjutkan'
+                                                : _pendingFields != null
+                                                    ? 'Selesaikan Percobaan Sebelumnya'
+                                                    : _tanggal == null
+                                                        ? 'Pilih Tanggal Kunjungan'
+                                                        : 'Tinjau Pendaftaran',
+                                            textAlign: TextAlign.center,
+                                            style: _jakarta(const TextStyle(
+                                                fontSize: 13,
+                                                fontWeight: FontWeight.w800)))),
+                              ]))),
+                ),
+          body: FadeTransition(
+              opacity: _fadeAnim,
+              child: SlideTransition(
+                  position: _slideAnim,
+                  child: Form(
+                      key: _formKey,
+                      child: SingleChildScrollView(
+                          controller: _scrollController,
+                          keyboardDismissBehavior:
+                              ScrollViewKeyboardDismissBehavior.onDrag,
+                          padding: const EdgeInsets.all(AppSpacing.lg),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
                             children: [
-                              Text('$_jumlahOrang orang',
-                                  style: const TextStyle(
-                                      color: _C.navy,
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.w800)),
-                              const SizedBox(height: 4),
-                              Text('$_unitPrice / orang',
-                                  style: const TextStyle(
-                                      color: _C.textMuted, fontSize: 12))
-                            ]);
-                        final counter =
-                            Row(mainAxisSize: MainAxisSize.min, children: [
-                          _CounterBtn(
-                              icon: PhosphorIconsRegular.minus,
-                              onTap: !_busy && _jumlahOrang > 1
-                                  ? () => _changeQuantity(_jumlahOrang - 1)
-                                  : null),
-                          Padding(
-                              padding:
-                                  const EdgeInsets.symmetric(horizontal: 12),
-                              child: Text('$_jumlahOrang',
-                                  style: const TextStyle(
-                                      color: _C.navy,
-                                      fontSize: 18,
-                                      fontWeight: FontWeight.w800))),
-                          _CounterBtn(
-                              icon: PhosphorIconsRegular.plus,
-                              onTap: !_busy &&
-                                      _jumlahOrang < 1000000 &&
-                                      (remaining == null ||
-                                          _jumlahOrang < remaining)
-                                  ? () => _changeQuantity(_jumlahOrang + 1)
-                                  : null),
-                        ]);
-                        if (constraints.maxWidth < 300 ||
-                            MediaQuery.textScalerOf(context).scale(14) > 19)
-                          return Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                label,
-                                const SizedBox(height: 14),
-                                counter
-                              ]);
-                        return Row(children: [
-                          Expanded(child: label),
-                          const SizedBox(width: 8),
-                          counter
-                        ]);
-                      })),
-                      if (_fieldErrors['quantity'] != null)
-                        _inlineError(_fieldErrors['quantity']!),
-                      const SizedBox(height: 26),
-                      _sectionLabel('Catatan Tambahan'),
-                      const SizedBox(height: 12),
-                      _DarkField(
-                          controller: _catatanCtrl,
-                          label: 'Catatan (opsional)',
-                          hint:
-                              'Kebutuhan aksesibilitas atau informasi untuk pengelola',
-                          icon: PhosphorIconsRegular.note,
-                          maxLines: 3,
-                          enabled: !_busy,
-                          error: _fieldErrors['notes'],
-                          onChanged: () =>
-                              setState(() => _fieldErrors.remove('notes')),
-                          validator: (v) => (v?.length ?? 0) > 5000
-                              ? 'Catatan maksimal 5000 karakter'
-                              : null),
-                      const SizedBox(height: 16),
-                      const Text(
-                          'Anda akan meninjau ringkasan sebelum permintaan dikirim.',
-                          style: TextStyle(
-                              color: _C.textMuted, fontSize: 12, height: 1.6)),
-                    ],
-                  )))),
-    );
+                              _stepProgress(),
+                              if (!widget.wisata.isActive)
+                                const Padding(
+                                    padding:
+                                        EdgeInsets.only(top: AppSpacing.lg),
+                                    child: Text(
+                                        'Destinasi ini sedang tidak menerima kunjungan.',
+                                        style: TextStyle(color: _C.danger))),
+                              if (_pendingLoading)
+                                Padding(
+                                    padding: const EdgeInsets.only(
+                                        top: AppSpacing.lg),
+                                    child: _infoCard(
+                                        child: Column(
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.start,
+                                            children: [
+                                          Text(_intentMessage ??
+                                              'Memeriksa percobaan pendaftaran sebelumnya...'),
+                                          if (_intentMessage != null)
+                                            TextButton(
+                                                onPressed: _loadPendingIntent,
+                                                child: const Text('Coba lagi'))
+                                        ]))),
+                              if (_pendingFields != null && !_completed) ...[
+                                const SizedBox(height: AppSpacing.lg),
+                                _buildIntentPanel(_pendingFields!)
+                              ],
+                              const SizedBox(height: AppSpacing.xl),
+                              Offstage(
+                                offstage: _step != 1,
+                                child: ExcludeFocus(
+                                    excluding: _step != 1,
+                                    child: Form(
+                                        key: _contactFormKey,
+                                        child: Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.stretch,
+                                          children: [
+                                            KeyedSubtree(
+                                                key: _guestKey,
+                                                child: Column(
+                                                    crossAxisAlignment:
+                                                        CrossAxisAlignment
+                                                            .start,
+                                                    children: [
+                                                      Text(
+                                                          'Siapa yang dapat kami hubungi?',
+                                                          style: _jakarta(
+                                                              const TextStyle(
+                                                                  color:
+                                                                      _C.navy,
+                                                                  fontSize: 22,
+                                                                  height: 1.2,
+                                                                  fontWeight:
+                                                                      FontWeight
+                                                                          .w800))),
+                                                    ])),
+                                            const SizedBox(
+                                                height: AppSpacing.sm),
+                                            const Text(
+                                                'Isi kontak aktif untuk informasi terkait permintaan kunjungan Anda.',
+                                                style: TextStyle(
+                                                    color: _C.textMuted,
+                                                    fontSize: 12,
+                                                    height: 1.6)),
+                                            const SizedBox(
+                                                height: AppSpacing.lg),
+                                            _DestinasiCard(
+                                                wisata: widget.wisata,
+                                                repository: _repository),
+                                            const SizedBox(
+                                                height: AppSpacing.xl),
+                                            _fieldLabel('Nama lengkap'),
+                                            _DarkField(
+                                                controller: _namaCtrl,
+                                                label: 'Nama lengkap',
+                                                labelAbove: true,
+                                                hint: 'Masukkan nama lengkap',
+                                                icon: PhosphorIconsRegular
+                                                    .userCircle,
+                                                enabled: !_busy,
+                                                error: _fieldErrors[
+                                                    'visitor_name'],
+                                                onChanged: () => setState(() =>
+                                                    _fieldErrors.remove(
+                                                        'visitor_name')),
+                                                validator: (v) => v == null ||
+                                                        v.trim().isEmpty
+                                                    ? 'Nama wajib diisi'
+                                                    : v.trim().length > 255
+                                                        ? 'Nama maksimal 255 karakter'
+                                                        : null),
+                                            const SizedBox(
+                                                height: AppSpacing.lg),
+                                            _fieldLabel('Nomor telepon'),
+                                            Semantics(
+                                                label: 'Nomor telepon',
+                                                child: InternationalPhoneField(
+                                                    controller: _teleponCtrl,
+                                                    country: _phoneCountry,
+                                                    enabled: !_busy,
+                                                    error: _phoneError,
+                                                    label: null,
+                                                    helper:
+                                                        'Gunakan nomor aktif yang dapat dihubungi.',
+                                                    onCountryChanged:
+                                                        (country) =>
+                                                            setState(() {
+                                                              _phoneCountry =
+                                                                  country;
+                                                              _phoneError =
+                                                                  null;
+                                                              if (_teleponCtrl
+                                                                  .text
+                                                                  .trim()
+                                                                  .startsWith(
+                                                                      '+')) {
+                                                                final phone =
+                                                                    parseBookingPhone(
+                                                                        _teleponCtrl
+                                                                            .text,
+                                                                        country);
+                                                                if (phone !=
+                                                                    null)
+                                                                  _teleponCtrl
+                                                                          .text =
+                                                                      phone.nsn;
+                                                              }
+                                                              final phone =
+                                                                  parseBookingPhone(
+                                                                      _teleponCtrl
+                                                                          .text,
+                                                                      country);
+                                                              if (phone != null)
+                                                                _teleponCtrl
+                                                                        .text =
+                                                                    phone.formatNsn(
+                                                                        format:
+                                                                            NsnFormat.international);
+                                                            }),
+                                                    onChanged: () =>
+                                                        setState(() {
+                                                          _phoneError = null;
+                                                          _detectPhoneCountry();
+                                                        }))),
+                                            const SizedBox(
+                                                height: AppSpacing.lg),
+                                            _fieldLabel('Alamat email'),
+                                            _DarkField(
+                                                controller: _emailCtrl,
+                                                label: 'Alamat email',
+                                                labelAbove: true,
+                                                hint: 'nama@email.com',
+                                                icon: PhosphorIconsRegular
+                                                    .envelope,
+                                                keyboardType:
+                                                    TextInputType.emailAddress,
+                                                enabled: !_busy,
+                                                error: _fieldErrors[
+                                                    'visitor_email'],
+                                                onChanged: () => setState(() =>
+                                                    _fieldErrors.remove(
+                                                        'visitor_email')),
+                                                validator: (v) => v == null ||
+                                                        !RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$')
+                                                            .hasMatch(v.trim())
+                                                    ? 'Email tidak valid'
+                                                    : v.trim().length > 255
+                                                        ? 'Email maksimal 255 karakter'
+                                                        : null),
+                                          ],
+                                        ))),
+                              ),
+                              Offstage(
+                                offstage: _step != 2,
+                                child: ExcludeFocus(
+                                    excluding: _step != 2,
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.stretch,
+                                      children: [
+                                        KeyedSubtree(
+                                            key: _calendarKey,
+                                            child: Text(
+                                                'Kapan Anda berkunjung?',
+                                                style: _jakarta(const TextStyle(
+                                                    color: _C.navy,
+                                                    fontSize: 22,
+                                                    height: 1.2,
+                                                    fontWeight:
+                                                        FontWeight.w800)))),
+                                        const SizedBox(height: AppSpacing.sm),
+                                        const Text(
+                                            'Pilih tanggal dan jumlah pengunjung berdasarkan kuota yang tersedia.',
+                                            style: TextStyle(
+                                                color: _C.textMuted,
+                                                fontSize: 12,
+                                                height: 1.6)),
+                                        const SizedBox(height: AppSpacing.md),
+                                        _infoCard(
+                                            child: AvailabilityCalendar(
+                                                month: _month,
+                                                availability:
+                                                    _availability.data,
+                                                requiredQuantity: _jumlahOrang,
+                                                selectedDate: _tanggal == null
+                                                    ? null
+                                                    : formatVisitDate(
+                                                        _tanggal!),
+                                                enabled: canChooseDate &&
+                                                    !_availability.loading &&
+                                                    _availability.error == null,
+                                                navigationEnabled:
+                                                    canChooseDate,
+                                                earliestMonth:
+                                                    destinationCalendarNow(
+                                                        _availability.data
+                                                                ?.timezone ??
+                                                            widget.wisata
+                                                                .timezone),
+                                                onMonthChanged: (month) {
+                                                  setState(() {
+                                                    _month = month;
+                                                    _tanggal = null;
+                                                    _fieldErrors
+                                                        .remove('visit_date');
+                                                  });
+                                                  _loadAvailability();
+                                                },
+                                                onSelected: (day) =>
+                                                    setState(() {
+                                                      _tanggal = DateTime.parse(
+                                                          day.date);
+                                                      _fieldErrors
+                                                          .remove('visit_date');
+                                                    }))),
+                                        const SizedBox(height: AppSpacing.md),
+                                        _buildAvailability(),
+                                        if (_fieldErrors['visit_date'] != null)
+                                          _inlineError(
+                                              _fieldErrors['visit_date']!),
+                                        const SizedBox(height: AppSpacing.xl),
+                                        _sectionLabel('Jumlah pengunjung'),
+                                        const SizedBox(height: AppSpacing.md),
+                                        _infoCard(child: LayoutBuilder(
+                                            builder: (context, constraints) {
+                                          final label = Column(
+                                              crossAxisAlignment:
+                                                  CrossAxisAlignment.start,
+                                              children: [
+                                                Text('$_jumlahOrang pengunjung',
+                                                    style: const TextStyle(
+                                                        color: _C.navy,
+                                                        fontSize: 16,
+                                                        fontWeight:
+                                                            FontWeight.w800)),
+                                                const SizedBox(
+                                                    height: AppSpacing.xs),
+                                                Text('$_unitPrice / orang',
+                                                    style: const TextStyle(
+                                                        color: _C.textMuted,
+                                                        fontSize: 12))
+                                              ]);
+                                          final counter = Row(
+                                              mainAxisSize: MainAxisSize.min,
+                                              children: [
+                                                _CounterBtn(
+                                                    icon: PhosphorIconsRegular
+                                                        .minus,
+                                                    onTap: !_busy &&
+                                                            _jumlahOrang > 1
+                                                        ? () => _changeQuantity(
+                                                            _jumlahOrang - 1)
+                                                        : null),
+                                                Padding(
+                                                    padding: const EdgeInsets
+                                                        .symmetric(
+                                                        horizontal:
+                                                            AppSpacing.md),
+                                                    child: Text('$_jumlahOrang',
+                                                        style: const TextStyle(
+                                                            color: _C.navy,
+                                                            fontSize: 18,
+                                                            fontWeight:
+                                                                FontWeight
+                                                                    .w800))),
+                                                _CounterBtn(
+                                                    icon: PhosphorIconsRegular
+                                                        .plus,
+                                                    onTap: !_busy &&
+                                                            _jumlahOrang <
+                                                                1000000 &&
+                                                            (remaining ==
+                                                                    null ||
+                                                                _jumlahOrang <
+                                                                    remaining)
+                                                        ? () => _changeQuantity(
+                                                            _jumlahOrang + 1)
+                                                        : null),
+                                              ]);
+                                          if (constraints.maxWidth < 300 ||
+                                              MediaQuery.textScalerOf(context)
+                                                      .scale(14) >
+                                                  19)
+                                            return Column(
+                                                crossAxisAlignment:
+                                                    CrossAxisAlignment.start,
+                                                children: [
+                                                  label,
+                                                  const SizedBox(
+                                                      height: AppSpacing.md),
+                                                  counter
+                                                ]);
+                                          return Row(children: [
+                                            Expanded(child: label),
+                                            const SizedBox(
+                                                width: AppSpacing.sm),
+                                            counter
+                                          ]);
+                                        })),
+                                        if (_fieldErrors['quantity'] != null)
+                                          _inlineError(
+                                              _fieldErrors['quantity']!),
+                                        const SizedBox(height: AppSpacing.xl),
+                                        _sectionLabel(
+                                            'Catatan tambahan (opsional)'),
+                                        const SizedBox(height: AppSpacing.md),
+                                        KeyedSubtree(
+                                            key: _notesKey,
+                                            child: _DarkField(
+                                                controller: _catatanCtrl,
+                                                label: 'Catatan (opsional)',
+                                                labelAbove: true,
+                                                hint:
+                                                    'Kebutuhan aksesibilitas atau informasi untuk pengelola',
+                                                icon: PhosphorIconsRegular.note,
+                                                maxLines: 3,
+                                                enabled: !_busy,
+                                                error: _fieldErrors['notes'],
+                                                onChanged: () => setState(() =>
+                                                    _fieldErrors
+                                                        .remove('notes')),
+                                                validator: (v) => (v?.length ??
+                                                            0) >
+                                                        5000
+                                                    ? 'Catatan maksimal 5000 karakter'
+                                                    : null)),
+                                        const SizedBox(height: AppSpacing.lg),
+                                        const Text(
+                                            'Anda akan meninjau ringkasan sebelum permintaan dikirim.',
+                                            style: TextStyle(
+                                                color: _C.textMuted,
+                                                fontSize: 12,
+                                                height: 1.6)),
+                                      ],
+                                    )),
+                              ),
+                            ],
+                          ))))),
+        ));
   }
 
+  Widget _stepProgress() => Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Wrap(
+              alignment: WrapAlignment.spaceBetween,
+              spacing: AppSpacing.sm,
+              runSpacing: AppSpacing.xs,
+              children: [
+                Text(
+                    _step == 1
+                        ? '01 / 03 · Data Kontak'
+                        : '02 / 03 · Rencana Kunjungan',
+                    style: _jakarta(const TextStyle(
+                        fontSize: 11,
+                        color: _C.blue,
+                        fontWeight: FontWeight.w700))),
+                Text('Langkah $_step dari 3',
+                    style: _jakarta(const TextStyle(
+                        fontSize: 11,
+                        color: _C.blue,
+                        fontWeight: FontWeight.w700))),
+              ]),
+          const SizedBox(height: AppSpacing.sm),
+          Row(children: [
+            for (var i = 1; i <= 3; i++) ...[
+              if (i > 1) const SizedBox(width: AppSpacing.xs),
+              Expanded(
+                  child: Container(
+                height: AppSpacing.xs,
+                decoration: BoxDecoration(
+                  color: i <= _step ? _C.blue : _C.border,
+                  borderRadius: BorderRadius.circular(AppSpacing.xs),
+                ),
+              )),
+            ],
+          ]),
+        ],
+      );
+
   Widget _inlineError(String message) => Padding(
-      padding: const EdgeInsets.only(top: 8),
+      padding: const EdgeInsets.only(top: AppSpacing.sm),
       child: Text(message,
           style: const TextStyle(color: _C.danger, fontSize: 12)));
 
   Widget _infoCard({required Widget child, Color? accent}) => Container(
         width: double.infinity,
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.lg, vertical: AppSpacing.md),
         decoration: BoxDecoration(
           color: _C.card,
           borderRadius: BorderRadius.circular(14),
@@ -1094,9 +1341,9 @@ class _DaftarKunjunganScreenState extends State<DaftarKunjunganScreen>
               width: 16,
               height: 16,
               child: CircularProgressIndicator(strokeWidth: 2)),
-          SizedBox(width: 10),
+          SizedBox(width: AppSpacing.sm),
           Text('Memeriksa ketersediaan...',
-              style: TextStyle(color: _C.textMuted, fontSize: 12.5)),
+              style: TextStyle(color: _C.textMuted, fontSize: 12)),
         ]),
       );
     }
@@ -1107,7 +1354,7 @@ class _DaftarKunjunganScreenState extends State<DaftarKunjunganScreen>
           Expanded(
               child: Text(
                   'Ketersediaan belum dapat diperiksa. ${bookingErrorMessage(_availability.error!)}',
-                  style: const TextStyle(color: _C.danger, fontSize: 12.5))),
+                  style: const TextStyle(color: _C.danger, fontSize: 12))),
           TextButton(
               onPressed: _loadAvailability, child: const Text('Coba lagi')),
         ]),
@@ -1120,11 +1367,12 @@ class _DaftarKunjunganScreenState extends State<DaftarKunjunganScreen>
             _tanggal == null
                 ? 'Pilih tanggal untuk melihat ketersediaan tiket.'
                 : 'Ketersediaan tanggal terpilih belum tersedia. Pilih tanggal lain.',
-            style: const TextStyle(color: _C.textMuted, fontSize: 12.5)),
+            style: const TextStyle(color: _C.textMuted, fontSize: 12)),
       );
     }
-    final ok = availability.bookable;
-    final tooMany = availability.status == 'insufficient_quantity';
+    final tooMany = availability.remaining != null &&
+        _jumlahOrang > availability.remaining!;
+    final ok = availability.bookable && !tooMany;
     return _infoCard(
       accent: ok ? null : _C.danger,
       child: Column(
@@ -1133,19 +1381,21 @@ class _DaftarKunjunganScreenState extends State<DaftarKunjunganScreen>
           Text(
               ok
                   ? '${availabilityLevelLabel(availability.level)} - ${availability.remaining ?? '\u2014'} tiket tersisa'
-                  : availabilityStatusLabel(availability.status),
+                  : tooMany
+                      ? 'Jumlah pengunjung melebihi sisa kuota'
+                      : availabilityStatusLabel(availability.status),
               style: TextStyle(
                   color: ok ? _C.teal : _C.danger,
                   fontSize: 13,
                   fontWeight: FontWeight.w700)),
-          const SizedBox(height: 2),
+          const SizedBox(height: AppSpacing.xs),
           Text(
               'Kuota total ${availability.capacity ?? '—'} · sisa ${availability.remaining ?? '—'}',
-              style: const TextStyle(color: _C.textMuted, fontSize: 12.5)),
+              style: const TextStyle(color: _C.textMuted, fontSize: 12)),
           if (tooMany)
             Text(
                 'Jumlah pengunjung melebihi sisa kuota (${availability.remaining ?? '—'}).',
-                style: const TextStyle(color: _C.danger, fontSize: 12.5)),
+                style: const TextStyle(color: _C.danger, fontSize: 12)),
         ],
       ),
     );
@@ -1165,19 +1415,19 @@ class _DaftarKunjunganScreenState extends State<DaftarKunjunganScreen>
           const Text('Pendaftaran sebelumnya belum dipastikan',
               style: TextStyle(
                   color: _C.text, fontSize: 14, fontWeight: FontWeight.w800)),
-          const SizedBox(height: 6),
+          const SizedBox(height: AppSpacing.sm),
           Text(
               'Hasil pendaftaran untuk ${sameDestination ? widget.wisata.nama : 'destinasi lain'}, tanggal ${pending['visit_date']}, '
               '${pending['quantity']} orang atas nama ${pending['visitor_name']} belum diketahui. '
               'Periksa hasilnya sebelum mendaftar lagi.',
-              style: const TextStyle(color: _C.textMuted, fontSize: 12.5)),
+              style: const TextStyle(color: _C.textMuted, fontSize: 12)),
           if (_intentMessage != null) ...[
-            const SizedBox(height: 6),
+            const SizedBox(height: AppSpacing.sm),
             Text(_intentMessage!,
                 key: const ValueKey('intentMessage'),
-                style: const TextStyle(color: _C.text, fontSize: 12.5)),
+                style: const TextStyle(color: _C.text, fontSize: 12)),
           ],
-          const SizedBox(height: 8),
+          const SizedBox(height: AppSpacing.sm),
           if (_intentBusy)
             const Center(
                 child: SizedBox(
@@ -1185,7 +1435,7 @@ class _DaftarKunjunganScreenState extends State<DaftarKunjunganScreen>
                     height: 20,
                     child: CircularProgressIndicator(strokeWidth: 2)))
           else
-            Wrap(spacing: 8, children: [
+            Wrap(spacing: AppSpacing.sm, children: [
               OutlinedButton(
                   key: const ValueKey('intentCheck'),
                   onPressed: _checkIntent,
@@ -1206,12 +1456,12 @@ class _DaftarKunjunganScreenState extends State<DaftarKunjunganScreen>
   }
 
   Widget _sectionLabel(String label) => Text(label,
-      style: const TextStyle(
-          color: _C.navy, fontWeight: FontWeight.w800, fontSize: 17));
+      style: _jakarta(const TextStyle(
+          color: _C.navy, fontWeight: FontWeight.w700, fontSize: 14)));
 
   /// Label shown above a contact field (the field itself has no float label).
   Widget _fieldLabel(String label) => Padding(
-      padding: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.only(bottom: AppSpacing.sm),
       child: ExcludeSemantics(
           child: Text(label,
               style: _jakarta(const TextStyle(
@@ -1261,7 +1511,7 @@ class _DestinasiCard extends StatelessWidget {
                 width: 20,
                 height: 20,
                 child: CircularProgressIndicator(
-                  color: Color(0xFF1976D2),
+                  color: AppColors.blue,
                   strokeWidth: 2,
                 ),
               ),
@@ -1285,19 +1535,18 @@ class _DestinasiCard extends StatelessWidget {
         color: const Color(0xFFE6F0FC),
         child: const Center(
           child: Icon(PhosphorIconsRegular.mountains,
-              color: Color(0xFF1976D2), size: 28),
+              color: AppColors.blue, size: 28),
         ),
       );
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(AppSpacing.md),
       decoration: BoxDecoration(
-        color: const Color(0xFFFFFFFF),
+        color: AppColors.surface,
         borderRadius: BorderRadius.circular(16),
-        border:
-            Border.all(color: const Color(0xFF1976D2).withValues(alpha: 0.2)),
+        border: Border.all(color: AppColors.blue.withValues(alpha: 0.2)),
       ),
       child: Row(
         children: [
@@ -1305,40 +1554,39 @@ class _DestinasiCard extends StatelessWidget {
           ClipRRect(
             borderRadius: BorderRadius.circular(12),
             child: SizedBox(
-              width: 72,
-              height: 72,
+              width: AppSpacing.xl * 2 + AppSpacing.md,
+              height: AppSpacing.xl * 2 + AppSpacing.md,
               child: _buildImage(),
             ),
           ),
-          const SizedBox(width: 14),
+          const SizedBox(width: AppSpacing.md),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
                   wisata.nama,
-                  style: const TextStyle(
-                    color: Color(0xFF102D59),
+                  style: _jakarta(const TextStyle(
+                    color: AppColors.navy,
                     fontWeight: FontWeight.w800,
-                    fontSize: 15,
-                  ),
+                    fontSize: 16,
+                  )),
                 ),
-                const SizedBox(height: 3),
-                Text(
-                  wisata.lokasi,
-                  style:
-                      const TextStyle(color: Color(0xFF728099), fontSize: 12),
-                ),
-                const SizedBox(height: 3),
+                const SizedBox(height: AppSpacing.xs),
                 Text(
                   [
                     wisata.kategori,
-                    wisata.jamBuka,
                     '${visitMoney(wisata.ticketPrice, wisata.hargaTiket.split(' ').first)} / orang'
                   ].where((value) => value.isNotEmpty).join(' - '),
                   style:
-                      const TextStyle(color: Color(0xFF728099), fontSize: 12),
+                      const TextStyle(color: AppColors.textMuted, fontSize: 11),
                 ),
+                const SizedBox(height: AppSpacing.xs),
+                Text(wisata.lokasi,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                        color: AppColors.textMuted, fontSize: 11)),
               ],
             ),
           ),
@@ -1390,34 +1638,35 @@ class _DarkField extends StatelessWidget {
       controller: controller,
       enabled: enabled,
       onChanged: (_) => onChanged?.call(),
-      scrollPadding: const EdgeInsets.all(24),
+      scrollPadding: const EdgeInsets.all(AppSpacing.xl),
       keyboardType: keyboardType,
       maxLines: maxLines,
       validator: validator,
-      style: const TextStyle(color: Color(0xFF102D59), fontSize: 14),
+      style: const TextStyle(color: AppColors.navy, fontSize: 13),
       decoration: InputDecoration(
         errorText: error,
         errorMaxLines: 3,
         labelText: labelAbove ? null : label,
         hintText: hint,
-        labelStyle: const TextStyle(color: Color(0xFF728099), fontSize: 13),
+        labelStyle: const TextStyle(color: AppColors.textMuted, fontSize: 13),
         hintStyle: const TextStyle(color: Color(0xFF9AA7BC), fontSize: 13),
         prefixIcon: labelAbove
             ? null
             : Padding(
-                padding: const EdgeInsets.only(left: 14, right: 10),
-                child: Icon(icon, color: const Color(0xFF1976D2), size: 18),
+                padding: const EdgeInsets.only(
+                    left: AppSpacing.lg, right: AppSpacing.sm),
+                child: Icon(icon, color: AppColors.blue, size: 18),
               ),
         prefixIconConstraints: const BoxConstraints(minWidth: 0, minHeight: 0),
         filled: true,
-        fillColor: const Color(0xFFFFFFFF),
+        fillColor: AppColors.surface,
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(14),
-          borderSide: const BorderSide(color: Color(0xFFDCE4F0), width: 1.2),
+          borderSide: const BorderSide(color: AppColors.border, width: 1.2),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(14),
-          borderSide: const BorderSide(color: Color(0xFF1976D2), width: 1.5),
+          borderSide: const BorderSide(color: AppColors.blue, width: 1.5),
         ),
         errorBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(14),
@@ -1429,7 +1678,7 @@ class _DarkField extends StatelessWidget {
         ),
         errorStyle: const TextStyle(color: Color(0xFFE5484D), fontSize: 11),
         contentPadding: EdgeInsets.symmetric(
-            horizontal: 16, vertical: labelAbove ? 18 : 14),
+            horizontal: AppSpacing.lg, vertical: AppSpacing.lg),
       ),
     );
   }
@@ -1453,23 +1702,23 @@ class _CounterBtn extends StatelessWidget {
       child: GestureDetector(
         onTap: onTap,
         child: Container(
-          width: 44,
-          height: 44,
+          width: kMinInteractiveDimension,
+          height: kMinInteractiveDimension,
           decoration: BoxDecoration(
             color: active
-                ? const Color(0xFF1976D2).withValues(alpha: 0.15)
-                : const Color(0xFFFFFFFF),
+                ? AppColors.blue.withValues(alpha: 0.15)
+                : AppColors.surface,
             borderRadius: BorderRadius.circular(10),
             border: Border.all(
               color: active
-                  ? const Color(0xFF1976D2).withValues(alpha: 0.4)
-                  : const Color(0xFFDCE4F0),
+                  ? AppColors.blue.withValues(alpha: 0.4)
+                  : AppColors.border,
             ),
           ),
           child: Icon(
             icon,
             size: 16,
-            color: active ? const Color(0xFF1976D2) : const Color(0xFF9AA7BC),
+            color: active ? AppColors.blue : const Color(0xFF9AA7BC),
           ),
         ),
       ),

@@ -20,6 +20,11 @@ class AppColors {
   static const warningTint = Color(0xFFFFF7EA);
   static const warningBorder = Color(0xFFFFE0AD);
   static const warningText = Color(0xFF98621E);
+  static const danger = Color(0xFFB23B3B);
+  static const dangerTint = Color(0xFFFDECEC);
+  static const dangerBorder = Color(0xFFF3C9C9);
+  static const sheetCloseBackground = Color(0xFFEEF3FA);
+  static const dockShadow = Color(0x22102D59);
 
   static ThemeData get operationsTheme => visitorTheme.copyWith(
         splashFactory: NoSplash.splashFactory,
@@ -90,4 +95,5 @@ class AppSpacing {
   static const md = 12.0;
   static const lg = 16.0;
   static const xl = 24.0;
+  static const sheetPadding = 20.0;
 }

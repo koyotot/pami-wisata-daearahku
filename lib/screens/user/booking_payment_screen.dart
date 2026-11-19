@@ -1,25 +1,31 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:phosphor_icons/phosphor_icons.dart';
 
 import '../../data/booking_payment_state.dart';
+import '../../data/admin_state.dart' show formatInstantInZone, visitDayLabel;
 import '../../data/booking_state.dart';
 import '../../data/business_repository.dart';
 import '../../data/payment_models.dart';
 import '../../services/payment_qr_export.dart';
 import '../../theme/app_colors.dart';
-import '../../widgets/availability_calendar.dart' show destinationCalendarNow;
 import '../../widgets/booking_refund_section.dart';
 import '../../widgets/booking_ticket_qr_section.dart';
 import '../../widgets/payment_deadline.dart';
 import '../auth/auth_presentation.dart';
+import '../admin/admin_common.dart' show showAdminSnack;
 import 'payment_instruction_preview_screen.dart';
 
 /// When the real payment instruction cannot be created, open a preview of the
 /// instruction page (no VA number or QR, local countdown) instead of leaving
 /// the customer on the chooser. Set to false to show only the error.
 const kPaymentPreviewOnFailure = true;
+
+/// "Ganti metode pembayaran" needs the provider's Cancel API, which the Midtrans merchant account does not allow yet (HTTP 403).
+/// While off, an open payment can only be replaced after its 15 minute countdown ends, and the screen says so.
+bool kPaymentSwitchEnabled = false;
 
 /// Native checkout for BCA/BNI virtual accounts and QRIS. Amounts, currency, deadlines and availability all
 /// come from Laravel; this page only sends the chosen method and channel, on an explicit tap.
@@ -62,6 +68,7 @@ class _BookingPaymentScreenState extends State<BookingPaymentScreen> {
   bool _showTickets = false;
   bool _routeVisible = true;
   bool _detail = false;
+  bool _successDetails = true;
 
   /// True while one of this page's own bottom sheets is open. A sheet sits on
   /// top of the page but does not hide it, so the payment window must not
@@ -182,11 +189,13 @@ class _BookingPaymentScreenState extends State<BookingPaymentScreen> {
   Future<void> _downloadReceipt() async {
     final saved = await _payment
         .downloadReceipt(widget.documentSaver ?? saveBookingDocument);
-    if (!mounted) return;
-    setState(() => _feedback = saved != null
-        ? 'Bukti pembayaran diambil dan disimpan sementara di ${saved.path}. '
-            'Aplikasi ini belum memiliki pembaca PDF; buka file tersebut dengan aplikasi lain.'
-        : _payment.notice);
+    if (!mounted || !_payment.valid) return;
+    showAdminSnack(
+        context,
+        saved != null
+            ? 'Bukti pembayaran berhasil diunduh.'
+            : (_payment.notice ?? 'Unduhan gagal. Silakan coba lagi.'),
+        error: saved == null);
   }
 
   // ── Presentation helpers ───────────────────────────────────
@@ -217,31 +226,43 @@ class _BookingPaymentScreenState extends State<BookingPaymentScreen> {
           crossAxisAlignment: CrossAxisAlignment.stretch, children: children));
 
   Widget _line(String label, String value, {Key? key}) => Padding(
-      padding: const EdgeInsets.symmetric(vertical: AppSpacing.xs + 2),
-      child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Expanded(
-            child: Text(label,
-                style: const TextStyle(
-                    fontSize: 12, color: AppColors.textSecondary))),
-        const SizedBox(width: AppSpacing.md),
-        Flexible(
-            child: Text(value,
-                key: key,
-                textAlign: TextAlign.end,
-                style: const TextStyle(
-                    fontSize: 13, fontWeight: FontWeight.w700))),
-      ]));
+      padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
+      child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+                child: Text(label,
+                    style: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w500,
+                        color: AppColors.textSecondary))),
+            const SizedBox(width: AppSpacing.md),
+            Flexible(
+                child: Text(value,
+                    key: key,
+                    textAlign: TextAlign.end,
+                    style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.navy))),
+          ]));
 
-  Widget _heading(String text) => Padding(
+  Widget _heading(String text, {bool small = false}) => Padding(
       padding: const EdgeInsets.only(bottom: AppSpacing.sm),
       child: Text(text,
-          style: const TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.w800,
+          style: GoogleFonts.plusJakartaSans(
+              fontSize: small ? 14 : 16,
+              fontWeight: small ? FontWeight.w700 : FontWeight.w800,
               color: AppColors.navy)));
 
   Widget _body(String text, {Color color = AppColors.textSecondary}) =>
-      Text(text, style: TextStyle(fontSize: 13, height: 1.5, color: color));
+      Text(text,
+          style: TextStyle(
+              fontSize: 12,
+              height: 1.5,
+              fontWeight: FontWeight.w500,
+              color: color));
 
   Widget _button(String text, VoidCallback? onPressed,
           {Key? key, bool primary = true, IconData? icon}) =>
@@ -251,14 +272,25 @@ class _BookingPaymentScreenState extends State<BookingPaymentScreen> {
               width: double.infinity,
               child: primary
                   ? ElevatedButton(
-                      key: key, onPressed: onPressed, child: Text(text))
+                      key: key,
+                      style: ElevatedButton.styleFrom(
+                          minimumSize: const Size(48, 48),
+                          elevation: 0,
+                          textStyle: const TextStyle(
+                              fontSize: 13, fontWeight: FontWeight.w800),
+                          shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(14))),
+                      onPressed: onPressed,
+                      child: Text(text))
                   : OutlinedButton(
                       key: key,
                       style: OutlinedButton.styleFrom(
                           minimumSize:
                               const Size.fromHeight(kMinInteractiveDimension),
+                          textStyle: const TextStyle(
+                              fontSize: 13, fontWeight: FontWeight.w800),
                           shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(16))),
+                              borderRadius: BorderRadius.circular(14))),
                       onPressed: onPressed,
                       child: icon == null
                           ? Text(text, textAlign: TextAlign.center)
@@ -280,7 +312,7 @@ class _BookingPaymentScreenState extends State<BookingPaymentScreen> {
         Text(title,
             textAlign: TextAlign.center,
             style: const TextStyle(
-                fontSize: 18,
+                fontSize: 20,
                 fontWeight: FontWeight.w800,
                 color: AppColors.navy)),
         const SizedBox(height: AppSpacing.sm),
@@ -309,7 +341,7 @@ class _BookingPaymentScreenState extends State<BookingPaymentScreen> {
   Widget _caption(String text) => Text(text,
       style: const TextStyle(
           fontSize: 11,
-          fontWeight: FontWeight.w800,
+          fontWeight: FontWeight.w700,
           letterSpacing: .8,
           color: AppColors.textMuted));
 
@@ -327,17 +359,22 @@ class _BookingPaymentScreenState extends State<BookingPaymentScreen> {
     final currency = (s.json['currency'] as String?) ?? b.currency;
     final quantity = s.quantity ?? b.quantity;
     return _panel([
-      _caption('RINGKASAN PESANAN'),
+      const Text('RINGKASAN PESANAN',
+          style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w700,
+              letterSpacing: .8,
+              color: AppColors.textMuted)),
       const SizedBox(height: AppSpacing.md),
       Row(children: [
         Container(
-            width: 48,
-            height: 48,
+            width: AppSpacing.xl + AppSpacing.lg,
+            height: AppSpacing.xl + AppSpacing.lg,
             decoration: BoxDecoration(
                 color: AppColors.blueTint,
-                borderRadius: BorderRadius.circular(14)),
+                borderRadius: BorderRadius.circular(AppSpacing.md)),
             child: const Icon(PhosphorIconsRegular.mountains,
-                size: 22, color: AppColors.blue)),
+                size: 20, color: AppColors.blue)),
         const SizedBox(width: AppSpacing.md),
         Expanded(
             child:
@@ -347,32 +384,39 @@ class _BookingPaymentScreenState extends State<BookingPaymentScreen> {
                   fontSize: 16,
                   fontWeight: FontWeight.w800,
                   color: AppColors.navy)),
-          const SizedBox(height: 2),
+          const SizedBox(height: AppSpacing.xs),
           Text('${formatLongDate(b.visitDate)} · $quantity tiket masuk',
               style: const TextStyle(
-                  fontSize: 12, color: AppColors.textSecondary)),
+                  fontSize: 12,
+                  fontWeight: FontWeight.w500,
+                  color: AppColors.textSecondary)),
         ])),
       ]),
-      const Divider(height: AppSpacing.xl + 4, color: AppColors.border),
+      const Divider(height: AppSpacing.xl, color: AppColors.border),
       if (s.quantity != null && s.unitPrice != null)
         _line('Harga tiket',
             '${s.quantity} × ${formatMoney(s.unitPrice!, currency)}'),
+      if (s.quantity != null && s.unitPrice != null && s.subtotal != null)
+        const Divider(height: AppSpacing.md, color: AppColors.border),
       if (s.subtotal != null)
         _line('Subtotal', formatMoney(s.subtotal!, currency)),
       if ((s.serviceFee ?? 0) > 0)
         _line('Biaya layanan', formatMoney(s.serviceFee!, currency)),
-      const Divider(height: AppSpacing.xl + 4, color: AppColors.border),
+      const Divider(height: AppSpacing.xl, color: AppColors.border),
       Row(crossAxisAlignment: CrossAxisAlignment.end, children: [
         Expanded(
             child:
                 Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           const Text('Total tagihan',
-              style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+              style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w500,
+                  color: AppColors.textSecondary)),
           const SizedBox(height: AppSpacing.xs),
           Text(total == null ? 'Belum tersedia' : formatMoney(total, currency),
               key: const Key('pay-total'),
               style: TextStyle(
-                  fontSize: total == null ? 16 : 30,
+                  fontSize: total == null ? 14 : 26,
                   height: 1.1,
                   fontWeight: FontWeight.w800,
                   color: AppColors.blueDeep)),
@@ -381,16 +425,18 @@ class _BookingPaymentScreenState extends State<BookingPaymentScreen> {
             key: const Key('pay-detail'),
             onPressed: () => setState(() => _detail = !_detail),
             style: TextButton.styleFrom(
-                minimumSize: const Size(48, 44),
+                minimumSize: const Size(48, 48),
+                tapTargetSize: MaterialTapTargetSize.padded,
+                visualDensity: VisualDensity.standard,
                 foregroundColor: AppColors.blue,
                 backgroundColor: AppColors.blueTint,
-                padding: const EdgeInsets.symmetric(horizontal: 14),
+                padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm),
                 shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12))),
+                    borderRadius: BorderRadius.circular(14))),
             child: Row(mainAxisSize: MainAxisSize.min, children: [
-              const Text('Detail',
-                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800)),
-              const SizedBox(width: 6),
+              const Text('Rincian',
+                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800)),
+              const SizedBox(width: AppSpacing.xs),
               AnimatedRotation(
                   turns: _detail ? .5 : 0,
                   duration: const Duration(milliseconds: 280),
@@ -419,13 +465,7 @@ class _BookingPaymentScreenState extends State<BookingPaymentScreen> {
                                   crossAxisAlignment:
                                       CrossAxisAlignment.stretch,
                                   children: [
-                                    const SizedBox(height: AppSpacing.lg),
-                                    const SizedBox(
-                                        height: 1,
-                                        child: CustomPaint(
-                                            painter: _DashedLinePainter(
-                                                Color(0xFFC9D6E8)))),
-                                    const SizedBox(height: AppSpacing.lg),
+                                    const SizedBox(height: AppSpacing.md),
                                     _copyTile('Nomor booking',
                                         s.bookingNumber ?? b.bookingNumber),
                                     if (s.invoiceNumber != null) ...[
@@ -438,10 +478,9 @@ class _BookingPaymentScreenState extends State<BookingPaymentScreen> {
   }
 
   Widget _copyTile(String label, String value) => Container(
-      padding: const EdgeInsets.fromLTRB(
-          AppSpacing.md + 2, AppSpacing.md, AppSpacing.md, AppSpacing.md),
+      padding: const EdgeInsets.all(AppSpacing.sm),
       decoration: BoxDecoration(
-          color: const Color(0xFFF5F9FE),
+          color: AppColors.bg,
           border: Border.all(color: AppColors.border),
           borderRadius: BorderRadius.circular(14)),
       child: Row(children: [
@@ -450,11 +489,11 @@ class _BookingPaymentScreenState extends State<BookingPaymentScreen> {
                 Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Text(label,
               style: const TextStyle(
-                  fontSize: 11, color: AppColors.textSecondary)),
+                  fontSize: 12, color: AppColors.textSecondary)),
           const SizedBox(height: AppSpacing.sm),
           Text(value,
               style: const TextStyle(
-                  fontSize: 12,
+                  fontSize: 13,
                   fontWeight: FontWeight.w600,
                   color: AppColors.navy)),
         ])),
@@ -470,13 +509,16 @@ class _BookingPaymentScreenState extends State<BookingPaymentScreen> {
                 ..showSnackBar(SnackBar(content: Text('$label disalin')));
             },
             style: IconButton.styleFrom(
-                minimumSize: const Size(44, 44),
-                backgroundColor: AppColors.blueTint,
-                foregroundColor: AppColors.blue,
-                side: const BorderSide(color: Color(0xFFC9DDF7)),
-                shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12))),
-            icon: const Icon(PhosphorIconsRegular.copy, size: 18)),
+                minimumSize: const Size(48, 48), padding: EdgeInsets.zero),
+            icon: Container(
+                padding: const EdgeInsets.all(AppSpacing.sm),
+                decoration: BoxDecoration(
+                    color: AppColors.blueTint,
+                    border:
+                        Border.all(color: AppColors.blue.withValues(alpha: .2)),
+                    borderRadius: BorderRadius.circular(14)),
+                child: const Icon(PhosphorIconsRegular.copy,
+                    size: 18, color: AppColors.blue))),
       ]));
 
   Widget _countdown() => Padding(
@@ -490,6 +532,45 @@ class _BookingPaymentScreenState extends State<BookingPaymentScreen> {
               _payment.serverNow == null ? null : _payment.paymentDeadline,
           now: () => _payment.serverNow,
           onElapsed: _payment.onCountdownElapsed));
+
+  /// Before a method is chosen there is no countdown, only a plain deadline for choosing one.
+  Widget _selectionNote() {
+    final until = _payment.snapshot?.selectionExpiresAt;
+    if (_payment.countdownStarted || until == null) return const SizedBox();
+    return Container(
+        margin: const EdgeInsets.only(bottom: AppSpacing.md),
+        padding: const EdgeInsets.all(AppSpacing.md),
+        decoration: BoxDecoration(
+            color: AppColors.warningTint,
+            border: Border.all(color: AppColors.warningBorder),
+            borderRadius: BorderRadius.circular(14)),
+        child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          const Icon(PhosphorIconsRegular.clock,
+              size: 16, color: AppColors.warningText),
+          const SizedBox(width: AppSpacing.sm),
+          Expanded(
+              child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text('Batas memilih pembayaran',
+                  style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.warningText)),
+              const SizedBox(height: AppSpacing.xs),
+              Text(
+                  formatInstantInZone(until, _payment.snapshot?.timezone)
+                      .replaceFirst(', ', ' · '),
+                  key: const Key('pay-selection-deadline'),
+                  style: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w800,
+                      height: 1.5,
+                      color: AppColors.warningText)),
+            ],
+          )),
+        ]));
+  }
 
   String _choiceTitle(PayChoice choice) => choice.methodCode == 'qris'
       ? 'QRIS'
@@ -519,9 +600,9 @@ class _BookingPaymentScreenState extends State<BookingPaymentScreen> {
         width: 72,
         height: 52,
         alignment: Alignment.center,
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+        padding: const EdgeInsets.all(AppSpacing.sm),
         decoration: BoxDecoration(
-            color: Colors.white,
+            color: AppColors.surface,
             border: Border.all(color: AppColors.border),
             borderRadius: BorderRadius.circular(14)),
         child: asset == null
@@ -534,7 +615,7 @@ class _BookingPaymentScreenState extends State<BookingPaymentScreen> {
                 fit: BoxFit.contain,
                 excludeFromSemantics: true,
                 filterQuality: FilterQuality.medium));
-    return muted ? Opacity(opacity: .4, child: tile) : tile;
+    return muted ? Opacity(opacity: .5, child: tile) : tile;
   }
 
   Widget _chooser() {
@@ -542,26 +623,20 @@ class _BookingPaymentScreenState extends State<BookingPaymentScreen> {
     final choices = p.snapshot!.payChoices;
     final locked = p.lockedChoiceKey;
     final selected = _effectiveChoice;
-    final available = choices.where((c) => c.available).length;
-    final anyAvailable = available > 0;
+    final anyAvailable = choices.any((c) => c.available);
     return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
       const SizedBox(height: AppSpacing.sm),
-      Row(crossAxisAlignment: CrossAxisAlignment.end, children: [
-        const Expanded(
-            child: Text('Metode Pembayaran',
-                style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w800,
-                    color: AppColors.navy))),
-        Text('$available pilihan',
-            style: const TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w800,
-                color: AppColors.blue)),
-      ]),
+      const Text('Metode Pembayaran',
+          style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w800,
+              color: AppColors.navy)),
       const SizedBox(height: AppSpacing.xs),
-      const Text('Pilih metode yang paling nyaman untuk Anda.',
-          style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+      const Text('Pilih satu metode pembayaran yang tersedia.',
+          style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w500,
+              color: AppColors.textSecondary)),
       const SizedBox(height: AppSpacing.md),
       for (final choice in choices) _choiceTile(choice, selected, locked),
       if (locked != null)
@@ -581,9 +656,9 @@ class _BookingPaymentScreenState extends State<BookingPaymentScreen> {
   }
 
   Widget _noteBox(String text, {bool warning = false}) {
-    final bg = warning ? const Color(0xFFFFF7E6) : const Color(0xFFEEF5FD);
-    final border = warning ? const Color(0xFFF3DDAA) : const Color(0xFFC9DDF7);
-    final fg = warning ? const Color(0xFF80531B) : AppColors.blueDeep;
+    final bg = warning ? AppColors.warningTint : AppColors.blueTint;
+    final border = warning ? AppColors.warningBorder : AppColors.border;
+    final fg = warning ? AppColors.warningText : AppColors.blueDeep;
     return Container(
         padding: const EdgeInsets.all(AppSpacing.md),
         decoration: BoxDecoration(
@@ -595,7 +670,11 @@ class _BookingPaymentScreenState extends State<BookingPaymentScreen> {
           const SizedBox(width: AppSpacing.sm),
           Expanded(
               child: Text(text,
-                  style: TextStyle(fontSize: 12, height: 1.5, color: fg))),
+                  style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w500,
+                      height: 1.5,
+                      color: fg))),
         ]));
   }
 
@@ -619,7 +698,7 @@ class _BookingPaymentScreenState extends State<BookingPaymentScreen> {
                     borderRadius: BorderRadius.circular(18),
                     side: BorderSide(
                         color: isSelected ? AppColors.blue : AppColors.border,
-                        width: isSelected ? 1.5 : 1)),
+                        width: 1)),
                 clipBehavior: Clip.antiAlias,
                 child: InkWell(
                     key: Key(
@@ -642,7 +721,7 @@ class _BookingPaymentScreenState extends State<BookingPaymentScreen> {
                                           alignment: Alignment.center,
                                           decoration: BoxDecoration(
                                               shape: BoxShape.circle,
-                                              color: Colors.white,
+                                              color: AppColors.surface,
                                               border: Border.all(
                                                   color: choice.available
                                                       ? AppColors.blue
@@ -672,7 +751,7 @@ class _BookingPaymentScreenState extends State<BookingPaymentScreen> {
                                         Text(_choiceTitle(choice),
                                             style: TextStyle(
                                                 fontSize: 14,
-                                                fontWeight: FontWeight.w800,
+                                                fontWeight: FontWeight.w700,
                                                 color: choice.available
                                                     ? AppColors.navy
                                                     : AppColors.textMuted)),
@@ -681,6 +760,7 @@ class _BookingPaymentScreenState extends State<BookingPaymentScreen> {
                                           Text(_choiceDescription(choice),
                                               style: const TextStyle(
                                                   fontSize: 12,
+                                                  fontWeight: FontWeight.w500,
                                                   height: 1.5,
                                                   color:
                                                       AppColors.textSecondary))
@@ -688,6 +768,7 @@ class _BookingPaymentScreenState extends State<BookingPaymentScreen> {
                                           Text(payChoiceReason(choice.reason),
                                               style: const TextStyle(
                                                   fontSize: 12,
+                                                  fontWeight: FontWeight.w500,
                                                   height: 1.5,
                                                   color:
                                                       AppColors.warningText)),
@@ -702,13 +783,13 @@ class _BookingPaymentScreenState extends State<BookingPaymentScreen> {
                                           Container(
                                               padding:
                                                   const EdgeInsets.symmetric(
-                                                      horizontal: 8,
-                                                      vertical: 3),
+                                                      horizontal: AppSpacing.sm,
+                                                      vertical: AppSpacing.xs),
                                               decoration: BoxDecoration(
-                                                  color:
-                                                      const Color(0xFFDCEBFB),
+                                                  color: AppColors.blueTint,
                                                   borderRadius:
-                                                      BorderRadius.circular(8)),
+                                                      BorderRadius.circular(
+                                                          AppSpacing.md)),
                                               child: const Text('Terpilih',
                                                   style: TextStyle(
                                                       fontSize: 11,
@@ -727,69 +808,116 @@ class _BookingPaymentScreenState extends State<BookingPaymentScreen> {
         key: const Key('pay-check'),
         onPressed: p.canCheckNow ? p.checkNow : null,
         style: FilledButton.styleFrom(
-            minimumSize: const Size(48, 52),
+            minimumSize: const Size(140, 52),
             backgroundColor: AppColors.blue,
-            foregroundColor: Colors.white,
-            disabledBackgroundColor: const Color(0xFFD5DEEC),
-            disabledForegroundColor: Colors.white,
-            padding: const EdgeInsets.symmetric(horizontal: 22),
+            foregroundColor: AppColors.surface,
+            disabledBackgroundColor: AppColors.blue.withValues(alpha: .5),
+            disabledForegroundColor: AppColors.surface,
+            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
             shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(14))),
         child: Text(p.checking ? 'Memeriksa status…' : 'Cek Status Pembayaran',
-            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800)));
+            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w800)));
   }
 
-  Future<void> _explainSwitch(PaymentSnapshot s) => showModalBottomSheet<void>(
-      context: context,
-      useSafeArea: true,
-      showDragHandle: true,
-      backgroundColor: AppColors.surface,
-      shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
-      builder: (sheet) => SafeArea(
-          top: false,
-          child: Padding(
-              padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
-              child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Row(children: [
-                      const Expanded(
-                          child: Text('Ganti Metode',
-                              style: TextStyle(
-                                  fontSize: 20,
-                                  fontWeight: FontWeight.w800,
-                                  color: AppColors.navy))),
-                      IconButton(
-                          tooltip: 'Tutup',
-                          onPressed: () => Navigator.pop(sheet),
-                          style: IconButton.styleFrom(
-                              backgroundColor: const Color(0xFFEEF3FA),
-                              foregroundColor: AppColors.textSecondary,
-                              shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(12))),
-                          icon: const Icon(PhosphorIconsRegular.x, size: 18)),
-                    ]),
-                    const SizedBox(height: 12),
-                    const Divider(height: 1, color: AppColors.border),
-                    const SizedBox(height: 16),
-                    KeyedSubtree(
-                        key: const Key('pay-switch-note'),
-                        child: _noteBox(switchReasonText(s.switchReason))),
-                    const SizedBox(height: 20),
-                    FilledButton(
-                        onPressed: () => Navigator.pop(sheet),
-                        style: FilledButton.styleFrom(
-                            minimumSize: const Size.fromHeight(52),
-                            backgroundColor: AppColors.blue,
-                            foregroundColor: Colors.white,
-                            shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(14))),
-                        child: const Text('Mengerti',
-                            style: TextStyle(
-                                fontSize: 14, fontWeight: FontWeight.w800))),
-                  ]))));
+  /// "Ganti metode pembayaran": confirm in the same bottom sheet style, then ask the server to close the
+  /// unpaid attempt. The countdown keeps running; only the next read shows the chooser.
+  Future<void> _confirmSwitch() async {
+    if (_payment.busy || _payment.phase != PaymentPhase.awaiting) return;
+    _ownSheet = true;
+    final bool? ok;
+    try {
+      ok = await showModalBottomSheet<bool>(
+          context: context,
+          useSafeArea: true,
+          isScrollControlled: true,
+          showDragHandle: true,
+          backgroundColor: AppColors.surface,
+          shape: const RoundedRectangleBorder(
+              borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+          builder: (sheet) => SafeArea(
+              top: false,
+              child: SingleChildScrollView(
+                  padding: const EdgeInsets.fromLTRB(AppSpacing.sheetPadding, 0,
+                      AppSpacing.sheetPadding, AppSpacing.sheetPadding),
+                  child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Row(children: [
+                          const Expanded(
+                              child: Text('Ganti metode pembayaran?',
+                                  style: TextStyle(
+                                      fontSize: 20,
+                                      fontWeight: FontWeight.w800,
+                                      color: AppColors.navy))),
+                          IconButton(
+                              tooltip: 'Tutup',
+                              onPressed: () => Navigator.pop(sheet, false),
+                              style: IconButton.styleFrom(
+                                  minimumSize: const Size(48, 48),
+                                  backgroundColor:
+                                      AppColors.sheetCloseBackground,
+                                  foregroundColor: AppColors.textSecondary,
+                                  shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(12))),
+                              icon:
+                                  const Icon(PhosphorIconsRegular.x, size: 18)),
+                        ]),
+                        const SizedBox(height: AppSpacing.md),
+                        const Divider(height: 1, color: AppColors.border),
+                        const SizedBox(height: AppSpacing.lg),
+                        KeyedSubtree(
+                            key: const Key('pay-switch-note'),
+                            child: _noteBox(
+                                'Instruksi pembayaran saat ini akan dibatalkan. Jangan membayar ke nomor atau kode lama. Sisa waktu pembayaran tidak bertambah.')),
+                        const SizedBox(height: AppSpacing.xl),
+                        Row(children: [
+                          Expanded(
+                              child: OutlinedButton(
+                                  key: const Key('pay-switch-back'),
+                                  onPressed: () => Navigator.pop(sheet, false),
+                                  style: OutlinedButton.styleFrom(
+                                      minimumSize: const Size.fromHeight(52),
+                                      foregroundColor: AppColors.blue,
+                                      side: const BorderSide(
+                                          color: AppColors.border),
+                                      shape: RoundedRectangleBorder(
+                                          borderRadius:
+                                              BorderRadius.circular(14))),
+                                  child: const Text('Kembali',
+                                      style: TextStyle(
+                                          fontSize: 13,
+                                          fontWeight: FontWeight.w800)))),
+                          const SizedBox(width: AppSpacing.md),
+                          Expanded(
+                              child: FilledButton(
+                                  key: const Key('pay-switch-confirm'),
+                                  onPressed: () => Navigator.pop(sheet, true),
+                                  style: FilledButton.styleFrom(
+                                      minimumSize: const Size.fromHeight(52),
+                                      backgroundColor: AppColors.blue,
+                                      foregroundColor: AppColors.surface,
+                                      shape: RoundedRectangleBorder(
+                                          borderRadius:
+                                              BorderRadius.circular(14))),
+                                  child: const Text('Ganti Metode',
+                                      style: TextStyle(
+                                          fontSize: 13,
+                                          fontWeight: FontWeight.w800)))),
+                        ]),
+                      ]))));
+    } finally {
+      _ownSheet = false;
+    }
+    if (ok != true || !mounted) return;
+    final failure = await _payment.cancelAttempt();
+    if (!mounted) return;
+    setState(() {
+      _selected = null;
+      _feedback = failure;
+    });
+  }
 
   Future<void> _confirmStart() async {
     final choice = _effectiveChoice;
@@ -821,7 +949,8 @@ class _BookingPaymentScreenState extends State<BookingPaymentScreen> {
           builder: (sheet) => SafeArea(
               top: false,
               child: SingleChildScrollView(
-                  padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+                  padding: const EdgeInsets.fromLTRB(AppSpacing.sheetPadding, 0,
+                      AppSpacing.sheetPadding, AppSpacing.sheetPadding),
                   child: Column(
                       mainAxisSize: MainAxisSize.min,
                       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -837,16 +966,18 @@ class _BookingPaymentScreenState extends State<BookingPaymentScreen> {
                               tooltip: 'Tutup',
                               onPressed: () => Navigator.pop(sheet, false),
                               style: IconButton.styleFrom(
-                                  backgroundColor: const Color(0xFFEEF3FA),
+                                  minimumSize: const Size(48, 48),
+                                  backgroundColor:
+                                      AppColors.sheetCloseBackground,
                                   foregroundColor: AppColors.textSecondary,
                                   shape: RoundedRectangleBorder(
                                       borderRadius: BorderRadius.circular(12))),
                               icon:
                                   const Icon(PhosphorIconsRegular.x, size: 18)),
                         ]),
-                        const SizedBox(height: 12),
+                        const SizedBox(height: AppSpacing.md),
                         const Divider(height: 1, color: AppColors.border),
-                        const SizedBox(height: 16),
+                        const SizedBox(height: AppSpacing.lg),
                         Text(_choiceTitle(choice),
                             style: const TextStyle(
                                 fontSize: 20,
@@ -861,22 +992,27 @@ class _BookingPaymentScreenState extends State<BookingPaymentScreen> {
                         for (final row in rows) ...[
                           const Divider(height: 1, color: AppColors.border),
                           Padding(
-                              padding: const EdgeInsets.symmetric(vertical: 14),
-                              child: Row(children: [
-                                Expanded(
-                                    child: Text(row.$1,
-                                        style: const TextStyle(
-                                            fontSize: 13,
-                                            color: AppColors.textSecondary))),
-                                const SizedBox(width: AppSpacing.md),
-                                Flexible(
-                                    child: Text(row.$2,
-                                        textAlign: TextAlign.end,
-                                        style: const TextStyle(
-                                            fontSize: 13,
-                                            fontWeight: FontWeight.w800,
-                                            color: AppColors.navy))),
-                              ])),
+                              padding: const EdgeInsets.symmetric(
+                                  vertical: AppSpacing.md),
+                              child: Row(
+                                  mainAxisAlignment:
+                                      MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    Expanded(
+                                        child: Text(row.$1,
+                                            style: const TextStyle(
+                                                fontSize: 13,
+                                                color:
+                                                    AppColors.textSecondary))),
+                                    const SizedBox(width: AppSpacing.md),
+                                    Flexible(
+                                        child: Text(row.$2,
+                                            textAlign: TextAlign.end,
+                                            style: const TextStyle(
+                                                fontSize: 13,
+                                                fontWeight: FontWeight.w800,
+                                                color: AppColors.navy))),
+                                  ])),
                         ],
                         const Divider(height: 1, color: AppColors.border),
                         const SizedBox(height: AppSpacing.lg),
@@ -898,7 +1034,7 @@ class _BookingPaymentScreenState extends State<BookingPaymentScreen> {
                                               BorderRadius.circular(14))),
                                   child: const Text('Ubah Metode',
                                       style: TextStyle(
-                                          fontSize: 14,
+                                          fontSize: 13,
                                           fontWeight: FontWeight.w800)))),
                           const SizedBox(width: AppSpacing.md),
                           Expanded(
@@ -908,13 +1044,13 @@ class _BookingPaymentScreenState extends State<BookingPaymentScreen> {
                                   style: FilledButton.styleFrom(
                                       minimumSize: const Size.fromHeight(52),
                                       backgroundColor: AppColors.blue,
-                                      foregroundColor: Colors.white,
+                                      foregroundColor: AppColors.surface,
                                       shape: RoundedRectangleBorder(
                                           borderRadius:
                                               BorderRadius.circular(14))),
                                   child: const Text('Lihat Instruksi',
                                       style: TextStyle(
-                                          fontSize: 14,
+                                          fontSize: 13,
                                           fontWeight: FontWeight.w800)))),
                         ]),
                       ]))));
@@ -926,6 +1062,27 @@ class _BookingPaymentScreenState extends State<BookingPaymentScreen> {
 
   Widget? _dock(PaymentPhase phase) {
     final p = _payment;
+    if (p.valid && phase == PaymentPhase.paid) {
+      return Material(
+          color: AppColors.surface,
+          elevation: 8,
+          shadowColor: AppColors.dockShadow,
+          child: SafeArea(
+              top: false,
+              minimum: const EdgeInsets.all(AppSpacing.lg),
+              child: OutlinedButton(
+                  key: const Key('pay-view-booking'),
+                  onPressed: () => Navigator.maybePop(context),
+                  style: OutlinedButton.styleFrom(
+                      minimumSize: const Size(140, 52),
+                      foregroundColor: AppColors.blue,
+                      side: const BorderSide(color: AppColors.border),
+                      textStyle: GoogleFonts.plusJakartaSans(
+                          fontSize: 13, fontWeight: FontWeight.w800),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14))),
+                  child: const Text('Lihat Booking'))));
+    }
     if (!p.valid ||
         phase == PaymentPhase.loading ||
         phase == PaymentPhase.loadFailed ||
@@ -945,60 +1102,80 @@ class _BookingPaymentScreenState extends State<BookingPaymentScreen> {
     return Material(
         color: AppColors.surface,
         elevation: 8,
-        shadowColor: Colors.black26,
+        shadowColor: AppColors.dockShadow,
         child: SafeArea(
             top: false,
             child: Padding(
-                padding: const EdgeInsets.fromLTRB(20, 12, 20, 12),
-                child: Row(children: [
-                  Expanded(
-                      child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                        Text(awaiting ? 'Total tagihan' : 'Total pembayaran',
-                            style: const TextStyle(
-                                fontSize: 11, color: AppColors.textSecondary)),
-                        const SizedBox(height: 2),
-                        Text(
-                            total == null
-                                ? 'Belum tersedia'
-                                : formatMoney(total, currency),
-                            style: const TextStyle(
-                                fontSize: 20,
-                                fontWeight: FontWeight.w800,
-                                color: AppColors.navy)),
-                      ])),
-                  const SizedBox(width: AppSpacing.md),
-                  awaiting
-                      ? _checkButton()
-                      : FilledButton(
-                          key: const Key('pay-start'),
-                          onPressed: enabled ? _confirmStart : null,
-                          style: FilledButton.styleFrom(
-                              minimumSize: const Size(48, 52),
-                              backgroundColor: AppColors.blue,
-                              foregroundColor: Colors.white,
-                              disabledBackgroundColor: const Color(0xFFD5DEEC),
-                              disabledForegroundColor: Colors.white,
-                              padding:
-                                  const EdgeInsets.symmetric(horizontal: 22),
-                              shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(14))),
-                          child: Row(mainAxisSize: MainAxisSize.min, children: [
-                            Text(
-                                p.creating
-                                    ? 'Membuat instruksi…'
-                                    : expired
-                                        ? 'Waktu Habis'
-                                        : 'Lanjut Bayar',
-                                style: const TextStyle(
-                                    fontSize: 14, fontWeight: FontWeight.w800)),
-                            const SizedBox(width: 8),
-                            const Icon(PhosphorIconsRegular.arrowRight,
-                                size: 18),
-                          ])),
-                ]))));
+                padding: const EdgeInsets.symmetric(
+                    horizontal: AppSpacing.lg, vertical: AppSpacing.md),
+                child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Expanded(
+                          flex: 2,
+                          child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                    awaiting
+                                        ? 'Total tagihan'
+                                        : 'Total pembayaran',
+                                    style: const TextStyle(
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w500,
+                                        color: AppColors.textSecondary)),
+                                const SizedBox(height: AppSpacing.xs),
+                                Text(
+                                    total == null
+                                        ? 'Belum tersedia'
+                                        : formatMoney(total, currency),
+                                    style: const TextStyle(
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.w800,
+                                        color: AppColors.navy)),
+                              ])),
+                      const SizedBox(width: AppSpacing.md),
+                      Flexible(
+                          flex: 3,
+                          child: awaiting
+                              ? _checkButton()
+                              : FilledButton(
+                                  key: const Key('pay-start'),
+                                  onPressed: enabled ? _confirmStart : null,
+                                  style: FilledButton.styleFrom(
+                                      minimumSize: const Size(140, 52),
+                                      backgroundColor: AppColors.blue,
+                                      foregroundColor: AppColors.surface,
+                                      disabledBackgroundColor:
+                                          AppColors.blue.withValues(alpha: .5),
+                                      disabledForegroundColor:
+                                          AppColors.surface,
+                                      padding: const EdgeInsets.symmetric(
+                                          horizontal: AppSpacing.lg),
+                                      shape: RoundedRectangleBorder(
+                                          borderRadius:
+                                              BorderRadius.circular(14))),
+                                  child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Flexible(
+                                            child: Text(
+                                                p.creating
+                                                    ? 'Membuat instruksi…'
+                                                    : expired
+                                                        ? 'Waktu Habis'
+                                                        : 'Lanjut Bayar',
+                                                style: const TextStyle(
+                                                    fontSize: 13,
+                                                    fontWeight:
+                                                        FontWeight.w800))),
+                                        const SizedBox(width: AppSpacing.sm),
+                                        const Icon(
+                                            PhosphorIconsRegular.arrowRight,
+                                            size: 18),
+                                      ]))),
+                    ]))));
   }
 
   String _groupDigits(String value) {
@@ -1037,17 +1214,32 @@ class _BookingPaymentScreenState extends State<BookingPaymentScreen> {
       _countdown(),
       _methodCard(s, total),
       if (isQris) _qrisPanel(amount) else _vaPanel(s, amount),
-      Center(
-          child: TextButton.icon(
-              key: const Key('pay-switch'),
-              onPressed: () => _explainSwitch(s),
-              style: TextButton.styleFrom(
-                  minimumSize: const Size(48, 48),
-                  foregroundColor: AppColors.blue),
-              icon: const Icon(PhosphorIconsRegular.arrowLeft, size: 16),
-              label: const Text('Pilih Metode Lain',
-                  style:
-                      TextStyle(fontSize: 12, fontWeight: FontWeight.w800)))),
+      if (!kPaymentSwitchEnabled)
+        const Padding(
+            padding: EdgeInsets.only(top: AppSpacing.md),
+            child: Text('Penggantian metode pembayaran harus menunggu 15 menit',
+                key: Key('pay-switch-wait-note'),
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                    fontSize: 12,
+                    height: 1.5,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.textSecondary)))
+      else
+        Center(
+            child: TextButton.icon(
+                key: const Key('pay-switch'),
+                onPressed: _payment.busy ? null : _confirmSwitch,
+                style: TextButton.styleFrom(
+                    minimumSize: const Size(48, 48),
+                    foregroundColor: AppColors.blue),
+                icon: const Icon(PhosphorIconsRegular.arrowLeft, size: 16),
+                label: Text(
+                    _payment.switching
+                        ? 'Mengganti metode…'
+                        : 'Ganti metode pembayaran',
+                    style: const TextStyle(
+                        fontSize: 13, fontWeight: FontWeight.w800)))),
     ]);
   }
 
@@ -1080,12 +1272,12 @@ class _BookingPaymentScreenState extends State<BookingPaymentScreen> {
                   fontSize: 16,
                   fontWeight: FontWeight.w800,
                   color: AppColors.navy)),
-          const SizedBox(height: 2),
+          const SizedBox(height: AppSpacing.xs),
           const Text('Instruksi pembayaran aktif',
               style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
         ])),
       ]),
-      const Divider(height: AppSpacing.xl + 4, color: AppColors.border),
+      const Divider(height: AppSpacing.xl, color: AppColors.border),
       const Text('Total tagihan',
           style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
       const SizedBox(height: AppSpacing.xs),
@@ -1095,7 +1287,7 @@ class _BookingPaymentScreenState extends State<BookingPaymentScreen> {
               : formatMoney(total, currency ?? 'IDR'),
           key: const Key('pay-total'),
           style: TextStyle(
-              fontSize: total == null ? 16 : 30,
+              fontSize: total == null ? 16 : 26,
               height: 1.1,
               fontWeight: FontWeight.w800,
               color: AppColors.blueDeep)),
@@ -1110,13 +1302,12 @@ class _BookingPaymentScreenState extends State<BookingPaymentScreen> {
       _caption('INSTRUKSI PEMBAYARAN'),
       const SizedBox(height: AppSpacing.md),
       CustomPaint(
-          painter: const DashedBorderPainter(Color(0xFFB9D3F2)),
+          painter: const DashedBorderPainter(AppColors.border),
           child: Container(
               width: double.infinity,
               padding: const EdgeInsets.all(AppSpacing.lg),
               decoration: BoxDecoration(
-                  color: const Color(0xFFF5F9FE),
-                  borderRadius: BorderRadius.circular(18)),
+                  color: AppColors.bg, borderRadius: BorderRadius.circular(18)),
               child: Column(children: [
                 Container(
                     width: 52,
@@ -1134,7 +1325,7 @@ class _BookingPaymentScreenState extends State<BookingPaymentScreen> {
                     textAlign: TextAlign.center,
                     style: const TextStyle(
                         fontSize: 14,
-                        fontWeight: FontWeight.w800,
+                        fontWeight: FontWeight.w700,
                         color: AppColors.navy)),
                 const SizedBox(height: AppSpacing.sm),
                 if (digits == null)
@@ -1154,7 +1345,7 @@ class _BookingPaymentScreenState extends State<BookingPaymentScreen> {
                           key: const Key('pay-va-number'),
                           textAlign: TextAlign.center,
                           style: const TextStyle(
-                              fontSize: 24,
+                              fontSize: 26,
                               fontWeight: FontWeight.w800,
                               color: AppColors.navy,
                               fontFeatures: [FontFeature.tabularFigures()]))),
@@ -1179,7 +1370,7 @@ class _BookingPaymentScreenState extends State<BookingPaymentScreen> {
         _live(_feedback!),
       ],
       const SizedBox(height: AppSpacing.lg),
-      _heading('Cara pembayaran'),
+      _heading('Cara pembayaran', small: true),
       _steps([
         'Buka m-banking, internet banking, atau ATM $bank.',
         bank == 'BCA'
@@ -1215,7 +1406,7 @@ class _BookingPaymentScreenState extends State<BookingPaymentScreen> {
                 label: 'QR pembayaran QRIS, bukan tiket masuk',
                 excludeSemantics: true,
                 child: Container(
-                    color: Colors.white,
+                    color: AppColors.surface,
                     padding: const EdgeInsets.all(AppSpacing.lg),
                     child: ConstrainedBox(
                         constraints: const BoxConstraints(maxWidth: 280),
@@ -1257,7 +1448,7 @@ class _BookingPaymentScreenState extends State<BookingPaymentScreen> {
         _live(_feedback!),
       ],
       const SizedBox(height: AppSpacing.md),
-      _heading('Cara membayar'),
+      _heading('Cara membayar', small: true),
       _steps(const [
         'Buka aplikasi bank atau dompet digital yang mendukung QRIS.',
         'Pindai QR di atas, atau pilih dari galeri setelah menyimpannya.',
@@ -1286,7 +1477,7 @@ class _BookingPaymentScreenState extends State<BookingPaymentScreen> {
               'Status diperiksa otomatis selama halaman ini terbuka. Cek manual tersedia setiap 10 detik.',
               textAlign: TextAlign.center,
               style: TextStyle(
-                  fontSize: 11, height: 1.5, color: AppColors.textMuted))),
+                  fontSize: 12, height: 1.5, color: AppColors.textMuted))),
     ]);
   }
 
@@ -1341,7 +1532,7 @@ class _BookingPaymentScreenState extends State<BookingPaymentScreen> {
             p.canRetry
                 ? 'Instruksi ini tidak berhasil dibuat atau ditolak. Tidak ada tagihan yang perlu dibayar. Anda dapat memilih metode lagi.'
                 : 'Instruksi ini tidak berhasil. Percobaan baru belum dapat dibuat sekarang; periksa status booking.',
-            const Color(0xFF9C493D),
+            AppColors.danger,
             key: key,
             actions: retry);
       case PaymentPhase.expired:
@@ -1351,7 +1542,7 @@ class _BookingPaymentScreenState extends State<BookingPaymentScreen> {
             p.canRetry
                 ? 'Waktu pembayaran habis. Jangan membayar ke instruksi lama. Anda dapat memilih metode lagi.'
                 : 'Waktu pembayaran habis. Jangan membayar ke instruksi lama. Percobaan baru belum dapat dibuat sekarang.',
-            const Color(0xFF9C493D),
+            AppColors.danger,
             key: key,
             actions: retry);
       case PaymentPhase.cancelled:
@@ -1395,13 +1586,12 @@ class _BookingPaymentScreenState extends State<BookingPaymentScreen> {
   String _paidAtLabel() {
     final paid = _payment.snapshot?.paidAt;
     if (paid == null) return 'Belum tersedia';
-    final zone = _payment.tickets?.timezone ?? '';
-    final local = zone.isEmpty
-        ? paid.toUtc()
-        : destinationCalendarNow(zone, instant: paid);
-    String two(int n) => n.toString().padLeft(2, '0');
-    return '${formatLongDate('${local.year}-${two(local.month)}-${two(local.day)}')}, '
-        '${two(local.hour)}.${two(local.minute)} ${local.timeZoneName}';
+    return formatInstantInZone(
+            paid,
+            _payment.tickets?.timezone ??
+                _payment.snapshot?.timezone ??
+                _payment.booking?.destinationTimezone)
+        .replaceFirst(', ', ' · ');
   }
 
   Widget _ticketStatus() {
@@ -1421,30 +1611,67 @@ class _BookingPaymentScreenState extends State<BookingPaymentScreen> {
           list.any((t) => t.qrAvailable || t.checkedIn);
       text = switch (data.state) {
         'scheduled' =>
-          'QR tiket masuk per pengunjung tersedia mulai ${formatLongDate(data.availableFrom)} (${data.timezone}).',
+          'QR tiket disediakan secara terpisah untuk setiap pengunjung, mengikuti status kelayakan tiket.',
         'available' when data.admissionAllowed && !qrReady =>
           'Tiket sedang diterbitkan. QR per pengunjung akan muncul di sini begitu siap.',
         _ => data.message,
       };
     }
     return _panel([
-      _heading('Tiket masuk'),
-      _body(text),
+      Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Container(
+            padding: const EdgeInsets.all(AppSpacing.sm),
+            decoration: BoxDecoration(
+                color: AppColors.blueTint,
+                borderRadius: BorderRadius.circular(14)),
+            child: const Icon(PhosphorIconsRegular.qrCode,
+                size: 20, color: AppColors.blue)),
+        const SizedBox(width: AppSpacing.md),
+        Expanded(
+            child:
+                Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          _heading('Tiket Masuk'),
+          _body(text),
+        ])),
+      ]),
+      if (data != null &&
+          data.state == 'scheduled' &&
+          data.availableFrom.isNotEmpty) ...[
+        const SizedBox(height: AppSpacing.lg),
+        Container(
+          padding: const EdgeInsets.all(AppSpacing.md),
+          decoration: BoxDecoration(
+              color: AppColors.blueTint,
+              border: Border.all(color: AppColors.border),
+              borderRadius: BorderRadius.circular(14)),
+          child: _line('Mulai tersedia sesuai jadwal',
+              visitDayLabel(data.availableFrom)),
+        ),
+      ],
       const SizedBox(height: AppSpacing.sm),
       _body(
-          'Pembayaran dan tiket masuk adalah dua status berbeda. QR pembayaran tidak dipakai untuk masuk.',
+          'Pembayaran lunas tidak otomatis berarti QR tiket sudah siap. QR pembayaran tidak dapat digunakan untuk check-in.',
           color: AppColors.textMuted),
       if (qrReady)
         _button(_showTickets ? 'Sembunyikan Tiket' : 'Lihat Tiket',
             () => setState(() => _showTickets = !_showTickets),
             key: const Key('pay-view-ticket')),
-      _button(p.ticketsLoading ? 'Memeriksa…' : 'Perbarui Status Tiket',
-          p.ticketsLoading ? null : p.loadTickets,
-          key: const Key('pay-ticket-refresh'), primary: false),
+      Padding(
+        padding: const EdgeInsets.only(top: AppSpacing.md),
+        child: OutlinedButton.icon(
+          key: const Key('pay-ticket-refresh'),
+          onPressed: p.ticketsLoading ? null : p.loadTickets,
+          style: _successOutlineStyle(),
+          icon: const Icon(PhosphorIconsRegular.arrowsClockwise, size: 16),
+          label:
+              Text(p.ticketsLoading ? 'Memeriksa…' : 'Perbarui Status Tiket'),
+        ),
+      ),
       if (_showTickets && qrReady)
         BookingTicketQrSection(
             repository: widget.repository,
             bookingGuid: widget.bookingGuid,
+            booking: p.booking,
             onRefreshed: p.loadTickets),
     ]);
   }
@@ -1459,44 +1686,154 @@ class _BookingPaymentScreenState extends State<BookingPaymentScreen> {
         key: const Key('pay-success'),
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          _statePanel(
-              PhosphorIconsRegular.checkCircle,
-              'Pembayaran Berhasil!',
-              'Pembayaran sudah diverifikasi server dan booking Anda dikonfirmasi.',
-              AppColors.success),
           _panel([
-            _line('Status', 'Lunas'),
-            _line('Nomor booking', s.bookingNumber ?? b.bookingNumber),
-            _line('Nomor invoice', s.invoiceNumber ?? 'Belum tersedia'),
-            _line('Destinasi', b.destinationName),
-            _line('Tanggal kunjungan', formatLongDate(b.visitDate)),
-            _line('Jumlah tiket', '${s.quantity ?? b.quantity}'),
-            _line('Metode',
-                paymentMethodLabel(s.attemptMethod, s.attemptChannel)),
-            _line(
-                'Total dibayar',
-                total == null
-                    ? 'Belum tersedia'
-                    : formatMoney(total, currency)),
-            _line('Waktu bayar', _paidAtLabel()),
+            Center(
+                child: Container(
+                    padding: const EdgeInsets.all(AppSpacing.md),
+                    decoration: const BoxDecoration(
+                        color: AppColors.successTint, shape: BoxShape.circle),
+                    child: const Icon(PhosphorIconsRegular.checkCircle,
+                        size: 24, color: AppColors.success))),
+            const SizedBox(height: AppSpacing.lg),
+            Text('Pembayaran Berhasil!',
+                textAlign: TextAlign.center,
+                style: GoogleFonts.plusJakartaSans(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w800,
+                    color: AppColors.navy)),
+            const SizedBox(height: AppSpacing.sm),
+            const Text(
+                'Pembayaran telah diverifikasi server dan booking Anda dikonfirmasi.',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                    fontSize: 12, height: 1.6, color: AppColors.textSecondary)),
+            const SizedBox(height: AppSpacing.lg),
+            Text(
+                total == null ? 'Belum tersedia' : formatMoney(total, currency),
+                textAlign: TextAlign.center,
+                style: GoogleFonts.plusJakartaSans(
+                    fontSize: 26,
+                    fontWeight: FontWeight.w800,
+                    color: AppColors.blueDeep)),
+            const SizedBox(height: AppSpacing.sm),
+            Text(b.destinationName,
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                    fontSize: 12, color: AppColors.textSecondary)),
           ]),
+          _panel([
+            Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+              Expanded(child: _heading('Rincian Transaksi')),
+              const Text('Terverifikasi',
+                  style:
+                      TextStyle(fontSize: 11, color: AppColors.textSecondary)),
+            ]),
+            const SizedBox(height: AppSpacing.sm),
+            for (final row in <(String, String)>[
+              ('Destinasi', b.destinationName),
+              ('Tanggal kunjungan', formatLongDate(b.visitDate)),
+              ('Jumlah tiket', '${s.quantity ?? b.quantity} orang'),
+              (
+                'Metode pembayaran',
+                paymentMethodLabel(s.attemptMethod, s.attemptChannel)
+              ),
+              ('Waktu pembayaran', _paidAtLabel()),
+            ]) ...[
+              _line(row.$1, row.$2),
+              const Divider(height: AppSpacing.md, color: AppColors.border),
+            ],
+            const SizedBox(height: AppSpacing.sm),
+            OutlinedButton(
+              key: const Key('pay-success-details'),
+              onPressed: () =>
+                  setState(() => _successDetails = !_successDetails),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: AppColors.blue,
+                backgroundColor: AppColors.blueTint,
+                minimumSize: const Size(48, 48),
+                side: const BorderSide(color: AppColors.border),
+                textStyle: GoogleFonts.plusJakartaSans(
+                    fontSize: 13, fontWeight: FontWeight.w800),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14)),
+              ),
+              child: Text(_successDetails
+                  ? 'Sembunyikan nomor booking & invoice ⌃'
+                  : 'Lihat nomor booking & invoice ⌄'),
+            ),
+            if (_successDetails) ...[
+              const SizedBox(height: AppSpacing.sm),
+              _copyTile('Nomor booking', s.bookingNumber ?? b.bookingNumber),
+              const SizedBox(height: AppSpacing.sm),
+              if (s.invoiceNumber != null)
+                _copyTile('Nomor invoice', s.invoiceNumber!)
+              else
+                _body('Nomor invoice belum tersedia.'),
+            ],
+          ]),
+          const SizedBox(height: AppSpacing.sm),
+          _heading('Tiket Kunjungan'),
           _ticketStatus(),
-          if (_feedback != null) _live(_feedback!),
-          if (!s.receiptAvailable)
-            _body('Bukti pembayaran sedang disiapkan.',
-                color: AppColors.textMuted),
-          _button(p.receiptBusy ? 'Mengunduh…' : 'Unduh Bukti Pembayaran',
-              s.receiptAvailable && !p.receiptBusy ? _downloadReceipt : null,
-              key: const Key('pay-receipt')),
+          const SizedBox(height: AppSpacing.sm),
+          _heading('Dokumen Pembayaran'),
+          _panel([
+            Row(children: [
+              Container(
+                  padding: const EdgeInsets.all(AppSpacing.sm),
+                  decoration: BoxDecoration(
+                      color: AppColors.blueTint,
+                      borderRadius: BorderRadius.circular(14)),
+                  child: const Icon(PhosphorIconsRegular.fileText,
+                      size: 20, color: AppColors.blue)),
+              const SizedBox(width: AppSpacing.md),
+              Expanded(
+                  child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                    _heading('Bukti Pembayaran'),
+                    _body('Dokumen transaksi · PDF'),
+                  ])),
+            ]),
+            const SizedBox(height: AppSpacing.md),
+            ElevatedButton.icon(
+              key: const Key('pay-receipt'),
+              onPressed: s.receiptAvailable && !p.receiptBusy
+                  ? _downloadReceipt
+                  : null,
+              style: ElevatedButton.styleFrom(
+                minimumSize: const Size(48, 48),
+                elevation: 0,
+                textStyle: GoogleFonts.plusJakartaSans(
+                    fontSize: 13, fontWeight: FontWeight.w800),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(AppSpacing.md)),
+              ),
+              icon: const Icon(PhosphorIconsRegular.downloadSimple, size: 16),
+              label:
+                  Text(p.receiptBusy ? 'Mengunduh…' : 'Unduh Bukti Pembayaran'),
+            ),
+            if (!s.receiptAvailable) ...[
+              const SizedBox(height: AppSpacing.md),
+              _body('Bukti pembayaran sedang disiapkan.'),
+            ],
+          ]),
           BookingRefundSection(
               repository: widget.repository,
               bookingGuid: widget.bookingGuid,
               seed: s,
+              compact: true,
               storage: widget.storage),
-          _button('Lihat Booking', () => Navigator.maybePop(context),
-              primary: false),
         ]);
   }
+
+  ButtonStyle _successOutlineStyle() => OutlinedButton.styleFrom(
+      minimumSize: const Size(48, 48),
+      foregroundColor: AppColors.blue,
+      side: const BorderSide(color: AppColors.blue, width: 2),
+      textStyle: GoogleFonts.plusJakartaSans(
+          fontSize: 13, fontWeight: FontWeight.w800),
+      shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(AppSpacing.md)));
 
   // ── Build ──────────────────────────────────────────────────
 
@@ -1520,8 +1857,11 @@ class _BookingPaymentScreenState extends State<BookingPaymentScreen> {
                             children: [
                               _header(context, phase),
                               Padding(
-                                  padding: const EdgeInsets.fromLTRB(20,
-                                      AppSpacing.lg + 2, 20, AppSpacing.xl + 4),
+                                  padding: const EdgeInsets.fromLTRB(
+                                      AppSpacing.lg,
+                                      AppSpacing.lg,
+                                      AppSpacing.lg,
+                                      AppSpacing.xl),
                                   child: _content(phase)),
                             ]))))));
   }
@@ -1531,38 +1871,37 @@ class _BookingPaymentScreenState extends State<BookingPaymentScreen> {
           active: true,
           child: Padding(
               padding: EdgeInsets.fromLTRB(
-                  AppSpacing.md,
+                  AppSpacing.lg,
                   MediaQuery.paddingOf(context).top + AppSpacing.sm,
-                  20,
+                  AppSpacing.lg,
                   AppSpacing.xl),
               child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     const Row(children: [
-                      BackButton(color: Colors.white),
+                      BackButton(color: AppColors.surface),
                       Expanded(
                           child: Text('WISATA DAERAHKU',
                               style: TextStyle(
                                   fontSize: 12,
                                   fontWeight: FontWeight.w800,
-                                  color: Colors.white)))
+                                  color: AppColors.surface)))
                     ]),
                     Padding(
-                        padding: const EdgeInsets.only(
-                            left: AppSpacing.sm, top: AppSpacing.lg),
+                        padding: const EdgeInsets.only(top: AppSpacing.lg),
                         child: Semantics(
                             header: true,
                             child: Text(_title(phase),
                                 style: const TextStyle(
-                                    fontSize: 24,
+                                    fontSize: 22,
                                     fontWeight: FontWeight.w800,
-                                    color: Colors.white)))),
+                                    color: AppColors.surface)))),
                     const Padding(
-                        padding: EdgeInsets.only(left: AppSpacing.sm, top: 6),
+                        padding: EdgeInsets.only(top: AppSpacing.sm),
                         child: Text(
                             'Status pembayaran dikonfirmasi oleh server',
-                            style:
-                                TextStyle(fontSize: 12, color: Colors.white))),
+                            style: TextStyle(
+                                fontSize: 12, color: AppColors.surface))),
                   ])));
 
   Widget _content(PaymentPhase phase) {
@@ -1583,7 +1922,8 @@ class _BookingPaymentScreenState extends State<BookingPaymentScreen> {
     if (phase == PaymentPhase.loadFailed) {
       return _panel([
         Text(p.error ?? 'Status pembayaran belum dapat dimuat.',
-            style: const TextStyle(color: Color(0xFF9C493D))),
+            style: const TextStyle(
+                fontSize: 12, height: 1.5, color: AppColors.danger)),
         _button('Coba lagi', p.busy ? null : () => p.reload(initial: true),
             primary: false),
       ]);
@@ -1598,15 +1938,18 @@ class _BookingPaymentScreenState extends State<BookingPaymentScreen> {
     return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
       if (p.busy && p.creating) const LinearProgressIndicator(),
       if (p.error != null)
-        _live(p.error!,
-            key: const Key('pay-error'), color: const Color(0xFF9C493D)),
+        _live(p.error!, key: const Key('pay-error'), color: AppColors.danger),
       if (phase != PaymentPhase.awaiting) _summary(),
       if (phase == PaymentPhase.verifying &&
           s.attemptExpiresAt != null &&
           !s.verificationPending &&
           s.attemptStatus != 'paid')
         _countdown(),
-      if (p.chooserVisible) ...[_countdown(), _chooser()],
+      if (p.chooserVisible) ...[
+        if (p.countdownStarted) _countdown(),
+        _selectionNote(),
+        _chooser()
+      ],
       if (phase == PaymentPhase.awaiting)
         _instruction()
       else if (!p.chooserVisible)

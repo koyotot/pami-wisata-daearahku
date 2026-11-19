@@ -94,8 +94,18 @@ class PaymentSnapshot {
   bool get canSwitch => json['can_switch'] == true;
   String? get switchReason => _text('switch_reason');
 
-  /// Booking deadline (top level `expires_at` on GET). Every attempt shares this deadline.
+  /// Running countdown (top level `expires_at` on GET). Every attempt shares it. Null means the countdown
+  /// has not started (no method chosen yet, or the cycle was reset), never "closed".
   DateTime? get bookingExpiresAt => _time(json['expires_at']);
+
+  /// Deadline to choose a payment method. Plain text only, not a countdown.
+  DateTime? get selectionExpiresAt => _time(json['selection_expires_at']);
+
+  /// Destination zone the booking's deadlines run on.
+  String? get timezone => json['timezone'] as String?;
+
+  /// The selection deadline passed; nothing can be chosen any more.
+  bool get selectionClosed => json['reason'] == 'payment_selection_closed';
 
   /// Absolute server time the unfinished attempt stops being payable.
   DateTime? get attemptExpiresAt => _time(lastAttempt?['expires_at']);
@@ -253,6 +263,8 @@ String paymentReason(String? reason) => switch (reason) {
       'unsupported_currency' => 'Mata uang booking belum didukung simulator.',
       'payment_window_closed' =>
         'Batas pembayaran telah berakhir. Periksa status booking terbaru.',
+      'payment_selection_closed' =>
+        'Batas waktu memilih metode pembayaran telah berakhir. Periksa status booking terbaru.',
       'visit_window_closed' =>
         'Waktu pembayaran untuk kunjungan ini telah berakhir.',
       'payment_provider_conflict' =>
@@ -282,4 +294,21 @@ String paymentError(Object error) {
         ? 'Koneksi terputus atau respons belum pasti. Periksa status; pembayaran tidak diulang otomatis.'
         : error.message,
   };
+}
+
+/// Plain Indonesian message for a refused "Ganti metode pembayaran" call. Maps the stable 409 `code`.
+String cancelAttemptError(Object error) {
+  if (error is ApiException) {
+    switch (error.code) {
+      case 'payment_already_received':
+        return 'Pembayaran sudah diterima.';
+      case 'payment_verification_pending':
+        return 'Sedang memverifikasi, coba lagi sebentar.';
+      case 'payment_needs_review':
+        return 'Pembayaran sedang diperiksa pengelola. Tidak perlu membayar ulang.';
+      case 'booking_not_awaiting_payment':
+        return 'Booking ini tidak sedang menunggu pembayaran.';
+    }
+  }
+  return paymentError(error);
 }

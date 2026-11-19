@@ -5,22 +5,23 @@
 // ============================================================
 import 'package:flutter/material.dart';
 import 'package:phosphor_icons/phosphor_icons.dart';
+import '../../theme/app_colors.dart';
 import '../../services/auth_session.dart';
 import '../../widgets/operations_chrome.dart';
 import '../../widgets/scroll_aware_status_bar.dart';
 
 class AdminColors {
-  static const blue = Color(0xFF1976D2);
-  static const blueDeep = Color(0xFF1558B0);
-  static const navy = Color(0xFF102D59);
-  static const orange = Color(0xFFFF9800);
-  static const bg = Color(0xFFF5F8FD);
-  static const card = Colors.white;
+  static const blue = AppColors.blue;
+  static const blueDeep = AppColors.blueDeep;
+  static const navy = AppColors.navy;
+  static const orange = AppColors.orange;
+  static const bg = AppColors.bg;
+  static const card = AppColors.surface;
   static const tint = Color(0xFFE6F0FC);
   static const text = navy;
-  static const textMuted = Color(0xFF728099);
+  static const textMuted = AppColors.textMuted;
   static const textDim = Color(0xFF9AA7BC);
-  static const border = Color(0xFFDCE4F0);
+  static const border = AppColors.border;
   static const danger = Color(0xFFE5484D);
   static const success = Color(0xFF10B981);
   static const warning = Color(0xFFF59E0B);
@@ -84,7 +85,8 @@ class AdminPage extends StatelessWidget {
                               actions: actions ?? const []),
                     ),
                   ),
-                  const SliverToBoxAdapter(child: SizedBox(height: 8)),
+                  const SliverToBoxAdapter(
+                      child: SizedBox(height: AppSpacing.sm)),
                   ...slivers,
                 ],
               ),
@@ -111,42 +113,42 @@ class AdminActionBar extends StatelessWidget {
   final Key? buttonKey;
 
   @override
-  Widget build(BuildContext context) => Container(
-        padding: EdgeInsets.fromLTRB(
-            16, 12, 16, 12 + MediaQuery.paddingOf(context).bottom),
-        decoration: const BoxDecoration(
-            color: Colors.white,
-            border: Border(top: BorderSide(color: AdminColors.border)),
-            boxShadow: [
-              BoxShadow(
-                  color: Color(0x14102D59),
-                  blurRadius: 16,
-                  offset: Offset(0, -4))
+  Widget build(BuildContext context) => Material(
+      color: AppColors.surface,
+      elevation: 8,
+      shadowColor: AppColors.dockShadow,
+      child: SafeArea(
+          top: false,
+          child: Container(
+            padding: const EdgeInsets.symmetric(
+                horizontal: AppSpacing.lg, vertical: AppSpacing.md),
+            decoration: const BoxDecoration(
+                border: Border(top: BorderSide(color: AdminColors.border))),
+            child: Row(children: [
+              Expanded(
+                  child: Text(note,
+                      style: const TextStyle(
+                          color: AdminColors.textMuted,
+                          fontSize: 12,
+                          height: 1.5))),
+              const SizedBox(width: AppSpacing.md),
+              FilledButton.icon(
+                  key: buttonKey,
+                  style: FilledButton.styleFrom(
+                      backgroundColor: AdminColors.blue,
+                      foregroundColor: Colors.white,
+                      minimumSize: const Size(140, 50),
+                      padding:
+                          const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
+                      textStyle: const TextStyle(
+                          fontSize: 13, fontWeight: FontWeight.w800),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14))),
+                  onPressed: onPressed,
+                  icon: Icon(icon, size: 18),
+                  label: Text(label)),
             ]),
-        child: Row(children: [
-          Expanded(
-              child: Text(note,
-                  style: const TextStyle(
-                      color: AdminColors.textMuted,
-                      fontSize: 11.5,
-                      height: 1.4))),
-          const SizedBox(width: 12),
-          FilledButton.icon(
-              key: buttonKey,
-              style: FilledButton.styleFrom(
-                  backgroundColor: AdminColors.blue,
-                  foregroundColor: Colors.white,
-                  minimumSize: const Size(48, 48),
-                  padding: const EdgeInsets.symmetric(horizontal: 18),
-                  textStyle: const TextStyle(
-                      fontSize: 13.5, fontWeight: FontWeight.w800),
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(14))),
-              onPressed: onPressed,
-              icon: Icon(icon, size: 18),
-              label: Text(label)),
-        ]),
-      );
+          )));
 }
 
 /// Horizontal single-choice chips (same look as the category chips).
@@ -164,46 +166,43 @@ class AdminFilterChips<T> extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      height: 52,
+      height: kMinInteractiveDimension + AppSpacing.md,
       child: ListView.builder(
         scrollDirection: Axis.horizontal,
         physics: const BouncingScrollPhysics(),
-        padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+        padding: const EdgeInsets.fromLTRB(
+            AppSpacing.lg, AppSpacing.md, AppSpacing.lg, 0),
         itemCount: options.length,
         itemBuilder: (_, i) {
           final (label, value) = options[i];
           final sel = value == selected;
-          return GestureDetector(
-            key: ValueKey('chip-$label'),
-            onTap: () => onSelected(value),
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 200),
-              margin: const EdgeInsets.only(right: 8),
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-              decoration: BoxDecoration(
-                color: sel ? AdminColors.blue : AdminColors.card,
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(
-                    color: sel ? AdminColors.blue : AdminColors.border),
-                boxShadow: sel
-                    ? [
-                        BoxShadow(
-                            color: AdminColors.blue.withValues(alpha: 0.40),
-                            blurRadius: 10,
-                            offset: const Offset(0, 3))
-                      ]
-                    : [],
-              ),
-              child: Center(
-                child: Text(label,
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w700,
-                      color: sel ? Colors.white : AdminColors.textMuted,
-                    )),
-              ),
-            ),
-          );
+          return Semantics(
+              button: true,
+              selected: sel,
+              child: GestureDetector(
+                key: ValueKey('chip-$label'),
+                onTap: () => onSelected(value),
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 200),
+                  margin: const EdgeInsets.only(right: AppSpacing.sm),
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: AppSpacing.lg, vertical: AppSpacing.sm),
+                  decoration: BoxDecoration(
+                    color: sel ? AdminColors.blue : AdminColors.card,
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(
+                        color: sel ? AdminColors.blue : AdminColors.border),
+                  ),
+                  child: Center(
+                    child: Text(label,
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                          color: sel ? Colors.white : AdminColors.textMuted,
+                        )),
+                  ),
+                ),
+              ));
         },
       ),
     );
@@ -220,7 +219,8 @@ class AdminStatCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Container(
-        padding: const EdgeInsets.fromLTRB(14, 14, 10, 12),
+        padding: const EdgeInsets.fromLTRB(
+            AppSpacing.lg, AppSpacing.lg, AppSpacing.sm, AppSpacing.md),
         decoration: BoxDecoration(
             color: AdminColors.card,
             border: Border.all(color: AdminColors.border),
@@ -232,7 +232,7 @@ class AdminStatCard extends StatelessWidget {
                   fontSize: 26,
                   height: 1.2,
                   fontWeight: FontWeight.w800)),
-          const SizedBox(height: 4),
+          const SizedBox(height: AppSpacing.xs),
           Row(children: [
             if (dotColor != null) ...[
               Container(
@@ -240,7 +240,7 @@ class AdminStatCard extends StatelessWidget {
                   height: 7,
                   decoration:
                       BoxDecoration(color: dotColor, shape: BoxShape.circle)),
-              const SizedBox(width: 6),
+              const SizedBox(width: AppSpacing.sm),
             ],
             Expanded(
               child: Text(label,
@@ -248,7 +248,7 @@ class AdminStatCard extends StatelessWidget {
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
                       color: AdminColors.textMuted,
-                      fontSize: 11.5,
+                      fontSize: 11,
                       fontWeight: FontWeight.w600)),
             ),
           ]),
@@ -295,7 +295,14 @@ Widget adminErrorSliver(String message, VoidCallback onRetry, {int? role}) =>
           child: Column(mainAxisSize: MainAxisSize.min, children: [
             Text(message, textAlign: TextAlign.center),
             if ((role ?? AuthSession.instance.role) != 1)
-              TextButton(onPressed: onRetry, child: const Text('Coba lagi'))
+              TextButton(
+                  style: TextButton.styleFrom(
+                      textStyle: const TextStyle(
+                          fontSize: 13, fontWeight: FontWeight.w800),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14))),
+                  onPressed: onRetry,
+                  child: const Text('Coba lagi'))
             else
               const Text('Tarik turun untuk menyinkronkan data.'),
           ]),
@@ -310,7 +317,8 @@ Widget adminEmptySliver(IconData icon, String title, String subtitle,
     SliverFillRemaining(
       hasScrollBody: false,
       child: Padding(
-        padding: EdgeInsets.fromLTRB(24, 16, 24, 16 + bottomInset),
+        padding: EdgeInsets.fromLTRB(AppSpacing.lg, AppSpacing.lg,
+            AppSpacing.lg, AppSpacing.lg + bottomInset),
         child: Center(
           child: Builder(builder: (context) {
             // Short screens with large text drop the decorative icon so the
@@ -334,14 +342,14 @@ Widget adminEmptySliver(IconData icon, String title, String subtitle,
                         size: 42,
                         color: AdminColors.blue.withValues(alpha: 0.5)),
                   ),
-                  const SizedBox(height: 18),
+                  const SizedBox(height: AppSpacing.lg),
                 ],
                 Text(title,
                     style: const TextStyle(
                         color: AdminColors.text,
                         fontSize: 16,
                         fontWeight: FontWeight.w800)),
-                const SizedBox(height: 6),
+                const SizedBox(height: AppSpacing.sm),
                 Text(subtitle,
                     textAlign: TextAlign.center,
                     style: const TextStyle(
@@ -362,14 +370,14 @@ class AdminNotice extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Container(
         width: double.infinity,
-        padding: const EdgeInsets.all(12),
+        padding: const EdgeInsets.all(AppSpacing.md),
         decoration: BoxDecoration(
           color: color.withValues(alpha: 0.10),
           borderRadius: BorderRadius.circular(12),
           border: Border.all(color: color.withValues(alpha: 0.30)),
         ),
         child: Text(message,
-            style: TextStyle(color: color, fontSize: 12.5, height: 1.4)),
+            style: TextStyle(color: color, fontSize: 13, height: 1.4)),
       );
 }
 
@@ -381,7 +389,8 @@ class AdminBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+        padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.sm, vertical: AppSpacing.xs),
         decoration: BoxDecoration(
           color: color.withValues(alpha: 0.10),
           borderRadius: BorderRadius.circular(10),
@@ -390,7 +399,7 @@ class AdminBadge extends StatelessWidget {
         child: Row(mainAxisSize: MainAxisSize.min, children: [
           if (icon != null) ...[
             Icon(icon, size: 11, color: color),
-            const SizedBox(width: 4),
+            const SizedBox(width: AppSpacing.xs),
           ],
           Text(label,
               style: TextStyle(
@@ -403,13 +412,6 @@ BoxDecoration adminCardDecoration() => BoxDecoration(
       color: AdminColors.card,
       borderRadius: BorderRadius.circular(20),
       border: Border.all(color: AdminColors.border),
-      boxShadow: [
-        BoxShadow(
-          color: AdminColors.blue.withValues(alpha: 0.10),
-          blurRadius: 20,
-          offset: const Offset(0, 8),
-        ),
-      ],
     );
 
 void showAdminSnack(BuildContext context, String message,
@@ -446,22 +448,29 @@ Future<bool> adminConfirm(
               color: AdminColors.textMuted, fontSize: 13, height: 1.5)),
       actions: [
         TextButton(
+          style: TextButton.styleFrom(
+              textStyle:
+                  const TextStyle(fontSize: 13, fontWeight: FontWeight.w800),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(14))),
           onPressed: () => Navigator.pop(ctx, false),
           child: const Text('Batal',
               style: TextStyle(color: AdminColors.textMuted, fontSize: 13)),
         ),
         ElevatedButton(
           style: ElevatedButton.styleFrom(
+            textStyle:
+                const TextStyle(fontSize: 13, fontWeight: FontWeight.w800),
             backgroundColor: danger ? AdminColors.danger : AdminColors.blue,
             foregroundColor: Colors.white,
             elevation: 0,
             shape:
-                RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
           ),
           onPressed: () => Navigator.pop(ctx, true),
           child: Text(confirmLabel,
               style:
-                  const TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
+                  const TextStyle(fontWeight: FontWeight.w800, fontSize: 13)),
         ),
       ],
     ),
@@ -492,7 +501,8 @@ InputDecoration adminInputDecoration(String? label, {String? hint}) =>
         borderRadius: BorderRadius.circular(14),
         borderSide: const BorderSide(color: AdminColors.danger, width: 1.5),
       ),
-      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      contentPadding: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.lg, vertical: AppSpacing.lg),
     );
 
 /// Compact "⋮" row menu with Ubah + activate/deactivate, for master-data
@@ -516,13 +526,13 @@ class AdminRowMenu extends StatelessWidget {
     final toggleColor = active ? AdminColors.danger : AdminColors.success;
     Widget item(IconData icon, String label, Color color) => Row(children: [
           Icon(icon, size: 18, color: color),
-          const SizedBox(width: 12),
+          const SizedBox(width: AppSpacing.md),
           Flexible(
               child: Text(label,
                   style: TextStyle(
                       color:
                           color == AdminColors.blue ? AdminColors.text : color,
-                      fontSize: 14,
+                      fontSize: 13,
                       fontWeight: FontWeight.w600))),
         ]);
     return PopupMenuButton<String>(

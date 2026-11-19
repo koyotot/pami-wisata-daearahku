@@ -52,6 +52,10 @@ String bookingErrorMessage(Object error, {bool mutation = false}) {
       return 'Pendaftaran dari percobaan sebelumnya ternyata sudah terbentuk.';
     case 'booking_not_cancellable':
       return 'Pendaftaran ini sudah diproses sehingga tidak dapat dibatalkan.';
+    case 'booking_already_paid':
+      return 'Pembayaran sudah diterima sehingga pendaftaran tidak dapat dibatalkan.';
+    case 'payment_verification_pending':
+      return 'Pembayaran sedang diverifikasi sehingga pendaftaran belum dapat dibatalkan. Coba lagi sebentar.';
     case 'booking_already_cancelled':
       return 'Pendaftaran ini sudah dibatalkan sebelumnya.';
     case 'check_in_duplicate':

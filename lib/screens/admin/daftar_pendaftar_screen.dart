@@ -72,8 +72,8 @@ class _DaftarPendaftarScreenState extends State<DaftarPendaftarScreen> {
     if (!_valid || _accessRevoked) return;
     // Superadmin loads everything once and filters/sorts locally, so the
     // status chips can reflect what the server actually returned.
-    await _list.load(
-        filters: {if (_status != null && _role != 2) 'status': _status!});
+    await _list
+        .load(filters: {if (_status != null && _role != 2) 'status': _status!});
     final error = _list.error;
     if (_valid &&
         error is ApiException &&
@@ -217,7 +217,8 @@ class _DaftarPendaftarScreenState extends State<DaftarPendaftarScreen> {
               enabledBorder: InputBorder.none,
               focusedBorder: InputBorder.none,
               filled: false,
-              contentPadding: const EdgeInsets.symmetric(vertical: 14),
+              contentPadding:
+                  const EdgeInsets.symmetric(vertical: AppSpacing.lg),
               prefixIcon: const Icon(PhosphorIconsRegular.magnifyingGlass,
                   size: 20, color: AppColors.blue),
               suffixIcon: _query.isEmpty
@@ -243,8 +244,11 @@ class _DaftarPendaftarScreenState extends State<DaftarPendaftarScreen> {
                   child: Semantics(
                       selected: status == item.$2,
                       child: TextButton(
-                          key: ValueKey('registrants-status-${item.$2 ?? 'all'}'),
+                          key: ValueKey(
+                              'registrants-status-${item.$2 ?? 'all'}'),
                           style: TextButton.styleFrom(
+                              textStyle: const TextStyle(
+                                  fontSize: 13, fontWeight: FontWeight.w800),
                               foregroundColor: status == item.$2
                                   ? AppColors.surface
                                   : AppColors.blueDeep,
@@ -263,7 +267,8 @@ class _DaftarPendaftarScreenState extends State<DaftarPendaftarScreen> {
                           onPressed: () => setState(() => _status = item.$2),
                           child: Text(item.$1,
                               style: const TextStyle(
-                                  fontSize: 12, fontWeight: FontWeight.w700))))),
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w800))))),
           ]));
 
   Widget _registrantCard(Booking booking) {
@@ -272,7 +277,7 @@ class _DaftarPendaftarScreenState extends State<DaftarPendaftarScreen> {
         : booking.visitorEmail;
     return Container(
         key: ValueKey(booking.guid),
-        margin: const EdgeInsets.only(bottom: 12),
+        margin: const EdgeInsets.only(bottom: AppSpacing.md),
         decoration: BoxDecoration(
             color: Colors.white,
             border: Border.all(color: AppColors.border),
@@ -284,7 +289,7 @@ class _DaftarPendaftarScreenState extends State<DaftarPendaftarScreen> {
             child: InkWell(
                 onTap: () => _open(booking),
                 child: Padding(
-                    padding: const EdgeInsets.all(16),
+                    padding: const EdgeInsets.all(AppSpacing.lg),
                     child: Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
@@ -298,22 +303,22 @@ class _DaftarPendaftarScreenState extends State<DaftarPendaftarScreen> {
                                         children: [
                                       const Text('DESTINASI WISATA',
                                           style: TextStyle(
-                                              fontSize: 10,
+                                              fontSize: 11,
                                               letterSpacing: .8,
                                               fontWeight: FontWeight.w700,
                                               color: AppColors.textSecondary)),
-                                      const SizedBox(height: 6),
+                                      const SizedBox(height: AppSpacing.sm),
                                       Text(booking.destinationName,
                                           style: const TextStyle(
                                               fontSize: 16,
                                               height: 1.3,
                                               fontWeight: FontWeight.w800,
                                               color: AppColors.navy)),
-                                      const SizedBox(height: 8),
+                                      const SizedBox(height: AppSpacing.sm),
                                       Row(children: [
                                         const Icon(PhosphorIconsRegular.user,
                                             size: 15, color: AppColors.blue),
-                                        const SizedBox(width: 6),
+                                        const SizedBox(width: AppSpacing.sm),
                                         Expanded(
                                             child: Text(who,
                                                 maxLines: 1,
@@ -324,29 +329,31 @@ class _DaftarPendaftarScreenState extends State<DaftarPendaftarScreen> {
                                                         .textSecondary))),
                                       ]),
                                     ])),
-                                const SizedBox(width: 8),
+                                const SizedBox(width: AppSpacing.sm),
                                 OperationsStatusBadge(
                                     bookingStatusLabel(booking.status),
                                     _tone(booking.status),
                                     small: true),
                               ]),
-                          const SizedBox(height: 14),
+                          const SizedBox(height: AppSpacing.lg),
                           const Divider(height: 1, color: AppColors.border),
-                          const SizedBox(height: 14),
+                          const SizedBox(height: AppSpacing.lg),
                           Row(children: [
                             const Icon(PhosphorIconsRegular.calendarBlank,
                                 size: 15, color: AppColors.blue),
-                            const SizedBox(width: 6),
+                            const SizedBox(width: AppSpacing.sm),
                             Text(visitDayLabel(booking.visitDate),
                                 style: const TextStyle(
-                                    fontSize: 12, color: AppColors.textSecondary)),
+                                    fontSize: 12,
+                                    color: AppColors.textSecondary)),
                             const Spacer(),
                             const Icon(PhosphorIconsRegular.users,
                                 size: 15, color: AppColors.blue),
-                            const SizedBox(width: 6),
+                            const SizedBox(width: AppSpacing.sm),
                             Text('${booking.quantity} orang',
                                 style: const TextStyle(
-                                    fontSize: 12, color: AppColors.textSecondary)),
+                                    fontSize: 12,
+                                    color: AppColors.textSecondary)),
                             const Spacer(),
                             Container(
                                 width: 32,
@@ -354,8 +361,10 @@ class _DaftarPendaftarScreenState extends State<DaftarPendaftarScreen> {
                                 decoration: BoxDecoration(
                                     color: AppColors.blueTint,
                                     borderRadius: BorderRadius.circular(10)),
-                                child: const Icon(PhosphorIconsRegular.caretRight,
-                                    size: 16, color: AppColors.blue)),
+                                child: const Icon(
+                                    PhosphorIconsRegular.caretRight,
+                                    size: 16,
+                                    color: AppColors.blue)),
                           ]),
                         ])))));
   }
@@ -368,28 +377,36 @@ class _DaftarPendaftarScreenState extends State<DaftarPendaftarScreen> {
       String? action,
       VoidCallback? onAction}) {
     return Container(
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 32),
+        padding:
+            const EdgeInsets.symmetric(horizontal: AppSpacing.lg, vertical: 32),
         decoration: BoxDecoration(
             color: Colors.white,
             border: Border.all(color: AppColors.border),
             borderRadius: BorderRadius.circular(20)),
         child: Column(children: [
           Icon(icon, size: 40, color: color),
-          const SizedBox(height: 16),
+          const SizedBox(height: AppSpacing.lg),
           Text(title,
               textAlign: TextAlign.center,
               style: const TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.w800,
                   color: AppColors.navy)),
-          const SizedBox(height: 8),
+          const SizedBox(height: AppSpacing.sm),
           Text(body,
               textAlign: TextAlign.center,
               style: const TextStyle(
                   fontSize: 13, height: 1.6, color: AppColors.textSecondary)),
           if (action != null) ...[
-            const SizedBox(height: 12),
-            TextButton(onPressed: onAction, child: Text(action)),
+            const SizedBox(height: AppSpacing.md),
+            TextButton(
+                style: TextButton.styleFrom(
+                    textStyle: const TextStyle(
+                        fontSize: 13, fontWeight: FontWeight.w800),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14))),
+                onPressed: onAction,
+                child: Text(action)),
           ],
         ]));
   }
@@ -404,9 +421,9 @@ class _DaftarPendaftarScreenState extends State<DaftarPendaftarScreen> {
     final filtering = status != null || _query.trim().isNotEmpty;
     return [
       _searchField(),
-      const SizedBox(height: 12),
+      const SizedBox(height: AppSpacing.md),
       _statusChips(status, statuses),
-      const SizedBox(height: 18),
+      const SizedBox(height: AppSpacing.lg),
       Row(children: [
         Expanded(
             child:
@@ -416,15 +433,15 @@ class _DaftarPendaftarScreenState extends State<DaftarPendaftarScreen> {
                   fontSize: 16,
                   fontWeight: FontWeight.w800,
                   color: AppColors.navy)),
-          const SizedBox(height: 4),
+          const SizedBox(height: AppSpacing.xs),
           Text(
               loaded
                   ? '${rows.length} pendaftaran ditemukan'
                   : firstLoad
                       ? 'Memuat data…'
                       : 'Data belum tersedia',
-              style:
-                  const TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+              style: const TextStyle(
+                  fontSize: 12, color: AppColors.textSecondary)),
         ])),
         OutlinedButton.icon(
             key: const ValueKey('registrants-sort'),
@@ -432,28 +449,30 @@ class _DaftarPendaftarScreenState extends State<DaftarPendaftarScreen> {
             iconAlignment: IconAlignment.end,
             icon: const Icon(PhosphorIconsRegular.caretDown, size: 16),
             style: OutlinedButton.styleFrom(
+                textStyle:
+                    const TextStyle(fontSize: 13, fontWeight: FontWeight.w800),
                 foregroundColor: AppColors.navy,
                 backgroundColor: Colors.white,
                 minimumSize: const Size(48, 48),
-                padding: const EdgeInsets.symmetric(horizontal: 14),
+                padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
                 side: const BorderSide(color: AppColors.border),
                 shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12))),
             label: Text(_sortLabels[_sort]!,
-                style:
-                    const TextStyle(fontSize: 12, fontWeight: FontWeight.w700))),
+                style: const TextStyle(
+                    fontSize: 13, fontWeight: FontWeight.w800))),
       ]),
-      const SizedBox(height: 14),
+      const SizedBox(height: AppSpacing.lg),
       if (firstLoad)
         const OperationsSkeleton()
       else if (_list.loading)
         const Padding(
-            padding: EdgeInsets.only(bottom: 12),
+            padding: EdgeInsets.only(bottom: AppSpacing.md),
             child: LinearProgressIndicator()),
       if (_accessRevoked)
         _messageBox(
             icon: PhosphorIconsRegular.lock,
-            color: const Color(0xFFB23B3B),
+            color: AppColors.danger,
             title: 'Akses telah berubah',
             body: 'Akses destinasi berubah. Kembali dan pilih ulang destinasi.',
             action: 'Kembali',
@@ -461,7 +480,7 @@ class _DaftarPendaftarScreenState extends State<DaftarPendaftarScreen> {
       else if (_list.error != null && !_list.loading)
         _messageBox(
             icon: PhosphorIconsRegular.wifiSlash,
-            color: const Color(0xFF98621E),
+            color: AppColors.warningText,
             title: 'Data belum dapat dimuat',
             body: adminErrorMessage(_list.error!),
             action: 'Coba lagi',
@@ -524,6 +543,9 @@ class _DaftarPendaftarScreenState extends State<DaftarPendaftarScreen> {
                                 key: _statusKeys.putIfAbsent(
                                     item.$2, () => GlobalKey()),
                                 style: TextButton.styleFrom(
+                                    textStyle: const TextStyle(
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.w800),
                                     foregroundColor: _status == item.$2
                                         ? AppColors.surface
                                         : AppColors.blueDeep,
@@ -566,10 +588,10 @@ class _DaftarPendaftarScreenState extends State<DaftarPendaftarScreen> {
                                       },
                                 child: Text(item.$1,
                                     style: const TextStyle(
-                                        fontSize: 11,
-                                        fontWeight: FontWeight.w700))))),
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.w800))))),
                 ])),
-            const SizedBox(height: 16),
+            const SizedBox(height: AppSpacing.lg),
             if (_list.loading) const LinearProgressIndicator(),
             if (_accessRevoked)
               const Text(
@@ -579,7 +601,7 @@ class _DaftarPendaftarScreenState extends State<DaftarPendaftarScreen> {
                   '${adminErrorMessage(_list.error!)}\nTarik turun untuk menyinkronkan.')
             else if (!_list.loading && rows.isEmpty)
               const Padding(
-                  padding: EdgeInsets.symmetric(vertical: 24),
+                  padding: EdgeInsets.symmetric(vertical: AppSpacing.xl),
                   child: Text('Belum ada pendaftar untuk filter ini.',
                       textAlign: TextAlign.center)),
             for (final booking in rows)

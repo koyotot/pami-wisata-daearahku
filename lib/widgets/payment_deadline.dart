@@ -106,18 +106,19 @@ class _PaymentDeadlineState extends State<PaymentDeadline>
     String two(int n) => n.toString().padLeft(2, '0');
     if (widget.banner) return _banner(seconds, two);
     return Container(
-        padding: const EdgeInsets.all(12),
+        padding: const EdgeInsets.all(AppSpacing.md),
         decoration: BoxDecoration(
-            color: const Color(0xFFFFF3DC),
-            borderRadius: BorderRadius.circular(12)),
+            color: AppColors.warningTint,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: AppColors.warningBorder)),
         child: Wrap(
             alignment: WrapAlignment.spaceBetween,
-            spacing: 12,
-            runSpacing: 6,
+            spacing: AppSpacing.md,
+            runSpacing: AppSpacing.sm,
             children: [
               Text(widget.label,
-                  style:
-                      const TextStyle(fontSize: 12, color: Color(0xFF80531B))),
+                  style: const TextStyle(
+                      fontSize: 12, color: AppColors.warningText)),
               Text(
                   widget.expiresAt == null || _now == null
                       ? 'Belum tersedia'
@@ -125,6 +126,7 @@ class _PaymentDeadlineState extends State<PaymentDeadline>
                           ? 'Waktu habis · periksa status'
                           : '${two(seconds ~/ 3600)}:${two(seconds ~/ 60 % 60)}:${two(seconds % 60)}',
                   style: const TextStyle(
+                      fontSize: 13,
                       fontWeight: FontWeight.w700,
                       color: AppColors.navy,
                       fontFeatures: [FontFeature.tabularFigures()])),
@@ -134,12 +136,13 @@ class _PaymentDeadlineState extends State<PaymentDeadline>
   Widget _banner(int seconds, String Function(int) two) {
     final unavailable = widget.expiresAt == null || _now == null;
     final expired = !unavailable && seconds == 0;
-    final bg = expired ? const Color(0xFFFDECEC) : const Color(0xFFFFF7E6);
-    final border = expired ? const Color(0xFFF3C9C9) : const Color(0xFFF3DDAA);
-    final fg = expired ? const Color(0xFFB23B3B) : const Color(0xFF80531B);
-    final clock = '${two(seconds ~/ 3600)}:${two(seconds ~/ 60 % 60)}:${two(seconds % 60)}';
+    final bg = expired ? AppColors.dangerTint : AppColors.warningTint;
+    final border = expired ? AppColors.dangerBorder : AppColors.warningBorder;
+    final fg = expired ? AppColors.danger : AppColors.warningText;
+    final clock =
+        '${two(seconds ~/ 3600)}:${two(seconds ~/ 60 % 60)}:${two(seconds % 60)}';
     return Container(
-        padding: const EdgeInsets.all(14),
+        padding: const EdgeInsets.all(AppSpacing.lg),
         decoration: BoxDecoration(
             color: bg,
             border: Border.all(color: border),
@@ -149,33 +152,42 @@ class _PaymentDeadlineState extends State<PaymentDeadline>
               width: 44,
               height: 44,
               decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: .6),
+                  color: AppColors.surface.withValues(alpha: .6),
                   border: Border.all(color: border),
                   borderRadius: BorderRadius.circular(14)),
               child: Icon(PhosphorIconsRegular.clock, size: 22, color: fg)),
-          const SizedBox(width: 12),
+          const SizedBox(width: AppSpacing.md),
           Expanded(
-              child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+              child: Wrap(
+                  alignment: WrapAlignment.spaceBetween,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  spacing: AppSpacing.md,
+                  runSpacing: AppSpacing.sm,
                   children: [
-                Text(expired ? 'Waktu pembayaran habis' : widget.label,
+                Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(expired ? 'Waktu pembayaran habis' : widget.label,
+                          style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w700,
+                              color: fg)),
+                      const SizedBox(height: AppSpacing.xs),
+                      Text(
+                          expired
+                              ? 'Waktu habis · periksa status'
+                              : widget.caption ?? '',
+                          style:
+                              TextStyle(fontSize: 12, height: 1.5, color: fg)),
+                    ]),
+                Text(unavailable ? 'Belum tersedia' : clock,
                     style: TextStyle(
-                        fontSize: 13, fontWeight: FontWeight.w800, color: fg)),
-                const SizedBox(height: 2),
-                Text(
-                    expired
-                        ? 'Waktu habis · periksa status'
-                        : widget.caption ?? '',
-                    style: TextStyle(
-                        fontSize: 12, color: fg.withValues(alpha: .8))),
+                        fontSize: unavailable ? 12 : 22,
+                        fontWeight: FontWeight.w800,
+                        color: fg,
+                        fontFeatures: const [FontFeature.tabularFigures()])),
               ])),
-          const SizedBox(width: 8),
-          Text(unavailable ? 'Belum tersedia' : clock,
-              style: TextStyle(
-                  fontSize: unavailable ? 12 : 22,
-                  fontWeight: FontWeight.w800,
-                  color: fg,
-                  fontFeatures: const [FontFeature.tabularFigures()])),
         ]));
   }
 }

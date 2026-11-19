@@ -6,6 +6,7 @@
 // ============================================================
 import 'package:flutter/material.dart';
 import 'package:phosphor_icons/phosphor_icons.dart';
+import '../../theme/app_colors.dart';
 import '../../data/admin_state.dart';
 import '../../data/facility_state.dart';
 import '../../data/business_repository.dart';
@@ -42,8 +43,8 @@ class _KelolaFasilitasScreenState extends State<KelolaFasilitasScreen> {
     _list = PagedListController<Facility>(
       session: _session,
       keyOf: (facility) => facility.guid,
-      fetchPage: (page, _) =>
-          _repository.superadminFacilities(status: 'all', page: page, perPage: 50),
+      fetchPage: (page, _) => _repository.superadminFacilities(
+          status: 'all', page: page, perPage: 50),
     )..addListener(_changed);
     _guard.addListener(_changed);
     _session.sessionChanges.addListener(_sessionChanged);
@@ -86,8 +87,7 @@ class _KelolaFasilitasScreenState extends State<KelolaFasilitasScreen> {
     final query = _query.trim().toLowerCase();
     return [
       for (final facility in _list.items)
-        if ((_status == 'all' ||
-                (_status == 'active') == facility.isActive) &&
+        if ((_status == 'all' || (_status == 'active') == facility.isActive) &&
             (query.isEmpty || facility.name.toLowerCase().contains(query)))
           facility,
     ];
@@ -214,16 +214,17 @@ class _KelolaFasilitasScreenState extends State<KelolaFasilitasScreen> {
           key: const ValueKey('facility-search'),
           controller: _searchController,
           onChanged: (value) => setState(() => _query = value),
-          style: const TextStyle(fontSize: 14, color: AdminColors.navy),
+          style: const TextStyle(fontSize: 13, color: AdminColors.navy),
           decoration: InputDecoration(
               hintText: 'Cari nama fasilitas...',
               hintStyle:
-                  const TextStyle(color: AdminColors.textMuted, fontSize: 14),
+                  const TextStyle(color: AdminColors.textMuted, fontSize: 13),
               border: InputBorder.none,
               enabledBorder: InputBorder.none,
               focusedBorder: InputBorder.none,
               filled: false,
-              contentPadding: const EdgeInsets.symmetric(vertical: 16),
+              contentPadding:
+                  const EdgeInsets.symmetric(vertical: AppSpacing.lg),
               prefixIcon: const Icon(PhosphorIconsRegular.magnifyingGlass,
                   color: AdminColors.blue, size: 20),
               suffixIcon: _query.isEmpty
@@ -231,15 +232,15 @@ class _KelolaFasilitasScreenState extends State<KelolaFasilitasScreen> {
                   : IconButton(
                       tooltip: 'Hapus pencarian',
                       onPressed: () => setState(() {
-                        _query = '';
-                        _searchController.clear();
-                      }),
+                            _query = '';
+                            _searchController.clear();
+                          }),
                       icon: const Icon(PhosphorIconsRegular.x, size: 18))),
         ),
       );
 
   Widget _statusSegments() => Container(
-        padding: const EdgeInsets.all(4),
+        padding: const EdgeInsets.all(AppSpacing.xs),
         decoration: BoxDecoration(
             color: const Color(0xFFE9EFF8),
             borderRadius: BorderRadius.circular(16)),
@@ -259,23 +260,16 @@ class _KelolaFasilitasScreenState extends State<KelolaFasilitasScreen> {
                   onTap: () => setState(() => _status = option.$1),
                   child: AnimatedContainer(
                     duration: const Duration(milliseconds: 180),
-                    constraints: const BoxConstraints(minHeight: 46),
+                    constraints: const BoxConstraints(
+                        minHeight: kMinInteractiveDimension),
                     alignment: Alignment.center,
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 6, vertical: 10),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: AppSpacing.sm, vertical: AppSpacing.sm),
                     decoration: BoxDecoration(
                         color: _status == option.$1
                             ? Colors.white
                             : Colors.transparent,
-                        borderRadius: BorderRadius.circular(12),
-                        boxShadow: _status == option.$1
-                            ? const [
-                                BoxShadow(
-                                    color: Color(0x14102D59),
-                                    blurRadius: 6,
-                                    offset: Offset(0, 2))
-                              ]
-                            : null),
+                        borderRadius: BorderRadius.circular(12)),
                     child: Text(option.$2,
                         textAlign: TextAlign.center,
                         style: TextStyle(
@@ -297,7 +291,8 @@ class _KelolaFasilitasScreenState extends State<KelolaFasilitasScreen> {
       painter: const AdminDashedBorderPainter(),
       child: Container(
         width: double.infinity,
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+        padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.lg, vertical: AppSpacing.xl),
         child: Column(mainAxisSize: MainAxisSize.min, children: [
           Icon(
               filtering
@@ -305,14 +300,17 @@ class _KelolaFasilitasScreenState extends State<KelolaFasilitasScreen> {
                   : PhosphorIconsRegular.bellSimple,
               size: 32,
               color: AdminColors.blue.withValues(alpha: 0.5)),
-          const SizedBox(height: 12),
-          Text(filtering ? 'Tidak ada fasilitas yang cocok' : 'Belum ada fasilitas',
+          const SizedBox(height: AppSpacing.md),
+          Text(
+              filtering
+                  ? 'Tidak ada fasilitas yang cocok'
+                  : 'Belum ada fasilitas',
               textAlign: TextAlign.center,
               style: const TextStyle(
                   color: AdminColors.navy,
                   fontSize: 14,
                   fontWeight: FontWeight.w800)),
-          const SizedBox(height: 4),
+          const SizedBox(height: AppSpacing.xs),
           Text(
               filtering
                   ? 'Coba dengan kata lain atau atur kembali filter.'
@@ -321,13 +319,13 @@ class _KelolaFasilitasScreenState extends State<KelolaFasilitasScreen> {
               style: const TextStyle(
                   color: AdminColors.textMuted, fontSize: 12, height: 1.4)),
           if (filtering) ...[
-            const SizedBox(height: 14),
+            const SizedBox(height: AppSpacing.lg),
             OutlinedButton(
               key: const ValueKey('reset-filter'),
               onPressed: _resetFilters,
               style: OutlinedButton.styleFrom(
                   foregroundColor: AdminColors.navy,
-                  minimumSize: const Size(0, 48),
+                  minimumSize: const Size(48, 48),
                   side: const BorderSide(color: AdminColors.border),
                   shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(14)),
@@ -342,14 +340,16 @@ class _KelolaFasilitasScreenState extends State<KelolaFasilitasScreen> {
   }
 
   Widget _infoNote() => Container(
-        padding: const EdgeInsets.all(14),
+        padding: const EdgeInsets.all(AppSpacing.lg),
         decoration: BoxDecoration(
             color: AdminColors.blue.withValues(alpha: 0.07),
             borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: AdminColors.blue.withValues(alpha: 0.18))),
-        child: const Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            border:
+                Border.all(color: AdminColors.blue.withValues(alpha: 0.18))),
+        child:
+            const Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Icon(PhosphorIconsRegular.info, size: 18, color: AdminColors.blue),
-          SizedBox(width: 10),
+          SizedBox(width: AppSpacing.sm),
           Expanded(
             child: Text(
                 'Fasilitas aktif dapat digunakan pada data destinasi. '
@@ -386,7 +386,8 @@ class _KelolaFasilitasScreenState extends State<KelolaFasilitasScreen> {
               'Kelola Fasilitas hanya untuk Super Administrator.')
         else
           SliverPadding(
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+            padding: const EdgeInsets.fromLTRB(
+                AppSpacing.lg, AppSpacing.sm, AppSpacing.lg, AppSpacing.xl),
             sliver: SliverList(
               delegate: SliverChildListDelegate([
                 IntrinsicHeight(
@@ -396,33 +397,33 @@ class _KelolaFasilitasScreenState extends State<KelolaFasilitasScreen> {
                         Expanded(
                             child: AdminStatCard(
                                 '${items.length}', 'Total fasilitas')),
-                        const SizedBox(width: 10),
+                        const SizedBox(width: AppSpacing.sm),
                         Expanded(
                             child: AdminStatCard('$active', 'Aktif',
                                 dotColor: AdminColors.success)),
-                        const SizedBox(width: 10),
+                        const SizedBox(width: AppSpacing.sm),
                         Expanded(
                             child: AdminStatCard(
                                 '${items.length - active}', 'Nonaktif',
                                 dotColor: AdminColors.textDim)),
                       ]),
                 ),
-                const SizedBox(height: 20),
+                const SizedBox(height: AppSpacing.xl),
                 const Text('Daftar Fasilitas',
                     style: TextStyle(
                         color: AdminColors.navy,
                         fontSize: 16,
                         fontWeight: FontWeight.w800)),
-                const SizedBox(height: 2),
+                const SizedBox(height: AppSpacing.xs),
                 const Text(
                     'Cari dan atur fasilitas yang dapat digunakan destinasi.',
-                    style: TextStyle(
-                        color: AdminColors.textMuted, fontSize: 12)),
-                const SizedBox(height: 14),
+                    style:
+                        TextStyle(color: AdminColors.textMuted, fontSize: 12)),
+                const SizedBox(height: AppSpacing.lg),
                 _searchField(),
-                const SizedBox(height: 16),
+                const SizedBox(height: AppSpacing.lg),
                 _statusSegments(),
-                const SizedBox(height: 24),
+                const SizedBox(height: AppSpacing.xl),
                 Row(children: [
                   const Expanded(
                       child: Text('Fasilitas Terdaftar',
@@ -434,10 +435,10 @@ class _KelolaFasilitasScreenState extends State<KelolaFasilitasScreen> {
                       style: const TextStyle(
                           color: AdminColors.textMuted, fontSize: 12)),
                 ]),
-                const SizedBox(height: 12),
+                const SizedBox(height: AppSpacing.md),
                 if (_list.error != null)
                   Padding(
-                    padding: const EdgeInsets.only(bottom: 12),
+                    padding: const EdgeInsets.only(bottom: AppSpacing.md),
                     child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
@@ -445,12 +446,19 @@ class _KelolaFasilitasScreenState extends State<KelolaFasilitasScreen> {
                               ? adminErrorMessage(_list.error!)
                               : 'Gagal memuat ulang: ${adminErrorMessage(_list.error!)}'),
                           TextButton(
-                              onPressed: _muat, child: const Text('Coba lagi')),
+                              style: TextButton.styleFrom(
+                                  textStyle: const TextStyle(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w800),
+                                  shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(14))),
+                              onPressed: _muat,
+                              child: const Text('Coba lagi')),
                         ]),
                   ),
                 if (!_list.hasLoaded && _list.error == null)
                   const Padding(
-                      padding: EdgeInsets.symmetric(vertical: 24),
+                      padding: EdgeInsets.symmetric(vertical: AppSpacing.xl),
                       child: Center(
                           child: CircularProgressIndicator(
                               color: AdminColors.blue)))
@@ -464,7 +472,7 @@ class _KelolaFasilitasScreenState extends State<KelolaFasilitasScreen> {
                       busy: _guard.isBusy(facility.guid),
                       onManage: () => _openActions(facility),
                     ),
-                const SizedBox(height: 8),
+                const SizedBox(height: AppSpacing.sm),
                 _infoNote(),
               ]),
             ),
@@ -506,8 +514,8 @@ class _FacilityCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final active = facility.isActive;
     return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(14),
+      margin: const EdgeInsets.only(bottom: AppSpacing.md),
+      padding: const EdgeInsets.all(AppSpacing.lg),
       decoration: adminCardDecoration(),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -521,9 +529,9 @@ class _FacilityCard extends StatelessWidget {
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
                         color: AdminColors.text,
-                        fontSize: 15,
+                        fontSize: 16,
                         fontWeight: FontWeight.w800)),
-                const SizedBox(height: 8),
+                const SizedBox(height: AppSpacing.sm),
                 AdminBadge(
                   active ? 'Aktif' : 'Nonaktif',
                   active ? AdminColors.success : AdminColors.textMuted,
@@ -532,10 +540,10 @@ class _FacilityCard extends StatelessWidget {
               ],
             ),
           ),
-          const SizedBox(width: 8),
+          const SizedBox(width: AppSpacing.sm),
           if (busy)
             const Padding(
-              padding: EdgeInsets.all(10),
+              padding: EdgeInsets.all(AppSpacing.sm),
               child: SizedBox(
                 width: 24,
                 height: 24,
@@ -544,17 +552,21 @@ class _FacilityCard extends StatelessWidget {
             )
           else
             Material(
-              color: const Color(0xFFF0F3F8),
+              color: AppColors.sheetCloseBackground,
               borderRadius: BorderRadius.circular(12),
               child: InkWell(
                 key: ValueKey('actions-${facility.guid}'),
                 borderRadius: BorderRadius.circular(12),
                 onTap: onManage,
-                child: const SizedBox(
-                  width: 44,
-                  height: 44,
-                  child: Icon(PhosphorIconsBold.dotsThreeVertical,
-                      color: AdminColors.textMuted, size: 20),
+                child: Semantics(
+                  button: true,
+                  label: 'Kelola fasilitas',
+                  child: const SizedBox(
+                    width: kMinInteractiveDimension,
+                    height: kMinInteractiveDimension,
+                    child: Icon(PhosphorIconsBold.dotsThreeVertical,
+                        color: AdminColors.textMuted, size: 20),
+                  ),
                 ),
               ),
             ),
@@ -584,7 +596,7 @@ class _FacilityActionSheet extends StatelessWidget {
                       bottom: BorderSide(color: AdminColors.border))),
           child: Row(children: [
             Icon(icon, size: 18, color: color),
-            const SizedBox(width: 14),
+            const SizedBox(width: AppSpacing.lg),
             Expanded(
                 child: Text(label,
                     style: TextStyle(
@@ -605,7 +617,10 @@ class _FacilityActionSheet extends StatelessWidget {
           BoxConstraints(maxHeight: MediaQuery.sizeOf(context).height * .88),
       child: SingleChildScrollView(
         padding: EdgeInsets.fromLTRB(
-            20, 0, 20, 20 + MediaQuery.paddingOf(context).bottom),
+            AppSpacing.sheetPadding,
+            0,
+            AppSpacing.sheetPadding,
+            AppSpacing.sheetPadding + MediaQuery.paddingOf(context).bottom),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -615,21 +630,23 @@ class _FacilityActionSheet extends StatelessWidget {
                   child: Text('Kelola Fasilitas',
                       style: TextStyle(
                           color: AdminColors.navy,
-                          fontSize: 18,
+                          fontSize: 20,
                           fontWeight: FontWeight.w800))),
               IconButton(
                 tooltip: 'Tutup',
                 onPressed: () => Navigator.pop(context),
                 style: IconButton.styleFrom(
-                    backgroundColor: const Color(0xFFF0F3F8),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12)),
+                    backgroundColor: AppColors.sheetCloseBackground,
                     foregroundColor: AdminColors.textMuted),
                 icon: const Icon(PhosphorIconsRegular.x, size: 16),
               ),
             ]),
-            const SizedBox(height: 12),
+            const SizedBox(height: AppSpacing.md),
             Row(children: [
               const _FacilityIcon(size: 52),
-              const SizedBox(width: 14),
+              const SizedBox(width: AppSpacing.lg),
               Expanded(
                 child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -637,12 +654,12 @@ class _FacilityActionSheet extends StatelessWidget {
                       Text(facility.name,
                           style: const TextStyle(
                               color: AdminColors.navy,
-                              fontSize: 15,
+                              fontSize: 16,
                               fontWeight: FontWeight.w800)),
                     ]),
               ),
             ]),
-            const SizedBox(height: 12),
+            const SizedBox(height: AppSpacing.md),
             _action(
                 ValueKey('edit-${facility.guid}'),
                 PhosphorIconsRegular.pencilSimple,
@@ -730,7 +747,7 @@ class _FacilityFormSheetState extends State<_FacilityFormSheet> {
   }
 
   Widget _label(String text) => Padding(
-        padding: const EdgeInsets.only(bottom: 8),
+        padding: const EdgeInsets.only(bottom: AppSpacing.sm),
         child: Text(text,
             style: const TextStyle(
                 color: AdminColors.text,
@@ -745,7 +762,10 @@ class _FacilityFormSheetState extends State<_FacilityFormSheet> {
       padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(context).bottom),
       child: SingleChildScrollView(
         padding: EdgeInsets.fromLTRB(
-            20, 0, 20, 20 + MediaQuery.paddingOf(context).bottom),
+            AppSpacing.sheetPadding,
+            0,
+            AppSpacing.sheetPadding,
+            AppSpacing.sheetPadding + MediaQuery.paddingOf(context).bottom),
         child: Form(
           key: _formKey,
           child: Column(
@@ -757,29 +777,31 @@ class _FacilityFormSheetState extends State<_FacilityFormSheet> {
                   child: Text(editing ? 'Ubah Fasilitas' : 'Tambah Fasilitas',
                       style: const TextStyle(
                           color: AdminColors.text,
-                          fontSize: 18,
+                          fontSize: 20,
                           fontWeight: FontWeight.w800)),
                 ),
-                const SizedBox(width: 8),
+                const SizedBox(width: AppSpacing.sm),
                 IconButton(
                   key: const ValueKey('facility-close'),
                   tooltip: 'Tutup',
                   onPressed:
                       _saving ? null : () => Navigator.pop(context, false),
                   style: IconButton.styleFrom(
-                      backgroundColor: const Color(0xFFF0F3F8),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12)),
+                      backgroundColor: AppColors.sheetCloseBackground,
                       foregroundColor: AdminColors.textMuted),
                   icon: const Icon(PhosphorIconsRegular.x, size: 16),
                 ),
               ]),
-              const SizedBox(height: 4),
+              const SizedBox(height: AppSpacing.xs),
               Text(
                   editing
                       ? 'Perbarui informasi fasilitas wisata.'
                       : 'Lengkapi informasi fasilitas baru yang akan tersedia di data master wisata.',
                   style: const TextStyle(
                       color: AdminColors.textMuted, fontSize: 13, height: 1.4)),
-              const SizedBox(height: 20),
+              const SizedBox(height: AppSpacing.xl),
               _label('Nama fasilitas *'),
               TextFormField(
                 key: const ValueKey('facility-name'),
@@ -789,17 +811,19 @@ class _FacilityFormSheetState extends State<_FacilityFormSheet> {
                 textCapitalization: TextCapitalization.words,
                 textInputAction: TextInputAction.done,
                 onFieldSubmitted: (_) => _submit(),
-                decoration: adminInputDecoration(null, hint: 'Contoh: Area Parkir')
-                    .copyWith(
-                        hintStyle: const TextStyle(
-                            color: AdminColors.textDim, fontSize: 14),
-                        errorMaxLines: 2),
+                decoration:
+                    adminInputDecoration(null, hint: 'Contoh: Area Parkir')
+                        .copyWith(
+                            hintStyle: const TextStyle(
+                                color: AdminColors.textDim, fontSize: 13),
+                            errorMaxLines: 2),
                 validator: (v) =>
                     (v == null || v.trim().isEmpty) ? 'Nama wajib diisi' : null,
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: AppSpacing.lg),
               Container(
-                padding: const EdgeInsets.fromLTRB(14, 10, 8, 10),
+                padding: const EdgeInsets.fromLTRB(
+                    AppSpacing.lg, AppSpacing.sm, AppSpacing.sm, AppSpacing.sm),
                 decoration: BoxDecoration(
                     color: AdminColors.blue.withValues(alpha: 0.06),
                     borderRadius: BorderRadius.circular(16),
@@ -815,7 +839,7 @@ class _FacilityFormSheetState extends State<_FacilityFormSheet> {
                                   color: AdminColors.text,
                                   fontSize: 13,
                                   fontWeight: FontWeight.w800)),
-                          SizedBox(height: 2),
+                          SizedBox(height: AppSpacing.xs),
                           Text('Fasilitas dapat dipilih oleh admin destinasi.',
                               style: TextStyle(
                                   color: AdminColors.textMuted,
@@ -833,10 +857,10 @@ class _FacilityFormSheetState extends State<_FacilityFormSheet> {
                 ]),
               ),
               if (_error != null) ...[
-                const SizedBox(height: 12),
+                const SizedBox(height: AppSpacing.md),
                 AdminNotice(_error!),
               ],
-              const SizedBox(height: 20),
+              const SizedBox(height: AppSpacing.xl),
               Row(children: [
                 Expanded(
                   child: OutlinedButton(
@@ -845,16 +869,16 @@ class _FacilityFormSheetState extends State<_FacilityFormSheet> {
                         _saving ? null : () => Navigator.pop(context, false),
                     style: OutlinedButton.styleFrom(
                         foregroundColor: AdminColors.textMuted,
-                        minimumSize: const Size.fromHeight(50),
+                        minimumSize: const Size.fromHeight(52),
                         side: const BorderSide(color: AdminColors.border),
                         shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(14)),
                         textStyle: const TextStyle(
-                            fontSize: 14, fontWeight: FontWeight.w800)),
+                            fontSize: 13, fontWeight: FontWeight.w800)),
                     child: const Text('Batal'),
                   ),
                 ),
-                const SizedBox(width: 12),
+                const SizedBox(width: AppSpacing.md),
                 Expanded(
                   flex: 2,
                   child: FilledButton(
@@ -863,18 +887,19 @@ class _FacilityFormSheetState extends State<_FacilityFormSheet> {
                     style: FilledButton.styleFrom(
                         backgroundColor: AdminColors.blue,
                         foregroundColor: Colors.white,
-                        minimumSize: const Size.fromHeight(50),
+                        minimumSize: const Size.fromHeight(52),
                         shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(14)),
                         textStyle: const TextStyle(
-                            fontSize: 14, fontWeight: FontWeight.w800)),
+                            fontSize: 13, fontWeight: FontWeight.w800)),
                     child: _saving
                         ? const SizedBox(
                             width: 18,
                             height: 18,
                             child: CircularProgressIndicator(
                                 strokeWidth: 2, color: Colors.white))
-                        : Text(editing ? 'Simpan Perubahan' : 'Tambah Fasilitas'),
+                        : Text(
+                            editing ? 'Simpan Perubahan' : 'Tambah Fasilitas'),
                   ),
                 ),
               ]),

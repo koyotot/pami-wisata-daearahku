@@ -18,7 +18,8 @@ String _decimalPercent(num? value) {
   if (value == null) return '—';
   var text = value.toStringAsFixed(2);
   if (text.contains('.')) {
-    text = text.replaceFirst(RegExp(r'0+$'), '').replaceFirst(RegExp(r'\.$'), '');
+    text =
+        text.replaceFirst(RegExp(r'0+$'), '').replaceFirst(RegExp(r'\.$'), '');
   }
   return '${text.replaceAll('.', ',')}%';
 }
@@ -110,8 +111,10 @@ class _DestinationComparisonState extends State<_DestinationComparison> {
     'name': 'Nama A–Z',
   };
 
-  List<_CapacityRow> get _all =>
-      [for (final row in widget.rows ?? const <OperationalRow>[]) _CapacityRow(row)];
+  List<_CapacityRow> get _all => [
+        for (final row in widget.rows ?? const <OperationalRow>[])
+          _CapacityRow(row)
+      ];
 
   List<_CapacityRow> _visible(List<_CapacityRow> all) {
     final list = [
@@ -162,7 +165,8 @@ class _DestinationComparisonState extends State<_DestinationComparison> {
   @override
   Widget build(BuildContext context) {
     final all = _all;
-    final ready = !widget.loading && widget.error == null && widget.rows != null;
+    final ready =
+        !widget.loading && widget.error == null && widget.rows != null;
     final visible = ready ? _visible(all) : const <_CapacityRow>[];
     return OperationsPage(
         role: widget.role,
@@ -189,7 +193,8 @@ class _DestinationComparisonState extends State<_DestinationComparison> {
             if (visible.isEmpty)
               _DashboardCard(
                   child: Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      padding:
+                          const EdgeInsets.symmetric(vertical: AppSpacing.md),
                       child: Text(
                           all.isEmpty
                               ? 'Tidak ada destinasi pada cakupan ini. Atur ulang filter untuk mencoba lagi.'
@@ -229,7 +234,8 @@ class _DestinationComparisonState extends State<_DestinationComparison> {
   }
 
   Widget _scopeCard() => _DashboardCard(
-          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          child:
+              Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         const Text('CAKUPAN LAPORAN',
             style: TextStyle(
                 fontSize: 11,
@@ -257,7 +263,8 @@ class _DestinationComparisonState extends State<_DestinationComparison> {
   Widget _listHeader(int count) =>
       Row(crossAxisAlignment: CrossAxisAlignment.center, children: [
         Expanded(
-            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            child:
+                Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           const Text('Performa per Destinasi',
               style: TextStyle(
                   fontSize: 16,
@@ -273,24 +280,30 @@ class _DestinationComparisonState extends State<_DestinationComparison> {
             key: const ValueKey('comparison-sort'),
             onPressed: _pickSort,
             style: OutlinedButton.styleFrom(
+                textStyle:
+                    const TextStyle(fontSize: 13, fontWeight: FontWeight.w800),
                 minimumSize: const Size(48, 48),
                 foregroundColor: AppColors.navy,
                 side: const BorderSide(color: AppColors.border),
                 backgroundColor: AppColors.surface,
-                padding: const EdgeInsets.symmetric(horizontal: 14),
+                padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
                 shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(14))),
             icon: const Icon(PhosphorIconsRegular.arrowsDownUp, size: 18),
             label: Text(_sortLabels[_sort]!,
                 style: const TextStyle(
-                    fontSize: 12, fontWeight: FontWeight.w700))),
+                    fontSize: 13, fontWeight: FontWeight.w800))),
       ]);
 
   Widget _chips(List<_CapacityRow> all) {
     int count(_CapacityState s) => all.where((item) => item.state == s).length;
     final options = <(String, _CapacityState?, int)>[
       ('Semua', null, all.length),
-      ('Ada alokasi', _CapacityState.allocated, count(_CapacityState.allocated)),
+      (
+        'Ada alokasi',
+        _CapacityState.allocated,
+        count(_CapacityState.allocated)
+      ),
       (
         'Belum teralokasi',
         _CapacityState.unallocated,
@@ -306,7 +319,8 @@ class _DestinationComparisonState extends State<_DestinationComparison> {
               Padding(
                   padding: const EdgeInsets.only(right: AppSpacing.sm),
                   child: ChoiceChip(
-                      key: ValueKey('comparison-chip-${option.$2?.name ?? 'all'}'),
+                      key: ValueKey(
+                          'comparison-chip-${option.$2?.name ?? 'all'}'),
                       label: Text('${option.$1} (${option.$3})'),
                       selected: _chip == option.$2,
                       showCheckmark: false,
@@ -331,11 +345,12 @@ class _DestinationComparisonState extends State<_DestinationComparison> {
   Widget _bottomBar(int total) => Material(
       color: AppColors.surface,
       elevation: 8,
-      shadowColor: Colors.black26,
+      shadowColor: AppColors.dockShadow,
       child: SafeArea(
           top: false,
           child: Padding(
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+              padding: const EdgeInsets.fromLTRB(
+                  AppSpacing.lg, AppSpacing.md, AppSpacing.lg, AppSpacing.md),
               child: Row(children: [
                 Expanded(
                     child: Column(
@@ -344,10 +359,10 @@ class _DestinationComparisonState extends State<_DestinationComparison> {
                         children: [
                       Text('$total destinasi',
                           style: const TextStyle(
-                              fontSize: 14,
+                              fontSize: 13,
                               fontWeight: FontWeight.w800,
                               color: AppColors.navy)),
-                      const SizedBox(height: 2),
+                      const SizedBox(height: AppSpacing.xs),
                       const Text('Perbandingan kapasitas',
                           style: TextStyle(
                               fontSize: 12, color: AppColors.textSecondary)),
@@ -357,15 +372,18 @@ class _DestinationComparisonState extends State<_DestinationComparison> {
                     key: const ValueKey('comparison-reset'),
                     onPressed: _reset,
                     style: OutlinedButton.styleFrom(
-                        minimumSize: const Size(48, 48),
+                        textStyle: const TextStyle(
+                            fontSize: 13, fontWeight: FontWeight.w800),
+                        minimumSize: const Size(140, 50),
                         foregroundColor: AppColors.blue,
                         side: const BorderSide(color: AppColors.blue),
-                        padding: const EdgeInsets.symmetric(horizontal: 20),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: AppSpacing.lg),
                         shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(14))),
                     child: const Text('Reset Filter',
                         style: TextStyle(
-                            fontSize: 14, fontWeight: FontWeight.w800))),
+                            fontSize: 13, fontWeight: FontWeight.w800))),
               ]))));
 }
 
@@ -375,13 +393,14 @@ class _CapacityHero extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final capacity = items.fold<num>(0, (sum, i) => sum + (i.hasQuota ? i.capacity : 0));
+    final capacity =
+        items.fold<num>(0, (sum, i) => sum + (i.hasQuota ? i.capacity : 0));
     final allocated = items.fold<num>(0, (sum, i) => sum + i.allocated);
     final percent = capacity > 0 ? allocated / capacity * 100 : null;
     return Container(
-        padding: const EdgeInsets.all(20),
+        padding: const EdgeInsets.all(AppSpacing.sheetPadding),
         decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(24),
+            borderRadius: BorderRadius.circular(20),
             gradient: const LinearGradient(
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
@@ -395,8 +414,8 @@ class _CapacityHero extends StatelessWidget {
                         fontWeight: FontWeight.w700,
                         color: Colors.white))),
             Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                padding: const EdgeInsets.symmetric(
+                    horizontal: AppSpacing.md, vertical: AppSpacing.sm),
                 decoration: BoxDecoration(
                     color: Colors.white.withValues(alpha: .18),
                     borderRadius: BorderRadius.circular(12)),
@@ -436,7 +455,8 @@ class _CapacityHero extends StatelessWidget {
                         fontSize: 12,
                         fontWeight: FontWeight.w700,
                         color: Colors.white))),
-            Text(percent == null ? '—' : '${_decimalPercent(percent)} kapasitas',
+            Text(
+                percent == null ? '—' : '${_decimalPercent(percent)} kapasitas',
                 style: const TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.w700,
@@ -516,7 +536,7 @@ class _ScopeRow extends StatelessWidget {
                           fontSize: 14,
                           fontWeight: FontWeight.w800,
                           color: AppColors.navy)),
-                  const SizedBox(height: 2),
+                  const SizedBox(height: AppSpacing.xs),
                   Text(subtitle,
                       style: const TextStyle(
                           fontSize: 12, color: AppColors.textSecondary)),
@@ -601,8 +621,7 @@ class _CapacityCard extends StatelessWidget {
               valueColor: const AlwaysStoppedAnimation(AppColors.blue))),
       const SizedBox(height: AppSpacing.md),
       Row(children: [
-        Expanded(
-            child: _MiniTile('Terkonfirmasi', _thousands(item.confirmed))),
+        Expanded(child: _MiniTile('Terkonfirmasi', _thousands(item.confirmed))),
         const SizedBox(width: AppSpacing.sm),
         Expanded(
             child: _MiniTile('Sisa kapasitas',
@@ -620,13 +639,14 @@ class _CapacityCard extends StatelessWidget {
             key: ValueKey('comparison-detail-${item.name}'),
             onPressed: onDetail,
             style: TextButton.styleFrom(
+                textStyle:
+                    const TextStyle(fontSize: 13, fontWeight: FontWeight.w800),
                 minimumSize: const Size(48, 48),
                 foregroundColor: AppColors.blue),
             child: const Row(mainAxisSize: MainAxisSize.min, children: [
               Text('Lihat Rincian',
-                  style:
-                      TextStyle(fontSize: 12, fontWeight: FontWeight.w800)),
-              SizedBox(width: 4),
+                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800)),
+              SizedBox(width: AppSpacing.xs),
               Icon(PhosphorIconsRegular.arrowRight, size: 16),
             ])),
       ]),
@@ -683,7 +703,8 @@ class _CapacityDetailSheet extends StatelessWidget {
     return SafeArea(
         top: false,
         child: SingleChildScrollView(
-            padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+            padding: const EdgeInsets.fromLTRB(AppSpacing.sheetPadding, 0,
+                AppSpacing.sheetPadding, AppSpacing.sheetPadding),
             child: Column(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -699,7 +720,7 @@ class _CapacityDetailSheet extends StatelessWidget {
                         tooltip: 'Tutup',
                         onPressed: () => Navigator.pop(context),
                         style: IconButton.styleFrom(
-                            backgroundColor: const Color(0xFFEEF3FA),
+                            backgroundColor: AppColors.sheetCloseBackground,
                             foregroundColor: AppColors.textSecondary,
                             shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(12))),
@@ -714,14 +735,14 @@ class _CapacityDetailSheet extends StatelessWidget {
                                 fontWeight: FontWeight.w800,
                                 color: AppColors.navy))),
                     const SizedBox(width: AppSpacing.sm),
-                    OperationsStatusBadge(badge.label, badge.tone,
-                        small: true),
+                    OperationsStatusBadge(badge.label, badge.tone, small: true),
                   ]),
                   const SizedBox(height: AppSpacing.md),
                   const Divider(height: 1, color: AppColors.border),
                   for (final row in rows) ...[
                     Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        padding:
+                            const EdgeInsets.symmetric(vertical: AppSpacing.md),
                         child: Row(children: [
                           Expanded(
                               child: Text(row.$1,

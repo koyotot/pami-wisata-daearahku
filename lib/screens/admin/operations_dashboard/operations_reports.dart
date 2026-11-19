@@ -375,9 +375,9 @@ class _OperationsReportScreenState extends State<OperationsReportScreen>
         children: [
           if (_role == 1 && widget.section == 'destinations') ...[
             if (!_manage) _reportFilterBar(),
-            const SizedBox(height: 12),
+            const SizedBox(height: AppSpacing.md),
             Container(
-                padding: const EdgeInsets.all(4),
+                padding: const EdgeInsets.all(AppSpacing.xs),
                 decoration: BoxDecoration(
                     color: AppColors.blue.withValues(alpha: .08),
                     borderRadius: BorderRadius.circular(16)),
@@ -392,6 +392,9 @@ class _OperationsReportScreenState extends State<OperationsReportScreen>
                             child: TextButton(
                                 key: ValueKey('destinations-tab-${tab.$1}'),
                                 style: TextButton.styleFrom(
+                                    textStyle: const TextStyle(
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.w800),
                                     foregroundColor: _manage == tab.$1
                                         ? AppColors.blue
                                         : AppColors.textMuted,
@@ -400,7 +403,8 @@ class _OperationsReportScreenState extends State<OperationsReportScreen>
                                         : Colors.transparent,
                                     minimumSize: const Size(48, 48),
                                     padding: const EdgeInsets.symmetric(
-                                        horizontal: 8, vertical: 12),
+                                        horizontal: AppSpacing.sm,
+                                        vertical: AppSpacing.md),
                                     shape: RoundedRectangleBorder(
                                         borderRadius:
                                             BorderRadius.circular(12))),
@@ -411,18 +415,18 @@ class _OperationsReportScreenState extends State<OperationsReportScreen>
                                 child: Text(tab.$2,
                                     textAlign: TextAlign.center,
                                     style: const TextStyle(
-                                        fontSize: 12,
-                                        fontWeight: FontWeight.w700))))),
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.w800))))),
                 ])),
-            const SizedBox(height: 16),
+            const SizedBox(height: AppSpacing.lg),
           ],
           if (!_manage) ...[
             if (_usesHomeFilters && widget.section != 'destinations') ...[
               _reportFilterBar(),
               const SizedBox(height: AppSpacing.lg),
             ] else if (!_usesHomeFilters) ...[
-              _filterButton(_filters, _filter),
-              const SizedBox(height: 16),
+              _reportFilterBar(),
+              const SizedBox(height: AppSpacing.lg),
             ],
             if (_loading) const OperationsSkeleton(),
             if (_error != null)
@@ -443,7 +447,7 @@ class _OperationsReportScreenState extends State<OperationsReportScreen>
               Text('Periode: ${_period(data.period)}',
                   style: const TextStyle(
                       fontSize: 12, color: AppColors.textMuted)),
-              const SizedBox(height: 16),
+              const SizedBox(height: AppSpacing.lg),
               if (widget.section == 'visitors') ...[
                 if (_role == 1) ...[
                   _DashboardCard(
@@ -452,31 +456,36 @@ class _OperationsReportScreenState extends State<OperationsReportScreen>
                         width: 70,
                         height: 70,
                         decoration: BoxDecoration(
-                            color: const Color(0xFFE8F3FF),
+                            color: AppColors.blueTint,
                             borderRadius: BorderRadius.circular(22)),
                         child: const Icon(PhosphorIconsRegular.qrCode,
                             color: AppColors.blue, size: 33)),
-                    const SizedBox(height: 16),
+                    const SizedBox(height: AppSpacing.lg),
                     const Text('Verifikasi Tiket QR',
                         style: TextStyle(
-                            fontSize: 18,
+                            fontSize: 16,
                             fontWeight: FontWeight.w800,
                             color: AppColors.navy)),
-                    const SizedBox(height: 8),
+                    const SizedBox(height: AppSpacing.sm),
                     const Text('Scan → Preview → Konfirmasi',
                         style:
                             TextStyle(fontSize: 13, color: Color(0xFF526787))),
-                    const SizedBox(height: 16),
+                    const SizedBox(height: AppSpacing.lg),
                     SizedBox(
                         width: double.infinity,
                         child: FilledButton.icon(
+                            style: FilledButton.styleFrom(
+                                textStyle: const TextStyle(
+                                    fontSize: 13, fontWeight: FontWeight.w800),
+                                shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(14))),
                             onPressed: () => showAdminTicketScannerSheet(
                                 context,
                                 repository: _repository),
                             icon: const Icon(PhosphorIconsRegular.qrCode),
                             label: const Text('Buka Scan QR'))),
                   ])),
-                  const SizedBox(height: 16),
+                  const SizedBox(height: AppSpacing.lg),
                 ],
                 const _SectionTitle('Kunjungan teramati'),
                 OperationsMetrics(icons: const [
@@ -499,7 +508,7 @@ class _OperationsReportScreenState extends State<OperationsReportScreen>
                   ),
                   ('Tidak hadir', _value(data.metrics['no_show_count']))
                 ]),
-                const SizedBox(height: 12),
+                const SizedBox(height: AppSpacing.md),
                 const _Notice(
                     'Tingkat kehadiran dan no-show belum tersedia karena data kelayakan tiket belum terverifikasi.'),
               ] else if (_role == 2) ...[
@@ -566,10 +575,10 @@ class _OperationsReportScreenState extends State<OperationsReportScreen>
                         const _SectionTitle('Keputusan pribadi'),
                         Text(_value(values['approved_decisions']),
                             style: const TextStyle(
-                                fontSize: 32, fontWeight: FontWeight.w800)),
+                                fontSize: 36, fontWeight: FontWeight.w800)),
                         const Text('Booking disetujui pada periode ini'),
                       ])),
-                  const SizedBox(height: 12),
+                  const SizedBox(height: AppSpacing.md),
                 ],
                 OperationsMetrics(
                     values: _role == 1
@@ -584,7 +593,7 @@ class _OperationsReportScreenState extends State<OperationsReportScreen>
                             PhosphorIconsRegular.timer,
                             PhosphorIconsRegular.sealCheck,
                           ]),
-                const SizedBox(height: 20),
+                const SizedBox(height: AppSpacing.xl),
                 if (widget.personal || _role == 1)
                   const _Notice(
                       'Grafik menunjukkan keputusan tim pada destinasi yang dapat diakses. Metrik pribadi ditampilkan di atas.'),
@@ -622,7 +631,7 @@ class _OperationsReportScreenState extends State<OperationsReportScreen>
                         repository: _repository,
                         session: _session))),
           if (widget.section == 'destinations' && _role != 1) ...[
-            const SizedBox(height: 16),
+            const SizedBox(height: AppSpacing.lg),
             _routeLink(
                 'Kelola destinasi dan kuota',
                 () => Navigator.of(context).push(MaterialPageRoute<void>(
@@ -643,14 +652,14 @@ class _OperationsReportScreenState extends State<OperationsReportScreen>
     };
     final guids = {...decisions.keys, ...workload.keys};
     return [
-      const SizedBox(height: 24),
+      const SizedBox(height: AppSpacing.xl),
       const _SectionTitle('Perbandingan Admin'),
       if (guids.isEmpty)
         const _Notice(
             'Belum ada keputusan atau claim aktif untuk ditampilkan.'),
       for (final guid in guids)
         Padding(
-            padding: const EdgeInsets.only(bottom: 8),
+            padding: const EdgeInsets.only(bottom: AppSpacing.sm),
             child: Material(
                 color: Colors.white,
                 shape: RoundedRectangleBorder(
@@ -658,8 +667,8 @@ class _OperationsReportScreenState extends State<OperationsReportScreen>
                     side: const BorderSide(color: AppColors.border)),
                 clipBehavior: Clip.antiAlias,
                 child: ListTile(
-                    contentPadding:
-                        const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                    contentPadding: const EdgeInsets.symmetric(
+                        horizontal: AppSpacing.lg, vertical: AppSpacing.sm),
                     leading: const CircleAvatar(
                         backgroundColor: Color(0xFFEAF3FF),
                         child: Icon(PhosphorIconsRegular.userCircle,
@@ -683,6 +692,11 @@ class _OperationsReportScreenState extends State<OperationsReportScreen>
       if (_accounts?.links?['next'] != null ||
           (_accountPage < (_number(_accounts?.meta?['last_page']) ?? 0)))
         TextButton(
+            style: TextButton.styleFrom(
+                textStyle:
+                    const TextStyle(fontSize: 13, fontWeight: FontWeight.w800),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14))),
             onPressed: () => _loadAccounts(_request),
             child: const Text('Muat nama Admin berikutnya')),
     ];
@@ -691,8 +705,8 @@ class _OperationsReportScreenState extends State<OperationsReportScreen>
   Widget _destination(OperationalRow row) {
     final raw = row.raw;
     return Container(
-        margin: const EdgeInsets.symmetric(vertical: 8),
-        padding: const EdgeInsets.all(16),
+        margin: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
+        padding: const EdgeInsets.all(AppSpacing.lg),
         decoration: BoxDecoration(
             color: Colors.white,
             border: Border.all(color: AppColors.border),
@@ -701,28 +715,28 @@ class _OperationsReportScreenState extends State<OperationsReportScreen>
           Row(children: [
             const Icon(PhosphorIconsRegular.mapPin,
                 color: AppColors.blue, size: 22),
-            const SizedBox(width: 8),
+            const SizedBox(width: AppSpacing.sm),
             Expanded(
                 child: Text(row.name ?? 'Destinasi',
                     style: const TextStyle(
                         fontSize: 16,
-                        fontWeight: FontWeight.w700,
+                        fontWeight: FontWeight.w800,
                         color: AppColors.navy))),
           ]),
-          const SizedBox(height: 12),
+          const SizedBox(height: AppSpacing.md),
           OperationsMetrics(values: [
             ('Kapasitas', _value(raw['capacity'])),
             ('Teralokasi', _value(raw['allocated'])),
             ('Terkonfirmasi', _value(raw['confirmed_quantity'])),
             ('Sisa kapasitas', _value(raw['remaining']))
           ], compact: true),
-          const SizedBox(height: 14),
+          const SizedBox(height: AppSpacing.lg),
           if ((_role != 1 || (_number(raw['capacity']) ?? 0) > 0) &&
               _number(raw['reserved_occupancy_percent']) != null) ...[
             Text(
                 'Alokasi terhadap kapasitas · ${_percent(raw['reserved_occupancy_percent'])}',
                 style: const TextStyle(fontSize: 12, color: Color(0xFF526787))),
-            const SizedBox(height: 8),
+            const SizedBox(height: AppSpacing.sm),
             LinearProgressIndicator(
                 value: (_number(raw['reserved_occupancy_percent'])! / 100)
                     .clamp(0.0, 1.0)
@@ -731,18 +745,18 @@ class _OperationsReportScreenState extends State<OperationsReportScreen>
                 borderRadius: BorderRadius.circular(99),
                 backgroundColor: const Color(0xFFEDF2F9),
                 color: AppColors.blue),
-            const SizedBox(height: 14),
+            const SizedBox(height: AppSpacing.lg),
           ],
           Text(
               'Booking: ${_value(raw['bookings'])} · Jumlah diminta: ${_value(raw['quantity_requested'])}',
               style: const TextStyle(fontSize: 12)),
-          const SizedBox(height: 6),
+          const SizedBox(height: AppSpacing.sm),
           Text(
               _role == 1 && (_number(raw['capacity']) ?? 0) <= 0
                   ? 'Okupansi: — · Belum tersedia'
                   : 'Okupansi alokasi: ${_percent(raw['reserved_occupancy_percent'])} · konfirmasi: ${_percent(raw['confirmed_occupancy_percent'])}',
               style: const TextStyle(fontSize: 12, color: AppColors.textMuted)),
-          const SizedBox(height: 6),
+          const SizedBox(height: AppSpacing.sm),
           const Text('Tiket layak hadir: — · Belum tersedia',
               style: TextStyle(fontSize: 12, color: AppColors.textMuted)),
         ]));
@@ -754,10 +768,15 @@ class _OperationsReportScreenState extends State<OperationsReportScreen>
     return Wrap(
         alignment: WrapAlignment.spaceBetween,
         crossAxisAlignment: WrapCrossAlignment.center,
-        spacing: 8,
-        runSpacing: 8,
+        spacing: AppSpacing.sm,
+        runSpacing: AppSpacing.sm,
         children: [
           TextButton(
+              style: TextButton.styleFrom(
+                  textStyle: const TextStyle(
+                      fontSize: 13, fontWeight: FontWeight.w800),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14))),
               onPressed: _page > 1
                   ? () {
                       _page--;
@@ -767,6 +786,11 @@ class _OperationsReportScreenState extends State<OperationsReportScreen>
               child: const Text('Sebelumnya')),
           Text('Halaman $_page', style: const TextStyle(fontSize: 12)),
           TextButton(
+              style: TextButton.styleFrom(
+                  textStyle: const TextStyle(
+                      fontSize: 13, fontWeight: FontWeight.w800),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14))),
               onPressed: hasNext
                   ? () {
                       _page++;

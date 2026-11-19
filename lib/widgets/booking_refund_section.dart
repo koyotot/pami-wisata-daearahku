@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:phosphor_icons/phosphor_icons.dart';
@@ -10,7 +11,7 @@ import '../theme/app_colors.dart';
 import 'visit_format.dart';
 
 /// Same error tone the payment checkout uses.
-const _errorColor = Color(0xFF9C493D);
+const _errorColor = AppColors.danger;
 
 /// Refund request and status for a paid booking. Renders nothing until the server confirms the
 /// booking is paid and confirmed (or a request already exists). Pass [seed] to reuse a payment
@@ -21,11 +22,13 @@ class BookingRefundSection extends StatefulWidget {
       required this.repository,
       required this.bookingGuid,
       this.seed,
+      this.compact = false,
       this.storage,
       this.onChanged});
   final BusinessRepository repository;
   final String bookingGuid;
   final PaymentSnapshot? seed;
+  final bool compact;
   final FlutterSecureStorage? storage;
 
   /// Called after a request was filed, so the parent can refresh the booking.
@@ -56,7 +59,9 @@ class _BookingRefundSectionState extends State<BookingRefundSection> {
   void didUpdateWidget(BookingRefundSection oldWidget) {
     super.didUpdateWidget(oldWidget);
     final seed = widget.seed;
-    if (seed != null && !identical(seed, oldWidget.seed) && !_state.submitting) {
+    if (seed != null &&
+        !identical(seed, oldWidget.seed) &&
+        !_state.submitting) {
       _state.applySnapshot(seed);
     }
   }
@@ -80,9 +85,16 @@ class _BookingRefundSectionState extends State<BookingRefundSection> {
         context: context,
         isScrollControlled: true,
         useSafeArea: true,
+        showDragHandle: true,
         backgroundColor: AppColors.surface,
-        builder: (_) => Theme(
-            data: AppColors.visitorTheme, child: _RefundSheet(state: _state)));
+        shape: const RoundedRectangleBorder(
+            borderRadius:
+                BorderRadius.vertical(top: Radius.circular(AppSpacing.xl))),
+        builder: (_) => SafeArea(
+            top: false,
+            child: Theme(
+                data: AppColors.visitorTheme,
+                child: _RefundSheet(state: _state))));
     if (!mounted) return;
     setState(() => _sheetOpen = false);
     if (sent == true) widget.onChanged?.call();
@@ -95,7 +107,7 @@ class _BookingRefundSectionState extends State<BookingRefundSection> {
     if (!s.loaded || (refund == null && !s.canRequest)) {
       return const SizedBox.shrink();
     }
-    return Container(
+    final card = Container(
         key: const Key('refund-section'),
         width: double.infinity,
         margin: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
@@ -104,50 +116,72 @@ class _BookingRefundSectionState extends State<BookingRefundSection> {
             color: AppColors.surface,
             borderRadius: BorderRadius.circular(18),
             border: Border.all(color: AppColors.border)),
-        child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Semantics(
-                  header: true,
-                  child: const Text('Pengembalian Dana',
-                      style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w800,
-                          color: AppColors.navy))),
-              const SizedBox(height: AppSpacing.sm),
-              if (refund != null) _status(refund) else _intro(),
-              if (s.notice != null)
-                _live(s.notice!, key: const Key('refund-notice'), color: AppColors.success),
-              if (s.error != null && !s.submitting && !_sheetOpen)
-                _live(s.error!, key: const Key('refund-error'), color: _errorColor),
-              if (s.canRequest)
-                Padding(
-                    padding: const EdgeInsets.only(top: AppSpacing.md),
-                    child: OutlinedButton(
-                        key: const Key('refund-open'),
-                        style: OutlinedButton.styleFrom(
-                            minimumSize:
-                                const Size.fromHeight(kMinInteractiveDimension),
-                            shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(16))),
-                        onPressed: s.submitting ? null : _openSheet,
-                        child: const Text('Ajukan Pengembalian Dana',
-                            textAlign: TextAlign.center))),
-              if (refund != null && refund.isActive)
-                Padding(
-                    padding: const EdgeInsets.only(top: AppSpacing.sm),
-                    child: TextButton(
-                        key: const Key('refund-refresh'),
-                        onPressed: s.loading ? null : s.refresh,
-                        child: Text(s.loading ? 'Memeriksa…' : 'Perbarui Status',
-                            textAlign: TextAlign.center))),
-            ]));
+        child:
+            Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          Semantics(
+              header: true,
+              child: Text('Pengembalian Dana',
+                  style: GoogleFonts.plusJakartaSans(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w800,
+                      color: AppColors.navy))),
+          const SizedBox(height: AppSpacing.sm),
+          if (refund != null) _status(refund) else _intro(),
+          if (s.notice != null)
+            _live(s.notice!,
+                key: const Key('refund-notice'), color: AppColors.success),
+          if (s.error != null && !s.submitting && !_sheetOpen)
+            _live(s.error!, key: const Key('refund-error'), color: _errorColor),
+          if (s.canRequest)
+            Padding(
+                padding: const EdgeInsets.only(top: AppSpacing.md),
+                child: OutlinedButton(
+                    key: const Key('refund-open'),
+                    style: OutlinedButton.styleFrom(
+                        foregroundColor: widget.compact ? AppColors.blue : null,
+                        side: widget.compact
+                            ? const BorderSide(color: AppColors.blue)
+                            : null,
+                        textStyle: GoogleFonts.plusJakartaSans(
+                            fontSize: 13, fontWeight: FontWeight.w800),
+                        minimumSize:
+                            const Size.fromHeight(kMinInteractiveDimension),
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(14))),
+                    onPressed: s.submitting ? null : _openSheet,
+                    child: const Text('Ajukan Pengembalian Dana',
+                        textAlign: TextAlign.center))),
+          if (refund != null && refund.isActive)
+            Padding(
+                padding: const EdgeInsets.only(top: AppSpacing.sm),
+                child: TextButton(
+                    key: const Key('refund-refresh'),
+                    style: TextButton.styleFrom(
+                        minimumSize: const Size(48, 48),
+                        textStyle: const TextStyle(
+                            fontSize: 13, fontWeight: FontWeight.w800)),
+                    onPressed: s.loading ? null : s.refresh,
+                    child: Text(s.loading ? 'Memeriksa…' : 'Perbarui Status',
+                        textAlign: TextAlign.center))),
+        ]));
+    if (!widget.compact) return card;
+    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+      Padding(
+          padding:
+              const EdgeInsets.only(top: AppSpacing.sm, bottom: AppSpacing.sm),
+          child: Text('Layanan Pengembalian Dana',
+              style: GoogleFonts.plusJakartaSans(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w800,
+                  color: AppColors.navy))),
+      card,
+    ]);
   }
 
-  Widget _intro() => const Text(
+  Widget _intro() => Text(
       'Jika tidak jadi berkunjung, Anda dapat mengajukan pengembalian dana. Pengelola akan meninjau pengajuan; persetujuan belum dijamin.',
-      style: TextStyle(
-          fontSize: 13, height: 1.5, color: AppColors.textSecondary));
+      style:
+          TextStyle(fontSize: 13, height: 1.6, color: AppColors.textSecondary));
 
   Widget _status(RefundRequest refund) {
     final color = switch (refund.status) {
@@ -172,8 +206,8 @@ class _BookingRefundSectionState extends State<BookingRefundSection> {
             Expanded(
                 child: Text(refund.title,
                     style: TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w800,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
                         color: color))),
           ]),
           const SizedBox(height: AppSpacing.sm),
@@ -185,9 +219,11 @@ class _BookingRefundSectionState extends State<BookingRefundSection> {
             _line('Catatan pengelola', refund.decisionNote!),
           ],
           if (refundedAt != null)
-            _line('Tanggal pengembalian dana', visitDateLabel(refundedAt.toLocal())),
+            _line('Tanggal pengembalian dana',
+                visitDateLabel(refundedAt.toLocal())),
           if (amount != null)
-            _line(refund.isClosedRefund ? 'Dana dikembalikan' : 'Nilai pengajuan',
+            _line(
+                refund.isClosedRefund ? 'Dana dikembalikan' : 'Nilai pengajuan',
                 formatMoney(amount, refund.currency ?? 'IDR')),
           if (refund.reason != null) _line('Alasan Anda', refund.reason!),
         ]);
@@ -269,22 +305,37 @@ class _RefundSheetState extends State<_RefundSheet> {
     final submitting = _state.submitting;
     final error = submitting ? null : _state.error;
     return Padding(
-        padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(context).bottom),
+        padding:
+            EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(context).bottom),
         child: SingleChildScrollView(
-            padding: const EdgeInsets.fromLTRB(
-                AppSpacing.lg, AppSpacing.lg, AppSpacing.lg, AppSpacing.xl),
+            padding: const EdgeInsets.all(AppSpacing.sheetPadding),
             child: Column(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Semantics(
-                      header: true,
-                      child: const Text('Ajukan Pengembalian Dana',
-                          style: TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.w800,
-                              color: AppColors.navy))),
-                  const SizedBox(height: AppSpacing.sm),
+                  Row(children: [
+                    Expanded(
+                        child: Semantics(
+                            header: true,
+                            child: const Text('Ajukan Pengembalian Dana',
+                                style: TextStyle(
+                                    fontSize: 20,
+                                    fontWeight: FontWeight.w800,
+                                    color: AppColors.navy)))),
+                    IconButton(
+                        tooltip: 'Tutup',
+                        onPressed: submitting
+                            ? null
+                            : () => Navigator.of(context).pop(),
+                        style: IconButton.styleFrom(
+                            minimumSize: const Size(48, 48),
+                            backgroundColor: AppColors.sheetCloseBackground,
+                            shape: RoundedRectangleBorder(
+                                borderRadius:
+                                    BorderRadius.circular(AppSpacing.md))),
+                        icon: const Icon(PhosphorIconsRegular.x, size: 20)),
+                  ]),
+                  const Divider(height: AppSpacing.xl, color: AppColors.border),
                   const Text(
                       'Ceritakan alasan Anda. Pengelola akan meninjau pengajuan ini; dana baru dikirim setelah pengelola menyelesaikan prosesnya.',
                       style: TextStyle(
@@ -294,6 +345,8 @@ class _RefundSheetState extends State<_RefundSheet> {
                   const SizedBox(height: AppSpacing.lg),
                   TextField(
                       key: const Key('refund-reason'),
+                      style:
+                          const TextStyle(fontSize: 13, color: AppColors.navy),
                       controller: _reason,
                       enabled: !submitting,
                       readOnly: _locked,
@@ -307,7 +360,8 @@ class _RefundSheetState extends State<_RefundSheet> {
                         LengthLimitingTextInputFormatter(refundReasonMaxLength)
                       ],
                       onChanged: (_) {
-                        if (_validation != null) setState(() => _validation = null);
+                        if (_validation != null)
+                          setState(() => _validation = null);
                       },
                       decoration: const InputDecoration(
                           labelText: 'Alasan pengembalian dana',
@@ -323,24 +377,51 @@ class _RefundSheetState extends State<_RefundSheet> {
                     _SheetNote(error,
                         key: const Key('refund-submit-error'),
                         color: _errorColor),
-                  const SizedBox(height: AppSpacing.lg),
-                  ElevatedButton(
-                      key: const Key('refund-submit'),
-                      onPressed: submitting ? null : _submit,
-                      child: submitting
-                          ? const SizedBox(
-                              width: 20,
-                              height: 20,
-                              child: CircularProgressIndicator(
-                                  strokeWidth: 2, color: AppColors.blueDeep))
-                          : const Text('Kirim Pengajuan',
-                              textAlign: TextAlign.center)),
-                  const SizedBox(height: AppSpacing.sm),
-                  TextButton(
-                      key: const Key('refund-cancel'),
-                      onPressed:
-                          submitting ? null : () => Navigator.of(context).pop(),
-                      child: const Text('Batal')),
+                  const SizedBox(height: AppSpacing.xl),
+                  IntrinsicHeight(
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Expanded(
+                          child: OutlinedButton(
+                              key: const Key('refund-cancel'),
+                              style: OutlinedButton.styleFrom(
+                                  minimumSize: const Size(48, 52),
+                                  textStyle: const TextStyle(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w800),
+                                  shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(14))),
+                              onPressed: submitting
+                                  ? null
+                                  : () => Navigator.of(context).pop(),
+                              child: const Text('Batal')),
+                        ),
+                        const SizedBox(width: AppSpacing.md),
+                        Expanded(
+                          child: ElevatedButton(
+                              key: const Key('refund-submit'),
+                              style: ElevatedButton.styleFrom(
+                                  minimumSize: const Size(48, 52),
+                                  textStyle: const TextStyle(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w800),
+                                  shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(14))),
+                              onPressed: submitting ? null : _submit,
+                              child: submitting
+                                  ? const SizedBox(
+                                      width: 20,
+                                      height: 20,
+                                      child: CircularProgressIndicator(
+                                          strokeWidth: 2,
+                                          color: AppColors.blueDeep))
+                                  : const Text('Kirim Pengajuan',
+                                      textAlign: TextAlign.center)),
+                        ),
+                      ],
+                    ),
+                  ),
                 ])));
   }
 }

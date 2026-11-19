@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:phosphor_icons/phosphor_icons.dart';
 import '../data/booking_state.dart';
+import '../theme/app_colors.dart';
 import '../data/business_repository.dart';
 import 'visit_format.dart';
 import 'package:timezone/data/latest.dart' as tzdata;
@@ -38,6 +39,7 @@ class AvailabilityCalendar extends StatelessWidget {
   final bool enabled;
   final bool navigationEnabled;
   final DateTime? earliestMonth;
+  final int? requiredQuantity;
   const AvailabilityCalendar(
       {super.key,
       required this.month,
@@ -47,13 +49,14 @@ class AvailabilityCalendar extends StatelessWidget {
       required this.onSelected,
       this.enabled = true,
       this.navigationEnabled = true,
+      this.requiredQuantity,
       this.earliestMonth});
 
   Color _color(String level) => switch (level) {
         'high' => const Color(0xFF218348),
         'medium' => const Color(0xFF9B7400),
         'low' => const Color(0xFFC7353C),
-        _ => const Color(0xFF728099),
+        _ => AppColors.textMuted,
       };
 
   @override
@@ -76,8 +79,8 @@ class AvailabilityCalendar extends StatelessWidget {
             child: Text(visitMonth(month),
                 textAlign: TextAlign.center,
                 style: const TextStyle(
-                    color: Color(0xFF102D59),
-                    fontSize: 15,
+                    color: AppColors.navy,
+                    fontSize: 16,
                     fontWeight: FontWeight.w800))),
         IconButton(
             tooltip: 'Bulan berikutnya',
@@ -86,18 +89,18 @@ class AvailabilityCalendar extends StatelessWidget {
                 : null,
             icon: const Icon(PhosphorIconsRegular.caretRight)),
       ]),
-      const SizedBox(height: 8),
+      const SizedBox(height: AppSpacing.sm),
       Row(children: [
         for (final day in ['Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab', 'Min'])
           Expanded(
               child: Text(day,
                   textAlign: TextAlign.center,
                   style: const TextStyle(
-                      color: Color(0xFF64748B),
+                      color: AppColors.textSecondary,
                       fontSize: 11,
                       fontWeight: FontWeight.w600)))
       ]),
-      const SizedBox(height: 8),
+      const SizedBox(height: AppSpacing.sm),
       GridView.builder(
         padding: EdgeInsets.zero,
         shrinkWrap: true,
@@ -114,11 +117,15 @@ class AvailabilityCalendar extends StatelessWidget {
           final date = formatVisitDate(
               DateTime(month.year, month.month, index - offset + 1));
           final day = availability?.onDate(date);
-          final selectable = enabled && day?.bookable == true;
+          final selectable = enabled &&
+              day?.bookable == true &&
+              (requiredQuantity == null ||
+                  (day?.remaining != null &&
+                      day!.remaining! >= requiredQuantity!));
           final selected = selectedDate == date;
           final available = day?.status == 'available';
           final color =
-              available ? _color(day!.level) : const Color(0xFF64748B);
+              available ? _color(day!.level) : AppColors.textSecondary;
           final label = day == null
               ? 'Belum dimuat'
               : '${availabilityStatusLabel(day.status)}, ${availabilityLevelLabel(day.level)}, sisa ${day.remaining ?? '\u2014'} tiket';
@@ -140,30 +147,27 @@ class AvailabilityCalendar extends StatelessWidget {
                                 ? color.withValues(alpha: .07)
                                 : const Color(0xFFF1F4F8),
                         side: selected
-                            ? const BorderSide(
-                                color: Color(0xFF1976D2), width: 2)
+                            ? const BorderSide(color: AppColors.blue, width: 2)
                             : BorderSide.none,
                         shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(10)),
                         minimumSize: Size.zero,
                         tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                         padding: const EdgeInsets.symmetric(
-                            horizontal: 1, vertical: 4)),
+                            horizontal: 1, vertical: AppSpacing.xs)),
                     onPressed: selectable ? () => onSelected(day!) : null,
                     child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
                           Text('${index - offset + 1}',
                               style: TextStyle(
-                                  color: selected
-                                      ? const Color(0xFF1976D2)
-                                      : color,
+                                  color: selected ? AppColors.blue : color,
                                   fontSize: 14,
                                   fontWeight: FontWeight.w800)),
                           const SizedBox(height: 3),
                           if (day?.status == 'closed')
                             const Icon(PhosphorIconsRegular.lock,
-                                size: 12, color: Color(0xFF64748B))
+                                size: 12, color: AppColors.textSecondary)
                           else
                             Text(day?.remaining?.toString() ?? '\u2014',
                                 maxLines: 1,
@@ -173,15 +177,15 @@ class AvailabilityCalendar extends StatelessWidget {
                   )));
         },
       ),
-      const SizedBox(height: 12),
+      const SizedBox(height: AppSpacing.md),
       const Text(
           'Angka kecil menunjukkan sisa tiket. Tahan tanggal untuk rincian.',
-          style:
-              TextStyle(color: Color(0xFF64748B), fontSize: 11, height: 1.5)),
-      const SizedBox(height: 10),
+          style: TextStyle(
+              color: AppColors.textSecondary, fontSize: 11, height: 1.5)),
+      const SizedBox(height: AppSpacing.sm),
       Wrap(
-          spacing: 12,
-          runSpacing: 8,
+          spacing: AppSpacing.md,
+          runSpacing: AppSpacing.sm,
           children: ['high', 'medium', 'low', 'none']
               .map((level) => Row(mainAxisSize: MainAxisSize.min, children: [
                     Container(
@@ -189,7 +193,7 @@ class AvailabilityCalendar extends StatelessWidget {
                         height: 6,
                         decoration: BoxDecoration(
                             color: _color(level), shape: BoxShape.circle)),
-                    const SizedBox(width: 5),
+                    const SizedBox(width: AppSpacing.xs),
                     Text(
                         level == 'none'
                             ? 'Tutup / habis / belum tersedia'
@@ -199,10 +203,10 @@ class AvailabilityCalendar extends StatelessWidget {
               .toList()),
       if (availability != null)
         Padding(
-            padding: const EdgeInsets.only(top: 12),
+            padding: const EdgeInsets.only(top: AppSpacing.md),
             child: Text('Zona waktu: ${availability!.timezone}',
-                style:
-                    const TextStyle(color: Color(0xFF64748B), fontSize: 11))),
+                style: const TextStyle(
+                    color: AppColors.textSecondary, fontSize: 11))),
     ]);
   }
 }

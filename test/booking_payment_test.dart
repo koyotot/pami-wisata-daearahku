@@ -55,6 +55,13 @@ class FakeV3Server {
   String? qrisReason;
   bool ewalletAvailable = true;
   late DateTime bookingExpiry = clock().add(const Duration(minutes: 15));
+
+  /// False until a method is chosen (and after a reset): `expires_at` is null.
+  bool countdownStarted = true;
+  late DateTime selectionExpiry = clock().add(const Duration(hours: 24));
+  String? selectionReason;
+  String? cancelCode;
+  int cancelPosts = 0;
   String vaNumber = '8277012345678901';
 
   // Tickets
@@ -220,12 +227,15 @@ class FakeV3Server {
         'can_switch': canSwitchOverride ?? (canCreate && attemptStatus != null),
         'switch_reason': switchReason,
         'availability': canPay ? 'available' : 'unavailable',
-        'reason': canPay ? null : (bniReason ?? qrisReason),
+        'reason':
+            selectionReason ?? (canPay ? null : (bniReason ?? qrisReason)),
+        'selection_expires_at': selectionExpiry.toUtc().toIso8601String(),
         'can_pay': canPay,
         'amount': 20000,
         'currency': 'IDR',
         'payment_status': bookingPaymentStatus,
-        'expires_at': bookingExpiry.toUtc().toIso8601String(),
+        'expires_at':
+            countdownStarted ? bookingExpiry.toUtc().toIso8601String() : null,
         'provider': 'midtrans',
         'server_time': clock().toUtc().toIso8601String(),
         'environment': 'sandbox',
@@ -302,8 +312,21 @@ class FakeV3Server {
         onRefresh?.call();
         return _ok(intent());
       }
+      if (request.method == 'POST' &&
+          path.contains('/payment-attempts/') &&
+          path.endsWith('/cancel')) {
+        cancelPosts++;
+        if (cancelCode != null) {
+          return jsonResponse({'message': 'x', 'code': cancelCode}, 409);
+        }
+        attemptStatus = 'failed';
+        intentStatus = 'failed';
+        canCreate = true;
+        return _ok(intent());
+      }
       if (request.method == 'POST' && path.endsWith('/payment-attempts')) {
         createPosts++;
+        countdownStarted = true;
         createKeys.add(request.headers['Idempotency-Key'] ?? '');
         createBodies.add(jsonDecode(request.body) as Map<String, dynamic>);
         storedKeyAtCreate.add(await readStoredKey?.call());
@@ -365,7 +388,10 @@ class FakeV3Server {
         return _ok({
           ...bookingJson(guid: 'booking-1', status: bookingStatus),
           'payment_status': bookingPaymentStatus,
-          'payment_expires_at': bookingExpiry.toUtc().toIso8601String(),
+          'payment_expires_at':
+              countdownStarted ? bookingExpiry.toUtc().toIso8601String() : null,
+          'payment_selection_expires_at':
+              selectionExpiry.toUtc().toIso8601String(),
         });
       }
       return jsonResponse({'message': 'not found'}, 404);
@@ -677,15 +703,25 @@ void main() {
           await const FlutterSecureStorage().read(key: _operationKey), isNull);
     });
 
-    testWidgets('an active attempt blocks switching and explains why',
+    testWidgets(
+        'an active attempt hides the chooser and says a change waits 15 minutes',
         (tester) async {
       server.startAttempt();
-      server.switchReason = 'payment_attempt_unresolved';
       await pumpScreen(tester);
       expect(choice('qris', 'qris'), findsNothing);
       expect(start(), findsNothing);
-      expect(find.byKey(const Key('pay-switch-note')), findsOneWidget);
-      expect(find.textContaining('tidak dapat diganti'), findsOneWidget);
+      expect(find.byKey(const Key('pay-switch')), findsNothing);
+      expect(find.text('Penggantian metode pembayaran harus menunggu 15 menit'),
+          findsOneWidget);
+    });
+    testWidgets('the switch button returns when the provider cancel is enabled',
+        (tester) async {
+      kPaymentSwitchEnabled = true;
+      addTearDown(() => kPaymentSwitchEnabled = false);
+      server.startAttempt();
+      await pumpScreen(tester);
+      expect(find.byKey(const Key('pay-switch')), findsOneWidget);
+      expect(find.byKey(const Key('pay-switch-wait-note')), findsNothing);
     });
   });
 
@@ -1366,6 +1402,181 @@ void main() {
     test('file names are sanitised', () {
       expect(paymentQrFileName('BK/0001 ../x'), 'qris-BK_0001_.._x.png');
       expect(paymentQrFileName(''), 'qris-pembayaran.png');
+    });
+  });
+
+  group('countdown starts at method choice', () {
+    testWidgets(
+        'null deadline is the choose phase: no countdown, plain deadline text',
+        (tester) async {
+      server.countdownStarted = false;
+      await pumpScreen(tester);
+      expect(find.byKey(const Key('pay-countdown')), findsNothing);
+      expect(find.byKey(const Key('pay-selection-deadline')), findsOneWidget);
+      expect(find.textContaining('Pilih metode pembayaran sebelum'),
+          findsOneWidget);
+      expect(find.textContaining('Waktu habis'), findsNothing);
+      expect(start(), findsOneWidget);
+      await tap(tester, choice('virtual_account', 'bni'));
+      await tester.pump();
+      expect(enabled(tester, start()), isTrue);
+      await unmount(tester);
+    });
+
+    test('state: null deadline with can_create is open, not closed', () async {
+      server.countdownStarted = false;
+      final state = BookingPaymentState(repository, 'booking-1',
+          now: () => now, jitter: () => 0.5);
+      await state.open();
+      expect(state.countdownStarted, isFalse);
+      expect(state.windowOpen, isTrue);
+      expect(state.phase, PaymentPhase.choose);
+      state.dispose();
+    });
+
+    test('state: selection deadline passed closes the window', () async {
+      server.countdownStarted = false;
+      server.canCreate = true;
+      server.selectionReason = 'payment_selection_closed';
+      final state = BookingPaymentState(repository, 'booking-1',
+          now: () => now, jitter: () => 0.5);
+      await state.open();
+      expect(state.selectionClosed, isTrue);
+      expect(state.windowOpen, isFalse);
+      expect(state.phase, PaymentPhase.blocked);
+      expect(paymentReason('payment_selection_closed'),
+          contains('memilih metode pembayaran'));
+      state.dispose();
+    });
+
+    test(
+        'state: reset cycle (old attempt expired, expires_at null) shows the chooser',
+        () async {
+      server.startAttempt(status: 'expired');
+      server.countdownStarted = false;
+      server.canCreate = true;
+      final state = BookingPaymentState(repository, 'booking-1',
+          now: () => now, jitter: () => 0.5);
+      await state.open();
+      expect(state.phase, PaymentPhase.choose);
+      expect(state.chooserVisible, isTrue);
+      state.dispose();
+    });
+
+    test(
+        'state: pending past the deadline stays verifying and locks the chooser',
+        () async {
+      server.startAttempt();
+      server.attemptExpiresAt = now.subtract(const Duration(minutes: 1));
+      server.bookingExpiry = now.subtract(const Duration(minutes: 1));
+      server.verificationPending = true;
+      server.canCreate = true;
+      final state = BookingPaymentState(repository, 'booking-1',
+          now: () => now, jitter: () => 0.5);
+      await state.open();
+      expect(state.phase, PaymentPhase.verifying);
+      expect(state.chooserVisible, isFalse);
+      expect(state.canRetry, isFalse);
+      state.dispose();
+    });
+
+    testWidgets('countdown element appears on the instruction after choosing',
+        (tester) async {
+      server.countdownStarted = false;
+      await pumpScreen(tester);
+      expect(find.byKey(const Key('pay-countdown')), findsNothing);
+      await tap(tester, choice('virtual_account', 'bni'));
+      await tester.pump();
+      await startPay(tester);
+      await tester.pump();
+      await tester.pump();
+      expect(find.byKey(const Key('pay-va-number')), findsOneWidget);
+      expect(find.byKey(const Key('pay-countdown')), findsOneWidget);
+      await unmount(tester);
+    });
+  });
+
+  group('Ganti metode pembayaran', () {
+    setUp(() => kPaymentSwitchEnabled = true);
+    tearDown(() => kPaymentSwitchEnabled = false);
+    Future<void> openSwitch(WidgetTester tester) async {
+      await tap(tester, find.byKey(const Key('pay-switch')));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 400));
+    }
+
+    Future<void> confirmSwitch(WidgetTester tester) async {
+      await tester.tap(find.byKey(const Key('pay-switch-confirm')));
+      await tester.pump();
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 400));
+    }
+
+    testWidgets(
+        'confirms, cancels the attempt, then shows the chooser with the countdown running',
+        (tester) async {
+      server.startAttempt();
+      await pumpScreen(tester);
+      expect(find.text('Ganti metode pembayaran'), findsOneWidget);
+      await openSwitch(tester);
+      expect(find.byKey(const Key('pay-switch-note')), findsOneWidget);
+      expect(server.cancelPosts, 0);
+      await confirmSwitch(tester);
+      expect(server.cancelPosts, 1);
+      expect(find.byKey(const Key('pay-va-number')), findsNothing);
+      expect(choice('qris', 'qris'), findsOneWidget);
+      expect(find.byKey(const Key('pay-countdown')), findsOneWidget);
+      expect(server.createPosts, 0);
+      await unmount(tester);
+    });
+
+    testWidgets('going back from the sheet does not cancel anything',
+        (tester) async {
+      server.startAttempt();
+      await pumpScreen(tester);
+      await openSwitch(tester);
+      await tester.tap(find.byKey(const Key('pay-switch-back')));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 400));
+      expect(server.cancelPosts, 0);
+      expect(find.byKey(const Key('pay-va-number')), findsOneWidget);
+      await unmount(tester);
+    });
+
+    testWidgets(
+        'payment_verification_pending keeps the instruction and says so',
+        (tester) async {
+      server.startAttempt();
+      server.cancelCode = 'payment_verification_pending';
+      await pumpScreen(tester);
+      await openSwitch(tester);
+      await confirmSwitch(tester);
+      expect(server.cancelPosts, 1);
+      expect(
+          find.text('Sedang memverifikasi, coba lagi sebentar.'), findsWidgets);
+      expect(find.byKey(const Key('pay-va-number')), findsOneWidget);
+      await unmount(tester);
+    });
+
+    testWidgets('payment_already_received says so', (tester) async {
+      server.startAttempt();
+      server.cancelCode = 'payment_already_received';
+      await pumpScreen(tester);
+      await openSwitch(tester);
+      await confirmSwitch(tester);
+      expect(find.text('Pembayaran sudah diterima.'), findsWidgets);
+      await unmount(tester);
+    });
+
+    test('error mapping covers every cancel 409 code', () {
+      String map(String code) =>
+          cancelAttemptError(ApiException('x', 409, code));
+      expect(map('payment_already_received'), 'Pembayaran sudah diterima.');
+      expect(map('payment_verification_pending'),
+          'Sedang memverifikasi, coba lagi sebentar.');
+      expect(map('payment_needs_review'), contains('diperiksa pengelola'));
+      expect(map('booking_not_awaiting_payment'),
+          contains('tidak sedang menunggu pembayaran'));
     });
   });
 
