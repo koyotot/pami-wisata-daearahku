@@ -16,6 +16,7 @@ import '../superadmin/destination_admin_assignments_screen.dart';
 import '../superadmin/kelola_admin_screen.dart';
 import '../superadmin/kelola_fasilitas_screen.dart';
 import '../superadmin/kelola_kategori_screen.dart';
+import '../superadmin/timezone_drift_screen.dart';
 import 'operations_dashboard/operations_dashboard.dart';
 import 'operations_queue_screen.dart';
 import '../shared/session_destination.dart';
@@ -196,6 +197,12 @@ class _OperationsNavigationShellState extends State<OperationsNavigationShell>
                             'Pilih ulang destinasi atau muat data sesuai akses terbaru.'),
                         if (_role != 1)
                           TextButton(
+                              style: TextButton.styleFrom(
+                                  textStyle: const TextStyle(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w800),
+                                  shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(14))),
                               onPressed: () => _select(_index),
                               child: const Text('Muat sesuai akses terbaru')),
                       ])
@@ -254,6 +261,12 @@ class _ManagementPage extends StatelessWidget {
                       repository: repository, session: session)),
               _link(
                   context,
+                  'Zona waktu booking',
+                  'Booking aktif yang masih memakai zona lama',
+                  TimezoneDriftScreen(
+                      repository: repository, session: session)),
+              _link(
+                  context,
                   'Aktivitas audit',
                   'Ketersediaan riwayat aktivitas',
                   const OperationsUnavailableScreen(audit: true)),
@@ -262,7 +275,7 @@ class _ManagementPage extends StatelessWidget {
   Widget _link(
           BuildContext context, String title, String subtitle, Widget page) =>
       Card(
-          margin: const EdgeInsets.only(bottom: 8),
+          margin: const EdgeInsets.only(bottom: AppSpacing.sm),
           color: Colors.white,
           elevation: 0,
           shape: RoundedRectangleBorder(
@@ -270,8 +283,8 @@ class _ManagementPage extends StatelessWidget {
               side: const BorderSide(color: AppColors.border)),
           clipBehavior: Clip.antiAlias,
           child: ListTile(
-              contentPadding:
-                  const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+              contentPadding: const EdgeInsets.symmetric(
+                  horizontal: AppSpacing.lg, vertical: AppSpacing.sm),
               title: Text(title,
                   style: const TextStyle(
                       fontSize: 14,
@@ -349,7 +362,8 @@ class _OperationsProfileState extends State<_OperationsProfile> {
         builder: (sheetContext) => SafeArea(
             top: false,
             child: Padding(
-                padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+                padding: const EdgeInsets.fromLTRB(AppSpacing.sheetPadding, 0,
+                    AppSpacing.sheetPadding, AppSpacing.sheetPadding),
                 child: Column(
                     mainAxisSize: MainAxisSize.min,
                     crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -365,27 +379,27 @@ class _OperationsProfileState extends State<_OperationsProfile> {
                             tooltip: 'Tutup',
                             onPressed: () => Navigator.pop(sheetContext, false),
                             style: IconButton.styleFrom(
-                                backgroundColor: const Color(0xFFEEF3FA),
+                                backgroundColor: AppColors.sheetCloseBackground,
                                 foregroundColor: AppColors.textSecondary,
                                 shape: RoundedRectangleBorder(
                                     borderRadius: BorderRadius.circular(12))),
                             icon: const Icon(PhosphorIconsRegular.x, size: 18)),
                       ]),
-                      const SizedBox(height: 12),
+                      const SizedBox(height: AppSpacing.md),
                       const Divider(height: 1, color: AppColors.border),
-                      const SizedBox(height: 16),
+                      const SizedBox(height: AppSpacing.lg),
                       Row(children: [
                         Container(
                             width: 48,
                             height: 48,
                             decoration: BoxDecoration(
-                                color: const Color(0xFFFDECEC),
+                                color: AppColors.dangerTint,
                                 border:
-                                    Border.all(color: const Color(0xFFF3C9C9)),
+                                    Border.all(color: AppColors.dangerBorder),
                                 borderRadius: BorderRadius.circular(14)),
                             child: const Icon(PhosphorIconsRegular.signOut,
                                 size: 22, color: danger)),
-                        const SizedBox(width: 12),
+                        const SizedBox(width: AppSpacing.md),
                         const Expanded(
                             child: Text('Akhiri sesi operasional?',
                                 style: TextStyle(
@@ -393,7 +407,7 @@ class _OperationsProfileState extends State<_OperationsProfile> {
                                     fontWeight: FontWeight.w800,
                                     color: AppColors.navy))),
                       ]),
-                      const SizedBox(height: 16),
+                      const SizedBox(height: AppSpacing.lg),
                       Text.rich(
                           TextSpan(children: [
                             const TextSpan(text: 'Anda akan keluar dari akun '),
@@ -413,7 +427,7 @@ class _OperationsProfileState extends State<_OperationsProfile> {
                               fontSize: 13,
                               height: 1.5,
                               color: AppColors.textSecondary)),
-                      const SizedBox(height: 20),
+                      const SizedBox(height: AppSpacing.xl),
                       Row(children: [
                         Expanded(
                             child: OutlinedButton(
@@ -421,6 +435,9 @@ class _OperationsProfileState extends State<_OperationsProfile> {
                                 onPressed: () =>
                                     Navigator.pop(sheetContext, false),
                                 style: OutlinedButton.styleFrom(
+                                    textStyle: const TextStyle(
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.w800),
                                     minimumSize: const Size.fromHeight(52),
                                     foregroundColor: AppColors.blue,
                                     side: const BorderSide(
@@ -430,9 +447,9 @@ class _OperationsProfileState extends State<_OperationsProfile> {
                                             BorderRadius.circular(14))),
                                 child: const Text('Batal',
                                     style: TextStyle(
-                                        fontSize: 14,
+                                        fontSize: 13,
                                         fontWeight: FontWeight.w800)))),
-                        const SizedBox(width: 12),
+                        const SizedBox(width: AppSpacing.md),
                         Expanded(
                             child: FilledButton(
                                 key:
@@ -440,6 +457,9 @@ class _OperationsProfileState extends State<_OperationsProfile> {
                                 onPressed: () =>
                                     Navigator.pop(sheetContext, true),
                                 style: FilledButton.styleFrom(
+                                    textStyle: const TextStyle(
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.w800),
                                     minimumSize: const Size.fromHeight(52),
                                     backgroundColor: danger,
                                     foregroundColor: Colors.white,
@@ -448,7 +468,7 @@ class _OperationsProfileState extends State<_OperationsProfile> {
                                             BorderRadius.circular(14))),
                                 child: const Text('Ya, Keluar',
                                     style: TextStyle(
-                                        fontSize: 14,
+                                        fontSize: 13,
                                         fontWeight: FontWeight.w800)))),
                       ]),
                     ]))));
@@ -497,8 +517,10 @@ class _OperationsProfileState extends State<_OperationsProfile> {
   void _showAccessDetail() {
     const items = <(String, String)>[
       ('Cakupan data', 'Seluruh destinasi, tanpa batas penugasan'),
-      ('Persetujuan booking',
-          'Antrean global, termasuk mengalihkan ke admin lain'),
+      (
+        'Persetujuan booking',
+        'Antrean global, termasuk mengalihkan ke admin lain'
+      ),
       ('Pengelolaan', 'Destinasi, kuota, akun admin, kategori, dan fasilitas'),
       ('Laporan', 'Perbandingan destinasi, kinerja admin, dan keuangan'),
     ];
@@ -511,7 +533,8 @@ class _OperationsProfileState extends State<_OperationsProfile> {
         builder: (sheetContext) => SafeArea(
             top: false,
             child: Padding(
-                padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+                padding: const EdgeInsets.fromLTRB(AppSpacing.sheetPadding, 0,
+                    AppSpacing.sheetPadding, AppSpacing.sheetPadding),
                 child: Column(
                     mainAxisSize: MainAxisSize.min,
                     crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -527,17 +550,18 @@ class _OperationsProfileState extends State<_OperationsProfile> {
                             tooltip: 'Tutup',
                             onPressed: () => Navigator.pop(sheetContext),
                             style: IconButton.styleFrom(
-                                backgroundColor: const Color(0xFFEEF3FA),
+                                backgroundColor: AppColors.sheetCloseBackground,
                                 foregroundColor: AppColors.textSecondary,
                                 shape: RoundedRectangleBorder(
                                     borderRadius: BorderRadius.circular(12))),
                             icon: const Icon(PhosphorIconsRegular.x, size: 18)),
                       ]),
-                      const SizedBox(height: 12),
+                      const SizedBox(height: AppSpacing.md),
                       const Divider(height: 1, color: AppColors.border),
                       for (final item in items) ...[
                         Padding(
-                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            padding: const EdgeInsets.symmetric(
+                                vertical: AppSpacing.md),
                             child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
@@ -545,7 +569,7 @@ class _OperationsProfileState extends State<_OperationsProfile> {
                                       style: const TextStyle(
                                           fontSize: 12,
                                           color: AppColors.textSecondary)),
-                                  const SizedBox(height: 4),
+                                  const SizedBox(height: AppSpacing.xs),
                                   Text(item.$2,
                                       style: const TextStyle(
                                           fontSize: 14,
@@ -601,10 +625,7 @@ class _OperationsProfileState extends State<_OperationsProfile> {
                           gradient: const LinearGradient(
                               begin: Alignment.topLeft,
                               end: Alignment.bottomRight,
-                              colors: [
-                                AppColors.blueDeep,
-                                Color(0xFF2077D6)
-                              ])),
+                              colors: [AppColors.blueDeep, Color(0xFF2077D6)])),
                       child: Text(_initials,
                           style: const TextStyle(
                               fontSize: 26,
@@ -626,7 +647,7 @@ class _OperationsProfileState extends State<_OperationsProfile> {
                             maxLines: 2,
                             overflow: TextOverflow.ellipsis,
                             style: const TextStyle(
-                                fontSize: 18,
+                                fontSize: 16,
                                 height: 1.25,
                                 fontWeight: FontWeight.w800,
                                 color: AppColors.navy)),
@@ -637,21 +658,23 @@ class _OperationsProfileState extends State<_OperationsProfile> {
                     alignment: Alignment.centerLeft,
                     child: Container(
                         padding: const EdgeInsets.symmetric(
-                            horizontal: 12, vertical: 8),
+                            horizontal: AppSpacing.md, vertical: AppSpacing.sm),
                         decoration: BoxDecoration(
                             color: AppColors.blueTint,
                             border: Border.all(color: const Color(0xFFC9DDF7)),
                             borderRadius: BorderRadius.circular(12)),
-                        child: const Row(mainAxisSize: MainAxisSize.min, children: [
-                          Icon(PhosphorIconsRegular.shieldCheck,
-                              size: 16, color: AppColors.blueDeep),
-                          SizedBox(width: 6),
-                          Text('Superadmin',
-                              style: TextStyle(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w800,
-                                  color: AppColors.blueDeep)),
-                        ]))),
+                        child: const Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(PhosphorIconsRegular.shieldCheck,
+                                  size: 16, color: AppColors.blueDeep),
+                              SizedBox(width: AppSpacing.sm),
+                              Text('Superadmin',
+                                  style: TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w800,
+                                      color: AppColors.blueDeep)),
+                            ]))),
                 const SizedBox(height: AppSpacing.lg),
                 const Divider(height: 1, color: AppColors.border),
                 const SizedBox(height: AppSpacing.md),
@@ -734,11 +757,13 @@ class _OperationsProfileState extends State<_OperationsProfile> {
                       key: const ValueKey('operations-profile-access-detail'),
                       onPressed: _showAccessDetail,
                       style: TextButton.styleFrom(
+                          textStyle: const TextStyle(
+                              fontSize: 13, fontWeight: FontWeight.w800),
                           minimumSize: const Size(48, 48),
                           foregroundColor: AppColors.blue),
                       child: const Text('Lihat rincian →',
                           style: TextStyle(
-                              fontSize: 12, fontWeight: FontWeight.w800))),
+                              fontSize: 13, fontWeight: FontWeight.w800))),
                 ]),
               ])),
           const SizedBox(height: AppSpacing.xl),
@@ -755,7 +780,8 @@ class _OperationsProfileState extends State<_OperationsProfile> {
                 ].indexed) ...[
                   if (i > 0) const Divider(height: 1, color: AppColors.border),
                   Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      padding:
+                          const EdgeInsets.symmetric(vertical: AppSpacing.lg),
                       child: Row(children: [
                         Expanded(
                             child: Text(detail.$1,
@@ -775,7 +801,9 @@ class _OperationsProfileState extends State<_OperationsProfile> {
               key: const ValueKey('operations-profile-logout'),
               onPressed: _busy ? null : _logout,
               style: OutlinedButton.styleFrom(
-                  foregroundColor: const Color(0xFFB23B3B),
+                  textStyle: const TextStyle(
+                      fontSize: 13, fontWeight: FontWeight.w800),
+                  foregroundColor: AppColors.danger,
                   backgroundColor: const Color(0xFFFDF1F1),
                   minimumSize: const Size.fromHeight(52),
                   side: const BorderSide(color: Color(0xFFF3C9C9)),
@@ -784,7 +812,7 @@ class _OperationsProfileState extends State<_OperationsProfile> {
               icon: const Icon(PhosphorIconsRegular.signOut, size: 20),
               label: Text(_busy ? 'Keluar…' : 'Keluar dari Akun',
                   style: const TextStyle(
-                      fontSize: 14, fontWeight: FontWeight.w800))),
+                      fontSize: 13, fontWeight: FontWeight.w800))),
         ]);
   }
 
@@ -797,105 +825,109 @@ class _OperationsProfileState extends State<_OperationsProfile> {
           title: 'Profil',
           subtitle: 'Akun operasional Wisata Daerahku',
           children: [
-            if (widget.session.role == 1) ...[
-              Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                      color: AppColors.surface,
-                      border: Border.all(color: AppColors.border),
-                      borderRadius: BorderRadius.circular(16)),
-                  child: Row(children: [
-                    Container(
-                        width: 52,
-                        height: 52,
-                        decoration: BoxDecoration(
-                            color: AppColors.blue.withValues(alpha: .1),
-                            borderRadius: BorderRadius.circular(16)),
-                        child: const Icon(PhosphorIconsRegular.userCircle,
-                            size: 24, color: AppColors.blue)),
-                    const SizedBox(width: 12),
-                    Expanded(
-                        child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                          Text(currentUser?.namaLengkap ?? 'Admin',
-                              style: const TextStyle(
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.w800,
-                                  color: AppColors.navy)),
-                          const SizedBox(height: 4),
-                          Text(currentUser?.email ?? '',
-                              style: const TextStyle(
-                                  fontSize: 12,
-                                  height: 1.5,
-                                  color: AppColors.textMuted)),
-                          const SizedBox(height: 4),
-                          const Text('Admin · destinasi yang ditugaskan',
+              if (widget.session.role == 1) ...[
+                Container(
+                    padding: const EdgeInsets.all(AppSpacing.lg),
+                    decoration: BoxDecoration(
+                        color: AppColors.surface,
+                        border: Border.all(color: AppColors.border),
+                        borderRadius: BorderRadius.circular(16)),
+                    child: Row(children: [
+                      Container(
+                          width: 52,
+                          height: 52,
+                          decoration: BoxDecoration(
+                              color: AppColors.blue.withValues(alpha: .1),
+                              borderRadius: BorderRadius.circular(16)),
+                          child: const Icon(PhosphorIconsRegular.userCircle,
+                              size: 24, color: AppColors.blue)),
+                      const SizedBox(width: AppSpacing.md),
+                      Expanded(
+                          child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                            Text(currentUser?.namaLengkap ?? 'Admin',
+                                style: const TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w800,
+                                    color: AppColors.navy)),
+                            const SizedBox(height: AppSpacing.xs),
+                            Text(currentUser?.email ?? '',
+                                style: const TextStyle(
+                                    fontSize: 12,
+                                    height: 1.5,
+                                    color: AppColors.textMuted)),
+                            const SizedBox(height: AppSpacing.xs),
+                            const Text('Admin · destinasi yang ditugaskan',
+                                style: TextStyle(
+                                    fontSize: 12,
+                                    height: 1.5,
+                                    color: AppColors.textMuted)),
+                          ])),
+                    ])),
+                const SizedBox(height: AppSpacing.md),
+                Container(
+                    padding: const EdgeInsets.all(AppSpacing.lg),
+                    decoration: BoxDecoration(
+                        color: AppColors.surface,
+                        border: Border.all(color: AppColors.border),
+                        borderRadius: BorderRadius.circular(16)),
+                    child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          const Text('Akses akun',
                               style: TextStyle(
-                                  fontSize: 12,
-                                  height: 1.5,
-                                  color: AppColors.textMuted)),
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                  color: AppColors.navy)),
+                          for (final detail in [
+                            ('Role', 'Admin'),
+                            ('Cakupan', 'Destinasi assigned'),
+                            ('Lokasi', _location),
+                          ]) ...[
+                            const Divider(height: 1, color: AppColors.border),
+                            Padding(
+                                padding: const EdgeInsets.symmetric(
+                                    vertical: AppSpacing.md),
+                                child: Row(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Expanded(
+                                          child: Text(detail.$1,
+                                              style: const TextStyle(
+                                                  fontSize: 12,
+                                                  color: AppColors.textMuted))),
+                                      const SizedBox(width: AppSpacing.md),
+                                      Expanded(
+                                          flex: 2,
+                                          child: Text(detail.$2,
+                                              textAlign: TextAlign.end,
+                                              style: const TextStyle(
+                                                  fontSize: 12,
+                                                  height: 1.5,
+                                                  fontWeight: FontWeight.w600,
+                                                  color: AppColors.navy))),
+                                    ])),
+                          ],
                         ])),
-                  ])),
-              const SizedBox(height: 12),
-              Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                      color: AppColors.surface,
-                      border: Border.all(color: AppColors.border),
-                      borderRadius: BorderRadius.circular(16)),
-                  child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        const Text('Akses akun',
-                            style: TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.bold,
-                                color: AppColors.navy)),
-                        for (final detail in [
-                          ('Role', 'Admin'),
-                          ('Cakupan', 'Destinasi assigned'),
-                          ('Lokasi', _location),
-                        ]) ...[
-                          const Divider(height: 1, color: AppColors.border),
-                          Padding(
-                              padding: const EdgeInsets.symmetric(vertical: 12),
-                              child: Row(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Expanded(
-                                        child: Text(detail.$1,
-                                            style: const TextStyle(
-                                                fontSize: 12,
-                                                color: AppColors.textMuted))),
-                                    const SizedBox(width: 12),
-                                    Expanded(
-                                        flex: 2,
-                                        child: Text(detail.$2,
-                                            textAlign: TextAlign.end,
-                                            style: const TextStyle(
-                                                fontSize: 12,
-                                                height: 1.5,
-                                                fontWeight: FontWeight.w600,
-                                                color: AppColors.navy))),
-                                  ])),
-                        ],
-                      ])),
-              const SizedBox(height: 12),
-              OutlinedButton.icon(
-                  key: const ValueKey('operations-profile-logout'),
-                  onPressed: _busy ? null : _logout,
-                  style: OutlinedButton.styleFrom(
-                      foregroundColor: AppColors.blue,
-                      backgroundColor: AppColors.surface,
-                      minimumSize: const Size(48, 48),
-                      side: const BorderSide(color: AppColors.border),
-                      shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12))),
-                  icon: const Icon(PhosphorIconsRegular.signOut, size: 16),
-                  label: Text(_busy ? 'Keluar…' : 'Keluar akun',
-                      style: const TextStyle(
-                          fontSize: 12, fontWeight: FontWeight.bold))),
-            ],
-          ]);
+                const SizedBox(height: AppSpacing.md),
+                OutlinedButton.icon(
+                    key: const ValueKey('operations-profile-logout'),
+                    onPressed: _busy ? null : _logout,
+                    style: OutlinedButton.styleFrom(
+                        textStyle: const TextStyle(
+                            fontSize: 13, fontWeight: FontWeight.w800),
+                        foregroundColor: AppColors.blue,
+                        backgroundColor: AppColors.surface,
+                        minimumSize: const Size(48, 48),
+                        side: const BorderSide(color: AppColors.border),
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12))),
+                    icon: const Icon(PhosphorIconsRegular.signOut, size: 16),
+                    label: Text(_busy ? 'Keluar…' : 'Keluar akun',
+                        style: const TextStyle(
+                            fontSize: 13, fontWeight: FontWeight.bold))),
+              ],
+            ]);
 }

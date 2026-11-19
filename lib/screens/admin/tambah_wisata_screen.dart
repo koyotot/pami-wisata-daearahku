@@ -26,16 +26,16 @@ import 'destination_location_picker_screen.dart';
 
 // ── Palet (sama dengan home_screen.dart) ─────────────────────
 class _C {
-  static const blue = Color(0xFF1976D2);
-  static const blueDeep = Color(0xFF1558B0);
-  static const navy = Color(0xFF102D59);
-  static const orange = Color(0xFFFF9800);
-  static const bg = Color(0xFFF5F8FD);
-  static const surface = Colors.white;
+  static const blue = AppColors.blue;
+  static const blueDeep = AppColors.blueDeep;
+  static const navy = AppColors.navy;
+  static const orange = AppColors.orange;
+  static const bg = AppColors.bg;
+  static const surface = AppColors.surface;
   static const text = navy;
-  static const textMuted = Color(0xFF728099);
+  static const textMuted = AppColors.textMuted;
   static const textDim = Color(0xFF9AA7BC);
-  static const border = Color(0xFFDCE4F0);
+  static const border = AppColors.border;
   static const tint = Color(0xFFE6F0FC);
   static const field = Color(0xFFF8FAFD);
   static const danger = Color(0xFFE5484D);
@@ -98,6 +98,7 @@ class _TambahWisataScreenState extends State<TambahWisataScreen> {
   String? _savedDestinationGuid;
   late final DestinationFacilitiesState _facilities;
   late String _timezone;
+  String? _savedTimezone;
   late final int _sessionGeneration;
 
   Future<void> _load() => _categories.load();
@@ -184,6 +185,7 @@ class _TambahWisataScreenState extends State<TambahWisataScreen> {
         (w?.categoryGuid.isNotEmpty ?? false) ? w!.categoryGuid : null;
     _timezone =
         (w?.timezone.isNotEmpty ?? false) ? w!.timezone : kAdminTimezones.first;
+    _savedTimezone = w?.timezone;
     _sessionGeneration = _session.sessionGeneration;
     // Registered before the lists below so it runs first (see _onSessionRevalidated).
     _session.sessionChanges.addListener(_onSessionRevalidated);
@@ -340,13 +342,13 @@ class _TambahWisataScreenState extends State<TambahWisataScreen> {
                   : PhosphorIconsFill.checkCircle,
               color: Colors.white,
               size: 18),
-          const SizedBox(width: 10),
+          const SizedBox(width: AppSpacing.sm),
           Expanded(child: Text(message)),
         ]),
         backgroundColor: error ? _C.danger : _C.tealDark,
         behavior: SnackBarBehavior.floating,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        margin: const EdgeInsets.all(16),
+        margin: const EdgeInsets.all(AppSpacing.lg),
       ),
     );
   }
@@ -454,6 +456,7 @@ class _TambahWisataScreenState extends State<TambahWisataScreen> {
       }
       if (!mounted || !_session.isCurrentGeneration(_sessionGeneration)) return;
       _savedDestinationGuid = saved.guid;
+      _savedTimezone = saved.timezone;
       _galleryVersion = saved.galleryVersion;
       _gallery
         ..clear()
@@ -476,7 +479,9 @@ class _TambahWisataScreenState extends State<TambahWisataScreen> {
       if (!mounted || !_session.isCurrentGeneration(_sessionGeneration)) return;
       _snack(
           edit != null
-              ? 'Data wisata berhasil diubah!'
+              ? ((saved.timezoneImpactBookings ?? 0) > 0
+                  ? 'Data wisata berhasil diubah. ${saved.timezoneImpactBookings} booking aktif tetap memakai zona waktu lama.'
+                  : 'Data wisata berhasil diubah!')
               : 'Wisata baru berhasil ditambahkan!',
           error: false);
       Navigator.pop(context, true);
@@ -605,22 +610,22 @@ class _TambahWisataScreenState extends State<TambahWisataScreen> {
                 // ── Konten Form ──────────────────────────────────
                 SliverToBoxAdapter(
                   child: Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 20, 16, 120),
+                    padding: const EdgeInsets.all(AppSpacing.lg),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
                         _infoSection(),
-                        const SizedBox(height: 16),
+                        const SizedBox(height: AppSpacing.lg),
                         _locationSection(),
-                        const SizedBox(height: 16),
+                        const SizedBox(height: AppSpacing.lg),
                         _gallerySection(),
-                        const SizedBox(height: 16),
+                        const SizedBox(height: AppSpacing.lg),
                         _detailSection(),
-                        const SizedBox(height: 16),
+                        const SizedBox(height: AppSpacing.lg),
                         _ticketSection(),
-                        const SizedBox(height: 16),
+                        const SizedBox(height: AppSpacing.lg),
                         _facilitySection(),
-                        const SizedBox(height: 16),
+                        const SizedBox(height: AppSpacing.lg),
                         _ratingSection(),
                       ],
                     ),
@@ -632,7 +637,10 @@ class _TambahWisataScreenState extends State<TambahWisataScreen> {
       // ── Tombol Simpan fixed di bawah ──────────────────────
       bottomNavigationBar: Container(
         padding: EdgeInsets.fromLTRB(
-            16, 12, 16, MediaQuery.of(context).padding.bottom + 12),
+            AppSpacing.lg,
+            AppSpacing.md,
+            AppSpacing.lg,
+            MediaQuery.paddingOf(context).bottom + AppSpacing.md),
         decoration: BoxDecoration(
           color: _C.surface,
           border:
@@ -646,15 +654,15 @@ class _TambahWisataScreenState extends State<TambahWisataScreen> {
               child: ElevatedButton(
                 onPressed: _canSave ? _simpan : null,
                 style: ElevatedButton.styleFrom(
-                  minimumSize: const Size(48, 54),
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  minimumSize: const Size(48, 52),
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: AppSpacing.lg, vertical: AppSpacing.md),
                   backgroundColor: _C.teal,
                   disabledBackgroundColor: _C.teal.withValues(alpha: 0.5),
                   foregroundColor: Colors.white,
                   elevation: 0,
                   shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16)),
+                      borderRadius: BorderRadius.circular(14)),
                 ),
                 child: _isSaving
                     ? const Row(
@@ -666,13 +674,13 @@ class _TambahWisataScreenState extends State<TambahWisataScreen> {
                             child: CircularProgressIndicator(
                                 color: Colors.white, strokeWidth: 2.5),
                           ),
-                          SizedBox(width: 10),
+                          SizedBox(width: AppSpacing.sm),
                           Flexible(
                               child: Text(
                             'Menyimpan...',
                             textAlign: TextAlign.center,
                             style: TextStyle(
-                                fontSize: 14, fontWeight: FontWeight.w700),
+                                fontSize: 13, fontWeight: FontWeight.w800),
                           )),
                         ],
                       )
@@ -685,7 +693,7 @@ class _TambahWisataScreenState extends State<TambahWisataScreen> {
                                 : PhosphorIconsRegular.mapPinPlus,
                             size: 20,
                           ),
-                          const SizedBox(width: 10),
+                          const SizedBox(width: AppSpacing.sm),
                           Flexible(
                               child: Text(
                             isEdit
@@ -693,7 +701,7 @@ class _TambahWisataScreenState extends State<TambahWisataScreen> {
                                 : 'Simpan Destinasi Baru',
                             textAlign: TextAlign.center,
                             style: const TextStyle(
-                                fontSize: 15, fontWeight: FontWeight.w800),
+                                fontSize: 13, fontWeight: FontWeight.w800),
                           )),
                         ],
                       ),
@@ -796,7 +804,7 @@ class _TambahWisataScreenState extends State<TambahWisataScreen> {
   }) =>
       Container(
         key: key,
-        padding: const EdgeInsets.fromLTRB(16, 16, 16, 18),
+        padding: const EdgeInsets.all(AppSpacing.lg),
         decoration: BoxDecoration(
           color: _C.surface,
           borderRadius: BorderRadius.circular(18),
@@ -818,7 +826,7 @@ class _TambahWisataScreenState extends State<TambahWisataScreen> {
                         fontSize: 12,
                         fontWeight: FontWeight.w800)),
               ),
-              const SizedBox(width: 12),
+              const SizedBox(width: AppSpacing.md),
               Expanded(
                 child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -828,21 +836,21 @@ class _TambahWisataScreenState extends State<TambahWisataScreen> {
                               color: _C.text,
                               fontSize: 16,
                               fontWeight: FontWeight.w800)),
-                      const SizedBox(height: 2),
+                      const SizedBox(height: AppSpacing.xs),
                       Text(subtitle,
                           style: const TextStyle(
                               color: _C.textMuted, fontSize: 12)),
                     ]),
               ),
             ]),
-            const SizedBox(height: 18),
+            const SizedBox(height: AppSpacing.lg),
             ...children,
           ],
         ),
       );
 
   Widget _label(String text, {bool required = false}) => Padding(
-        padding: const EdgeInsets.only(bottom: 8),
+        padding: const EdgeInsets.only(bottom: AppSpacing.sm),
         child: Text.rich(
           TextSpan(text: text, children: [
             if (required)
@@ -865,13 +873,13 @@ class _TambahWisataScreenState extends State<TambahWisataScreen> {
         borderSide: BorderSide(color: color, width: width));
     return InputDecoration(
       hintText: hint,
-      hintStyle: const TextStyle(color: _C.textDim, fontSize: 14),
+      hintStyle: const TextStyle(color: _C.textDim, fontSize: 13),
       helperText: helper,
       helperMaxLines: 2,
-      helperStyle: const TextStyle(color: _C.textMuted, fontSize: 11.5),
+      helperStyle: const TextStyle(color: _C.textMuted, fontSize: 11),
       errorText: errorText,
       errorMaxLines: 2,
-      errorStyle: const TextStyle(color: _C.danger, fontSize: 11.5),
+      errorStyle: const TextStyle(color: _C.danger, fontSize: 11),
       prefixIcon: prefix,
       prefixIconConstraints: const BoxConstraints(minWidth: 0, minHeight: 0),
       suffixIcon: suffix,
@@ -883,7 +891,8 @@ class _TambahWisataScreenState extends State<TambahWisataScreen> {
       focusedBorder: border(_C.blue, 1.5),
       errorBorder: border(_C.danger, 1.2),
       focusedErrorBorder: border(_C.danger, 1.5),
-      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 15),
+      contentPadding: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.lg, vertical: AppSpacing.lg),
     );
   }
 
@@ -914,15 +923,15 @@ class _TambahWisataScreenState extends State<TambahWisataScreen> {
         textCapitalization: capitalization,
         inputFormatters: formatters,
         validator: validator,
-        style: const TextStyle(color: _C.text, fontSize: 14, height: 1.5),
+        style: const TextStyle(color: _C.text, fontSize: 13, height: 1.5),
         decoration: _decoration(
             hint: hint, helper: helper, errorText: errorText, prefix: prefix),
       );
 
   Widget _helperText(String text, {Color color = _C.textMuted}) => Padding(
-        padding: const EdgeInsets.only(top: 8),
+        padding: const EdgeInsets.only(top: AppSpacing.sm),
         child: Text(text,
-            style: TextStyle(color: color, fontSize: 11.5, height: 1.4)),
+            style: TextStyle(color: color, fontSize: 11, height: 1.4)),
       );
 
   Widget _mapChip(String text) => DecoratedBox(
@@ -940,7 +949,7 @@ class _TambahWisataScreenState extends State<TambahWisataScreen> {
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: const TextStyle(
-                  color: _C.text, fontSize: 11.5, fontWeight: FontWeight.w600)),
+                  color: _C.text, fontSize: 11, fontWeight: FontWeight.w600)),
         ),
       );
 
@@ -959,7 +968,7 @@ class _TambahWisataScreenState extends State<TambahWisataScreen> {
                 ? 'Nama destinasi wajib diisi'
                 : null,
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: AppSpacing.lg),
           _label('Kategori wisata', required: true),
           _kategoriPicker(),
         ],
@@ -1040,12 +1049,12 @@ class _TambahWisataScreenState extends State<TambahWisataScreen> {
                       color: _C.field,
                       child: Center(
                         child: Padding(
-                          padding: EdgeInsets.all(16),
+                          padding: EdgeInsets.all(AppSpacing.lg),
                           child:
                               Column(mainAxisSize: MainAxisSize.min, children: [
                             Icon(PhosphorIconsRegular.mapPinLine,
                                 color: _C.blue, size: 30),
-                            SizedBox(height: 8),
+                            SizedBox(height: AppSpacing.sm),
                             Text('Belum ada titik lokasi',
                                 textAlign: TextAlign.center,
                                 style: TextStyle(
@@ -1082,7 +1091,7 @@ class _TambahWisataScreenState extends State<TambahWisataScreen> {
             ),
           ),
         ),
-        const SizedBox(height: 10),
+        const SizedBox(height: AppSpacing.sm),
         OutlinedButton.icon(
           onPressed: canPick ? _pickLocation : null,
           style: OutlinedButton.styleFrom(
@@ -1096,9 +1105,10 @@ class _TambahWisataScreenState extends State<TambahWisataScreen> {
           icon: const Icon(PhosphorIconsRegular.mapPin, size: 18),
           label: Text(
               point == null ? 'Pilih Titik Lokasi' : 'Ubah Titik Lokasi',
-              style: const TextStyle(fontWeight: FontWeight.w700)),
+              style:
+                  const TextStyle(fontSize: 13, fontWeight: FontWeight.w800)),
         ),
-        const SizedBox(height: 18),
+        const SizedBox(height: AppSpacing.lg),
         _label('Alamat lengkap', required: true),
         _textField(
             ctrl: lokasiCtrl,
@@ -1114,7 +1124,7 @@ class _TambahWisataScreenState extends State<TambahWisataScreen> {
               }
               return value.trim().length > 255 ? 'Maksimal 255 karakter' : null;
             }),
-        const SizedBox(height: 4),
+        const SizedBox(height: AppSpacing.xs),
         Row(children: [
           Icon(
               point == null
@@ -1122,7 +1132,7 @@ class _TambahWisataScreenState extends State<TambahWisataScreen> {
                   : PhosphorIconsRegular.crosshair,
               size: 13,
               color: _C.textMuted),
-          const SizedBox(width: 6),
+          const SizedBox(width: AppSpacing.sm),
           Expanded(
             child: Text(
                 point == null
@@ -1130,7 +1140,7 @@ class _TambahWisataScreenState extends State<TambahWisataScreen> {
                         ? 'Pilih titik lokasi terlebih dahulu'
                         : 'Lokasi peta belum ditentukan'
                     : 'Koordinat: ${point.latitude.toStringAsFixed(7)}, ${point.longitude.toStringAsFixed(7)}',
-                style: const TextStyle(color: _C.textMuted, fontSize: 11.5)),
+                style: const TextStyle(color: _C.textMuted, fontSize: 11)),
           ),
         ]),
         for (final field in ['latitude', 'longitude'])
@@ -1149,13 +1159,13 @@ class _TambahWisataScreenState extends State<TambahWisataScreen> {
         children: [
           if (_galleryLoading)
             const Padding(
-                padding: EdgeInsets.only(bottom: 12),
+                padding: EdgeInsets.only(bottom: AppSpacing.md),
                 child: LinearProgressIndicator()),
           if (_galleryReady &&
               widget.wisataEdit?.imageUrl != null &&
               _gallery.isEmpty)
             const Padding(
-              padding: EdgeInsets.only(bottom: 12),
+              padding: EdgeInsets.only(bottom: AppSpacing.md),
               child: Text(
                   'Foto lama belum dapat diedit di galeri. Tambahkan foto untuk menyimpan.',
                   style: TextStyle(color: _C.textMuted, fontSize: 12)),
@@ -1182,7 +1192,7 @@ class _TambahWisataScreenState extends State<TambahWisataScreen> {
                     _dirty = true;
                   })),
           if (_failedSave || (widget.wisataEdit != null && _session.role != 1))
-            Wrap(spacing: 4, children: [
+            Wrap(spacing: AppSpacing.xs, children: [
               if (_failedSave)
                 TextButton(
                     onPressed: _isSaving || !_galleryReady || _gallery.isEmpty
@@ -1226,7 +1236,7 @@ class _TambahWisataScreenState extends State<TambahWisataScreen> {
         keyboardType: TextInputType.number,
         inputFormatters: [_TimeInputFormatter()],
         onChanged: (_) => _onTimeChanged(opening: opening),
-        style: const TextStyle(color: _C.text, fontSize: 14),
+        style: const TextStyle(color: _C.text, fontSize: 13),
         validator: (v) {
           final text = v ?? '';
           if (text.isEmpty) return _legacyHoursOnly ? null : 'Wajib diisi';
@@ -1254,14 +1264,15 @@ class _TambahWisataScreenState extends State<TambahWisataScreen> {
           keyboardType: TextInputType.number,
           formatters: [_RupiahInputFormatter()],
           prefix: Padding(
-            padding: const EdgeInsets.only(left: 16, right: 12),
+            padding: const EdgeInsets.only(
+                left: AppSpacing.lg, right: AppSpacing.md),
             child: Row(mainAxisSize: MainAxisSize.min, children: [
               const Text('Rp',
                   style: TextStyle(
                       color: _C.textMuted,
                       fontSize: 14,
                       fontWeight: FontWeight.w700)),
-              const SizedBox(width: 12),
+              const SizedBox(width: AppSpacing.md),
               Container(width: 1, height: 22, color: _C.border),
             ]),
           ),
@@ -1273,7 +1284,7 @@ class _TambahWisataScreenState extends State<TambahWisataScreen> {
           },
         ),
         const Padding(
-          padding: EdgeInsets.symmetric(vertical: 18),
+          padding: EdgeInsets.symmetric(vertical: AppSpacing.lg),
           child: Divider(height: 1, color: _C.border),
         ),
         const Text('JAM OPERASIONAL',
@@ -1282,14 +1293,14 @@ class _TambahWisataScreenState extends State<TambahWisataScreen> {
                 fontSize: 11,
                 fontWeight: FontWeight.w800,
                 letterSpacing: 1.2)),
-        const SizedBox(height: 12),
+        const SizedBox(height: AppSpacing.md),
         Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Expanded(
             child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [_label('Jam buka'), _timeField(opening: true)]),
           ),
-          const SizedBox(width: 12),
+          const SizedBox(width: AppSpacing.md),
           Expanded(
             child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -1298,7 +1309,7 @@ class _TambahWisataScreenState extends State<TambahWisataScreen> {
         ]),
         if (_legacyHoursOnly)
           _helperText('Tersimpan: "$_rawHours". Pilih jam untuk menggantinya.'),
-        const SizedBox(height: 16),
+        const SizedBox(height: AppSpacing.lg),
         _label('Zona waktu'),
         SelectFormField<String>(
           key: const ValueKey('timezone-field'),
@@ -1317,6 +1328,10 @@ class _TambahWisataScreenState extends State<TambahWisataScreen> {
           decoration: _decoration(
               helper: 'Jam operasional mengikuti zona waktu lokasi destinasi.'),
         ),
+        if (_savedTimezone != null && _savedTimezone != _timezone)
+          _helperText(
+              'Perubahan zona waktu hanya berlaku untuk booking baru. Booking aktif tetap memakai zona waktu lama.',
+              color: _C.danger),
       ],
     );
   }
@@ -1329,11 +1344,11 @@ class _TambahWisataScreenState extends State<TambahWisataScreen> {
         children: [
           if (_facilities.loading)
             const Padding(
-                padding: EdgeInsets.symmetric(vertical: 12),
+                padding: EdgeInsets.symmetric(vertical: AppSpacing.md),
                 child: Center(child: CircularProgressIndicator())),
           if (_facilities.error != null) ...[
             Text(adminErrorMessage(_facilities.error!),
-                style: const TextStyle(color: _C.danger, fontSize: 12.5)),
+                style: const TextStyle(color: _C.danger, fontSize: 12)),
             if (_session.role != 1)
               Align(
                 alignment: Alignment.centerLeft,
@@ -1347,11 +1362,11 @@ class _TambahWisataScreenState extends State<TambahWisataScreen> {
           if (_facilities.ready && _facilities.items.isEmpty)
             const Text(
                 'Belum ada fasilitas aktif. Superadmin dapat menambahkannya.',
-                style: TextStyle(color: _C.textMuted, fontSize: 12.5)),
+                style: TextStyle(color: _C.textMuted, fontSize: 12)),
           if (_facilities.ready && _facilities.items.isNotEmpty)
             Wrap(
-                spacing: 8,
-                runSpacing: 8,
+                spacing: AppSpacing.sm,
+                runSpacing: AppSpacing.sm,
                 children: _facilities.items.map((facility) {
                   final selected = _facilities.selected.contains(facility.guid);
                   return FilterChip(
@@ -1369,9 +1384,10 @@ class _TambahWisataScreenState extends State<TambahWisataScreen> {
                         fontSize: 13,
                         fontWeight:
                             selected ? FontWeight.w700 : FontWeight.w600),
-                    labelPadding: const EdgeInsets.only(left: 2, right: 6),
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                    labelPadding: const EdgeInsets.only(
+                        left: AppSpacing.xs, right: AppSpacing.sm),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: AppSpacing.sm, vertical: AppSpacing.sm),
                     backgroundColor: _C.surface,
                     selectedColor: _C.tint,
                     disabledColor: _C.field,
@@ -1411,7 +1427,7 @@ class _TambahWisataScreenState extends State<TambahWisataScreen> {
         CustomPaint(
           painter: _DashedBorderPainter(color: _C.border, radius: 14),
           child: Container(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.all(AppSpacing.lg),
             decoration: BoxDecoration(
                 color: _C.field, borderRadius: BorderRadius.circular(14)),
             child: Column(
@@ -1424,18 +1440,18 @@ class _TambahWisataScreenState extends State<TambahWisataScreen> {
                           : PhosphorIconsRegular.star,
                       color: _C.gold,
                       size: 18),
-                  const SizedBox(width: 8),
+                  const SizedBox(width: AppSpacing.sm),
                   if (rated) ...[
                     Text(_rating.toStringAsFixed(1),
                         style: const TextStyle(
                             color: _C.text,
                             fontSize: 15,
                             fontWeight: FontWeight.w800)),
-                    const SizedBox(width: 6),
+                    const SizedBox(width: AppSpacing.sm),
                     Flexible(
                       child: Text('dari $_ratingCount ulasan',
                           style: const TextStyle(
-                              color: _C.textMuted, fontSize: 12.5)),
+                              color: _C.textMuted, fontSize: 12)),
                     ),
                   ] else
                     const Flexible(
@@ -1446,7 +1462,7 @@ class _TambahWisataScreenState extends State<TambahWisataScreen> {
                               fontWeight: FontWeight.w800)),
                     ),
                 ]),
-                const SizedBox(height: 12),
+                const SizedBox(height: AppSpacing.md),
                 ExcludeSemantics(
                   child: Row(children: [
                     for (var i = 0; i < 5; i++) ...[
@@ -1459,11 +1475,11 @@ class _TambahWisataScreenState extends State<TambahWisataScreen> {
                         color: _C.gold,
                         size: 22,
                       ),
-                      const SizedBox(width: 4),
+                      const SizedBox(width: AppSpacing.xs),
                     ],
                   ]),
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: AppSpacing.md),
                 const Text(
                     'Rating akan muncul secara otomatis dari ulasan pengunjung. Admin tidak dapat mengubahnya secara manual.',
                     style: TextStyle(

@@ -67,6 +67,10 @@ class Destination {
   String get currency => json['currency'] as String? ?? 'IDR';
   String get openingHours => json['opening_hours'] as String? ?? '';
   String get timezone => json['timezone'] as String? ?? 'Asia/Jakarta';
+
+  /// Only present on the response of a save that changed the zone: active bookings that keep the old zone.
+  int? get timezoneImpactBookings =>
+      ((json['timezone_impact'] as Map?)?['active_bookings'] as num?)?.toInt();
   bool get isActive => json['is_active'] as bool? ?? true;
   double? get ratingAverage => (json['rating_average'] as num?)?.toDouble();
   int get ratingCount => (json['rating_count'] as num?)?.toInt() ?? 0;
@@ -138,8 +142,19 @@ class Booking {
   String get status => json['status'] as String;
 
   String get paymentStatus => json['payment_status'] as String? ?? 'unverified';
+
+  /// Start of the 15-minute payment countdown; null until a method is chosen (and after a reset).
+  DateTime? get paymentStartedAt =>
+      DateTime.tryParse(json['payment_started_at'] as String? ?? '');
+
+  /// End of the running countdown. Null means the countdown has NOT started, not that it ended.
   DateTime? get paymentExpiresAt =>
       DateTime.tryParse(json['payment_expires_at'] as String? ?? '');
+
+  /// Plain-text deadline for choosing a payment method (never a countdown).
+  DateTime? get paymentSelectionExpiresAt =>
+      DateTime.tryParse(json['payment_selection_expires_at'] as String? ?? '');
+  String? get destinationTimezone => json['destination_timezone'] as String?;
   String? get paymentProvider => json['payment_provider'] as String?;
   String? get paymentEnvironment => json['payment_environment'] as String?;
   bool get paymentTestOnly => json['payment_test_only'] == true;
@@ -508,6 +523,14 @@ class BusinessRepository {
       PaymentSnapshot(await api.object('POST',
           'bookings/${_id(guid)}/payment-attempts/${_id(attemptGuid)}/refresh',
           authenticated: true));
+
+  /// Closes the unpaid attempt so the customer can choose another method. Read the returned snapshot;
+  /// 409 `payment_already_received`, `payment_verification_pending`, ... mean nothing was closed.
+  Future<PaymentSnapshot> cancelPaymentAttempt(
+          String guid, String attemptGuid) async =>
+      PaymentSnapshot(await api.object('POST',
+          'bookings/${_id(guid)}/payment-attempts/${_id(attemptGuid)}/cancel',
+          authenticated: true));
   Future<Json> simulateDemoPayment(
           String guid, String key, String attemptGuid, String outcome) =>
       api.object('POST', 'bookings/${_id(guid)}/demo-payment/simulate',
@@ -520,7 +543,8 @@ class BusinessRepository {
           body: fields,
           headers: {'Idempotency-Key': idempotencyKey}));
 
-  /// Only a booking still awaiting approval can be cancelled (owner only).
+  /// Cancels a booking awaiting approval or payment (owner only). 409 codes such as
+  /// `booking_already_paid` and `payment_verification_pending` mean the cancel was refused.
   Future<Booking> cancelBooking(String guid) async => Booking(await api
       .object('POST', 'bookings/${_id(guid)}/cancel', authenticated: true));
 
@@ -756,6 +780,16 @@ class BusinessRepository {
 
   // ── Admin: categories (role 2) ─────────────────────────────
   /// [query] supports `status` (active|inactive|all), `per_page`, `page`.
+  /// Superadmin: active bookings still running on a different timezone than their destination now has.
+  Future<List<TimezoneDriftBooking>> timezoneDriftBookings() async {
+    final data = await api.object('GET', 'superadmin/bookings/timezone-drift',
+        authenticated: true);
+    return [
+      for (final item in (data['bookings'] as List? ?? const []))
+        TimezoneDriftBooking(item as Json)
+    ];
+  }
+
   Future<ApiPage<Category>> adminCategories({Map<String, String>? query}) =>
       api.collection(_path('admin/categories', query), Category.new,
           authenticated: true);
@@ -816,4 +850,20 @@ class BusinessRepository {
     if (data is! Json) throw const ApiException('Respons layanan tidak valid.');
     return data;
   }
+}
+
+/// One active booking whose own timezone differs from its destination's current one (read-only).
+class TimezoneDriftBooking {
+  final Json json;
+  TimezoneDriftBooking(this.json) {
+    guid;
+  }
+  String get guid => json['guid'] as String;
+  String get bookingNumber => json['booking_number'] as String? ?? '';
+  String get status => json['status'] as String? ?? '';
+  String get visitDate => json['visit_date'] as String? ?? '';
+  String get destinationName => json['destination_name'] as String? ?? '';
+  String get bookingTimezone => json['booking_timezone'] as String? ?? '';
+  String get destinationTimezone =>
+      json['destination_timezone'] as String? ?? '';
 }

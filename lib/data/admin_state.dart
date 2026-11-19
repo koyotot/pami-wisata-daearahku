@@ -583,3 +583,16 @@ Json buildQuotaPayload({
 /// Own account must not offer role/status changes (the server forbids it too).
 bool canModifyAccount(AdminAccount account, String? ownGuid) =>
     ownGuid != null && account.guid != ownGuid;
+
+/// Fixed offset of an Indonesian destination zone; null for an unknown or missing name.
+Duration? destinationZoneOffset(String? zone) => switch (zone) {
+      'Asia/Jakarta' || 'Asia/Pontianak' => const Duration(hours: 7),
+      'Asia/Makassar' => const Duration(hours: 8),
+      'Asia/Jayapura' => const Duration(hours: 9),
+      _ => null,
+    };
+
+/// [instant] in the destination's own zone (WIB/WITA/WIT); the device zone only when the destination zone is unknown.
+String formatInstantInZone(DateTime instant, String? zone) =>
+    formatInstantAt(instant,
+        destinationZoneOffset(zone) ?? instant.toLocal().timeZoneOffset);
