@@ -1189,7 +1189,7 @@ class _TicketCardState extends State<_TicketCard> {
                         b.status == 'awaiting_payment' &&
                                 _paymentSnapshot?.canCreate == true &&
                                 _paymentSnapshot?.attemptStatus == null
-                            ? 'Pendaftaran sudah disetujui, tetapi pembayaran belum dikonfirmasi. Pilih metode pembayaran untuk melanjutkan. Nomor VA atau QRIS ditampilkan setelah diterbitkan provider.'
+                            ? 'Pendaftaran sudah disetujui, tetapi pembayaran belum dikonfirmasi. Pilih metode pembayaran untuk melanjutkan. Nomor VA atau QRIS ditampilkan setelah diterbitkan penyedia pembayaran.'
                             : _nextStepFor(b,
                                 ticketIssued: c.documents?.entryTicketsIssued,
                                 entry: c.documents?.entryTickets),
@@ -1200,7 +1200,7 @@ class _TicketCardState extends State<_TicketCard> {
                       Padding(
                         padding: const EdgeInsets.only(top: AppSpacing.sm),
                         child: Text(
-                          '${b.paymentLabel ?? 'DEMO'} / TEST_ONLY · tanpa uang nyata',
+                          '${b.paymentLabel ?? 'Pembayaran uji'} / TEST_ONLY · tanpa uang nyata',
                           style: _font(12, FontWeight.w700, AppColors.blueDeep),
                         ),
                       ),
@@ -1935,7 +1935,7 @@ class _TicketCardState extends State<_TicketCard> {
     }
     if (!mounted) return;
     _snack(ok
-        ? 'Pendaftaran dibatalkan. Status dari server: ${bookingStatusLabel(c.booking.status)}.'
+        ? 'Pendaftaran dibatalkan. Status terakhir: ${bookingStatusLabel(c.booking.status)}.'
         : (c.message ?? 'Pendaftaran belum dapat dibatalkan.'));
   }
 
@@ -1943,8 +1943,7 @@ class _TicketCardState extends State<_TicketCard> {
     final saved = await c.download(type);
     if (!mounted) return;
     _snack(saved != null
-        ? 'Dokumen berhasil diambil dan disimpan sementara di ${saved.path}. '
-            'Aplikasi ini belum memiliki pembaca PDF; buka file tersebut dengan aplikasi lain.'
+        ? 'Dokumen berhasil diunduh.'
         : (c.message ?? 'Dokumen belum dapat diunduh.'));
   }
 

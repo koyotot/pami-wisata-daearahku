@@ -217,12 +217,13 @@ class _BookingPaymentSectionState extends State<BookingPaymentSection>
                   color: AppColors.blueDeep)),
           const SizedBox(height: AppSpacing.sm),
           if (_loading) const LinearProgressIndicator(),
-          Text(statusText ?? 'Memeriksa metode pembayaran dari server…',
+          Text(statusText ?? 'Memeriksa metode pembayaran…',
               style: const TextStyle(
                   fontSize: 12, height: 1.5, color: AppColors.textSecondary)),
           const SizedBox(height: AppSpacing.sm),
           if (_intent?.attemptStatus != null && (real || demo))
-            Text('Attempt terakhir: ${_intent!.attemptStatus}',
+            Text(
+                'Pembayaran terakhir: ${paymentAttemptLabel(_intent!.attemptStatus)}',
                 style: const TextStyle(
                     fontSize: 12, height: 1.5, color: AppColors.textSecondary)),
           // Real payments open the native checkout. The DEMO controls stay for demo mode.

@@ -15,6 +15,13 @@ import 'user_support.dart';
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
+  test('payment labels preserve uncertainty and omit internal codes', () {
+    expect(paymentAttemptLabel('paid'), 'Pembayaran diterima penyedia');
+    expect(paymentAttemptLabel('new_state'), 'Status belum diketahui');
+    expect(
+        payChoiceReason('new_reason'), 'Pembayaran belum tersedia saat ini.');
+  });
+
   test(
       'Midtrans pending PNG is payable despite device clock skew; resume never charges',
       () async {

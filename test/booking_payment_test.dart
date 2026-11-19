@@ -596,6 +596,7 @@ void main() {
         'opening and leaving the page creates nothing; two options, no amount input, no wallet',
         (tester) async {
       await pumpScreen(tester);
+      expect(find.text('SANDBOX / TEST_ONLY'), findsOneWidget);
       expect(choice('virtual_account', 'bni'), findsOneWidget);
       expect(choice('qris', 'qris'), findsOneWidget);
       expect(find.byType(TextField), findsNothing);
@@ -619,7 +620,7 @@ void main() {
       await pumpScreen(tester);
       expect(find.textContaining('batas waktu pembayaran'), findsWidgets);
       expect(find.textContaining('provider_expiry_window_unverified'),
-          findsWidgets);
+          findsNothing);
       await tap(tester, choice('virtual_account', 'bni'));
       await tester.pump();
       expect(enabled(tester, start()), isFalse);
@@ -663,6 +664,9 @@ void main() {
       await tester.pump();
       await tester.pump();
       expect(server.createPosts, 1);
+      await tester.pump(const Duration(milliseconds: 400));
+      expect(find.byKey(const Key('pay-error')), findsOneWidget);
+      expect(find.textContaining('Countdown simulasi'), findsNothing);
       final stored =
           await const FlutterSecureStorage().read(key: _operationKey);
       expect(stored, contains(server.createKeys.single));

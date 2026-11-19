@@ -236,7 +236,7 @@ String formatMoney(int amount, [String currency = 'IDR']) {
   return currency == 'IDR' ? '${sign}Rp$digits' : '$currency $sign$digits';
 }
 
-/// Customer wording for a v3 channel or booking reason. Unknown codes are shown, not guessed.
+/// Customer wording for a v3 channel or booking reason. Unrecognized reasons use a neutral message.
 String payChoiceReason(String? reason) => switch (reason) {
       'provider_expiry_window_unverified' =>
         'Metode ini belum dapat dipakai karena batas waktu pembayaran dari penyedia belum terverifikasi.',
@@ -259,8 +259,8 @@ String switchReasonText(String? reason) => switch (reason) {
 String paymentReason(String? reason) => switch (reason) {
       'booking_not_awaiting_payment' =>
         'Booking ini tidak sedang menunggu pembayaran.',
-      'booking_not_payable' => 'Booking ini tidak memerlukan pembayaran DEMO.',
-      'unsupported_currency' => 'Mata uang booking belum didukung simulator.',
+      'booking_not_payable' => 'Pendaftaran ini tidak memerlukan pembayaran.',
+      'unsupported_currency' => 'Mata uang pendaftaran ini belum didukung.',
       'payment_window_closed' =>
         'Batas pembayaran telah berakhir. Periksa status booking terbaru.',
       'payment_selection_closed' =>
@@ -272,7 +272,21 @@ String paymentReason(String? reason) => switch (reason) {
       'payment_needs_review' =>
         'Pembayaran sedang diperiksa pengelola. Tidak perlu membayar ulang.',
       null => 'Pembayaran DEMO tersedia; tidak ada transfer uang nyata.',
-      _ => 'Pembayaran belum tersedia ($reason).',
+      _ => 'Pembayaran belum tersedia saat ini.',
+    };
+
+String paymentAttemptLabel(String? status) => switch (status) {
+      'initiating' => 'Sedang disiapkan',
+      'pending' => 'Menunggu konfirmasi',
+      'paid' => 'Pembayaran diterima penyedia',
+      'reversed' => 'Pembayaran dibalik',
+      'refunded' => 'Dana dikembalikan',
+      'refund_pending' => 'Pengembalian dana diproses',
+      'chargeback' => 'Pembayaran disengketakan',
+      'failed' => 'Gagal',
+      'cancelled' => 'Dibatalkan',
+      'expired' => 'Kedaluwarsa',
+      _ => 'Status belum diketahui',
     };
 
 String paymentError(Object error) {
@@ -283,7 +297,7 @@ String paymentError(Object error) {
     401 => 'Sesi berakhir. Silakan masuk kembali.',
     403 ||
     404 =>
-      'Pembayaran tidak dapat diakses. Hak akses atau gate simulator mungkin berubah.',
+      'Pembayaran ini tidak dapat diakses. Periksa kembali detail pendaftaran Anda.',
     409 =>
       'Status pembayaran berubah. Periksa hasil terbaru sebelum melanjutkan.',
     422 =>

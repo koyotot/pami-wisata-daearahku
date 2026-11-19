@@ -16,12 +16,6 @@ import '../../widgets/booking_ticket_qr_section.dart';
 import '../../widgets/payment_deadline.dart';
 import '../auth/auth_presentation.dart';
 import '../admin/admin_common.dart' show showAdminSnack;
-import 'payment_instruction_preview_screen.dart';
-
-/// When the real payment instruction cannot be created, open a preview of the
-/// instruction page (no VA number or QR, local countdown) instead of leaving
-/// the customer on the chooser. Set to false to show only the error.
-const kPaymentPreviewOnFailure = true;
 
 /// "Ganti metode pembayaran" needs the provider's Cancel API, which the Midtrans merchant account does not allow yet (HTTP 403).
 /// While off, an open payment can only be replaced after its 15 minute countdown ends, and the screen says so.
@@ -125,28 +119,6 @@ class _BookingPaymentScreenState extends State<BookingPaymentScreen> {
     final choice = _effectiveChoice;
     if (choice == null || !_payment.canStartWith(choice)) return;
     await _payment.start(choice);
-    if (!mounted) return;
-    final p = _payment;
-    final snapshot = p.snapshot;
-    // Success shows the real VA/QR inline (phase awaiting). The preview is only
-    // a fallback when the server refused to create the instruction.
-    if (kPaymentPreviewOnFailure &&
-        p.phase != PaymentPhase.awaiting &&
-        p.error != null &&
-        snapshot != null &&
-        p.booking != null) {
-      final total = snapshot.totalAmount;
-      final currency =
-          (snapshot.json['currency'] as String?) ?? p.booking!.currency;
-      await Navigator.of(context).push(MaterialPageRoute<void>(
-          builder: (_) => PaymentInstructionPreviewScreen(
-              methodTitle: _choiceTitle(choice),
-              isQris: choice.methodCode == 'qris',
-              totalLabel: total == null
-                  ? 'Belum tersedia'
-                  : formatMoney(total, currency),
-              failure: p.error)));
-    }
   }
 
   Future<void> _copyVa(String digits) async {
@@ -764,7 +736,7 @@ class _BookingPaymentScreenState extends State<BookingPaymentScreen> {
                                                   height: 1.5,
                                                   color:
                                                       AppColors.textSecondary))
-                                        else ...[
+                                        else
                                           Text(payChoiceReason(choice.reason),
                                               style: const TextStyle(
                                                   fontSize: 12,
@@ -772,12 +744,6 @@ class _BookingPaymentScreenState extends State<BookingPaymentScreen> {
                                                   height: 1.5,
                                                   color:
                                                       AppColors.warningText)),
-                                          const SizedBox(height: AppSpacing.xs),
-                                          Text('Kode alasan: ${choice.reason}',
-                                              style: const TextStyle(
-                                                  fontSize: 11,
-                                                  color: AppColors.textMuted)),
-                                        ],
                                         if (isSelected) ...[
                                           const SizedBox(height: AppSpacing.sm),
                                           Container(
@@ -1017,7 +983,7 @@ class _BookingPaymentScreenState extends State<BookingPaymentScreen> {
                         const Divider(height: 1, color: AppColors.border),
                         const SizedBox(height: AppSpacing.lg),
                         _noteBox(
-                            'Melanjutkan akan membuat instruksi pembayaran untuk metode ini. Nominal dan batas waktu ditentukan oleh server.'),
+                            'Melanjutkan akan membuat instruksi pembayaran untuk metode ini. Periksa nominal dan batas waktu pada instruksi pembayaran.'),
                         const SizedBox(height: AppSpacing.lg),
                         Row(children: [
                           Expanded(
@@ -1511,7 +1477,7 @@ class _BookingPaymentScreenState extends State<BookingPaymentScreen> {
         final text = wallet
             ? 'Pembayaran dompet digital sedang berjalan. Lanjutkan dari halaman detail booking dan jangan membayar ulang.'
             : status == 'paid'
-                ? 'Penyedia melaporkan pembayaran. Booking baru dikonfirmasi setelah server memverifikasinya; halaman ini diperbarui otomatis.'
+                ? 'Penyedia melaporkan pembayaran. Pendaftaran akan dikonfirmasi setelah pembayaran terverifikasi. Halaman ini diperbarui otomatis.'
                 : 'Kami memeriksa status langsung ke penyedia. Jangan membayar ulang; halaman ini diperbarui otomatis.';
         return _statePanel(
             PhosphorIconsRegular.hourglassHigh, title, text, AppColors.blueDeep,
@@ -1703,7 +1669,7 @@ class _BookingPaymentScreenState extends State<BookingPaymentScreen> {
                     color: AppColors.navy)),
             const SizedBox(height: AppSpacing.sm),
             const Text(
-                'Pembayaran telah diverifikasi server dan booking Anda dikonfirmasi.',
+                'Pembayaran telah terverifikasi dan pendaftaran Anda dikonfirmasi.',
                 textAlign: TextAlign.center,
                 style: TextStyle(
                     fontSize: 12, height: 1.6, color: AppColors.textSecondary)),
@@ -1896,12 +1862,13 @@ class _BookingPaymentScreenState extends State<BookingPaymentScreen> {
                                     fontSize: 22,
                                     fontWeight: FontWeight.w800,
                                     color: AppColors.surface)))),
-                    const Padding(
-                        padding: EdgeInsets.only(top: AppSpacing.sm),
-                        child: Text(
-                            'Status pembayaran dikonfirmasi oleh server',
-                            style: TextStyle(
-                                fontSize: 12, color: AppColors.surface))),
+                    if (_payment.snapshot?.isRealPayment == true &&
+                        _payment.snapshot?.json['test_only'] == true)
+                      const Padding(
+                          padding: EdgeInsets.only(top: AppSpacing.sm),
+                          child: Text('SANDBOX / TEST_ONLY',
+                              style: TextStyle(
+                                  fontSize: 12, color: AppColors.surface))),
                   ])));
 
   Widget _content(PaymentPhase phase) {
