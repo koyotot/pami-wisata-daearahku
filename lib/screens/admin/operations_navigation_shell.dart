@@ -20,6 +20,7 @@ import '../superadmin/timezone_drift_screen.dart';
 import 'operations_dashboard/operations_dashboard.dart';
 import 'operations_queue_screen.dart';
 import '../shared/session_destination.dart';
+import '../shared/profile_account_actions.dart';
 
 class OperationsNavigationShell extends StatefulWidget {
   const OperationsNavigationShell(
@@ -265,11 +266,6 @@ class _ManagementPage extends StatelessWidget {
                   'Booking aktif yang masih memakai zona lama',
                   TimezoneDriftScreen(
                       repository: repository, session: session)),
-              _link(
-                  context,
-                  'Aktivitas audit',
-                  'Ketersediaan riwayat aktivitas',
-                  const OperationsUnavailableScreen(audit: true)),
             ],
           ]);
   Widget _link(
@@ -603,6 +599,27 @@ class _OperationsProfileState extends State<_OperationsProfile> {
                   fontSize: 12, color: AppColors.textSecondary)),
       ]);
 
+  Widget _accountActions() => _card(
+        padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm),
+        child: Material(
+            color: Colors.transparent,
+            child: Column(children: [
+              ListTile(
+                leading: const Icon(PhosphorIconsRegular.key),
+                title: const Text('Ubah Kata Sandi'),
+                onTap: () => changeProfilePassword(context, widget.session),
+              ),
+              const Divider(height: 1, color: AppColors.border),
+              ListTile(
+                leading: const Icon(PhosphorIconsRegular.trash,
+                    color: AppColors.danger),
+                title: const Text('Hapus Akun',
+                    style: TextStyle(color: AppColors.danger)),
+                onTap: () => closeProfileAccount(context, widget.session),
+              ),
+            ])),
+      );
+
   Widget _superadminProfile() {
     final name = currentUser?.namaLengkap ?? 'Superadmin';
     final email = currentUser?.email ?? '';
@@ -797,6 +814,8 @@ class _OperationsProfileState extends State<_OperationsProfile> {
                 ],
               ])),
           const SizedBox(height: AppSpacing.lg),
+          _accountActions(),
+          const SizedBox(height: AppSpacing.md),
           OutlinedButton.icon(
               key: const ValueKey('operations-profile-logout'),
               onPressed: _busy ? null : _logout,
@@ -911,6 +930,8 @@ class _OperationsProfileState extends State<_OperationsProfile> {
                                     ])),
                           ],
                         ])),
+                const SizedBox(height: AppSpacing.md),
+                _accountActions(),
                 const SizedBox(height: AppSpacing.md),
                 OutlinedButton.icon(
                     key: const ValueKey('operations-profile-logout'),

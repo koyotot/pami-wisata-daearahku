@@ -25,6 +25,7 @@ import '../../widgets/international_phone_field.dart';
 import '../auth/auth_presentation.dart';
 import '../auth/home_screen.dart';
 import '../auth/user_login_screen.dart';
+import '../shared/profile_account_actions.dart';
 
 // ── Palet & font (sama dengan home_screen.dart) ──────────────
 class _C {
@@ -246,25 +247,6 @@ class _ProfilUserScreenState extends State<ProfilUserScreen>
     );
   }
 
-  // Retain the notification fallback while its duplicate profile entry is hidden.
-  // ignore: unused_element
-  void _bukaNotifikasi(BuildContext context) {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.transparent,
-      isScrollControlled: true,
-      builder: (_) => const _NotifikasiSheet(),
-    );
-  }
-
-  void _bukaPilihBahasa(BuildContext context) {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.transparent,
-      builder: (_) => const _PilihBahasaSheet(),
-    );
-  }
-
   void _bukaSemuaWisataTersimpan(BuildContext context) {
     showModalBottomSheet(
       context: context,
@@ -272,11 +254,6 @@ class _ProfilUserScreenState extends State<ProfilUserScreen>
       isScrollControlled: true,
       builder: (_) => const SavedDestinationsSheet(),
     );
-  }
-
-  void _bukaGantiPassword(BuildContext context) {
-    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-        content: Text('Perubahan kata sandi belum tersedia di profil.')));
   }
 
   @override
@@ -439,20 +416,20 @@ class _ProfilUserScreenState extends State<ProfilUserScreen>
                                                     iconColor: _C.blueDeep,
                                                     title: 'Bahasa',
                                                     subtitle:
-                                                        'Indonesia · bahasa lain belum tersedia',
-                                                    onTap: () =>
-                                                        _bukaPilihBahasa(
-                                                            context),
+                                                        'Bahasa Indonesia',
                                                   ),
                                                   _MenuItemData(
                                                     icon: PhosphorIconsRegular
                                                         .key,
                                                     iconColor: _C.blue,
-                                                    title: 'Ubah Password',
-                                                    subtitle: 'Belum tersedia',
+                                                    title: 'Ubah Kata Sandi',
+                                                    subtitle:
+                                                        'Verifikasi melalui email',
                                                     onTap: () =>
-                                                        _bukaGantiPassword(
-                                                            context),
+                                                        changeProfilePassword(
+                                                            context,
+                                                            AuthSession
+                                                                .instance),
                                                   ),
                                                 ]),
                                                 const SizedBox(height: 26),
@@ -482,10 +459,13 @@ class _ProfilUserScreenState extends State<ProfilUserScreen>
                                                         .trash,
                                                     iconColor: _C.danger,
                                                     title: 'Hapus Akun',
-                                                    subtitle: 'Belum tersedia',
+                                                    subtitle:
+                                                        'Tutup akun secara permanen',
                                                     onTap: () =>
-                                                        _konfirmasiHapusAkun(
-                                                            context),
+                                                        closeProfileAccount(
+                                                            context,
+                                                            AuthSession
+                                                                .instance),
                                                     isDanger: true,
                                                   ),
                                                 ]),
@@ -901,8 +881,9 @@ class _ProfilUserScreenState extends State<ProfilUserScreen>
                               ],
                             ),
                           ),
-                          Icon(PhosphorIconsRegular.caretRight,
-                              color: _C.textDim, size: 13),
+                          if (item.onTap != null)
+                            Icon(PhosphorIconsRegular.caretRight,
+                                color: _C.textDim, size: 13),
                         ],
                       ),
                     ),
@@ -921,11 +902,6 @@ class _ProfilUserScreenState extends State<ProfilUserScreen>
         ],
       ),
     );
-  }
-
-  void _konfirmasiHapusAkun(BuildContext context) {
-    ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Penghapusan akun belum tersedia.')));
   }
 
   Widget _buildLogoutButton(BuildContext context) {
@@ -1000,7 +976,7 @@ class _MenuItemData {
   final Color iconColor;
   final String title;
   final String subtitle;
-  final VoidCallback onTap;
+  final VoidCallback? onTap;
   final bool isDanger;
 
   const _MenuItemData({
@@ -1008,7 +984,7 @@ class _MenuItemData {
     required this.iconColor,
     required this.title,
     required this.subtitle,
-    required this.onTap,
+    this.onTap,
     this.isDanger = false,
   });
 }
@@ -1510,54 +1486,6 @@ class _EditProfilScreenState extends State<_EditProfilScreen> {
 // ════════════════════════════════════════════════════════════
 //  BOTTOM SHEET — Riwayat Ulasan
 // ════════════════════════════════════════════════════════════
-class _NotifikasiSheet extends StatelessWidget {
-  const _NotifikasiSheet();
-  @override
-  Widget build(BuildContext context) => const _UnavailableSettingSheet(
-        title: 'Preferensi Notifikasi',
-        message:
-            'Pengaturan jenis notifikasi belum tersedia. Notifikasi perangkat tetap mengikuti izin sistem perangkat.',
-      );
-}
-
-class _PilihBahasaSheet extends StatelessWidget {
-  const _PilihBahasaSheet();
-  @override
-  Widget build(BuildContext context) => const _UnavailableSettingSheet(
-        title: 'Bahasa',
-        message:
-            'Aplikasi menggunakan Bahasa Indonesia. Pilihan bahasa lain belum tersedia.',
-      );
-}
-
-class _UnavailableSettingSheet extends StatelessWidget {
-  const _UnavailableSettingSheet({required this.title, required this.message});
-  final String title;
-  final String message;
-  @override
-  Widget build(BuildContext context) => SafeArea(
-        top: false,
-        child: Container(
-            padding: const EdgeInsets.all(24),
-            decoration: const BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.vertical(top: Radius.circular(28))),
-            child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(title, style: _font(20, FontWeight.w800, _C.navy)),
-                  const SizedBox(height: 12),
-                  Text(message,
-                      style: _font(14, FontWeight.w500, _C.textMuted,
-                          height: 1.5)),
-                  const SizedBox(height: 16),
-                  TextButton(
-                      onPressed: () => Navigator.pop(context),
-                      child: const Text('Tutup')),
-                ])),
-      );
-}
 
 class SavedDestinationsSheet extends StatelessWidget {
   const SavedDestinationsSheet({super.key});

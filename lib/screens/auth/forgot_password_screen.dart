@@ -4,22 +4,15 @@ import 'package:phosphor_icons/phosphor_icons.dart';
 import '../../services/auth_session.dart';
 import 'verify_reset_otp_screen.dart';
 
-String recoveryError(ApiException e) {
-  if (e.code == 'timeout') return 'Koneksi habis waktu. Silakan coba lagi.';
-  if (e.code == 'network') {
-    return 'Tidak dapat terhubung. Periksa koneksi internet Anda.';
-  }
-  if (e.status == 429) {
-    return 'Terlalu banyak permintaan. Tunggu sebentar dan coba lagi.';
-  }
-  return 'Permintaan belum dapat diproses. Silakan coba lagi.';
-}
-
 class ForgotPasswordScreen extends StatefulWidget {
   const ForgotPasswordScreen(
-      {super.key, required this.session, this.initialEmail = ''});
+      {super.key,
+      required this.session,
+      this.initialEmail = '',
+      this.fromProfile = false});
   final AuthSession session;
   final String initialEmail;
+  final bool fromProfile;
   @override
   State<ForgotPasswordScreen> createState() => _ForgotPasswordScreenState();
 }
@@ -42,6 +35,8 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
       return;
     }
     final generation = widget.session.sessionGeneration;
+    if (widget.fromProfile &&
+        widget.session.profile?.email.trim().toLowerCase() != email) return;
     setState(() {
       _loading = true;
       _error = null;
@@ -59,14 +54,14 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
           builder: (_) => VerifyResetOtpScreen(
               session: widget.session,
               email: email,
+              fromProfile: widget.fromProfile,
               resendAfterSeconds: response['data'] is Map &&
                       response['data']['resend_after_seconds'] is int
                   ? response['data']['resend_after_seconds'] as int
                   : 60)));
     } on ApiException catch (e) {
       if (mounted && widget.session.isCurrentGeneration(generation)) {
-        setState(() => _error =
-            e.status == 422 ? 'Masukkan email yang valid.' : recoveryError(e));
+        setState(() => _error = e.fieldErrors['email'] ?? e.message);
       }
     } finally {
       if (mounted) setState(() => _loading = false);
@@ -75,18 +70,21 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
 
   @override
   Widget build(BuildContext context) => AuthScenicShell(
-      title: 'Pulihkan akun',
+      title: widget.fromProfile ? 'Ubah kata sandi' : 'Pulihkan akun',
       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
         AuthBackLink(
-            label: 'Kembali ke Login',
+            label:
+                widget.fromProfile ? 'Kembali ke Profil' : 'Kembali ke Login',
             onPressed: _loading ? null : () => Navigator.of(context).pop()),
         const SizedBox(height: 12),
-        const AuthHeading(
-            title: 'Lupa password?',
-            description:
-                'Masukkan email yang terdaftar untuk melanjutkan proses pemulihan akun.'),
+        AuthHeading(
+            title: widget.fromProfile ? 'Ubah kata sandi' : 'Lupa password?',
+            description: widget.fromProfile
+                ? 'Kode verifikasi akan dikirim ke email akun Anda.'
+                : 'Masukkan email yang terdaftar untuk melanjutkan proses pemulihan akun.'),
         TextField(
             controller: _email,
+            readOnly: widget.fromProfile,
             enabled: !_loading,
             keyboardType: TextInputType.emailAddress,
             textInputAction: TextInputAction.done,
