@@ -1,4 +1,5 @@
 import '../services/api_client.dart';
+import '../services/api_error_messages.dart';
 import '../services/auth_session.dart';
 import 'refund_models.dart';
 
@@ -302,8 +303,7 @@ String paymentError(Object error) {
       'Status pembayaran berubah. Periksa hasil terbaru sebelum melanjutkan.',
     422 =>
       'Permintaan ditolak. Booking atau percobaan ini tidak lagi memenuhi syarat pembayaran.',
-    429 =>
-      'Terlalu banyak permintaan. Tunggu sebentar lalu periksa status kembali.',
+    429 => apiStatusMessage(429, '', error.context?['retry_after'] as int?),
     _ => error.outcomeUnknown
         ? 'Koneksi terputus atau respons belum pasti. Periksa status; pembayaran tidak diulang otomatis.'
         : error.message,

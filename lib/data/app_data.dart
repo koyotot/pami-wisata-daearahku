@@ -17,6 +17,7 @@ class User {
   final String? avatarUrl;
   final int avatarVersion;
   final bool googleAvatarAvailable;
+  final bool? hasLocalPassword;
 
   User({
     this.isLaravel = false,
@@ -24,6 +25,7 @@ class User {
     this.avatarUrl,
     this.avatarVersion = 0,
     this.googleAvatarAvailable = false,
+    this.hasLocalPassword,
     this.emailVerifiedAt,
     required this.id,
     required this.namaLengkap,

@@ -197,29 +197,7 @@ String adminErrorMessage(Object error) {
     case 'network':
       return error.message;
   }
-  switch (error.status) {
-    case 401:
-      return 'Sesi berakhir. Silakan masuk kembali.';
-    case 403:
-      return 'Anda tidak memiliki hak akses untuk tindakan ini.';
-    case 404:
-      return 'Data tidak ditemukan atau sudah tidak tersedia.';
-    case 422:
-      return _friendlyValidation(error.message);
-  }
   return error.message;
-}
-
-String _friendlyValidation(String message) {
-  final lower = message.toLowerCase();
-  if (lower.contains('last active superadmin')) {
-    return 'Superadmin aktif terakhir tidak dapat dinonaktifkan atau '
-        'diturunkan perannya.';
-  }
-  if (lower.contains('cannot change your own')) {
-    return 'Anda tidak dapat mengubah peran atau status akun sendiri.';
-  }
-  return message;
 }
 
 // -- Paged list ---------------------------------------------------------

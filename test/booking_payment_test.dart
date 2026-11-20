@@ -957,7 +957,7 @@ void main() {
       await pumpScreen(tester);
       await elapse(tester, 12);
       expect(server.refreshPosts, 1);
-      expect(find.textContaining('Terlalu banyak permintaan'), findsWidgets);
+      expect(find.textContaining('Terlalu banyak percobaan'), findsWidgets);
       server.refreshFailure = null;
       await elapse(tester, 40);
       expect(server.refreshPosts, 1);

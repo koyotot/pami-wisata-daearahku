@@ -5,6 +5,7 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:http/http.dart' as http;
 import '../core/config/app_config.dart';
 import '../data/app_data.dart';
+import 'api_error_messages.dart';
 
 class ApiException implements Exception {
   final String message;
@@ -139,17 +140,24 @@ class AuthSession {
 
   /// Sends [request] and maps transport failures; non-2xx handling stays with callers.
   Future<http.Response> _transport(http.BaseRequest request) async {
+    final mutation = !const ['GET', 'HEAD'].contains(request.method);
     try {
       return await client
           .send(request)
           .then(http.Response.fromStream)
           .timeout(const Duration(seconds: 20));
     } on TimeoutException {
-      throw const ApiException(
-          'Koneksi habis waktu. Silakan coba lagi.', null, 'timeout');
+      throw ApiException(
+          mutation
+              ? unknownMutationMessage
+              : 'Koneksi habis waktu. Muat ulang untuk mencoba lagi.',
+          null,
+          'timeout');
     } catch (_) {
-      throw const ApiException(
-          'Tidak dapat terhubung ke layanan. Periksa koneksi Anda.',
+      throw ApiException(
+          mutation
+              ? unknownMutationMessage
+              : 'Tidak dapat terhubung ke layanan. Periksa koneksi Anda.',
           null,
           'network');
     }
@@ -165,59 +173,59 @@ class AuthSession {
     }
   }
 
-  ApiException _failure(http.Response response, Map<String, dynamic> decoded) {
+  ApiException _failure(http.Response response, Map<String, dynamic> decoded,
+      {String path = '', bool mutation = false}) {
+    final status = response.statusCode;
+    final code = decoded['code'] is String ? decoded['code'] as String : null;
     final errors = decoded['errors'];
     final fieldErrors = <String, String>{};
-    if (errors is Map) {
-      for (final entry in errors.entries) {
-        if (entry.key is String && entry.value is List) {
-          final messages = (entry.value as List).whereType<String>();
-          if (messages.isNotEmpty) {
-            fieldErrors[entry.key as String] = messages.first;
-          }
+    if (status == 422 && errors is Map) {
+      for (final field in errors.keys.whereType<String>()) {
+        fieldErrors[field] =
+            (field == 'otp' || field == 'reset_ticket' || field == 'account'
+                    ? apiDomainMessage(code, null)
+                    : null) ??
+                apiFieldMessage(field) ??
+                apiStatusMessage(422, path, null);
+      }
+    }
+    final context = <String, dynamic>{};
+    final rawContext = decoded['context'];
+    if (rawContext is Map) {
+      for (final key in const [
+        'remaining',
+        'status',
+        'version',
+        'booking_guid'
+      ]) {
+        final value = rawContext[key];
+        if (value is num ||
+            ((key == 'status' || key == 'booking_guid') && value is String)) {
+          context[key] = value;
         }
       }
     }
-    final validation = errors is Map
-        ? errors.values
-            .whereType<List>()
-            .expand((v) => v)
-            .whereType<String>()
-            .join('\n')
-        : '';
-    final code = decoded['code'] is String ? decoded['code'] as String : null;
-    final context = decoded['context'] is Map<String, dynamic>
-        ? Map<String, dynamic>.from(decoded['context'] as Map)
-        : <String, dynamic>{};
     final retry = int.tryParse(response.headers['retry-after'] ?? '');
     if (retry != null) context['retry_after'] = retry;
-    return ApiException(
-        response.statusCode == 422 && validation.isNotEmpty
-            ? validation
-            : switch (response.statusCode) {
-                401 =>
-                  'Sesi atau kredensial tidak valid. Silakan masuk kembali.',
-                403 => 'Akses tidak diizinkan.',
-                404 => 'Wisata atau data tidak ditemukan.',
-                409 => decoded['message'] is String
-                    ? decoded['message'] as String
-                    : 'Terjadi konflik. Silakan coba lagi.',
-                429 => 'Terlalu banyak percobaan. Coba lagi nanti.',
-                _ => 'Layanan sedang bermasalah. Silakan coba lagi.',
-              },
-        response.statusCode,
-        code,
-        context,
-        fieldErrors);
+    final message = mutation && status >= 500
+        ? unknownMutationMessage
+        : apiDomainMessage(code, context) ??
+            apiStatusMessage(status, path, retry);
+    return ApiException(message, status, code, context, fieldErrors);
   }
 
-  Map<String, dynamic> _envelope(http.Response response) {
+  Map<String, dynamic> _envelope(http.Response response,
+      {required String path, required bool mutation}) {
     final decoded = _decode(response);
     if (response.statusCode < 200 || response.statusCode >= 300) {
-      throw _failure(response, decoded);
+      throw _failure(response, decoded, path: path, mutation: mutation);
     }
     if (!decoded.containsKey('data')) {
-      throw ApiException('Respons layanan tidak valid.', response.statusCode,
+      throw ApiException(
+          mutation
+              ? unknownMutationMessage
+              : 'Respons layanan tidak valid. Muat ulang untuk mencoba lagi.',
+          response.statusCode,
           'invalid_response');
     }
     return decoded;
@@ -230,7 +238,8 @@ class AuthSession {
     final request = http.Request(method, _uri(path));
     request.headers.addAll(_headers(token: token, extra: headers));
     if (body != null) request.body = jsonEncode(body);
-    return _envelope(await _transport(request));
+    return _envelope(await _transport(request),
+        path: path, mutation: !const ['GET', 'HEAD'].contains(method));
   }
 
   Future<Map<String, dynamic>> _sendMultipart(String method, String path,
@@ -246,7 +255,8 @@ class AuthSession {
       request.files.add(http.MultipartFile.fromBytes(file.field, file.bytes,
           filename: file.filename));
     }
-    return _envelope(await _transport(request));
+    return _envelope(await _transport(request),
+        path: path, mutation: !const ['GET', 'HEAD'].contains(method));
   }
 
   Future<BinaryResponse> _sendBinary(String path, {String? token}) async {
@@ -274,6 +284,9 @@ class AuthSession {
           {Map<String, dynamic>? body}) =>
       _sendEnvelope(method, path, body: body);
 
+  User? _profile;
+  User? get profile => _profile;
+
   void _user(Map<String, dynamic> data) {
     final nextRole = data['role'];
     if (data['guid'] is! String ||
@@ -294,7 +307,7 @@ class AuthSession {
         nextRole == 0 && (verifiedAt is! String || verifiedAt.trim().isEmpty);
     role = nextRole;
     status = 'active';
-    final previous = currentUser;
+    final previous = _profile;
     if (previous != null &&
         previous.id == data['guid'] &&
         previous.avatarVersion > (data['avatar_version'] as int? ?? 0)) {
@@ -306,7 +319,7 @@ class AuthSession {
         'google_avatar_available': previous.googleAvatarAvailable,
       };
     }
-    currentUser = User(
+    _profile = currentUser = User(
         id: data['guid'] as String,
         namaLengkap: data['name'] as String,
         email: data['email'] as String,
@@ -319,6 +332,7 @@ class AuthSession {
         avatarUrl: data['avatar_url'] as String?,
         avatarVersion: data['avatar_version'] as int? ?? 0,
         googleAvatarAvailable: data['google_avatar_available'] == true,
+        hasLocalPassword: data['has_local_password'] as bool?,
         isLaravel: true);
     _avatarCacheKey = null;
     _avatarCache = null;
@@ -385,7 +399,7 @@ class AuthSession {
     otpExpiresInSeconds = null;
     role = null;
     status = null;
-    currentUser = null;
+    _profile = currentUser = null;
     _avatarCacheKey = null;
     _avatarCache = null;
     authenticated.value = false;
@@ -484,7 +498,12 @@ class AuthSession {
       {Map<String, dynamic>? body}) async {
     final data = (await requestEnvelope(method, path, body: body))['data'];
     if (data is! Map<String, dynamic>) {
-      throw const ApiException('Respons layanan tidak valid.');
+      throw ApiException(
+          method == 'GET'
+              ? 'Respons layanan tidak valid.'
+              : unknownMutationMessage,
+          null,
+          'invalid_response');
     }
     return data;
   }
@@ -520,7 +539,7 @@ class AuthSession {
     try {
       result = await send(token);
     } on ApiException catch (e) {
-      if (e.status != 401) rethrow;
+      if (e.status != 401 || e.code == 'reauthentication_failed') rethrow;
       if (generation != _generation) {
         throw const ApiException('Sesi telah berakhir.', 401);
       }
@@ -531,7 +550,9 @@ class AuthSession {
       try {
         result = await send(_tokens!['access_token'] as String);
       } on ApiException catch (retry) {
-        if (retry.status == 401 && generation == _generation) await clear();
+        if (retry.status == 401 &&
+            retry.code != 'reauthentication_failed' &&
+            generation == _generation) await clear();
         rethrow;
       }
     }
@@ -769,7 +790,7 @@ class AuthSession {
     authenticating = false;
     role = null;
     status = null;
-    currentUser = null;
+    _profile = currentUser = null;
     _avatarCacheKey = null;
     _avatarCache = null;
     authenticated.value = false;
@@ -802,7 +823,7 @@ class AuthSession {
     resendAfterSeconds = 0;
     otpExpiresInSeconds = null;
     deviceSessionReady = false;
-    currentUser = null;
+    _profile = currentUser = null;
     _avatarCacheKey = null;
     _avatarCache = null;
     authenticated.value = false;

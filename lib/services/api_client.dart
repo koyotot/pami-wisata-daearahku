@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'auth_session.dart';
+import 'api_error_messages.dart';
 
 typedef Json = Map<String, dynamic>;
 
@@ -20,7 +21,14 @@ class ApiClient {
       Map<String, String>? headers}) async {
     final envelope = await _request(method, path, authenticated, body, headers);
     final data = envelope['data'];
-    if (data is! Json) throw const ApiException('Respons layanan tidak valid.');
+    if (data is! Json) {
+      throw ApiException(
+          const ['GET', 'HEAD'].contains(method)
+              ? 'Respons layanan tidak valid. Muat ulang untuk mencoba lagi.'
+              : unknownMutationMessage,
+          null,
+          'invalid_response');
+    }
     return data;
   }
 

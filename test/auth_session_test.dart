@@ -288,18 +288,58 @@ void main() {
     expect(session.role, isNull);
   });
 
-  test('conflict exposes the backend business message', () async {
+  test('unknown conflict code uses the safe status fallback', () async {
     final session = AuthSession(
       baseUrl: 'https://api.example.test/api/v1',
       store: MemoryStore(),
       client: MockClient((request) async => http.Response(
-          jsonEncode({'message': 'Booking is no longer awaiting approval.'}),
+          jsonEncode({
+            'code': 'new_conflict',
+            'message': 'Booking is no longer awaiting approval.'
+          }),
           409)),
     );
     await expectLater(
         session.login('user@example.test', 'password'),
+        throwsA(isA<ApiException>()
+            .having((e) => e.message, 'message',
+                'Data sudah berubah. Muat ulang untuk melihat kondisi terbaru.')
+            .having((e) => e.code, 'code', 'new_conflict')));
+  });
+
+  test(
+      'maps login denial, throttling and uncertain writes without raw messages',
+      () async {
+    var status = 401;
+    final session = AuthSession(
+      baseUrl: 'https://api.example.test/api/v1',
+      store: MemoryStore(),
+      client: MockClient((_) async => http.Response(
+            jsonEncode({'message': 'private upstream details'}),
+            status,
+            headers: {'retry-after': '25'},
+          )),
+    );
+    await expectLater(
+        session.login('user@example.test', 'wrong'),
         throwsA(isA<ApiException>().having((e) => e.message, 'message',
-            'Booking is no longer awaiting approval.')));
+            'Email atau kata sandi salah. Periksa kembali isian Anda.')));
+    status = 429;
+    await expectLater(
+        session.publicEnvelope('POST', 'auth/forgot-password'),
+        throwsA(isA<ApiException>().having((e) => e.message, 'message',
+            'Terlalu banyak percobaan. Coba lagi dalam 25 detik.')));
+    status = 503;
+    await expectLater(
+        session.publicEnvelope('POST', 'auth/reset-password'),
+        throwsA(isA<ApiException>()
+            .having((e) => e.outcomeUnknown, 'outcomeUnknown', true)
+            .having((e) => e.message, 'message',
+                'Hasil belum diketahui. Periksa status sebelum mencoba lagi.')));
+    await expectLater(
+        session.publicEnvelope('GET', 'destinations'),
+        throwsA(isA<ApiException>().having((e) => e.message, 'message',
+            'Layanan sedang bermasalah. Muat ulang nanti.')));
   });
 
   test('failed device removal does not block logout', () async {
@@ -414,7 +454,10 @@ void main() {
     await expectLater(
         session.login('user@example.test', 'password'),
         throwsA(isA<ApiException>()
-            .having((e) => e.message, 'message', 'Email sudah digunakan.')));
+            .having(
+                (e) => e.message, 'message', 'Periksa kembali data yang diisi.')
+            .having((e) => e.fieldErrors, 'fieldErrors',
+                {'email': 'Periksa alamat email.'})));
   });
   test(
       'concurrent unauthorized requests share one refresh and persist rotated pair',
