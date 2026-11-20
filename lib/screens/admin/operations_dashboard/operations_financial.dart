@@ -1,6 +1,6 @@
 part of 'operations_dashboard.dart';
 
-/// A09/E07 share the same server-scoped report; home uses its DEMO preview.
+/// The preview and full dashboard share the server-scoped report.
 class OperationsFinancialScreen extends StatefulWidget {
   const OperationsFinancialScreen(
       {super.key,
@@ -23,10 +23,6 @@ class _OperationsFinancialState extends State<OperationsFinancialScreen>
       widget.repository ?? BusinessRepository(ApiClient(_session));
   late final _generation = _session.sessionGeneration;
   late final _role = _session.role;
-  // Fixed (no selector): the full page always reads SANDBOX; the home preview
-  // keeps its DEMO source.
-  late String _environment = _defaultEnvironment;
-  String get _defaultEnvironment => widget.preview ? 'demo' : 'sandbox';
   bool _analytics = false;
   Map<String, String> _filters = {};
   Json? _financial;
@@ -62,20 +58,18 @@ class _OperationsFinancialState extends State<OperationsFinancialScreen>
 
   void _changed() {
     if (!mounted) return;
+    final scopeRejected = _scopeError(_error);
     setState(() {
       _request++;
       _financial = null;
       _bookingTrend = null;
       _activityError = null;
       _activityLoading = false;
-      _destinationLabel = null;
       _receivedAt = null;
-      _filters = _defaultFilters;
-      _environment = _defaultEnvironment;
       _loading = false;
-      _error = const ApiException(
-          'Akses diperbarui. Muat ulang keuangan sesuai penugasan terbaru.');
+      if (!scopeRejected) _error = null;
     });
+    if (!scopeRejected) _load();
   }
 
   @override
@@ -108,7 +102,6 @@ class _OperationsFinancialState extends State<OperationsFinancialScreen>
       return;
     }
     final request = ++_request;
-    final environment = _environment;
     final filters = Map<String, String>.of(_filters);
     setState(() {
       _loading = true;
@@ -120,13 +113,14 @@ class _OperationsFinancialState extends State<OperationsFinancialScreen>
       _activityLoading = _role == 1 && !widget.preview;
     });
     try {
-      final report = await _repository.operationalReport('financial',
-          query: {'environment': environment, ...filters});
-      if (!_valid || request != _request) return;
+      final report =
+          await _repository.operationalReport('financial', query: filters);
+      if (!_valid || !widget.active || request != _request) return;
       final financial = report.financial;
+      final environment = financial['environment'];
       final scope = financial['scope'];
       final unavailable = financial['availability'] == 'unavailable';
-      if (financial['environment'] != environment ||
+      if (!const ['demo', 'sandbox', 'production'].contains(environment) ||
           !(environment == 'demo'
                   ? const ['demo']
                   : const ['doku', 'midtrans', 'mixed'])
@@ -135,13 +129,15 @@ class _OperationsFinancialState extends State<OperationsFinancialScreen>
           financial['currency'] != 'IDR' ||
           !const ['partial', 'available', 'unavailable']
               .contains(financial['availability']) ||
-          (!unavailable &&
-              financial['source'] !=
-                  (environment == 'demo'
+          financial['source'] !=
+              (unavailable
+                  ? 'unavailable'
+                  : environment == 'demo'
                       ? 'simulated_demo_events'
-                      : 'verified_${environment}_events')) ||
+                      : 'verified_${environment}_events') ||
           scope is! Json ||
           scope['mode'] != (_role == 2 ? 'global' : 'assigned_destinations') ||
+          !scope.containsKey('destination_guid') ||
           scope['destination_guid'] != filters['destination_guid']) {
         throw const ApiException(
             'Laporan yang diterima tidak sesuai dengan pilihan Anda. Muat ulang laporan.',
@@ -164,7 +160,7 @@ class _OperationsFinancialState extends State<OperationsFinancialScreen>
         });
       }
     } catch (e) {
-      if (!_valid || request != _request) return;
+      if (!_valid || !widget.active || request != _request) return;
       setState(() {
         _error = e;
         _financial = null;
@@ -183,13 +179,13 @@ class _OperationsFinancialState extends State<OperationsFinancialScreen>
     try {
       final report =
           await _repository.operationalReport('overview', query: filters);
-      if (!_valid || request != _request) return;
+      if (!_valid || !widget.active || request != _request) return;
       setState(() {
         _bookingTrend = report.bookingTrend;
         _activityLoading = false;
       });
     } catch (e) {
-      if (!_valid || request != _request) return;
+      if (!_valid || !widget.active || request != _request) return;
       setState(() {
         _activityError = e;
         _activityLoading = false;
@@ -252,26 +248,24 @@ class _OperationsFinancialState extends State<OperationsFinancialScreen>
     return _superadminPage();
   }
 
-  Widget _sandboxNotice() => Container(
+  Widget _environmentNotice() {
+    final testOnly = _financial?['test_only'] == true;
+    return Container(
       padding: const EdgeInsets.all(AppSpacing.md),
       decoration: BoxDecoration(
-          color: AppColors.warningTint,
-          border: Border.all(color: AppColors.warningBorder),
-          borderRadius: BorderRadius.circular(AppSpacing.lg)),
-      child: const Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Text('SANDBOX / TEST_ONLY',
-                style: TextStyle(
-                    fontSize: 13,
-                    height: 1.5,
-                    fontWeight: FontWeight.w700,
-                    color: AppColors.warningText)),
-            SizedBox(height: AppSpacing.sm),
-            Text('Laporan ini menampilkan pembayaran uji.',
-                style: TextStyle(
-                    fontSize: 12, height: 1.6, color: AppColors.warningText)),
-          ]));
+        color: testOnly ? AppColors.warningTint : AppColors.surface,
+        border: Border.all(
+            color: testOnly ? AppColors.warningBorder : AppColors.border),
+        borderRadius: BorderRadius.circular(AppSpacing.lg),
+      ),
+      child: Text(_financialEnvironmentLabel(_financial?['environment']),
+          style: TextStyle(
+              fontSize: 13,
+              height: 1.5,
+              fontWeight: FontWeight.w700,
+              color: testOnly ? AppColors.warningText : AppColors.navy)),
+    );
+  }
 
   Widget _adminPage() {
     final financial = _financial;
@@ -324,7 +318,7 @@ class _OperationsFinancialState extends State<OperationsFinancialScreen>
                         fontSize: 11, color: AppColors.textSecondary)),
               ]),
           const SizedBox(height: AppSpacing.md),
-          if (financial?['test_only'] == true) _sandboxNotice(),
+          if (financial != null) _environmentNotice(),
           const SizedBox(height: AppSpacing.md),
           if (_loading)
             const OperationsSkeleton()
@@ -354,26 +348,27 @@ class _OperationsFinancialState extends State<OperationsFinancialScreen>
                   Text(
                       _available
                           ? '${_metric('successful_transactions')} transaksi sukses'
-                          : _financialReason(financial['reason']),
+                          : _financialUnavailableMessage,
                       style: const TextStyle(
                           fontSize: 12,
                           height: 1.6,
                           color: AppColors.textSecondary)),
                 ])),
             const SizedBox(height: AppSpacing.md),
-            OperationsMetrics(
-                values: [
-                  ('Pembayaran berhasil', _metric('successful_transactions')),
-                  ('Tiket terkait booking', _metric('tickets_sold')),
-                ],
-                icons: const [
-                  PhosphorIconsRegular.money,
-                  PhosphorIconsRegular.ticket
-                ],
-                labelStyle: const TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w500,
-                    color: AppColors.navy)),
+            if (_available)
+              OperationsMetrics(
+                  values: [
+                    ('Pembayaran berhasil', _metric('successful_transactions')),
+                    ('Tiket terkait booking', _metric('tickets_sold')),
+                  ],
+                  icons: const [
+                    PhosphorIconsRegular.money,
+                    PhosphorIconsRegular.ticket
+                  ],
+                  labelStyle: const TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w500,
+                      color: AppColors.navy)),
             const SizedBox(height: AppSpacing.md),
             _DashboardCard(
                 child: Column(
@@ -415,7 +410,7 @@ class _OperationsFinancialState extends State<OperationsFinancialScreen>
                   const _AdminHomeHeading('Sumber data'),
                   Text(
                       '${_financialSourceLine(financial)}. '
-                      'Jangan tafsirkan sebagai saldo tersedia atau net settlement.',
+                      '${_financialReason(financial['reason'])}',
                       style: const TextStyle(
                           fontSize: 12,
                           height: 1.6,
@@ -499,31 +494,34 @@ class _OperationsFinancialState extends State<OperationsFinancialScreen>
                       fontWeight: FontWeight.w800,
                       color: AppColors.navy))),
           Tooltip(
-              message: 'Ringkasan DEMO bulan ini (UTC), seluruh penugasan. '
+              message: 'Bulan ini (UTC), seluruh penugasan. '
                   'Filter keuangan tersedia di dashboard. '
                   'Sumber: ${_financialSourceLabel(_financial?['source'])}',
               child: const Icon(PhosphorIconsRegular.money,
                   size: 20, color: AppColors.navy)),
         ]),
         const SizedBox(height: AppSpacing.xs),
-        const Text('DEMO / TEST_ONLY · Bukan uang nyata',
-            style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+        if (_financial case final financial?)
+          Text(_financialEnvironmentLabel(financial['environment']),
+              style: const TextStyle(
+                  fontSize: 12, color: AppColors.textSecondary)),
         const SizedBox(height: AppSpacing.sm),
         if (_loading)
           const LinearProgressIndicator()
         else if (_error != null) ...[
           Text(adminErrorMessage(_error!),
               style: const TextStyle(fontSize: 13, height: 1.5)),
-          TextButton(
-              style: TextButton.styleFrom(
-                  textStyle: const TextStyle(
-                      fontSize: 13, fontWeight: FontWeight.w800),
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(14))),
-              onPressed: _load,
-              child: const Text('Muat ulang keuangan')),
+          if (!_scopeError(_error))
+            TextButton(
+                style: TextButton.styleFrom(
+                    textStyle: const TextStyle(
+                        fontSize: 13, fontWeight: FontWeight.w800),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14))),
+                onPressed: _load,
+                child: const Text('Muat ulang keuangan')),
         ] else if (!_available)
-          Text(_financialReason(_financial?['reason']),
+          Text(_financialUnavailableMessage,
               style: const TextStyle(
                   fontSize: 13, height: 1.5, color: AppColors.textSecondary))
         else ...[
@@ -531,12 +529,9 @@ class _OperationsFinancialState extends State<OperationsFinancialScreen>
               'Gross tercatat', _metric('gross_revenue', money: true)),
           const Divider(height: AppSpacing.sm, color: AppColors.border),
           _financialRow('Transaksi sukses', _metric('successful_transactions')),
-          if (_financial?['availability'] == 'partial')
-            Text(
-                'Sumber: ${_financialSourceLabel(_financial!['source'])} · '
-                '${_financialAvailabilityLabel('partial')}',
-                style: const TextStyle(
-                    fontSize: 12, height: 1.5, color: AppColors.textSecondary)),
+          Text('Sumber: ${_financialSourceLine(_financial)}',
+              style: const TextStyle(
+                  fontSize: 12, height: 1.5, color: AppColors.textSecondary)),
         ],
         const Divider(height: AppSpacing.sm, color: AppColors.border),
         Align(
@@ -593,7 +588,7 @@ class _OperationsFinancialState extends State<OperationsFinancialScreen>
                 _errorBlock(_error!, _scopeError(_error) ? _filter : _load,
                     role: _role),
               if (!_loading && financial != null) ...[
-                if (financial['test_only'] == true) _sandboxNotice(),
+                _environmentNotice(),
                 if (!_available) ...[
                   _DashboardCard(
                       child: Column(
@@ -601,7 +596,7 @@ class _OperationsFinancialState extends State<OperationsFinancialScreen>
                           children: [
                         const _SectionTitle(
                             'Belum ada sumber pembayaran tersedia'),
-                        Text(_financialReason(financial['reason']),
+                        Text(_financialUnavailableMessage,
                             style: const TextStyle(
                                 fontSize: 13,
                                 height: 1.6,
@@ -609,10 +604,12 @@ class _OperationsFinancialState extends State<OperationsFinancialScreen>
                       ])),
                   const SizedBox(height: AppSpacing.lg),
                 ],
-                if (_analytics)
-                  ..._analyticsContent(financial)
-                else
-                  ..._summaryContent(financial),
+                if (_available) ...[
+                  if (_analytics)
+                    ..._analyticsContent(financial)
+                  else
+                    ..._summaryContent(financial),
+                ],
                 const SizedBox(height: AppSpacing.lg),
                 _sourceCard(financial),
               ],
@@ -677,8 +674,7 @@ class _OperationsFinancialState extends State<OperationsFinancialScreen>
                     children: [
                       Row(children: [
                         Expanded(
-                            child: Text(
-                                'Gross revenue - ${_environment.toUpperCase()}',
+                            child: Text('Gross revenue',
                                 style: const TextStyle(
                                     fontSize: 13, color: Colors.white))),
                         _financeInfo(
@@ -786,15 +782,14 @@ class _OperationsFinancialState extends State<OperationsFinancialScreen>
             trailing: _financeInfo(
                 'Komponen yang belum tersedia tidak dihitung sebagai Rp0.')),
         const SizedBox(height: AppSpacing.sm),
-        for (final component in components) ...[
-          _financeComponentRow(
-              component.$1,
-              _available && _number(financial[component.$2]) != null
-                  ? Text(_financialMoney(financial[component.$2]),
-                      style: _financeValueStyle(13))
-                  : _financeChip('Belum tersedia')),
-          const Divider(height: 1, color: AppColors.border),
-        ],
+        for (final component in components)
+          if (_number(financial[component.$2]) != null) ...[
+            _financeComponentRow(
+                component.$1,
+                Text(_financialMoney(financial[component.$2]),
+                    style: _financeValueStyle(13))),
+            const Divider(height: 1, color: AppColors.border),
+          ],
         _financeComponentRow(
             'Kelengkapan refund',
             !_available
@@ -818,7 +813,10 @@ class _OperationsFinancialState extends State<OperationsFinancialScreen>
     final reason = financial['reason'];
     final missingFields = financial['missing_fields'];
     final rows = [
-      ('Lingkungan pembayaran', _financialCap('${financial['environment']}')),
+      (
+        'Lingkungan pembayaran',
+        _financialEnvironmentLabel(financial['environment'])
+      ),
       ('Penyedia pembayaran', '${financial['provider'] ?? '—'}'),
       ('Label', '${financial['label'] ?? '—'}'),
       ('Sumber', _financialSourceLabel(financial['source'])),
@@ -1417,6 +1415,13 @@ String _financialMoney(dynamic value) {
 
 // Operational wording for report metadata.
 
+String _financialEnvironmentLabel(dynamic environment) => switch (environment) {
+      'demo' => 'Demo · Data simulasi',
+      'sandbox' => 'Sandbox · Data uji',
+      'production' => 'Produksi',
+      _ => '',
+    };
+
 String _financialSourceLabel(dynamic source) => switch (source) {
       'simulated_demo_events' => 'Simulasi DEMO',
       'verified_sandbox_events' => 'Pembayaran sandbox terverifikasi',
@@ -1464,9 +1469,11 @@ String _financialSourceLine(Json? financial) {
   return '$source · ${_financialAvailabilityLabel(financial?['availability'])}';
 }
 
+const _financialUnavailableMessage =
+    'Data keuangan belum tersedia untuk periode ini.';
+
 String _financialReason(dynamic reason) => switch (reason) {
-      'no_verified_payment_source' =>
-        'Belum ada pembayaran terverifikasi untuk lingkungan dan cakupan ini.',
+      'no_verified_payment_source' => _financialUnavailableMessage,
       'fees_and_refunds_unavailable' =>
         'Data tersedia sebagian. Biaya layanan pembayaran, pendapatan bersih, pencairan dana, dan kelengkapan refund belum tersedia.',
       'fees_unavailable_refunds_incomplete' =>

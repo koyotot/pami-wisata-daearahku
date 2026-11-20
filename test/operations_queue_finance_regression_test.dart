@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -25,19 +27,17 @@ void main() {
     testWidgets('finance sandbox validates historical provider $provider',
         (tester) async {
       final session = await adminSession((request) async {
-        final environment =
-            request.url.queryParameters['environment'] ?? 'demo';
+        expectSync(request.url.queryParameters['environment'], isNull);
+        const environment = 'sandbox';
         return jsonResponse({
           'data': {
             'financial': {
               'environment': environment,
-              'provider': environment == 'demo' ? 'demo' : provider,
+              'provider': provider,
               'test_only': true,
               'currency': 'IDR',
               'availability': 'partial',
-              'source': environment == 'demo'
-                  ? 'simulated_demo_events'
-                  : 'verified_sandbox_events',
+              'source': 'verified_sandbox_events',
               'scope': {'mode': 'global', 'destination_guid': null},
               'gross_revenue': 12345,
               'successful_transactions': 2,
@@ -51,7 +51,7 @@ void main() {
                   repository: repositoryFor(session), session: session))));
       await tester.pumpAndSettle();
       expect(
-          find.text('SANDBOX / TEST_ONLY'),
+          find.text('Sandbox · Data uji'),
           ['doku', 'midtrans', 'mixed'].contains(provider)
               ? findsOneWidget
               : findsNothing);
@@ -65,6 +65,91 @@ void main() {
       await tester.pumpWidget(const SizedBox.shrink());
     });
   }
+
+  testWidgets(
+      'finance reload switches to production and rejects inconsistent metadata',
+      (tester) async {
+    var environment = 'sandbox';
+    var source = 'verified_sandbox_events';
+    var testOnly = true;
+    var availability = 'partial';
+    Completer<void>? delayed;
+    final session = await adminSession((request) async {
+      expectSync(request.url.queryParameters['environment'], isNull);
+      final response = jsonResponse({
+        'data': {
+          'financial': {
+            'environment': environment,
+            'provider': 'midtrans',
+            'test_only': testOnly,
+            'currency': 'IDR',
+            'availability': availability,
+            'source': source,
+            'scope': {'mode': 'global', 'destination_guid': null},
+            'gross_revenue': environment == 'sandbox' ? 12345 : 67890,
+          }
+        }
+      });
+      await delayed?.future;
+      return response;
+    }, role: 2);
+    await tester.pumpWidget(MaterialApp(
+        home: OperationsFinancialScreen(
+            repository: repositoryFor(session), session: session)));
+    await tester.pumpAndSettle();
+    expect(find.text('Sandbox · Data uji'), findsOneWidget);
+    expect(find.text('Rp12.345'), findsOneWidget);
+
+    void refresh() {
+      final observer = tester.state(find.byType(OperationsFinancialScreen))
+          as WidgetsBindingObserver;
+      observer.didChangeAppLifecycleState(AppLifecycleState.resumed);
+    }
+
+    Future<void> reload() async {
+      refresh();
+      await tester.pumpAndSettle();
+    }
+
+    final older = Completer<void>();
+    delayed = older;
+    refresh();
+    await tester.pump();
+    expect(find.text('Rp12.345'), findsNothing);
+    delayed = null;
+
+    environment = 'production';
+    source = 'verified_production_events';
+    testOnly = false;
+    session.sessionChanges.value++;
+    await tester.pumpAndSettle();
+    expect(find.text('Produksi'), findsOneWidget);
+    expect(find.text('Rp67.890'), findsOneWidget);
+    expect(find.text('Rp12.345'), findsNothing);
+    older.complete();
+    await tester.pumpAndSettle();
+    expect(find.text('Rp67.890'), findsOneWidget);
+    expect(find.text('Rp12.345'), findsNothing);
+
+    source = 'simulated_demo_events';
+    await reload();
+    expect(find.textContaining('Laporan yang diterima tidak sesuai'),
+        findsOneWidget);
+    expect(find.text('Rp67.890'), findsNothing);
+
+    source = 'verified_production_events';
+    testOnly = true;
+    await reload();
+    expect(find.text('Rp67.890'), findsNothing);
+
+    testOnly = false;
+    availability = 'unavailable';
+    source = 'unavailable';
+    await reload();
+    expect(find.text('Data keuangan belum tersedia untuk periode ini.'),
+        findsOneWidget);
+    expect(find.text('Rp67.890'), findsNothing);
+  });
 
   testWidgets('action center preserves server urgency order and guarded route',
       (tester) async {
@@ -117,6 +202,9 @@ void main() {
   });
 
   testWidgets('admin profile logout clears the private shell', (tester) async {
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
     final session = await adminSession(
         (request) async => request.url.path.endsWith('/auth/logout')
             ? jsonResponse({'data': {}})
@@ -128,8 +216,10 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.byTooltip('Profil'));
     await tester.pumpAndSettle();
-    expect(find.text('Admin'), findsOneWidget);
+    expect(find.text('Admin'), findsWidgets);
+    await tester.scrollUntilVisible(find.text('Keluar akun'), 180);
     await _tap(tester, find.text('Keluar akun'));
+    await _tap(tester, find.byKey(const ValueKey('operations-logout-confirm')));
     expect(session.authenticated.value, isFalse);
     expect(find.byType(UserLoginScreen), findsOneWidget);
     expect(find.text('Admin'), findsNothing);
@@ -228,8 +318,9 @@ void main() {
                   session: session))));
       await tester.pumpAndSettle();
       expect(requests.single.method, 'GET');
-      expect(requests.single.url.queryParameters['environment'], 'demo');
-      expect(find.text('DEMO / TEST_ONLY · Bukan uang nyata'), findsOneWidget);
+      expect(requests.single.url.queryParameters['environment'], isNull);
+      expect(find.text('Demo · Data simulasi'),
+          foreignScope ? findsNothing : findsOneWidget);
       if (foreignScope) {
         expect(find.textContaining('Laporan yang diterima tidak sesuai'),
             findsOneWidget);
