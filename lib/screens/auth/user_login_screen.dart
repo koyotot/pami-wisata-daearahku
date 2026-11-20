@@ -19,7 +19,6 @@ import 'forgot_password_screen.dart';
 Future<void>? _googleInitialization;
 bool _googleFlowActive = false;
 
-@visibleForTesting
 Future<String?> googleFirebaseToken(bool Function() isCurrent,
     {Future<String?> Function(String)? firebaseTokenForGoogle}) async {
   if (kIsWeb || defaultTargetPlatform != TargetPlatform.android) {

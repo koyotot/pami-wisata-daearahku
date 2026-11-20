@@ -7,11 +7,12 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:wisata_daerahku/screens/auth/verify_reset_otp_screen.dart';
+import 'package:wisata_daerahku/screens/shared/profile_account_actions.dart';
 import 'package:wisata_daerahku/screens/auth/reset_password_screen.dart';
 import 'package:wisata_daerahku/screens/auth/user_login_screen.dart';
 import 'package:wisata_daerahku/services/auth_session.dart';
 
-import 'auth_session_test.dart' show MemoryStore;
+import 'auth_session_test.dart' show MemoryStore, ok, tokens, user;
 
 void main() {
   setUpAll(() => GoogleFonts.config.allowRuntimeFetching = false);
@@ -23,6 +24,125 @@ void main() {
         store: store ?? MemoryStore(),
         client: MockClient(handler),
       );
+
+  testWidgets('profile password confirms a locked email before sending OTP',
+      (tester) async {
+    var otpCalls = 0;
+    final identity = {
+      ...user('1'),
+      'email': 'visitor@example.test',
+      'has_local_password': true
+    };
+    final auth = session((request) async {
+      if (request.url.path.endsWith('/login'))
+        return ok({...tokens('1'), 'user': identity});
+      if (request.url.path.endsWith('/me')) return ok(identity);
+      otpCalls++;
+      expectSync(jsonDecode(request.body), {'email': 'visitor@example.test'});
+      return ok({'message': 'Accepted.'});
+    });
+    await auth.login('visitor@example.test', 'password');
+    await tester.pumpWidget(MaterialApp(
+        home: Builder(
+            builder: (context) => Scaffold(
+                body: TextButton(
+                    onPressed: () => changeProfilePassword(context, auth),
+                    child: const Text('Ubah Kata Sandi'))))));
+    await tester.tap(find.text('Ubah Kata Sandi'));
+    await tester.pumpAndSettle();
+    final email = tester.widget<TextField>(find.byType(TextField));
+    expect(email.controller!.text, 'visitor@example.test');
+    expect(email.readOnly, isTrue);
+    expect(otpCalls, 0);
+    await tester.tap(find.text('Kembali ke Profil'));
+    await tester.pumpAndSettle();
+    expect(otpCalls, 0);
+    expect(auth.authenticated.value, isTrue);
+    await tester.tap(find.text('Ubah Kata Sandi'));
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('Kirim kode OTP'));
+    await tester.tap(find.text('Kirim kode OTP'));
+    await tester.pumpAndSettle();
+    expect(otpCalls, 1);
+    expect(find.byType(VerifyResetOtpScreen), findsOneWidget);
+    expect(find.text('Ubah email'), findsNothing);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
+  testWidgets(
+      'close keeps session on bad proof and checks status after an unknown result',
+      (tester) async {
+    var closeCalls = 0;
+    final wrongProof = Completer<http.Response>();
+    var statusReads = 0;
+    var refreshes = 0;
+    final identity = {...user('1'), 'has_local_password': true};
+    final store = MemoryStore();
+    final auth = session((request) async {
+      if (request.url.path.endsWith('/login'))
+        return ok({...tokens('1'), 'user': identity});
+      if (request.url.path.endsWith('/me')) {
+        statusReads++;
+        return ok(identity);
+      }
+      if (request.url.path.endsWith('/refresh')) refreshes++;
+      expect(request.url.path, '/api/v1/profile/close');
+      expect(request.headers['authorization'], 'Bearer access-1');
+      closeCalls++;
+      expect(jsonDecode(request.body),
+          {'password': closeCalls == 1 ? 'wrong' : 'correct'});
+      if (closeCalls == 1) return wrongProof.future;
+      if (closeCalls == 2) return http.Response('unreadable', 200);
+      return ok({'message': 'Account closed.'});
+    }, store);
+    await auth.login('visitor@example.test', 'password');
+    await tester.pumpWidget(MaterialApp(
+        home: Builder(
+            builder: (context) => Scaffold(
+                body: TextButton(
+                    onPressed: () => closeProfileAccount(context, auth),
+                    child: const Text('Hapus Akun'))))));
+    await tester.tap(find.text('Hapus Akun'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Batal'));
+    await tester.pumpAndSettle();
+    expect(closeCalls, 0);
+    await tester.tap(find.text('Hapus Akun'));
+    await tester.pumpAndSettle();
+    final close = find.widgetWithText(FilledButton, 'Tutup akun');
+    await tester.enterText(find.byType(TextField), 'wrong');
+    await tester.tap(close);
+    await tester.pump();
+    final pending = find.widgetWithText(FilledButton, 'Memproses…');
+    expect(tester.widget<FilledButton>(pending).onPressed, isNull);
+    await tester.tap(pending, warnIfMissed: false);
+    expect(closeCalls, 1);
+    wrongProof
+        .complete(http.Response('{"code":"reauthentication_failed"}', 401));
+    await tester.pumpAndSettle();
+    expect(
+        find.text('Kata sandi salah. Periksa dan coba lagi.'), findsOneWidget);
+    expect(auth.authenticated.value, isTrue);
+    expect(refreshes, 0);
+    final initialReads = statusReads;
+    await tester.enterText(find.byType(TextField), 'correct');
+    await tester.tap(close);
+    await tester.pumpAndSettle();
+    expect(closeCalls, 2);
+    expect(statusReads, initialReads + 1);
+    expect(find.text('Akun berhasil ditutup.'), findsNothing);
+    expect(
+        find.text('Sesi masih aktif. Penutupan akun belum dapat dipastikan.'),
+        findsOneWidget);
+    await tester.enterText(find.byType(TextField), 'correct');
+    await tester.tap(close);
+    await tester.pumpAndSettle();
+    expect(closeCalls, 3);
+    expect(auth.authenticated.value, isFalse);
+    expect(store.value, isNull);
+    expect(find.byType(UserLoginScreen), findsOneWidget);
+    expect(find.text('Hapus Akun'), findsNothing);
+  });
 
   testWidgets(
       'verification sends leading-zero OTP once and fails closed on malformed ticket',
@@ -192,6 +312,7 @@ void main() {
       if (request.url.path.endsWith('/verify-otp')) {
         return http.Response(
             jsonEncode({
+              'code': 'invalid_reset_otp',
               'errors': {
                 'otp': ['Invalid code']
               }
@@ -209,7 +330,7 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text('Verifikasi kode'));
     await tester.pumpAndSettle();
-    expect(find.textContaining('Kode tidak valid'), findsOneWidget);
+    expect(find.textContaining('Kode salah'), findsOneWidget);
     await tester.ensureVisible(find.text('Kirim ulang kode'));
     await tester.ensureVisible(find.text('Kirim ulang kode'));
     await tester.pumpAndSettle();
@@ -263,11 +384,17 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text('Simpan password'));
     await tester.pumpAndSettle();
-    expect(find.text('Password ditolak server.'), findsOneWidget);
+    expect(find.text('Periksa kata sandi.'), findsOneWidget);
+    expect(find.text('Password ditolak server.'), findsNothing);
     expect(find.byType(ResetPasswordScreen), findsOneWidget);
     await tester.tap(find.text('Simpan password'));
     await tester.pumpAndSettle();
     expect(calls, 2);
+    expect(find.text('Kode reset kedaluwarsa. Minta kode OTP baru.'),
+        findsOneWidget);
+    await tester.ensureVisible(find.text('Minta kode baru'));
+    await tester.tap(find.text('Minta kode baru'));
+    await tester.pumpAndSettle();
     expect(find.byType(ResetPasswordScreen), findsNothing);
     expect(find.text('Request OTP'), findsOneWidget);
     await tester.pumpWidget(const SizedBox());

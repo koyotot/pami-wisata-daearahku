@@ -12,11 +12,13 @@ class ResetPasswordScreen extends StatefulWidget {
       required this.session,
       required this.email,
       required this.ticket,
-      required this.expiresInSeconds});
+      required this.expiresInSeconds,
+      this.fromProfile = false});
   final AuthSession session;
   final String email;
   final String ticket;
   final int expiresInSeconds;
+  final bool fromProfile;
   @override
   State<ResetPasswordScreen> createState() => _ResetPasswordScreenState();
 }
@@ -27,13 +29,16 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
   late final DateTime _until;
   Timer? _timer;
   bool _busy = false;
+  bool _ticketRejected = false;
+  bool _outcomeUnknown = false;
   bool _showPassword = false;
   bool _showConfirmation = false;
   String? _passwordError;
   String? _confirmationError;
   String? _message;
-  int get _remaining =>
-      (_until.difference(DateTime.now()).inMilliseconds / 1000)
+  int get _remaining => _ticketRejected
+      ? 0
+      : (_until.difference(DateTime.now()).inMilliseconds / 1000)
           .ceil()
           .clamp(0, 86400);
   @override
@@ -60,12 +65,12 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
       widget.session.isCurrentGeneration(generation) &&
       ModalRoute.of(context)?.isCurrent == true;
   Future<void> _submit() async {
-    if (_busy || _remaining == 0) return;
+    if (_busy || _outcomeUnknown || _remaining == 0) return;
     setState(() {
       _passwordError =
           _password.text.length < 8 ? 'Password minimal 8 karakter.' : null;
       _confirmationError = _confirmation.text != _password.text
-          ? 'Konfirmasi password tidak sama.'
+          ? 'Ulangi kata sandi yang sama.'
           : null;
       _message = null;
     });
@@ -73,15 +78,42 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
     final generation = widget.session.sessionGeneration;
     setState(() => _busy = true);
     try {
-      await widget.session.publicEnvelope('POST', 'auth/reset-password', body: {
+      final response = await widget.session
+          .publicEnvelope('POST', 'auth/reset-password', body: {
         'email': widget.email,
         'reset_ticket': widget.ticket,
         'password': _password.text,
         'password_confirmation': _confirmation.text
       });
+      if (response['data'] is! Map || response['data']['message'] is! String) {
+        throw const ApiException(
+            'Respons layanan tidak valid.', null, 'invalid_response');
+      }
       if (!mounted || !_current(generation)) return;
       _password.clear();
       _confirmation.clear();
+      if (widget.fromProfile) {
+        final navigator = Navigator.of(context);
+        final messenger = ScaffoldMessenger.of(context);
+        final session = widget.session;
+        final clearing = session.clear();
+        final clearedGeneration = session.sessionGeneration;
+        await clearing;
+        if (!navigator.mounted ||
+            !session.isCurrentGeneration(clearedGeneration)) {
+          return;
+        }
+        navigator.pushAndRemoveUntil(
+            MaterialPageRoute(
+                builder: (_) => UserLoginScreen(session: session)),
+            (_) => false);
+        if (messenger.mounted) {
+          messenger.showSnackBar(const SnackBar(
+              content:
+                  Text('Kata sandi berhasil diubah. Silakan masuk kembali.')));
+        }
+        return;
+      }
       Navigator.of(context).pushAndRemoveUntil(
           MaterialPageRoute(
               builder: (_) =>
@@ -92,19 +124,16 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
       if (e.status == 422 && e.fieldErrors.containsKey('reset_ticket')) {
         _password.clear();
         _confirmation.clear();
-        _requestNewCode();
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-            content: Text(
-                'Kode reset tidak berlaku atau kedaluwarsa. Minta kode OTP baru.',
-                style: AuthTheme.snackBarTextStyle)));
+        setState(() => _ticketRejected = true);
       } else {
         setState(() {
           _passwordError = e.fieldErrors['password'];
           _confirmationError = e.fieldErrors['password_confirmation'];
           if (_passwordError == null && _confirmationError == null) {
+            _outcomeUnknown = e.outcomeUnknown;
             _message = e.outcomeUnknown
                 ? 'Hasil perubahan belum diketahui. Coba masuk dengan password baru atau minta kode baru.'
-                : recoveryError(e);
+                : e.message;
           }
         });
       }
@@ -121,7 +150,9 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
     } else {
       Navigator.of(context).pushReplacement(MaterialPageRoute(
           builder: (_) => ForgotPasswordScreen(
-              session: widget.session, initialEmail: widget.email)));
+              session: widget.session,
+              initialEmail: widget.email,
+              fromProfile: widget.fromProfile)));
     }
   }
 
@@ -129,86 +160,91 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
   Widget build(BuildContext context) {
     final minutes = (_remaining ~/ 60).toString().padLeft(2, '0');
     final seconds = (_remaining % 60).toString().padLeft(2, '0');
-    return AuthScenicShell(
-        title: 'Pulihkan akun',
-        child:
-            Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-          AuthBackLink(
-              label: 'Minta kode baru',
-              onPressed: _busy ? null : _requestNewCode),
-          const SizedBox(height: 12),
-          const AuthHeading(
-              title: 'Buat password baru',
-              description:
-                  'Kode OTP berhasil diverifikasi. Gunakan minimal 8 karakter untuk password baru.'),
-          Text(
-              _remaining > 0
-                  ? 'Sisa waktu kode reset: $minutes:$seconds'
-                  : 'Kode reset kedaluwarsa. Minta kode OTP baru.',
-              style: TextStyle(
-                  color: _remaining > 0
-                      ? const Color(0xFF536780)
-                      : const Color(0xFFE5484D))),
-          const SizedBox(height: 24),
-          TextField(
-              controller: _password,
-              enabled: !_busy && _remaining > 0,
-              obscureText: !_showPassword,
-              textInputAction: TextInputAction.next,
-              autofillHints: const [AutofillHints.newPassword],
-              onChanged: (_) => setState(() => _passwordError = null),
-              decoration: InputDecoration(
-                  labelText: 'Password baru',
-                  hintText: 'Minimal 8 karakter',
-                  prefixIcon: const Icon(PhosphorIconsRegular.lockKey),
-                  errorText: _passwordError,
-                  suffixIcon: IconButton(
-                      tooltip: _showPassword
-                          ? 'Sembunyikan password'
-                          : 'Tampilkan password',
-                      onPressed: _busy
-                          ? null
-                          : () =>
-                              setState(() => _showPassword = !_showPassword),
-                      icon: Icon(_showPassword
-                          ? PhosphorIconsRegular.eyeSlash
-                          : PhosphorIconsRegular.eye)))),
-          const SizedBox(height: 20),
-          TextField(
-              controller: _confirmation,
-              enabled: !_busy && _remaining > 0,
-              obscureText: !_showConfirmation,
-              textInputAction: TextInputAction.done,
-              autofillHints: const [AutofillHints.newPassword],
-              onChanged: (_) => setState(() => _confirmationError = null),
-              onSubmitted: (_) => _submit(),
-              decoration: InputDecoration(
-                  labelText: 'Konfirmasi password',
-                  hintText: 'Ulangi password',
-                  prefixIcon: const Icon(PhosphorIconsRegular.lockKey),
-                  errorText: _confirmationError,
-                  suffixIcon: IconButton(
-                      tooltip: _showConfirmation
-                          ? 'Sembunyikan konfirmasi password'
-                          : 'Tampilkan konfirmasi password',
-                      onPressed: _busy
-                          ? null
-                          : () => setState(
-                              () => _showConfirmation = !_showConfirmation),
-                      icon: Icon(_showConfirmation
-                          ? PhosphorIconsRegular.eyeSlash
-                          : PhosphorIconsRegular.eye)))),
-          if (_message != null)
-            Padding(
-                padding: const EdgeInsets.only(top: 12),
-                child: Text(_message!,
-                    style: const TextStyle(color: Color(0xFFE5484D)))),
-          const SizedBox(height: 24),
-          AuthPrimaryButton(
-              label: 'Simpan password',
-              loading: _busy,
-              onPressed: _remaining > 0 ? _submit : null),
-        ]));
+    return PopScope(
+        canPop: !_busy,
+        child: AuthScenicShell(
+            title: widget.fromProfile ? 'Ubah kata sandi' : 'Pulihkan akun',
+            child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  AuthBackLink(
+                      label: 'Minta kode baru',
+                      onPressed: _busy ? null : _requestNewCode),
+                  const SizedBox(height: 12),
+                  const AuthHeading(
+                      title: 'Buat password baru',
+                      description:
+                          'Kode OTP berhasil diverifikasi. Gunakan minimal 8 karakter untuk password baru.'),
+                  Text(
+                      _remaining > 0
+                          ? 'Sisa waktu kode reset: $minutes:$seconds'
+                          : 'Kode reset kedaluwarsa. Minta kode OTP baru.',
+                      style: TextStyle(
+                          color: _remaining > 0
+                              ? const Color(0xFF536780)
+                              : const Color(0xFFE5484D))),
+                  const SizedBox(height: 24),
+                  TextField(
+                      controller: _password,
+                      enabled: !_busy && _remaining > 0,
+                      obscureText: !_showPassword,
+                      textInputAction: TextInputAction.next,
+                      autofillHints: const [AutofillHints.newPassword],
+                      onChanged: (_) => setState(() => _passwordError = null),
+                      decoration: InputDecoration(
+                          labelText: 'Password baru',
+                          hintText: 'Minimal 8 karakter',
+                          prefixIcon: const Icon(PhosphorIconsRegular.lockKey),
+                          errorText: _passwordError,
+                          suffixIcon: IconButton(
+                              tooltip: _showPassword
+                                  ? 'Sembunyikan password'
+                                  : 'Tampilkan password',
+                              onPressed: _busy
+                                  ? null
+                                  : () => setState(
+                                      () => _showPassword = !_showPassword),
+                              icon: Icon(_showPassword
+                                  ? PhosphorIconsRegular.eyeSlash
+                                  : PhosphorIconsRegular.eye)))),
+                  const SizedBox(height: 20),
+                  TextField(
+                      controller: _confirmation,
+                      enabled: !_busy && _remaining > 0,
+                      obscureText: !_showConfirmation,
+                      textInputAction: TextInputAction.done,
+                      autofillHints: const [AutofillHints.newPassword],
+                      onChanged: (_) =>
+                          setState(() => _confirmationError = null),
+                      onSubmitted: (_) => _submit(),
+                      decoration: InputDecoration(
+                          labelText: 'Konfirmasi password',
+                          hintText: 'Ulangi password',
+                          prefixIcon: const Icon(PhosphorIconsRegular.lockKey),
+                          errorText: _confirmationError,
+                          suffixIcon: IconButton(
+                              tooltip: _showConfirmation
+                                  ? 'Sembunyikan konfirmasi password'
+                                  : 'Tampilkan konfirmasi password',
+                              onPressed: _busy
+                                  ? null
+                                  : () => setState(() =>
+                                      _showConfirmation = !_showConfirmation),
+                              icon: Icon(_showConfirmation
+                                  ? PhosphorIconsRegular.eyeSlash
+                                  : PhosphorIconsRegular.eye)))),
+                  if (_message != null)
+                    Padding(
+                        padding: const EdgeInsets.only(top: 12),
+                        child: Text(_message!,
+                            style: const TextStyle(color: Color(0xFFE5484D)))),
+                  const SizedBox(height: 24),
+                  AuthPrimaryButton(
+                      label: 'Simpan password',
+                      loading: _busy,
+                      onPressed:
+                          _remaining > 0 && !_outcomeUnknown ? _submit : null),
+                ])));
   }
 }
 

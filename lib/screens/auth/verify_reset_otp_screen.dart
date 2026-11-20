@@ -2,7 +2,6 @@ import 'auth_presentation.dart';
 import 'dart:async';
 import 'package:flutter/material.dart';
 import '../../services/auth_session.dart';
-import 'forgot_password_screen.dart';
 import 'reset_password_screen.dart';
 
 class VerifyResetOtpScreen extends StatefulWidget {
@@ -10,9 +9,11 @@ class VerifyResetOtpScreen extends StatefulWidget {
       {super.key,
       required this.session,
       required this.email,
+      this.fromProfile = false,
       this.resendAfterSeconds = 60});
   final AuthSession session;
   final String email;
+  final bool fromProfile;
   final int resendAfterSeconds;
   @override
   State<VerifyResetOtpScreen> createState() => _VerifyResetOtpScreenState();
@@ -86,15 +87,14 @@ class _VerifyResetOtpScreenState extends State<VerifyResetOtpScreen> {
           builder: (_) => ResetPasswordScreen(
               session: widget.session,
               email: widget.email,
+              fromProfile: widget.fromProfile,
               ticket: ticket,
               expiresInSeconds: expiry)));
     } on ApiException catch (e) {
       if (_current(generation)) {
         setState(() {
           _error = true;
-          _message = e.status == 422
-              ? 'Kode tidak valid, kedaluwarsa, atau sudah digunakan. Silakan coba lagi.'
-              : recoveryError(e);
+          _message = e.fieldErrors['otp'] ?? e.message;
         });
       }
     } finally {
@@ -133,7 +133,7 @@ class _VerifyResetOtpScreenState extends State<VerifyResetOtpScreen> {
                 : 60);
           }
           _error = true;
-          _message = recoveryError(e);
+          _message = e.message;
         });
       }
     } finally {
@@ -148,11 +148,13 @@ class _VerifyResetOtpScreenState extends State<VerifyResetOtpScreen> {
         ? '${parts[0][0]}***@${parts[1]}'
         : 'email Anda';
     return AuthScenicShell(
-        title: 'Pulihkan akun',
+        title: widget.fromProfile ? 'Ubah kata sandi' : 'Pulihkan akun',
         child:
             Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
           AuthBackLink(
-              label: 'Kembali ke Lupa Password',
+              label: widget.fromProfile
+                  ? 'Kembali ke email tujuan'
+                  : 'Kembali ke Lupa Password',
               onPressed: _busy ? null : () => Navigator.of(context).pop()),
           const SizedBox(height: 12),
           AuthHeading(
@@ -189,9 +191,10 @@ class _VerifyResetOtpScreenState extends State<VerifyResetOtpScreen> {
               child: Text(_remaining > 0
                   ? 'Kirim ulang kode ($_remaining dtk)'
                   : 'Kirim ulang kode')),
-          TextButton(
-              onPressed: _busy ? null : () => Navigator.of(context).pop(),
-              child: const Text('Ubah email')),
+          if (!widget.fromProfile)
+            TextButton(
+                onPressed: _busy ? null : () => Navigator.of(context).pop(),
+                child: const Text('Ubah email')),
           const SizedBox(height: 12),
           const Text('Periksa kotak masuk atau folder spam emailmu.',
               textAlign: TextAlign.center,
